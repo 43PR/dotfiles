@@ -1,0 +1,28 @@
+* {
+    font-family: "JetBrainsMono Nerd Font", "Symbols Nerd Font Mono", monospace;
+    font-size: 13px;
+    min-height: 0;
+}
+
+window#waybar {
+    background-color: rgba(20, 20, 20, 0);
+    color: #ffffff;
+}
+
+#cpu, #memory, #custom-gpu, #network, #clock, #pulseaudio, #mpris, #custom-power {
+    padding: 0 10px;
+    margin: 0 2px;
+}
+
+#custom-power {
+    color: #ffffff;
+    font-size: 15px;
+}
+
+#mpris {
+    min-width: 0;
+}
+
+#clock {
+    font-weight: bold;
+}
