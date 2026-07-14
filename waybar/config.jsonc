@@ -1,0 +1,61 @@
+{
+    "layer": "top",
+    "position": "top",
+    "height": 30,
+    "spacing": 4,
+
+    "modules-left": ["cpu", "memory", "custom/gpu", "network"],
+    "modules-center": ["clock"],
+    "modules-right": ["mpris", "pulseaudio", "custom/power"],
+
+    "cpu": {
+        "format": "CPU {usage}%",
+        "interval": 2
+    },
+
+    "memory": {
+        "format": "RAM {percentage}%",
+        "interval": 2
+    },
+
+    "custom/gpu": {
+        "exec": "intel_gpu_top -J -s 1000 | jq -r '.[0].engines[\"Render/3D\"].busy' | awk '{printf \"%.0f\", $1}'",
+        "format": "GPU {}%",
+        "interval": 2
+    },
+
+    "network": {
+        "format-wifi": "  {signalStrength}%",
+        "format-ethernet": " Wired",
+        "format-disconnected": " Disconnected",
+        "tooltip-format": "{ifname}: {ipaddr}/{cidr}"
+    },
+
+    "clock": {
+        "format": "{:%a %d %b  %H:%M}",
+        "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>"
+    },
+
+    "mpris": {
+        "format": "{title} - {artist}",
+        "format-paused": "{title} - {artist}",
+        "max-length": 50,
+        "tooltip": true,
+        "interval": 1
+    },
+
+    "pulseaudio": {
+        "format": "{icon}  {volume}%",
+        "format-muted": "Muted",
+        "format-icons": {
+            "default": ["", "", ""]
+        },
+        "on-click": "pavucontrol"
+    },
+
+    "custom/power": {
+        "format": "⏻",
+        "tooltip": false,
+        "on-click": "wlogout"
+    }
+}
