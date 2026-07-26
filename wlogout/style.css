@@ -1,45 +1,57 @@
 * {
-	background-image: none;
-	box-shadow: none;
+    background-image: none;
+    box-shadow: none;
 }
 
 window {
-	background-color: rgba(12, 12, 12, 0.5);
+    background-color: rgba(12, 12, 12, 0.5);
 }
 
 button {
-    border-radius: 0;
-    border-color: black;
-	text-decoration-color: #FFFFFF;
+    margin: 10px;                     
+    border-radius: 10px;              
+    border: 1px solid #222;
     color: #FFFFFF;
-	background-color:  rgba(12, 12, 12, 0.5);
-	border-style: solid;
-	border-width: 1px;
-	background-repeat: no-repeat;
-	background-position: center;
-	background-size: 25%;
+    background-color: rgba(12, 12, 12, 0.5);
+    text-decoration-color: #FFFFFF;
+
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 15%;
+
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+
+    transition: all 0.2s ease;
 }
 
-button:focus, button:active, button:hover {
-	background-color: rgba(255, 255, 255, 0.1);
-	outline-style: none;
+button:hover,
+button:focus,
+button:active {
+    background-color: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.6);
+    outline: none;
 }
 
 #lock {
     background-image: image(url("/home/rp34/.config/wlogout/icons/lock.png"));
 }
+
 #logout {
     background-image: image(url("/home/rp34/.config/wlogout/icons/logout.png"));
 }
+
 #suspend {
     background-image: image(url("/home/rp34/.config/wlogout/icons/suspend.png"));
 }
+
 #hibernate {
     background-image: image(url("/home/rp34/.config/wlogout/icons/hibernate.png"));
 }
+
 #shutdown {
     background-image: image(url("/home/rp34/.config/wlogout/icons/shutdown.png"));
 }
+
 #reboot {
     background-image: image(url("/home/rp34/.config/wlogout/icons/reboot.png"));
 }
