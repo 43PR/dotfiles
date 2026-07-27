@@ -7,11 +7,14 @@ STATE_FILE="$HOME/.cache/current_wallpaper"
 walls=(
     "$WALL_DIR/w1.jpg"
     "$WALL_DIR/w2.jpg"
-    "$WALL_DIR/w.png"
+    "$WALL_DIR/w0.png"
     "$WALL_DIR/w4.jpg"
     "$WALL_DIR/w3.jpg"
     "$WALL_DIR/w5.jpg"
     "$WALL_DIR/w6.jpg"
+    "$WALL_DIR/w7.jpg"
+    "$WALL_DIR/w03.jpg"
+    "$WALL_DIR/1.jpg"
 )
 
 # Initialize state if missing
