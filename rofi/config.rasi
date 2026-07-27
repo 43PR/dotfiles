@@ -1,109 +1,215 @@
-* {
-    font: "Figtree 10";
-    g-spacing: 10px;
-    g-margin: 0;
-
-    b-color: #00000080;
-    fg-color: #FFFFFFFF;
-    fgp-color: #888888FF;
-
-    b-radius: 8px;
-    g-padding: 8px;
-
-    hl-color: #d0d0d080;
-    hlt-color: #00000080;
-    alt-color: #00000080;
-
-    wbg-color: #00000080;
-
-    w-border: 0px solid;
-    w-border-color: transparent;
-
-    w-padding: 12px;
-}
-
 configuration {
-    drun-exclude-desktop-entries: "brave-browser.desktop,thunar.desktop,thunar-bulk-rename.desktop,thunar-settings.desktop";
-
-    modi: "drun";
-    show-icons: true;
-    display-drun: "";
+    modes: "combi";
+    /* modes: "combi,drun,window"; */
+    combi-modes: "window,run";
+    font: "monospace bold 16";
+    /* dpi: 144; */
+    location: 0;
+    fixed-num-lines: true;
+    show-icons: false;
+    sidebar-mode: false;
+    scroll-method: 1;
+    window-format: "{t:50} ·· {c}";
+    click-to-exit: true;
+    matching: "fuzzy";
+    sort: true;
+    sorting-method: "levenshtein";
+    /* sorting-method: "fzf"; */
+    /* matching-negate-char: "!"; */
+    /* Causes rofi to crash? */
+    /* normalize-match: true; */
+    combi-hide-mode-prefix: false;
+    display-run: "";
+    display-ssh: "";
+    display-drun: "";
+    display-combi: "";
+    kb-remove-word-back: "Control+BackSpace,Alt+d,Alt+BackSpace";
+    kb-accept-entry: "Control+m,Return,KP_Enter,Alt+m,Alt+a,Super+a";
+    kb-mode-next: "Shift+Right,Control+Tab,Control+Alt+l,Alt+Tab,Super+Tab";
+    kb-mode-previous: "Shift+Left,Control+ISO_Left_Tab,Control+Alt+h";
+    kb-row-left: "Control+Page_Up,Alt+h";
+    kb-row-right: "Control+Page_Down,Alt+l";
+    kb-row-up: "Up,Control+p,Alt+k";
+    kb-row-down: "Down,Control+n,Alt+j";
+    kb-element-next: "Tab";
+    kb-element-prev: "ISO_Left_Tab";
+    kb-select-1: "";
+    kb-select-2: "";
+    kb-select-3: "";
+    kb-select-4: "";
+    kb-select-5: "";
+    kb-select-6: "";
+    kb-select-7: "";
+    kb-select-8: "";
+    kb-select-9: "";
+    kb-select-10: "";
+    kb-custom-8: "";
+    kb-custom-14: "";
+    kb-custom-16: "";
+    me-select-entry: "";
+    me-accept-entry: "MousePrimary";
+    me-accept-custom: "MouseMiddle";
 }
 
-listview {
-    columns: 1;
-    lines: 7;
-    fixed-height: true;
-    fixed-columns: true;
-    cycle: false;
-    scrollbar: false;
-    border: 0px solid;
+element-text {
+    horizontal-align: 0.5;
 }
+
 
 window {
-    transparency: "real";
-    width: 450px;
-    border-radius: @b-radius;
-    background-color: @wbg-color;
-    border: @w-border;
-    border-color: @w-border-color;
-    padding: @w-padding;
-}
-
-prompt {
-    text-color: @fg-color;
-}
-
-inputbar {
-    children: ["prompt", "entry"];
-    spacing: @g-spacing;
-}
-
-entry {
-    placeholder: "Search";
-    text-color: @fg-color;
-    placeholder-color: @fgp-color;
+    background-color: @xbg;
+    border: 4px;
+    border-color: @x0;
+    border-radius: 12px;
+    padding: 0px;
+    width: 30%;
+    /* TODO: percentage height is buggy on rofi's wayland fork */
+    /* height: 50%; */
+    /* height: 350px; */
 }
 
 mainbox {
-    spacing: @g-spacing;
-    margin: @g-margin;
-    padding: @g-padding;
-    children: ["inputbar", "listview", "message"];
-}
-
-element {
-    spacing: @g-spacing;
-    margin: @g-margin;
-    padding: @g-padding;
-    border: 0px solid;
-    border-radius: @b-radius;
-    border-color: @b-color;
-    background-color: transparent;
-    text-color: @fg-color;
-}
-
-element normal.normal {
-	background-color: transparent;
-	text-color: @fg-color;
-}
-
-element alternate.normal {
-	background-color: @alt-color;
-	text-color: @fg-color;
-}
-
-element selected.active {
-	background-color: @hl-color;
-	text-color: @hlt-color;
-}
-
-element selected.normal {
-	background-color: @hl-color;
-	text-color: @hlt-color;
+    border: 0;
+    border-color: @x0;
+    padding: 0px;
 }
 
 message {
-    background-color: red;
-    border: 0px solid;
+    border: 0px;
+    padding: 6px 30px;
+    background-color: @x0;
 }
+
+/* Message text */
+textbox {
+    text-color: @x7;
+}
+
+listview {
+    fixed-height: 0;
+    border: 0px;
+    border-color: @x6;
+    spacing: 2px;
+    scrollbar: false;
+    lines: 8;
+    columns: 1;
+}
+
+element {
+    border: 0;
+    padding: 10px 25px;
+}
+
+element normal.normal {
+    background-color: rgba (0,0,0,0%);
+    text-color:       @xfg;
+}
+
+element normal.urgent {
+    background-color: rgba (0,0,0,0%);
+    text-color:       @x1;
+}
+
+element normal.active {
+    background-color: rgba (0,0,0,0%);
+    text-color:       @x5;
+}
+
+element selected.normal {
+    background-color: @x0;
+    text-color:       @x4;
+}
+
+element selected.urgent {
+    background-color: @x0;
+    text-color:       @x4;
+}
+
+element selected.active {
+    background-color: @x0;
+    text-color:       @x4;
+}
+
+element alternate.normal {
+    background-color: rgba (0,0,0,0%);
+    text-color:       @xfg;
+}
+
+element alternate.urgent {
+    background-color: rgba (0,0,0,0%);
+    text-color:       @x1;
+}
+
+element alternate.active {
+    background-color: rgba (0,0,0,0%);
+    text-color:       @x5;
+}
+
+scrollbar {
+    width:        4px ;
+    border:       0;
+    handle-color: @xfg;
+    handle-width: 8px ;
+    padding:      0;
+}
+
+sidebar {
+    border:       0px;
+    border-color: @x4;
+    border-radius: 20px;
+}
+
+button {
+  /* font: "sans Medium 11"; */
+  font: "icomoon 13";
+  background-color: @x0;
+  text-color: @x8;
+  border: 0px;
+  border-color: @x8;
+
+  border-radius: 0px;
+  margin: 0;
+  padding: 18px;
+}
+
+button selected {
+    background-color: @x0;
+    text-color: @x7;
+    border: 0px;
+    border-color: @x7;
+}
+
+inputbar {
+    spacing: 0px;
+    background-color: @xbg;
+    padding: 25px 25px 15px 25px;
+    /* children: [ prompt,textbox-prompt-colon,entry,case-indicator ]; */
+    children: [prompt, textbox-prompt-colon, entry];
+}
+
+case-indicator {
+    spacing:    0;
+    text-color: @xfg;
+}
+
+entry {
+    spacing:    0;
+    text-color: @xfg;
+    /* placeholder text in input field */
+    placeholder: "";
+}
+
+prompt {
+    spacing:    0;
+    border:     0;
+    text-color: @x1;
+}
+
+textbox-prompt-colon {
+    expand:     false;
+    str:        " ";
+    /* margin:     0px 0.3000em 0.0000em 0.0000em ; */
+    text-color: inherit;
+}
+
+@import "colors.rasi"
