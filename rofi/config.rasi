@@ -2,7 +2,7 @@ configuration {
     modes: "combi";
     /* modes: "combi,drun,window"; */
     combi-modes: "window,run";
-    font: "monospace bold 16";
+    font: "monospace bold 13";
     /* dpi: 144; */
     location: 0;
     fixed-num-lines: true;
@@ -62,7 +62,7 @@ window {
     border-color: @x0;
     border-radius: 12px;
     padding: 0px;
-    width: 30%;
+    width: 25%;
     /* TODO: percentage height is buggy on rofi's wayland fork */
     /* height: 50%; */
     /* height: 350px; */
