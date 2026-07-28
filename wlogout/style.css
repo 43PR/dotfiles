@@ -1,6 +1,7 @@
 * {
     background-image: none;
     box-shadow: none;
+    font-size: 12px;
 }
 
 window {
@@ -8,7 +9,9 @@ window {
 }
 
 button {
-    margin: 10px;                     
+
+    margin: 0px;   
+    background-size: 20%;                  
     border-radius: 10px;              
     border: 1px solid #222;
     color: #FFFFFF;
@@ -17,7 +20,6 @@ button {
 
     background-repeat: no-repeat;
     background-position: center;
-    background-size: 15%;
 
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
 

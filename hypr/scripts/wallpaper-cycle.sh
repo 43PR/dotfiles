@@ -13,6 +13,7 @@ walls=(
     "$WALL_DIR/w5.jpg"
     "$WALL_DIR/w6.jpg"
     "$WALL_DIR/w7.jpg"
+    "$WALL_DIR/2.jpg"
     "$WALL_DIR/w03.jpg"
     "$WALL_DIR/1.jpg"
 )

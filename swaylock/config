@@ -1,19 +1,16 @@
 # ~/.config/swaylock/config
 fade-in=1
-image=/home/rp34/Pictures/W/w3.jpg
+image=/home/rp34/Pictures/W/2.jpg
 clock
-effect-blur=12x6
+effect-blur=8x4
 effect-vignette=0.5:0.5
 indicator
 indicator-radius=100
 indicator-thickness=4
 
-ring-color=ffffff
-key-hl-color=880033
+key-hl-color=000000
 line-color=00000000
-inside-color=00000000
 separator-color=00000000
-text-color=ffffff
 text-clear-color=ffffff
 text-ver-color=ffffff
 text-wrong-color=ffffff

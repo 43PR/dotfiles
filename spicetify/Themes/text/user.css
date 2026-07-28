@@ -65,6 +65,7 @@
     --global-nav-margin-top: 50px; /* set to '0px' if you disabled window controls */
 }
 
+
 /* font */
 *:not([style*="lyric" i] *, [class*="lyric" i], .main-entityHeader-title) {
     font-family: var(--font-family) !important;
