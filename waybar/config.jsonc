@@ -1,12 +1,13 @@
 {
     "layer": "top",
     "position": "top",
+    "exclusive": false,
     "height": 30,
     "spacing": 4,
 
     "modules-left": ["cpu", "memory", "custom/gpu", "network"],
     "modules-center": ["clock"],
-    "modules-right": ["mpris", "pulseaudio", "custom/power"],
+    "modules-right": ["mpris", "pulseaudio", "custom/power",  ],
 
     "cpu": {
         "format": "CPU {usage}%",
@@ -15,33 +16,35 @@
 
     "memory": {
         "format": "RAM {percentage}%",
+        "tooltip-format": "{used} / {total}GiB",
         "interval": 2
     },
 
     "custom/gpu": {
-        "exec": "intel_gpu_top -J -s 1000 | jq -r '.[0].engines[\"Render/3D\"].busy' | awk '{printf \"%.0f\", $1}'",
+        "exec": "/home/rp34/.config/waybar/scripts/gpu_usage.sh",
+        "interval": 2,
         "format": "GPU {}%",
-        "interval": 2
+        "tooltip-format": "{}%"
     },
 
     "network": {
         "format-wifi": "  {signalStrength}%",
         "format-ethernet": " Wired",
         "format-disconnected": " Disconnected",
-        "tooltip-format": "{ifname}: {ipaddr}/{cidr}"
+        "tooltip-format": "↓ {bandwidthDownBytes} ↑ {bandwidthUpBytes}\n{frequency} MHz"
     },
 
     "clock": {
         "format": "{:%a %d %b  %H:%M}",
-        "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>"
+        "tooltip-format": "<tt>{calendar}</tt>"
     },
 
     "mpris": {
         "format": "{title} - {artist}",
         "format-paused": "{title} - {artist}",
         "max-length": 50,
-        "tooltip": true,
-        "interval": 1
+        "tooltip-format": "Now Playing: {title} — {artist}",
+        "interval": 2
     },
 
     "pulseaudio": {

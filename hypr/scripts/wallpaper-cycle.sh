@@ -1,6 +1,6 @@
 #!/bin/bash
 
-WALL_DIR="$HOME/Pictures/Wallpapers"
+WALL_DIR="$HOME/Pictures/W"
 STATE_FILE="$HOME/.cache/current_wallpaper"
 
 # Wallpapers in order

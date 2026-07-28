@@ -1,0 +1,4 @@
+Waybar custom/gpu → displays it every 2 seconds
+nvtop -s → gives machine-readable GPU stats
+jq → extracts gpu_util
+
