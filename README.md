@@ -1,6 +1,8 @@
 **Simple Hyprland Rice**
 
 ![](2.png)
+![](3.png)
+![](4.png)
 
 Feel free to use as inspiration or a starting point for your own setup.
 
