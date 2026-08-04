@@ -1,6 +1,6 @@
 **Simple Hyprland Rice**
 
-![](spicetify-btop-cava-rofi.png)
+![](spicetify-rofi.png)
 ![](thunar-browser-kitty-xed.png)
 ![](hyprquickpaper.png)
 ![](wlogout.png)
