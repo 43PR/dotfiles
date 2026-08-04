@@ -69,6 +69,6 @@
     "custom/power": {
         "format": "⏻",
         "tooltip": false,
-        "on-click": "wlogout -b 6 -m 470 -c 15"
+        "on-click": "wlogout -b 5 -m 470 -c 15"
     }
 }
