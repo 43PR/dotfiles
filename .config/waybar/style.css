@@ -39,4 +39,13 @@ tooltip label {
     font-weight: bold;
 }
 
+#temperature {
+    padding: 0 10px;
+    margin: 0 2px;
+}
+
+#temperature.critical {
+    color: #ff5555;
+}
+
 

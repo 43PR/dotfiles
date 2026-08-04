@@ -5,7 +5,7 @@
     "height": 30,
     "spacing": 4,
 
-    "modules-left": ["cpu", "memory", "custom/gpu", "network"],
+    "modules-left": ["cpu", "custom/gpu", "memory", "temperature", "network"],
     "modules-center": ["clock"],
     "modules-right": ["mpris", "pulseaudio", "custom/power",  ],
 
@@ -24,7 +24,7 @@
         "exec": "/home/rp34/.config/waybar/scripts/gpu_usage.sh",
         "interval": 2,
         "format": "GPU {}%",
-        "tooltip-format": "{}%"
+        "tooltip-format": "Skylake-H GT2: {}%"
     },
 
     "network": {
@@ -32,6 +32,16 @@
         "format-ethernet": " Wired",
         "format-disconnected": " Disconnected",
         "tooltip-format": "↓ {bandwidthDownBytes} ↑ {bandwidthUpBytes}\n{frequency} MHz"
+    },
+    
+    "temperature": {
+        "hwmon-path": "/sys/class/hwmon/hwmon5/temp1_input",
+        "critical-threshold": 80,
+        "format": " {temperatureC}°C",
+        "format-critical": " {temperatureC}°C",
+        "tooltip": true,
+        "tooltip-format": "CPU Temp: {temperatureC}°C",
+        "interval": 2
     },
 
     "clock": {
@@ -59,6 +69,6 @@
     "custom/power": {
         "format": "⏻",
         "tooltip": false,
-        "on-click": "wlogout -b 5 -m 470 -c 15"
+        "on-click": "wlogout -b 6 -m 470 -c 15"
     }
 }
