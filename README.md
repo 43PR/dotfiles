@@ -2,6 +2,7 @@
 
 ![](spicetify-btop-cava-rofi.png)
 ![](thunar-browser-kitty-xed.png)
+![](hyprquickpaper.png)
 ![](wlogout.png)
 
 Feel free to use as inspiration or starting point for your own setup. 
