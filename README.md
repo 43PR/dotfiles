@@ -5,7 +5,7 @@
 ![](hyprquickpaper.png)
 ![](wlogout.png)
 
-Source wallpaper selector: [https://github.com/iamsurjog/hyprquickpaper]
+Wallpaper selector: https://github.com/iamsurjog/hyprquickpaper
 
 Feel free to use as inspiration or starting point for your own setup. 
 
