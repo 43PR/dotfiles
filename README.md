@@ -1,8 +1,8 @@
 **Simple Hyprland Rice**
 
-[![Watch the demo](https://img.youtube.com/vi/F90YNhuOXDA/maxresdefault.jpg)](https://www.youtube.com/watch?v=F90YNhuOXDA)
+![Hyprland Showcase](showcase.gif)
 
-
+[▶ Watch the full showcase on YouTube](https://www.youtube.com/watch?v=F90YNhuOXDA)
 
 ![](spicetify-rofi.png)
 ![](thunar-browser-kitty-xed.png)
