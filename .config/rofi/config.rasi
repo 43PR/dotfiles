@@ -1,8 +1,9 @@
 configuration {
+    drun-display-format: "{name}";
     modes: "combi";
     /* modes: "combi,drun,window"; */
     combi-modes: "window,run";
-    font: "monospace bold 13";
+    font: "Iosevka 12";
     /* dpi: 144; */
     location: 0;
     fixed-num-lines: true;
@@ -13,7 +14,8 @@ configuration {
     click-to-exit: true;
     matching: "fuzzy";
     sort: true;
-    sorting-method: "levenshtein";
+    sorting-method: "fzf";
+
     /* sorting-method: "fzf"; */
     /* matching-negate-char: "!"; */
     /* Causes rofi to crash? */
@@ -62,9 +64,10 @@ window {
     border-color: @x0;
     border-radius: 12px;
     padding: 0px;
-    width: 25%;
+    width: 20%;
+    height: 40%;
     /* TODO: percentage height is buggy on rofi's wayland fork */
-    /* height: 50%; */
+    /*  */
     /* height: 350px; */
 }
 
@@ -97,7 +100,7 @@ listview {
 
 element {
     border: 0;
-    padding: 10px 25px;
+    padding: 14px 25px;
 }
 
 element normal.normal {
@@ -160,8 +163,6 @@ sidebar {
 }
 
 button {
-  /* font: "sans Medium 11"; */
-  font: "icomoon 13";
   background-color: @x0;
   text-color: @x8;
   border: 0px;
