@@ -2,7 +2,7 @@
 
 ![Hyprland Showcase](showcase.gif)
 
-[▶ Watch the full showcase on YouTube](https://www.youtube.com/watch?v=F90YNhuOXDA)
+[▶ Watch the full showcase](https://www.youtube.com/watch?v=F90YNhuOXDA)
 
 ![](spicetify-rofi.png)
 ![](thunar-browser-kitty-xed.png)
