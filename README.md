@@ -5,7 +5,7 @@
 
 ![](spicetify-rofi.png)
 ![](thunar-browser-kitty-xed.png)
-![](wallpaper-select.png)
+![](wallpapers.png)
 
 Wallpaper selector: https://github.com/iamsurjog/hyprquickpaper
 
