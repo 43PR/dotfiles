@@ -53,7 +53,7 @@
         "format": "{title} - {artist}",
         "format-paused": "{title} - {artist}",
         "max-length": 50,
-        "tooltip-format": "Now Playing: {title} — {artist}",
+        "tooltip": false,
         "interval": 2
     },
 
@@ -63,6 +63,7 @@
         "format-icons": {
             "default": ["", "", ""]
         },
+        "tooltip": false,
         "on-click": "pavucontrol"
     },
 
