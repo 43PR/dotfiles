@@ -6,7 +6,7 @@
 ![](thunar-browser-kitty-xed.png)
 ![](wallpapers.png)
 ![](lockscreen.png)
-![](y.png)
+![](x.png)
 
 Wallpaper selector: https://github.com/iamsurjog/hyprquickpaper
 
