@@ -5,9 +5,9 @@
     "height": 30,
     "spacing": 4,
 
-    "modules-left": ["cpu", "custom/gpu", "memory", "temperature", "network"],
+    "modules-left": ["cpu", "custom/gpu", "memory", "temperature"],
     "modules-center": ["clock"],
-    "modules-right": ["mpris", "pulseaudio", "custom/power",  ],
+    "modules-right": ["mpris", "pulseaudio", "custom/power"],
 
     "cpu": {
         "format": "CPU {usage}%",
@@ -25,13 +25,6 @@
         "interval": 2,
         "format": "GPU {}%",
         "tooltip-format": "Skylake-H GT2: {}%"
-    },
-
-    "network": {
-        "format-wifi": "  {signalStrength}%",
-        "format-ethernet": " Wired",
-        "format-disconnected": " Disconnected",
-        "tooltip-format": "↓ {bandwidthDownBytes} ↑ {bandwidthUpBytes}\n{frequency} MHz"
     },
     
     "temperature": {

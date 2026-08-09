@@ -12,21 +12,21 @@ window#waybar {
 
 /* LEFT */
 .modules-left {
-    background-color: rgba(20, 20, 20, 0.4);
+    background-color: rgba(20, 20, 20, 0.2);
     border-radius: 10px;
     margin: 3px 0 3px 6px;
 }
 
 /* CENTER */
 .modules-center {
-    background-color: rgba(20, 20, 20, 0.4);
+    background-color: rgba(20, 20, 20, 0.2);
     border-radius: 10px;
     margin: 3px 0;
 }
 
 /* RIGHT */
 .modules-right {
-    background-color: rgba(20, 20, 20, 0.4);
+    background-color: rgba(20, 20, 20, 0.2);
     border-radius: 10px;
     margin: 3px 6px 3px 0;
 }
@@ -35,7 +35,6 @@ window#waybar {
 #cpu,
 #memory,
 #custom-gpu,
-#network,
 #clock,
 #pulseaudio,
 #mpris,
@@ -85,7 +84,6 @@ tooltip label {
 #memory,
 #custom-gpu,
 #temperature,
-#network,
 #clock,
 #pulseaudio,
 #mpris,
@@ -97,7 +95,6 @@ tooltip label {
 #memory:hover,
 #custom-gpu:hover,
 #temperature:hover,
-#network:hover,
 #clock:hover,
 #pulseaudio:hover,
 #mpris:hover,
