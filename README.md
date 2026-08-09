@@ -6,7 +6,8 @@
 ![](lock.png)
 
 Wallpaper selector: https://github.com/iamsurjog/hyprquickpaper
-A really cool greeter: https://github.com/omerwk/samaritan-sddm-theme
+
+Cool greeter: https://github.com/omerwk/samaritan-sddm-theme
 
 Feel free to use as inspiration or starting point for your own setup. 
 
