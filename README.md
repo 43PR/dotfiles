@@ -3,8 +3,10 @@
 [▶ Watch the full showcase](https://www.youtube.com/watch?v=F90YNhuOXDA)
 
 ![](x.png)
+![](lock.png)
 
 Wallpaper selector: https://github.com/iamsurjog/hyprquickpaper
+A really cool greeter: https://github.com/omerwk/samaritan-sddm-theme
 
 Feel free to use as inspiration or starting point for your own setup. 
 
