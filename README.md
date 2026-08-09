@@ -4,7 +4,7 @@
 
 ![](x.png)
 ![](lock.png)
-![](rofi-wlogout.png)
+![](z.png)
 
 Wallpaper selector: https://github.com/iamsurjog/hyprquickpaper
 
