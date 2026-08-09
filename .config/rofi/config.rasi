@@ -3,7 +3,7 @@ configuration {
     modes: "combi";
     /* modes: "combi,drun,window"; */
     combi-modes: "window,run";
-    font: "Iosevka 12";
+    /* font: "Iosevka 12"; */
     /* dpi: 144; */
     location: 0;
     fixed-num-lines: true;
@@ -23,7 +23,7 @@ configuration {
     combi-hide-mode-prefix: false;
     display-run: "";
     display-ssh: "";
-    display-drun: "";
+    display-drun: "";
     display-combi: "";
     kb-remove-word-back: "Control+BackSpace,Alt+d,Alt+BackSpace";
     kb-accept-entry: "Control+m,Return,KP_Enter,Alt+m,Alt+a,Super+a";
@@ -55,6 +55,8 @@ configuration {
 
 element-text {
     horizontal-align: 0.5;
+    text-color: inherit;
+    font: "Iosevka 12";
 }
 
 
@@ -183,7 +185,7 @@ button selected {
 inputbar {
     spacing: 0px;
     background-color: @xbg;
-    padding: 25px 25px 15px 25px;
+    padding: 20px 25px 20px 25px;
     /* children: [ prompt,textbox-prompt-colon,entry,case-indicator ]; */
     children: [prompt, textbox-prompt-colon, entry];
 }
@@ -198,6 +200,7 @@ entry {
     text-color: @xfg;
     /* placeholder text in input field */
     placeholder: "";
+    horizontal-align: 0.5;
 }
 
 prompt {

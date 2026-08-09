@@ -16,16 +16,3 @@
     "text" : "L",
     "keybind" : "l"
 }
-{
-    "label" : "suspend",
-    "action" : "systemctl suspend",
-    "text" : "P",
-    "keybind" : "p"
-}
-{
-    "label" : "hibernate",
-    "action" : "systemctl hibernate",
-    "text" : "H",
-    "keybind" : "h"
-}
-

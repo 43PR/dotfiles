@@ -1,25 +1,29 @@
-* {
+/* bind = $mod, Escape, exec, wlogout -b 1 -c 20 -r 20 -L 1700 -R 1700 -T 325 -B 325 */
+* { 
     background-image: none;
     box-shadow: none;
-    font-size: 12px;
+    font-size: 0px;
 }
 
 window {
-    background-color: rgba(12, 12, 12, 0.5);
+    background-color: rgba(12, 12, 12, 0.3);
 }
 
 button {
+    margin: 0;
 
-    margin: 0px;   
-    background-size: 20%;                  
-    border-radius: 10px;              
-    border: 1px solid #222;
+    min-width: 100px;
+    min-height: 100px;
+
+    border-radius: 100px;
+    border: 1px solid transparent;
+
     color: #FFFFFF;
-    background-color: rgba(12, 12, 12, 0.5);
-    text-decoration-color: #FFFFFF;
+    background-color: rgba(12, 12, 12, 0.4);
 
     background-repeat: no-repeat;
     background-position: center;
+    background-size: 20%;
 
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
 
@@ -34,26 +38,15 @@ button:active {
     outline: none;
 }
 
-#lock {
-    background-image: image(url("/home/rp34/.config/wlogout/icons/lock.png"));
-}
-
-#logout {
-    background-image: image(url("/home/rp34/.config/wlogout/icons/logout.png"));
-}
-
-#suspend {
-    background-image: image(url("/home/rp34/.config/wlogout/icons/suspend.png"));
-}
-
-#hibernate {
-    background-image: image(url("/home/rp34/.config/wlogout/icons/hibernate.png"));
-}
-
 #shutdown {
-    background-image: image(url("/home/rp34/.config/wlogout/icons/shutdown.png"));
+    background-image: url("/home/rp34/.config/wlogout/icons/shutdown.png");
 }
 
 #reboot {
-    background-image: image(url("/home/rp34/.config/wlogout/icons/reboot.png"));
+    background-image: url("/home/rp34/.config/wlogout/icons/reboot.png");
 }
+
+#logout {
+    background-image: url("/home/rp34/.config/wlogout/icons/logout.png");
+}
+
