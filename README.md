@@ -5,6 +5,7 @@
 ![](x.png)
 ![](lock.png)
 ![](z.png)
+![](w.png)
 
 Wallpaper selector: https://github.com/iamsurjog/hyprquickpaper
 

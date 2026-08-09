@@ -10,9 +10,10 @@ PanelWindow {
     // ---- Easy-to-edit settings ----
     property int speed: 5000          // scroll animation speed
     property int animDuration: 100    // ms for scroll animation
-    property int zoomDuration: 120    // ms for hover zoom animation
-    property real zoomScale: 1.2      // how much the active tile grows
-    property real skewFactor: -0.25   // italic-style shear on tiles
+    property real zoomScale: 0.8        // scale of the tile at screen center (peak)
+    property real edgeScale: 0.3      // scale of tiles at the screen edges (trough)
+    property real skewFactor: 0   // italic-style shear on tiles
+    property int baseSpacing: 8       // resting gap between tiles (grows automatically as tiles magnify)
     // --------------------------------
 
     implicitHeight: 500
@@ -59,12 +60,13 @@ PanelWindow {
 
         model: folderModel
         orientation: ListView.Horizontal
-        spacing: 4
+        spacing: main.baseSpacing
         clip: true
-        cacheBuffer: width * 2
+        cacheBuffer: 400
 
         property int selectedIndex: 0
         property real tileWidth: width / configs.number_of_pictures - 10
+        property real viewportCenterX: width / 2
 
         function clampIndex(i) {
             return Math.max(0, Math.min(i, count - 1))
@@ -108,30 +110,45 @@ PanelWindow {
 
         delegate: Item {
             id: delegateItem
-            width: list.tileWidth
             height: 500
             property bool active: index === list.selectedIndex
-            z: active ? 1 : 0 // bring the enlarged tile above its neighbors
+
+            // Base (unscaled) slot width. Used to work out where this tile currently sits
+            // on screen for the magnification curve below. Deliberately NOT derived from
+            // this item's own (dynamic) width - if it were, width would depend on position
+            // which would depend on width, i.e. a binding loop.
+            readonly property real baseWidth: list.tileWidth
+
+            // --- Dock-style magnification: scale depends on on-screen position ---
+            // One binding instead of several chained ones - list.contentX already animates
+            // smoothly (SmoothedAnimation below), so this recomputes every frame during
+            // scroll anyway; no need for extra Behavior/NumberAnimation layered on top of
+            // it (that was two animations fighting over the same value, which is what was
+            // causing the sluggish feel).
+            property real scaleFactor: {
+                const centerX = x - list.contentX + baseWidth / 2
+                const frac = Math.min(1, Math.abs(centerX - list.viewportCenterX) / list.viewportCenterX)
+                const t = 1 - frac * frac * (3 - 2 * frac) // smoothstep falloff
+                return main.edgeScale + (main.zoomScale - main.edgeScale) * t
+            }
+
+            // This IS the delegate's real layout width, so as it grows, ListView pushes
+            // every following tile further along - real spacing, not an overlapping overlay.
+            // No Behavior here: it already tracks contentX's smooth animation 1:1, and tiles
+            // never overlap in this layout, so there's nothing to visually smooth over.
+            width: baseWidth * scaleFactor
 
             Item {
                 id: content
                 anchors.centerIn: parent
-                // Width grows past its slot into the spacing gap (needs the z-boost above).
-                width: delegateItem.active ? delegateItem.width * main.zoomScale : delegateItem.width
-                // Height rests smaller than the row and grows up to fill it - visible
-                // growth with no clipping, since it never exceeds the row's own height.
-                height: delegateItem.active ? delegateItem.height : delegateItem.height / main.zoomScale
-
-                Behavior on width {
-                    NumberAnimation { duration: main.zoomDuration; easing.type: Easing.OutCubic }
-                }
-                Behavior on height {
-                    NumberAnimation { duration: main.zoomDuration; easing.type: Easing.OutCubic }
-                }
+                width: parent.width
+                // Height scale uses the same factor but caps at 1.0 - the row is already
+                // full window height, so growing past that would just get clipped.
+                height: delegateItem.height * Math.min(1, delegateItem.scaleFactor)
 
                 Text {
                     id: alt
-                    text: "Loading..."
+                    text: ""
                     color: configs.border_color
                     anchors.centerIn: parent
                     font.pixelSize: 16
@@ -154,7 +171,7 @@ PanelWindow {
                     // (the active/zoomed size), rather than tracking the animating
                     // width/height - that would re-decode on every animation frame
                     // and cause a visible blink.
-                    sourceSize.width: delegateItem.width * main.zoomScale
+                    sourceSize.width: delegateItem.baseWidth * main.zoomScale
                     sourceSize.height: delegateItem.height
 
                     transform: Shear { xFactor: main.skewFactor }
@@ -200,7 +217,7 @@ PanelWindow {
                 onClicked: list.activateCurrent()
 
                 onWheel: function(wheel) {
-                    list.flick(-wheel.angleDelta.y * 16, 0)
+                    list.flick(-wheel.angleDelta.y * 8, 0)
                     wheel.accepted = true
                 }
             }
