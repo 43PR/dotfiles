@@ -2,11 +2,7 @@
 
 [▶ Watch the full showcase](https://www.youtube.com/watch?v=F90YNhuOXDA)
 
-![](spicetify-rofi.png)
-![](wallpapers.png)
 ![](x.png)
-![](lockscreen.png)
-
 
 Wallpaper selector: https://github.com/iamsurjog/hyprquickpaper
 
