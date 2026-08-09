@@ -1,219 +1,209 @@
+
 configuration {
-    drun-display-format: "{name}";
     modes: "combi";
-    /* modes: "combi,drun,window"; */
-    combi-modes: "window,run";
-    /* font: "Iosevka 12"; */
-    /* dpi: 144; */
+    combi-modes: "window,run,drun";
+    drun-display-format: "{name}";
+    window-format: "{t:45}  ·  {c}";
+    font: "Iosevka 13";
+
     location: 0;
     fixed-num-lines: true;
-    show-icons: false;
+    show-icons: true;
     sidebar-mode: false;
     scroll-method: 1;
-    window-format: "{t:50} ·· {c}";
-    click-to-exit: true;
     matching: "fuzzy";
     sort: true;
-    sorting-method: "fzf";
+    sorting-method: "normal";
+    click-to-exit: true;
+    combi-hide-mode-prefix: true;
 
-    /* sorting-method: "fzf"; */
-    /* matching-negate-char: "!"; */
-    /* Causes rofi to crash? */
-    /* normalize-match: true; */
-    combi-hide-mode-prefix: false;
-    display-run: "";
-    display-ssh: "";
+    display-run: "";
+    display-window: "󰖯";
     display-drun: "";
-    display-combi: "";
-    kb-remove-word-back: "Control+BackSpace,Alt+d,Alt+BackSpace";
-    kb-accept-entry: "Control+m,Return,KP_Enter,Alt+m,Alt+a,Super+a";
-    kb-mode-next: "Shift+Right,Control+Tab,Control+Alt+l,Alt+Tab,Super+Tab";
-    kb-mode-previous: "Shift+Left,Control+ISO_Left_Tab,Control+Alt+h";
-    kb-row-left: "Control+Page_Up,Alt+h";
-    kb-row-right: "Control+Page_Down,Alt+l";
-    kb-row-up: "Up,Control+p,Alt+k";
-    kb-row-down: "Down,Control+n,Alt+j";
-    kb-element-next: "Tab";
-    kb-element-prev: "ISO_Left_Tab";
-    kb-select-1: "";
-    kb-select-2: "";
-    kb-select-3: "";
-    kb-select-4: "";
-    kb-select-5: "";
-    kb-select-6: "";
-    kb-select-7: "";
-    kb-select-8: "";
-    kb-select-9: "";
-    kb-select-10: "";
-    kb-custom-8: "";
-    kb-custom-14: "";
-    kb-custom-16: "";
-    me-select-entry: "";
-    me-accept-entry: "MousePrimary";
-    me-accept-custom: "MouseMiddle";
+    display-combi: "󰘔";
+    display-ssh: "";
 }
 
-element-text {
-    horizontal-align: 0.5;
-    text-color: inherit;
-    font: "Iosevka 12";
-}
+* {
+    bg: #00000020;
+    bg-alt: #00000000;
+    bg-hover: #242832FF;
+    bg-selected: #FFFFFF10;
+    fg: #E6EAF2FF;
+    fg-muted: #8B93A7FF;
+    fg-dark: #111318FF;
+    accent: #7AA2F7FF;
+    accent-soft: #7AA2F733;
+    urgent: #F7768EFF;
+    border-color: #FFFFFF00;
 
+    background-color: transparent;
+    text-color: @fg;
+    margin: 0;
+    padding: 0;
+    spacing: 0;
+}
 
 window {
-    background-color: @xbg;
-    border: 4px;
-    border-color: @x0;
-    border-radius: 12px;
-    padding: 0px;
-    width: 20%;
-    height: 40%;
-    /* TODO: percentage height is buggy on rofi's wayland fork */
-    /*  */
-    /* height: 350px; */
+    location: center;
+    width: 420px;
+    height: 420px;
+    background-color: @bg;
+    border: 2px;
+    border-color: @border-color;
+    border-radius: 18px;
+    padding: 10;
 }
 
 mainbox {
-    border: 0;
-    border-color: @x0;
-    padding: 0px;
-}
-
-message {
-    border: 0px;
-    padding: 6px 30px;
-    background-color: @x0;
-}
-
-/* Message text */
-textbox {
-    text-color: @x7;
-}
-
-listview {
-    fixed-height: 0;
-    border: 0px;
-    border-color: @x6;
-    spacing: 2px;
-    scrollbar: false;
-    lines: 8;
-    columns: 1;
-}
-
-element {
-    border: 0;
-    padding: 14px 25px;
-}
-
-element normal.normal {
-    background-color: rgba (0,0,0,0%);
-    text-color:       @xfg;
-}
-
-element normal.urgent {
-    background-color: rgba (0,0,0,0%);
-    text-color:       @x1;
-}
-
-element normal.active {
-    background-color: rgba (0,0,0,0%);
-    text-color:       @x5;
-}
-
-element selected.normal {
-    background-color: @x0;
-    text-color:       @x4;
-}
-
-element selected.urgent {
-    background-color: @x0;
-    text-color:       @x4;
-}
-
-element selected.active {
-    background-color: @x0;
-    text-color:       @x4;
-}
-
-element alternate.normal {
-    background-color: rgba (0,0,0,0%);
-    text-color:       @xfg;
-}
-
-element alternate.urgent {
-    background-color: rgba (0,0,0,0%);
-    text-color:       @x1;
-}
-
-element alternate.active {
-    background-color: rgba (0,0,0,0%);
-    text-color:       @x5;
-}
-
-scrollbar {
-    width:        4px ;
-    border:       0;
-    handle-color: @xfg;
-    handle-width: 8px ;
-    padding:      0;
-}
-
-sidebar {
-    border:       0px;
-    border-color: @x4;
-    border-radius: 20px;
-}
-
-button {
-  background-color: @x0;
-  text-color: @x8;
-  border: 0px;
-  border-color: @x8;
-
-  border-radius: 0px;
-  margin: 0;
-  padding: 18px;
-}
-
-button selected {
-    background-color: @x0;
-    text-color: @x7;
-    border: 0px;
-    border-color: @x7;
+    orientation: vertical;
+    background-color: transparent;
+    spacing: 12px;
 }
 
 inputbar {
-    spacing: 0px;
-    background-color: @xbg;
-    padding: 20px 25px 20px 25px;
-    /* children: [ prompt,textbox-prompt-colon,entry,case-indicator ]; */
-    children: [prompt, textbox-prompt-colon, entry];
-}
-
-case-indicator {
-    spacing:    0;
-    text-color: @xfg;
-}
-
-entry {
-    spacing:    0;
-    text-color: @xfg;
-    /* placeholder text in input field */
-    placeholder: "";
-    horizontal-align: 0.5;
+    background-color: @bg-alt;
+    border: 1px;
+    border-color: @border-color;
+    border-radius: 12px;
+    padding: 5px 15px;
+    spacing: 12px;
+    children: [prompt, entry];
 }
 
 prompt {
-    spacing:    0;
-    border:     0;
-    text-color: @x1;
+    enabled: true;
+    background-color: transparent;
+    text-color: @accent;
+    font: "Iosevka Nerd Font 16";
+    padding: 0;
+    vertical-align: 0.5;
+}
+
+entry {
+    background-color: transparent;
+    text-color: @fg;
+    font: "Iosevka 14";
+    placeholder: "";
+    placeholder-color: @fg-muted;
+    padding: 0;
+    vertical-align: 0.5;
+    horizontal-align: 0.5;
+}
+
+listview {
+    background-color: transparent;
+    border: 0;
+    spacing: 6px;
+    padding: 4px 0;
+    lines: 8;
+    columns: 1;
+    fixed-height: true;
+    scrollbar: false;
+}
+
+element {
+    background-color: transparent;
+    border: 0;
+    border-radius: 10px;
+    padding: 10px 14px;
+    spacing: 14px;
+}
+
+element-icon {
+    size: 28px;
+    background-color: transparent;
+    vertical-align: 0.5;
+}
+
+element-text {
+    background-color: transparent;
+    text-color: inherit;
+    vertical-align: 0.5;
+    font: "Iosevka 11";
+}
+
+element normal.normal,
+element alternate.normal {
+    background-color: transparent;
+    text-color: @fg;
+}
+
+element normal.active,
+element alternate.active {
+    background-color: transparent;
+    text-color: @accent;
+}
+
+element normal.urgent,
+element alternate.urgent {
+    background-color: transparent;
+    text-color: @urgent;
+}
+
+element selected.normal,
+element selected.active {
+    background-color: @bg-selected;
+    text-color: @fg-dark;
+}
+
+element selected.urgent {
+    background-color: @urgent;
+    text-color: @fg-dark;
+}
+
+message {
+    background-color: transparent;
+    border: 0;
+    padding: 4px 8px;
+    text-color: @fg-muted;
+}
+
+textbox {
+    background-color: transparent;
+    text-color: @fg-muted;
+    horizontal-align: 0.0;
+}
+
+sidebar {
+    background-color: transparent;
+    border: 0;
+    padding: 0;
+}
+
+button {
+    background-color: @bg-alt;
+    text-color: @fg-muted;
+    border: 1px;
+    border-color: @border-color;
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin: 2px;
+}
+
+button selected {
+    background-color: @accent-soft;
+    text-color: @accent;
+    border-color: @accent;
+}
+
+scrollbar {
+    width: 4px;
+    border: 0;
+    handle-color: @accent;
+    handle-width: 4px;
+    padding: 0;
+}
+
+case-indicator {
+    spacing: 0;
+    text-color: @fg-muted;
 }
 
 textbox-prompt-colon {
-    expand:     false;
-    str:        " ";
-    /* margin:     0px 0.3000em 0.0000em 0.0000em ; */
+    expand: false;
+    str: "";
     text-color: inherit;
 }
 
-@import "colors.rasi"
+
