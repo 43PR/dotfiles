@@ -3,7 +3,6 @@
 [▶ Watch the full showcase](https://www.youtube.com/watch?v=F90YNhuOXDA)
 
 ![](spicetify-rofi.png)
-![](thunar-browser-kitty-xed.png)
 ![](wallpapers.png)
 ![](x.png)
 ![](lockscreen.png)
