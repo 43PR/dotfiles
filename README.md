@@ -61,14 +61,11 @@ bind = $mod, W, exec, quickshell -c hyprquickpaper
 | `Super + Q`     | Close active window |
 | `Super + F`     | Toggle fullscreen   |
 | `Super + Space` | Toggle floating     |
-
+| `Super + Tab`   | Lock screen         |
+| `Super + Esc`   | Open logout menu    |
 ```ini
 bind = $mod, Space, exec, ~/.config/hypr/scripts/togglefloat.sh
 ```
-
-| `Super + Tab`   | Lock screen         |
-| `Super + Esc`   | Open logout menu    |
-
 ```ini
 bind = $mod, Escape, exec, wlogout -b 1 -c 20 -r 20 -L 1700 -R 1700 -T 325 -B 325
 ```
