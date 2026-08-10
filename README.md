@@ -1,6 +1,6 @@
 **Simple Hyprland Rice**
 
-[▶ Watch the full showcase](https://www.youtube.com/watch?v=F90YNhuOXDA)
+[▶ Watch the full showcase](https://www.youtube.com/watch?v=kYZ5mkGuQEg)
 
 ![](x.png)
 ![](lock.png)
