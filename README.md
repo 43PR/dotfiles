@@ -4,7 +4,7 @@ A simple and minimal **Hyprland rice** for Arch Linux, focused on a clean deskto
 
 **Full showcase: https://www.youtube.com/watch?v=kYZ5mkGuQEg**
 
-Feel free to use this setup as inspiration or as a starting point for your own Hyprland configuration.
+Feel free to use as inspiration or as a starting point for your own setup.
 
 ![](x.png)
 ![](lock.png)
