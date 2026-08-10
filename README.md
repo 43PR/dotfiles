@@ -12,7 +12,7 @@ Feel free to use as inspiration or as a starting point for your own setup.
 ## Features
 
 * Waybar
-> Change volume with mouse wheel, pause and next media with mouse R L click
+> Change volume with mouse wheel, play/pause and next media
 * Rofi
 * Hyprlock
 * Wlogout
