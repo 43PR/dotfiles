@@ -20,12 +20,7 @@ Feel free to use as inspiration or as a starting point for your own setup.
 * Wlogout
 * Custom wallpaper selector
 * Custom scripts
-* Spotify integration
-* Keyboard layout switching
-* Clipboard history
-* Screenshot shortcuts
-
----
+* Spotify + Spicetify
 
 ## Useful Links
 
@@ -50,8 +45,6 @@ A cool SDDM theme used with this setup.
 ---
 
 ## [Hyprland] Keybinds
-
-
 
 > **$mod = Super / Windows key**
 
