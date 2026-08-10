@@ -2,7 +2,9 @@
 
 **Full showcase: https://www.youtube.com/watch?v=kYZ5mkGuQEg**
 
-Feel free to use as inspiration or as a starting point for your own setup.
+Simple and minimal Hyprland setup focused on practical keybinds, productivity, and a smooth workflow easy to customize
+
+Feel free to use as inspiration or as a starting point for building your own setup.
 
 ![](x.png)
 ![](lock.png)
