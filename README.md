@@ -14,6 +14,7 @@ Feel free to use as inspiration or as a starting point for your own setup.
 * Waybar
 > Change volume with mouse wheel, play/pause and next media
 * Rofi
+> App search, clipboard history and switch opacity
 * Hyprlock
 * Wlogout
 * Custom wallpaper selector
