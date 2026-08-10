@@ -2,7 +2,7 @@
 
 A simple and minimal **Hyprland rice** for Arch Linux, focused on a clean desktop and useful shortcuts.
 
-### Full showcase: https://www.youtube.com/watch?v=kYZ5mkGuQEg
+**Full showcase: https://www.youtube.com/watch?v=kYZ5mkGuQEg**
 
 Feel free to use this setup as inspiration or as a starting point for your own Hyprland configuration.
 
