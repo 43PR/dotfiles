@@ -80,12 +80,6 @@ bind = $mod SHIFT, W, exec, sh -c 'pgrep -x waybar >/dev/null && pkill waybar ||
 | `Super + Delete` | Screenshot entire screen             |
 | `Delete`         | Select an area and take a screenshot |
 
-Screenshots are saved to:
-
-```text
-~/Pictures/
-```
-
 ## Clipboard
 
 | Keybind     | Action                 |
@@ -110,9 +104,7 @@ bind = $mod, Z, exec, hyprctl switchxkblayout current next
 
 ---
 
-# Dependencies
-
-This setup uses some external programs. You may need to install them depending on your existing Arch Linux setup:
+### Installed Programs:
 
 ```text
 Hyprland
@@ -127,11 +119,7 @@ Cliphist
 wl-clipboard
 ```
 
-You will also need the required fonts, icons, scripts, and configuration files included in this repository.
-
 ---
-
-# Installation
 
 Clone the repository:
 
@@ -158,7 +146,4 @@ Restart Hyprland or log out and back in.
 * [hyprquickpaper](https://github.com/iamsurjog/hyprquickpaper)
 * [samaritan-sddm-theme](https://github.com/omerwk/samaritan-sddm-theme)
 
-Thanks to the original developers for their work.
-
-Feel free to use, modify, and build upon this configuration for your own setup.
 
