@@ -174,9 +174,5 @@ Restart Hyprland or log out and back in.
 
 Thanks to the original developers for their work.
 
----
-
-## License
-
 Feel free to use, modify, and build upon this configuration for your own setup.
 
