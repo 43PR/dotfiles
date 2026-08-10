@@ -12,7 +12,6 @@ Feel free to use as inspiration or as a starting point for your own setup.
 
 ## Features
 
-* Hyprland window manager
 * Waybar
 * Rofi
 * Hyprlock
