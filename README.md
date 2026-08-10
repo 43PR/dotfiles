@@ -1,16 +1,15 @@
-# Simple Hyprland Rice
+## Simple Hyprland Rice
 
-A simple and minimal **Hyprland rice** for Arch Linux, focused on a clean desktop, useful shortcuts, and a lightweight workflow.
+A simple and minimal **Hyprland rice** for Arch Linux, focused on a clean desktop and useful shortcuts.
 
-## Showcase
-
-Watch the full showcase on YouTube:
-
-**[Watch the showcase](https://www.youtube.com/watch?v=kYZ5mkGuQEg)**
+### Full showcase: https://www.youtube.com/watch?v=kYZ5mkGuQEg
 
 Feel free to use this setup as inspiration or as a starting point for your own Hyprland configuration.
 
----
+![](x.png)
+![](lock.png)
+![](z.png)
+![](ww.png)
 
 ## Features
 
@@ -50,9 +49,9 @@ A cool SDDM theme used with this setup.
 
 ---
 
-# Keybinds
+## [Hyprland] Keybinds
 
-The following keybinds are configured in Hyprland.
+
 
 > **$mod = Super / Windows key**
 
