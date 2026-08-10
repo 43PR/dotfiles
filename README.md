@@ -40,7 +40,7 @@ A cool SDDM theme used with this setup.
 
 > **$mod = Super / Windows key**
 
-## Applications
+**Applications**
 
 | Keybind     | Action                    |
 | ----------- | ------------------------- |
@@ -54,7 +54,7 @@ A cool SDDM theme used with this setup.
 bind = $mod, W, exec, quickshell -c hyprquickpaper
 ```
 
-## Window Management
+**Window Management**
 
 | Keybind         | Action              |
 | --------------- | ------------------- |
@@ -71,7 +71,7 @@ bind = $mod, Escape, exec, wlogout -b 1 -c 20 -r 20 -L 1700 -R 1700 -T 325 -B 32
 ```
 
 
-## Waybar
+**Waybar**
 
 | Keybind             | Action        |
 | ------------------- | ------------- |
@@ -83,14 +83,14 @@ Waybar is completely stopped when hidden and started again when enabled.
 bind = $mod SHIFT, W, exec, sh -c 'pgrep -x waybar >/dev/null && pkill waybar || nohup waybar >/dev/null 2>&1 &'
 ```
 
-## Screenshots
+**Screenshots**
 
 | Keybind          | Action                               |
 | ---------------- | ------------------------------------ |
 | `Super + Delete` | Screenshot entire screen             |
 | `Delete`         | Select an area and take a screenshot |
 
-## Clipboard
+**Clipboard**
 
 | Keybind     | Action                 |
 | ----------- | ---------------------- |
