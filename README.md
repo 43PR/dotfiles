@@ -25,17 +25,7 @@ Feel free to use as inspiration or as a starting point for your own setup.
 
 [hyprquickpaper](https://github.com/iamsurjog/hyprquickpaper)
 
-> I use **hyprquickpaper** as the wallpaper selector and made some changes to the original project.
-
-Please check out the original source and give the project some love.
-
-### SDDM Theme
-
-[samaritan-sddm-theme](https://github.com/omerwk/samaritan-sddm-theme)
-
-A cool SDDM theme used with this setup.
-
----
+> **hyprquickpaper** check out the original source I just made changes to it 
 
 ### Most used keybinds
 
