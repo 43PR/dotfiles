@@ -1,6 +1,7 @@
 ## Simple Hyprland Rice
 
 **Full showcase: https://www.youtube.com/watch?v=kYZ5mkGuQEg**
+[Spotify Playlists](https://open.spotify.com/user/22ijtohiijms6hd555vqgmrpi)
 
 Feel free to use as inspiration or as a starting point for your own setup.
 
@@ -19,12 +20,6 @@ Feel free to use as inspiration or as a starting point for your own setup.
 * Custom wallpaper selector
 * Custom scripts
 * Spotify + Spicetify
-
-## Useful Links
-
-### Spotify
-
-[My Spotify profile](https://open.spotify.com/user/22ijtohiijms6hd555vqgmrpi)
 
 ### Wallpaper Selector
 
