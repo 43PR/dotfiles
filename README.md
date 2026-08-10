@@ -121,20 +121,27 @@ wl-clipboard
 
 ---
 
-Clone the repository:
+**Clone the repository:**
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/YOUR_REPOSITORY.git
-cd YOUR_REPOSITORY
+git clone https://github.com/43PR/dotfiles.git
+cd dotfiles
 ```
 
-Copy the configuration files to your `.config` directory:
+Create the `.config` directory if it doesn't already exist:
+
+```bash
+mkdir -p ~/.config
+```
+
+Copy the configuration files:
 
 ```bash
 cp -r .config/* ~/.config/
 ```
 
 Restart Hyprland or log out and back in.
+
 
 > **Note:** Some paths and applications are specific to my setup. You may need to modify the configuration files to match your system.
 
