@@ -51,6 +51,10 @@ A cool SDDM theme used with this setup.
 | `Super + B` | Open browser              |
 | `Super + W` | Open wallpaper selector   |
 
+```ini
+bind = $mod, W, exec, quickshell -c hyprquickpaper
+```
+
 ## Window Management
 
 | Keybind         | Action              |
@@ -58,8 +62,18 @@ A cool SDDM theme used with this setup.
 | `Super + Q`     | Close active window |
 | `Super + F`     | Toggle fullscreen   |
 | `Super + Space` | Toggle floating     |
+
+```ini
+bind = $mod, Space, exec, ~/.config/hypr/scripts/togglefloat.sh
+```
+
 | `Super + Tab`   | Lock screen         |
 | `Super + Esc`   | Open logout menu    |
+
+```ini
+bind = $mod, Escape, exec, wlogout -b 1 -c 20 -r 20 -L 1700 -R 1700 -T 325 -B 325
+```
+
 
 ## Waybar
 
@@ -90,16 +104,6 @@ Uses `cliphist`, `rofi`, and `wl-copy`.
 
 ```ini
 bind = $mod, V, exec, cliphist list | rofi -dmenu | cliphist decode | wl-copy
-```
-
-## Keyboard Layout
-
-| Keybind     | Action                             |
-| ----------- | ---------------------------------- |
-| `Super + Z` | Switch to the next keyboard layout |
-
-```ini
-bind = $mod, Z, exec, hyprctl switchxkblayout current next
 ```
 
 ---
