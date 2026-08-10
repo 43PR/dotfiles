@@ -1,7 +1,6 @@
 ## Simple Hyprland Rice
 
 **Full showcase: https://www.youtube.com/watch?v=kYZ5mkGuQEg**
-[Spotify Playlists](https://open.spotify.com/user/22ijtohiijms6hd555vqgmrpi)
 
 Feel free to use as inspiration or as a starting point for your own setup.
 
