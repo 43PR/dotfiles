@@ -140,8 +140,6 @@ Restart Hyprland or log out and back in.
 
 ---
 
-# Credits
-
 * [Hyprland](https://hyprland.org/)
 * [hyprquickpaper](https://github.com/iamsurjog/hyprquickpaper)
 * [samaritan-sddm-theme](https://github.com/omerwk/samaritan-sddm-theme)
