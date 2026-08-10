@@ -62,13 +62,16 @@ bind = $mod, W, exec, quickshell -c hyprquickpaper
 | `Super + Space` | Toggle floating     |
 | `Super + Tab`   | Lock screen         |
 | `Super + Esc`   | Open logout menu    |
+| `Super + O`     | Switch opacity      |
 ```ini
 bind = $mod, Space, exec, ~/.config/hypr/scripts/togglefloat.sh
 ```
 ```ini
 bind = $mod, Escape, exec, wlogout -b 1 -c 20 -r 20 -L 1700 -R 1700 -T 325 -B 325
 ```
-
+```ini
+bind = $mod, O, exec, ~/.config/hypr/scripts/opacity.sh
+```
 
 **Waybar**
 
