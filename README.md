@@ -35,7 +35,7 @@ A cool SDDM theme used with this setup.
 
 ---
 
-## [Hyprland] Keybinds
+### Most used keybinds
 
 > **$mod = Super / Windows key**
 
