@@ -51,7 +51,7 @@ hl.bind(mainMod .. " + O", hl.dsp.exec_cmd(home .. "/.config/hypr/scripts/opacit
 ```ini
 hl.bind(mainMod .. " + V", hl.dsp.exec_cmd("cliphist list | rofi -dmenu | cliphist decode | wl-copy"))
 ```
-**Window Management**
+**Window Management and more**
 | Keybind         | Action              |
 | --------------- | ------------------- |
 | `Super + Q`     | Close active window |
