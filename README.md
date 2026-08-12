@@ -27,7 +27,7 @@ Feel free to use as inspiration or as a starting point for building your own set
 
 [hyprquickpaper](https://github.com/iamsurjog/hyprquickpaper)
 
-> check out the original source I just made changes to it 
+> check out the original source it explains how to setup I just made changes to it 
 
 ### Most used keybinds
 
