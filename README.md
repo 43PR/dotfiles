@@ -46,13 +46,6 @@ Feel free to use as inspiration or as a starting point for building your own set
 ```ini
 hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("quickshell -c hyprquickpaper"))
 ```
-**Mouse move/resize**
-```ini
-hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
-```
-```ini
-hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
-```
 **Window Management**
 
 | Keybind         | Action              |
@@ -69,7 +62,13 @@ hl.bind(mainMod .. " + Escape", hl.dsp.exec_cmd("wlogout -b 1 -c 20 -r 20 -L 170
 ```ini
 hl.bind(mainMod .. " + O", hl.dsp.exec_cmd(home .. "/.config/hypr/scripts/opacity.sh"))
 ```
-
+**Mouse move/resize**
+```ini
+hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
+```
+```ini
+hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
+```
 **Waybar**
 
 | Keybind             | Action        |
