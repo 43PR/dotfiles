@@ -17,7 +17,7 @@ hl.bind(mainMod .. " + Escape", hl.dsp.exec_cmd("wlogout -b 1 -c 20 -r 20 -L 170
 hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("quickshell -c hyprquickpaper"))
 
 hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen({ mode = 0 }))
-hl.bind(mainMod .. " + Space", hl.dsp.window.float({ action = "toggle" }))
+
 hl.bind(mainMod .. " + O", hl.dsp.exec_cmd(home .. "/.config/hypr/scripts/opacity.sh"))
 
 -- Toggle waybar
@@ -32,6 +32,31 @@ hl.bind(mainMod .. " + V", hl.dsp.exec_cmd("cliphist list | rofi -dmenu | cliphi
 
 -- Keyboard layout
 hl.bind(mainMod .. " + Z", hl.dsp.exec_cmd("hyprctl switchxkblayout current next"))
+
+-- Toggle window Center and rezise
+hl.bind(mainMod .. " + Space", function()
+    hl.dispatch(hl.dsp.window.float({ action = "toggle" }))
+
+    local w = hl.get_active_window()
+    if w ~= nil and w.floating then
+        local mon = hl.get_active_monitor()
+        if mon ~= nil then
+            local target_w = math.floor(mon.width * 0.6)
+            local target_h = math.floor(mon.height * 0.6)
+
+            -- absolute resize (relative = false), not a delta
+            hl.dispatch(hl.dsp.window.resize({ x = target_w, y = target_h, relative = false }))
+
+            local mon_x = mon.x or 0
+            local mon_y = mon.y or 0
+            local target_x = mon_x + math.floor((mon.width - target_w) / 2)
+            local target_y = mon_y + math.floor((mon.height - target_h) / 2)
+
+            -- absolute move to the centered position
+            hl.dispatch(hl.dsp.window.move({ x = target_x, y = target_y, relative = false }))
+        end
+    end
+end)
 
 -- VERIFY: exit dispatcher. Docs explicitly say to double check the exit
 -- dispatcher call when moving to Lua.
