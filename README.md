@@ -44,7 +44,7 @@ Feel free to use as inspiration or as a starting point for building your own set
 | `Super + W` | Open wallpaper selector   |
 
 ```ini
-bind = $mod, W, exec, quickshell -c hyprquickpaper
+hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("quickshell -c hyprquickpaper"))
 ```
 
 **Window Management**
@@ -58,13 +58,13 @@ bind = $mod, W, exec, quickshell -c hyprquickpaper
 | `Super + Esc`   | Open logout menu    |
 | `Super + O`     | Switch opacity      |
 ```ini
-bind = $mod, Space, exec, ~/.config/hypr/scripts/togglefloat.sh
+hl.bind(mainMod .. " + Space", hl.dsp.window.float({ action = "toggle" }))
 ```
 ```ini
-bind = $mod, Escape, exec, wlogout -b 1 -c 20 -r 20 -L 1700 -R 1700 -T 325 -B 325
+hl.bind(mainMod .. " + Escape", hl.dsp.exec_cmd("wlogout -b 1 -c 20 -r 20 -L 1700 -R 1700 -T 325 -B 325"))
 ```
 ```ini
-bind = $mod, O, exec, ~/.config/hypr/scripts/opacity.sh
+hl.bind(mainMod .. " + O", hl.dsp.exec_cmd(home .. "/.config/hypr/scripts/opacity.sh"))
 ```
 
 **Waybar**
@@ -76,7 +76,7 @@ bind = $mod, O, exec, ~/.config/hypr/scripts/opacity.sh
 Waybar is completely stopped when hidden and started again when enabled.
 
 ```ini
-bind = $mod SHIFT, W, exec, sh -c 'pgrep -x waybar >/dev/null && pkill waybar || nohup waybar >/dev/null 2>&1 &'
+hl.bind(mainMod .. " + SHIFT + W", hl.dsp.exec_cmd("sh -c 'pgrep -x waybar >/dev/null && pkill waybar || nohup waybar >/dev/null 2>&1 &'"))
 ```
 
 **Screenshots**
@@ -95,7 +95,7 @@ bind = $mod SHIFT, W, exec, sh -c 'pgrep -x waybar >/dev/null && pkill waybar ||
 Uses `cliphist`, `rofi`, and `wl-copy`.
 
 ```ini
-bind = $mod, V, exec, cliphist list | rofi -dmenu | cliphist decode | wl-copy
+hl.bind(mainMod .. " + V", hl.dsp.exec_cmd("cliphist list | rofi -dmenu | cliphist decode | wl-copy"))
 ```
 
 ---
