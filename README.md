@@ -58,31 +58,6 @@ hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("quickshell -c hyprquickpaper"))
 | `Super + Esc`   | Open logout menu    |
 | `Super + O`     | Switch opacity      |
 ```ini
-hl.bind(mainMod .. " + Space", function()
-    hl.dispatch(hl.dsp.window.float({ action = "toggle" }))
-
-    local w = hl.get_active_window()
-    if w ~= nil and w.floating then
-        local mon = hl.get_active_monitor()
-        if mon ~= nil then
-            local target_w = math.floor(mon.width * 0.6)
-            local target_h = math.floor(mon.height * 0.6)
-
-            -- absolute resize (relative = false), not a delta
-            hl.dispatch(hl.dsp.window.resize({ x = target_w, y = target_h, relative = false }))
-
-            local mon_x = mon.x or 0
-            local mon_y = mon.y or 0
-            local target_x = mon_x + math.floor((mon.width - target_w) / 2)
-            local target_y = mon_y + math.floor((mon.height - target_h) / 2)
-
-            -- absolute move to the centered position
-            hl.dispatch(hl.dsp.window.move({ x = target_x, y = target_y, relative = false }))
-        end
-    end
-end)
-```
-```ini
 hl.bind(mainMod .. " + Escape", hl.dsp.exec_cmd("wlogout -b 1 -c 20 -r 20 -L 1700 -R 1700 -T 325 -B 325"))
 ```
 ```ini
