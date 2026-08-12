@@ -109,6 +109,7 @@ Rofi
 Hyprlock
 Wlogout
 Quickshell
+awww
 Grim
 Slurp
 Cliphist
