@@ -46,7 +46,13 @@ Feel free to use as inspiration or as a starting point for building your own set
 ```ini
 hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("quickshell -c hyprquickpaper"))
 ```
-
+Mouse move/resize (Super + Right/Left Click)
+```ini
+hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
+```
+```ini
+hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
+```
 **Window Management**
 
 | Keybind         | Action              |
