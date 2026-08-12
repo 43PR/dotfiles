@@ -33,10 +33,6 @@ Feel free to use as inspiration or as a starting point for building your own set
 
 > **$mod = Super / Windows key**
 
-**Applications**
-
-| Keybind     | Action                    |
-| ----------- | ------------------------- |
 | `Super + T` | Open terminal             |
 | `Super + D` | Open application launcher |
 | `Super + E` | Open file manager         |
@@ -48,8 +44,6 @@ hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("quickshell -c hyprquickpaper"))
 ```
 **Window Management**
 
-| Keybind         | Action              |
-| --------------- | ------------------- |
 | `Super + Q`     | Close active window |
 | `Super + F`     | Toggle fullscreen   |
 | `Super + Space` | Toggle floating     |
@@ -71,8 +65,6 @@ hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 ```
 **Waybar**
 
-| Keybind             | Action        |
-| ------------------- | ------------- |
 | `Super + Shift + W` | Toggle Waybar |
 
 Waybar is completely stopped when hidden and started again when enabled.
@@ -83,15 +75,11 @@ hl.bind(mainMod .. " + SHIFT + W", hl.dsp.exec_cmd("sh -c 'pgrep -x waybar >/dev
 
 **Screenshots**
 
-| Keybind          | Action                               |
-| ---------------- | ------------------------------------ |
 | `Super + Delete` | Screenshot entire screen             |
 | `Delete`         | Select an area and take a screenshot |
 
 **Clipboard**
 
-| Keybind     | Action                 |
-| ----------- | ---------------------- |
 | `Super + V` | Open clipboard history |
 
 Uses `cliphist`, `rofi`, and `wl-copy`.
