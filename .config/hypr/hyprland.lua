@@ -1,22 +1,13 @@
 -- ~/.config/hypr/hyprland.lua
--- Migrated from hyprland.conf / keybinds.conf / rules.conf (hyprlang) to Lua (Hyprland 0.55+)
 -- Docs: https://wiki.hypr.land/Configuring/Start/
 
-------------------
----- MONITORS ----
-------------------
 -- Old: monitor = eDP-1,disable
 -- Old: monitor = HDMI-A-1,preferred,auto,1
 
 hl.monitor({ output = "eDP-1", disabled = true })
 hl.monitor({ output = "HDMI-A-1", mode = "preferred", position = "auto", scale = 1 })
 
----------------------
 ---- MY PROGRAMS ----
----------------------
--- NOTE: no "local" here on purpose - keybinds.lua and rules.lua (required below)
--- need to see these same variables. Globals are shared across require()'d files
--- in the same Lua state, same as $vars used to be shared via `source` in hyprlang.
 
 mainMod    = "SUPER"
 terminal   = "kitty"
@@ -24,9 +15,9 @@ menu       = "rofi -show drun"
 fileManager = "thunar"
 browser    = "brave"
 
--------------------
+
 ---- AUTOSTART ----
--------------------
+
 -- Old exec-once lines. hl.exec_cmd() fires immediately (not a dispatcher),
 -- so these are wrapped in the hyprland.start event, same timing as exec-once.
 
@@ -42,17 +33,13 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("sleep 1 && awww img /home/rp34/Pictures/Wallpapers/w3.png")
 end)
 
--------------------------------
 ---- ENVIRONMENT VARIABLES ----
--------------------------------
 
 hl.env("XCURSOR_SIZE", "18")
 hl.env("QT_QPA_PLATFORM", "wayland")
 hl.env("MOZ_ENABLE_WAYLAND", "1")
 
----------------
 ---- INPUT ----
----------------
 
 hl.config({
     input = {
@@ -66,9 +53,7 @@ hl.config({
     },
 })
 
------------------------
 ---- LOOK AND FEEL ----
------------------------
 
 hl.config({
     general = {
@@ -124,12 +109,7 @@ hl.config({
     },
 })
 
-------------------------
 ---- SPLIT-OUT FILES ----
-------------------------
--- These live as plain .lua files right next to this one:
---   ~/.config/hypr/keybinds.lua
---   ~/.config/hypr/rules.lua
 
 require("keybinds")
 require("rules")
