@@ -33,28 +33,34 @@ Feel free to use as inspiration or as a starting point for building your own set
 
 > **$mod = Super / Windows key**
 
+| Keybind     | Action                    |
+| ----------- | ------------------------- |
 | `Super + T` | Open terminal             |
 | `Super + D` | Open application launcher |
 | `Super + E` | Open file manager         |
 | `Super + B` | Open browser              |
 | `Super + W` | Open wallpaper selector   |
-
+| `Super + O` | Switch opacity            |
+| `Super + V` | Open clipboard history    |
 ```ini
 hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("quickshell -c hyprquickpaper"))
 ```
+```ini
+hl.bind(mainMod .. " + O", hl.dsp.exec_cmd(home .. "/.config/hypr/scripts/opacity.sh"))
+```
+```ini
+hl.bind(mainMod .. " + V", hl.dsp.exec_cmd("cliphist list | rofi -dmenu | cliphist decode | wl-copy"))
+```
 **Window Management**
-
+| Keybind         | Action              |
+| --------------- | ------------------- |
 | `Super + Q`     | Close active window |
 | `Super + F`     | Toggle fullscreen   |
 | `Super + Space` | Toggle floating     |
 | `Super + Tab`   | Lock screen         |
 | `Super + Esc`   | Open logout menu    |
-| `Super + O`     | Switch opacity      |
 ```ini
 hl.bind(mainMod .. " + Escape", hl.dsp.exec_cmd("wlogout -b 1 -c 20 -r 20 -L 1700 -R 1700 -T 325 -B 325"))
-```
-```ini
-hl.bind(mainMod .. " + O", hl.dsp.exec_cmd(home .. "/.config/hypr/scripts/opacity.sh"))
 ```
 **Mouse move/resize**
 ```ini
@@ -63,29 +69,9 @@ hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
 ```ini
 hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 ```
-**Waybar**
-
-| `Super + Shift + W` | Toggle Waybar |
-
-Waybar is completely stopped when hidden and started again when enabled.
-
+**Toggle Waybar**
 ```ini
 hl.bind(mainMod .. " + SHIFT + W", hl.dsp.exec_cmd("sh -c 'pgrep -x waybar >/dev/null && pkill waybar || nohup waybar >/dev/null 2>&1 &'"))
-```
-
-**Screenshots**
-
-| `Super + Delete` | Screenshot entire screen             |
-| `Delete`         | Select an area and take a screenshot |
-
-**Clipboard**
-
-| `Super + V` | Open clipboard history |
-
-Uses `cliphist`, `rofi`, and `wl-copy`.
-
-```ini
-hl.bind(mainMod .. " + V", hl.dsp.exec_cmd("cliphist list | rofi -dmenu | cliphist decode | wl-copy"))
 ```
 
 ---
