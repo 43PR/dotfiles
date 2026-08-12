@@ -120,6 +120,15 @@ wl-clipboard
 
 **Clone the repository:**
 
+> **Note:** Some paths and applications are specific to my setup. You may need to modify the configuration files to match your system.
+
+```bash
+git clone https://github.com/43PR/dotfiles.git
+cd dotfiles
+```
+
+Back up your existing configuration
+
 ```bash
 git clone https://github.com/43PR/dotfiles.git
 cd dotfiles
@@ -139,12 +148,8 @@ cp -r .config/* ~/.config/
 
 Restart Hyprland or log out and back in.
 
-
-> **Note:** Some paths and applications are specific to my setup. You may need to modify the configuration files to match your system.
-
 ---
 
-* [Hyprland](https://hyprland.org/)
 * [hyprquickpaper](https://github.com/iamsurjog/hyprquickpaper)
 * [samaritan-sddm-theme](https://github.com/omerwk/samaritan-sddm-theme)
 
