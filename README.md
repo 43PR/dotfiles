@@ -62,7 +62,7 @@ hl.bind(mainMod .. " + V", hl.dsp.exec_cmd("cliphist list | rofi -dmenu | cliphi
 ```ini
 hl.bind(mainMod .. " + Escape", hl.dsp.exec_cmd("wlogout -b 1 -c 20 -r 20 -L 1700 -R 1700 -T 325 -B 325"))
 ```
-**Mouse move/resize**
+**Move/resize window with mouse**
 ```ini
 hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
 ```
