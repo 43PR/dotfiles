@@ -126,7 +126,9 @@ After the installation finishes, restart Hyprland or log out and back in.
 ```bash
 hyprctl reload
 ```
+
 If you encounter any issues, check the relevant configuration files under: ~/.config/
+
 ---
 
 * [hyprquickpaper](https://github.com/iamsurjog/hyprquickpaper)
