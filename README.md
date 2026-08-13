@@ -105,7 +105,8 @@ chmod +x install.sh
 ./install.sh
 ```
 
-What it does:
+### What it does:
+
 The installer will modify your ~/.config directory. 
 
 Existing configuration files that are being replaced will be backed up automatically.
