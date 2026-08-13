@@ -93,37 +93,34 @@ wl-clipboard
 ```
 
 ---
-
-**Clone the repository:**
-
+## Installation
 > **Note:** Some paths and applications are specific to my setup. You may need to modify the configuration files to match your system.
 
-```bash
-git clone https://github.com/43PR/dotfiles.git
-cd dotfiles
-```
-
-Back up your existing configuration
+**Clone the repository and run the installer:**
 
 ```bash
 git clone https://github.com/43PR/dotfiles.git
 cd dotfiles
+chmod +x install.sh
+./install.sh
 ```
 
-Create the `.config` directory if it doesn't already exist:
+What it does:
+The installer will modify your ~/.config directory. Existing configuration files that are being replaced will be backed up automatically.
+Install the required Arch Linux packages from packages.txt
+Back up existing configuration files before replacing them
+Copy the dotfiles into ~/.config
+Set the required script permissions
+Enable the required user services
+
+After the installation finishes, restart Hyprland or log out and back in.
 
 ```bash
-mkdir -p ~/.config
+hyprctl reload
 ```
+If you encounter any issues, check the relevant configuration files under:
 
-Copy the configuration files:
-
-```bash
-cp -r .config/* ~/.config/
-```
-
-Restart Hyprland or log out and back in.
-
+~/.config/
 ---
 
 * [hyprquickpaper](https://github.com/iamsurjog/hyprquickpaper)
