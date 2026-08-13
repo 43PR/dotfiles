@@ -106,11 +106,18 @@ chmod +x install.sh
 ```
 
 What it does:
-The installer will modify your ~/.config directory. Existing configuration files that are being replaced will be backed up automatically.
+The installer will modify your ~/.config directory. 
+
+Existing configuration files that are being replaced will be backed up automatically.
+
 Install the required Arch Linux packages from packages.txt
+
 Back up existing configuration files before replacing them
+
 Copy the dotfiles into ~/.config
+
 Set the required script permissions
+
 Enable the required user services
 
 After the installation finishes, restart Hyprland or log out and back in.
