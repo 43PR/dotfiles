@@ -23,7 +23,7 @@ Wallpapers: https://wallhaven.cc/user/43pr
 * Wlogout
 * Custom wallpaper selector
 * Custom scripts
-* Spotify + Spicetify. Theme: text darkthemer but I changed the colors
+* Spotify + Spicetify. Theme: text darkthemer
 
 ### Wallpaper Selector
 
