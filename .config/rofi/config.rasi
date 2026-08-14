@@ -11,7 +11,7 @@ configuration {
     show-icons: true;
     sidebar-mode: false;
     scroll-method: 1;
-    matching: "fuzzy";
+    matching: "prefix";
     sort: true;
     sorting-method: "normal";
     click-to-exit: true;
