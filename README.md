@@ -11,6 +11,8 @@ Feel free to use as inspiration or as a starting point for building your own set
 ![](z.png)
 ![](ww.png)
 
+Wallpapers: https://wallhaven.cc/user/43pr
+
 ## Features
 
 * Waybar
