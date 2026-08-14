@@ -4,17 +4,22 @@
 set -euo pipefail
 
 # 43PR/dotfiles installer
-# Arch Linux + Hyprland
+# Arch-compatible Linux + Hyprland
 #
 # Usage:
 #   ./install.sh
 #
 # This script:
-#   1. Verifies that the system is Arch Linux
-#   2. Updates package databases
+#   1. Verifies that the system is Arch-based
+#   2. Detects the available package manager
 #   3. Installs required packages
 #   4. Backs up existing ~/.config
 #   5. Installs this repository's configuration
+#
+# Supported package managers:
+#   - pacman       (Arch, Manjaro, EndeavourOS, CachyOS, etc.)
+#   - paru         (AUR helper)
+#   - yay          (AUR helper)
 #
 # Designed to be safe to run more than once.
 
@@ -53,8 +58,19 @@ if [[ "${EUID}" -eq 0 ]]; then
     exit 1
 fi
 
-if [[ ! -f /etc/arch-release ]]; then
-    error "This installer is intended for Arch Linux."
+if [[ ! -f /etc/os-release ]]; then
+    error "Cannot determine the operating system."
+    exit 1
+fi
+
+# shellcheck disable=SC1091
+source /etc/os-release
+
+# Arch-compatible distributions normally identify themselves
+# through ID_LIKE=arch or ID=arch.
+if [[ "${ID:-}" != "arch" && "${ID_LIKE:-}" != *arch* ]]; then
+    error "This installer is intended for Arch-compatible Linux distributions."
+    error "Detected: ${PRETTY_NAME:-unknown}"
     exit 1
 fi
 
@@ -64,7 +80,7 @@ if ! command -v sudo >/dev/null 2>&1; then
 fi
 
 # --------------------------------------------------
-# Packages
+# Package manager detection
 # --------------------------------------------------
 
 PACKAGE_FILE="$REPO_DIR/packages.txt"
@@ -74,13 +90,45 @@ if [[ ! -f "$PACKAGE_FILE" ]]; then
     exit 1
 fi
 
+if command -v paru >/dev/null 2>&1; then
+    PACKAGE_MANAGER="paru"
+elif command -v yay >/dev/null 2>&1; then
+    PACKAGE_MANAGER="yay"
+elif command -v pacman >/dev/null 2>&1; then
+    PACKAGE_MANAGER="pacman"
+else
+    error "No supported package manager found."
+    error "Install pacman, paru, or yay before running this installer."
+    exit 1
+fi
+
+info "Detected distribution: ${PRETTY_NAME:-unknown}"
+info "Using package manager: $PACKAGE_MANAGER"
+
+# --------------------------------------------------
+# Packages
+# --------------------------------------------------
+
 mapfile -t PACKAGES < <(
-    grep -vE '^\s*(#|$)' "$PACKAGE_FILE"
+    grep -vE '^[[:space:]]*(#|$)' "$PACKAGE_FILE"
 )
 
-info "Installing required packages..."
+if [[ "${#PACKAGES[@]}" -eq 0 ]]; then
+    warning "packages.txt does not contain any packages."
+else
+    info "Installing required packages..."
 
-sudo pacman -S --needed --noconfirm "${PACKAGES[@]}"
+    case "$PACKAGE_MANAGER" in
+        paru|yay)
+            "$PACKAGE_MANAGER" -S --needed --noconfirm "${PACKAGES[@]}"
+            ;;
+        pacman)
+            sudo pacman -Syu --needed --noconfirm "${PACKAGES[@]}"
+            ;;
+    esac
+
+    success "Packages installed."
+fi
 
 # --------------------------------------------------
 # Backup existing configuration
@@ -136,13 +184,17 @@ fi
 # Enable user audio services
 # --------------------------------------------------
 
-info "Enabling PipeWire..."
+if command -v systemctl >/dev/null 2>&1; then
+    info "Enabling PipeWire..."
 
-systemctl --user enable --now pipewire.service
-systemctl --user enable --now pipewire-pulse.service
-systemctl --user enable --now wireplumber.service
+    systemctl --user enable --now pipewire.service
+    systemctl --user enable --now pipewire-pulse.service
+    systemctl --user enable --now wireplumber.service
 
-success "PipeWire configured."
+    success "PipeWire configured."
+else
+    warning "systemctl was not found; skipping PipeWire service setup."
+fi
 
 # --------------------------------------------------
 # Permissions
@@ -168,6 +220,8 @@ printf '\033[1;32m       43PR Hyprland Setup Ready       \033[0m\n'
 printf '\033[1;32m========================================\033[0m\n'
 printf '\n'
 
+printf 'Distribution:  %s\n' "${PRETTY_NAME:-unknown}"
+printf 'Package mgr:   %s\n' "$PACKAGE_MANAGER"
 printf 'Configuration: %s\n' "$CONFIG_DIR"
 
 if [[ -d "$BACKUP_DIR" ]]; then
