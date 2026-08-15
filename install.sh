@@ -1,4 +1,3 @@
-```bash
 #!/usr/bin/env bash
 
 set -euo pipefail
@@ -237,5 +236,4 @@ printf '  Hyprland\n'
 
 printf '\n'
 success "Installation complete!"
-```
 
