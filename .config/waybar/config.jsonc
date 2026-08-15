@@ -2,8 +2,8 @@
     "layer": "top",
     "position": "top",
     "exclusive": false,
-    "height": 30,
-    "spacing": 4,
+    "height": 24,
+    "spacing": 2,
 
     "modules-left": ["cpu", "custom/gpu", "memory", "temperature"],
     "modules-center": ["clock"],
@@ -38,8 +38,8 @@
     },
 
     "clock": {
-        "format": "{:%a %d %b  %H:%M}",
-        "tooltip-format": "<tt>{calendar}</tt>"
+        "format": "{:%H:%M}",
+        "tooltip-format": "<tt>{:%a %d %b %Y}</tt>"
     },
 
     "mpris": {
@@ -57,7 +57,8 @@
             "default": ["", "", ""]
         },
         "tooltip": false,
-        "on-click": "pavucontrol"
+        "on-click": "pavucontrol",
+        "on-click-right": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
     },
 
     "custom/power": {

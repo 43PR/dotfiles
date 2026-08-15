@@ -6,27 +6,28 @@
 }
 
 window#waybar {
+    min-height: 10px;
     background-color: rgba(20, 20, 20, 0);
     color: #ffffff;
 }
 
 /* LEFT */
 .modules-left {
-    background-color: rgba(20, 20, 20, 0.2);
+    background-color: rgba(20, 20, 20, 0.3);
     border-radius: 10px;
     margin: 3px 0 3px 6px;
 }
 
 /* CENTER */
 .modules-center {
-    background-color: rgba(20, 20, 20, 0.2);
+    background-color: rgba(20, 20, 20, 0.3);
     border-radius: 10px;
     margin: 3px 0;
 }
 
 /* RIGHT */
 .modules-right {
-    background-color: rgba(20, 20, 20, 0.2);
+    background-color: rgba(20, 20, 20, 0.3);
     border-radius: 10px;
     margin: 3px 6px 3px 0;
 }
@@ -70,13 +71,16 @@ window#waybar {
 tooltip {
     background-color: rgba(20, 20, 20, 0.4);
     color: #ffffff;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 6px;
+    font-weight: bold;
+    border: 1px solid rgba(255, 255, 255, 0);
+    border-radius: 25px;
 }
 
 tooltip label {
     color: #ffffff;
-    font-size: 14px;
+    font-size: 11px;
+    padding: 0;
+    margin: 0;
 }
 
 /* Interactive hover effect */

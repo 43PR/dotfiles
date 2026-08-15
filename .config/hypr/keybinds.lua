@@ -41,8 +41,8 @@ hl.bind(mainMod .. " + Space", function()
     if w ~= nil and w.floating then
         local mon = hl.get_active_monitor()
         if mon ~= nil then
-            local target_w = math.floor(mon.width * 0.6)
-            local target_h = math.floor(mon.height * 0.6)
+            local target_w = math.floor(mon.width * 0.7)
+            local target_h = math.floor(mon.height * 0.7)
 
             -- absolute resize (relative = false), not a delta
             hl.dispatch(hl.dsp.window.resize({ x = target_w, y = target_h, relative = false }))
@@ -57,6 +57,10 @@ hl.bind(mainMod .. " + Space", function()
         end
     end
 end)
+
+-- Mouse move/resize (confirmed pattern from the official example config)
+hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
+hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 
 -- VERIFY: exit dispatcher. Docs explicitly say to double check the exit
 -- dispatcher call when moving to Lua.
@@ -91,10 +95,6 @@ for i = 1, 10 do
     hl.bind(mainMod .. " + " .. key, hl.dsp.focus({ workspace = i }))
     hl.bind(mainMod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = i }))
 end
-
--- Mouse move/resize (confirmed pattern from the official example config)
-hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
-hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 
 -- Media keys (confirmed pattern from the official example config)
 hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+"), { locked = true, repeating = true })
