@@ -1,6 +1,6 @@
 ## Simple Hyprland Rice
 
-**Full showcase: https://www.youtube.com/watch?v=kYZ5mkGuQEg**
+**Full showcase: https://youtu.be/-fGqZo_W268**
 
 Simple Hyprland setup focused on practical keybinds, productivity, and a smooth workflow easy to customize
 
