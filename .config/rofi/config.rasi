@@ -31,7 +31,7 @@ configuration {
     bg-selected: #FFFFFF10;
     fg: #E6EAF2FF;
     fg-muted: #8B93A7FF;
-    fg-dark: #111318FF;
+    fg-dark: #6f6f6f;
     accent: #7AA2F7FF;
     accent-soft: #7AA2F733;
     urgent: #F7768EFF;
