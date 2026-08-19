@@ -20,6 +20,10 @@ hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen({ mode = 0 }))
 
 hl.bind(mainMod .. " + O", hl.dsp.exec_cmd(home .. "/.config/hypr/scripts/opacity.sh"))
 
+-- Mouse move/resize window
+hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
+hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
+
 -- Toggle waybar
 hl.bind(mainMod .. " + SHIFT + W", hl.dsp.exec_cmd("sh -c 'pgrep -x waybar >/dev/null && pkill waybar || nohup waybar >/dev/null 2>&1 &'"))
 
@@ -35,7 +39,7 @@ hl.bind(mainMod .. " + V", hl.dsp.exec_cmd(
 -- Keyboard layout
 hl.bind(mainMod .. " + Z", hl.dsp.exec_cmd("hyprctl switchxkblayout current next"))
 
--- Toggle window Center and rezise
+-- Toggle float window, center and rezise
 hl.bind(mainMod .. " + Space", function()
     hl.dispatch(hl.dsp.window.float({ action = "toggle" }))
 
@@ -43,7 +47,7 @@ hl.bind(mainMod .. " + Space", function()
     if w ~= nil and w.floating then
         local mon = hl.get_active_monitor()
         if mon ~= nil then
-            local target_w = math.floor(mon.width * 0.7)
+            local target_w = math.floor(mon.width * 0.7) 
             local target_h = math.floor(mon.height * 0.7)
 
             -- absolute resize (relative = false), not a delta
@@ -59,10 +63,6 @@ hl.bind(mainMod .. " + Space", function()
         end
     end
 end)
-
--- Mouse move/resize (confirmed pattern from the official example config)
-hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
-hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 
 -- VERIFY: exit dispatcher. Docs explicitly say to double check the exit
 -- dispatcher call when moving to Lua.

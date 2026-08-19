@@ -18,9 +18,6 @@ browser    = "brave"
 
 ---- AUTOSTART ----
 
--- Old exec-once lines. hl.exec_cmd() fires immediately (not a dispatcher),
--- so these are wrapped in the hyprland.start event, same timing as exec-once.
-
 hl.on("hyprland.start", function()
     hl.exec_cmd("waybar")
     hl.exec_cmd("dunst")
@@ -30,7 +27,6 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("/usr/lib/polkit-kde-authentication-agent-1")
 
     hl.exec_cmd("awww-daemon")
-    hl.exec_cmd("sleep 1 && awww img /home/rp34/Pictures/Wallpapers/w3.png")
 end)
 
 ---- ENVIRONMENT VARIABLES ----
@@ -58,7 +54,7 @@ hl.config({
 hl.config({
     general = {
         gaps_in = 3,
-        gaps_out = 5,
+        gaps_out = 3,
         border_size = 0,
         resize_on_border = true,
         allow_tearing = false,
@@ -83,10 +79,8 @@ hl.config({
     },
 })
 
--- Old: bezier = easeOut,0.05,0.9,0.1,1.0
 hl.curve("easeOut", { type = "bezier", points = { {0.05, 0.9}, {0.1, 1.0} } })
 
--- Old: animation = windows,1,5,easeOut  (enabled, speed, style)
 hl.animation({ leaf = "windows",    enabled = true, speed = 5, bezier = "easeOut" })
 hl.animation({ leaf = "windowsOut", enabled = true, speed = 5, bezier = "easeOut" })
 hl.animation({ leaf = "border",     enabled = true, speed = 5, bezier = "default" })

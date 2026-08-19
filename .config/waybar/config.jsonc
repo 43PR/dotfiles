@@ -1,9 +1,9 @@
 {
     "layer": "top",
     "position": "top",
-    "exclusive": false,
-    "height": 24,
-    "spacing": 2,
+    "exclusive": false, // "true" to take a space instead
+    "height": 20,
+    "spacing": 1,
 
     "modules-left": ["cpu", "custom/gpu", "memory", "temperature"],
     "modules-center": ["clock"],
@@ -21,7 +21,7 @@
     },
 
     "custom/gpu": {
-        "exec": "/home/rp34/.config/waybar/scripts/gpu_usage.sh",
+        "exec": "~/.config/waybar/scripts/gpu_usage.sh",
         "interval": 2,
         "format": "GPU {}%",
         "tooltip-format": "Skylake-H GT2: {}%"
@@ -34,7 +34,8 @@
         "format-critical": " {temperatureC}°C",
         "tooltip": true,
         "tooltip-format": "CPU Temp: {temperatureC}°C",
-        "interval": 2
+        "interval": 2,
+        "on-click": "~/.config/waybar/scripts/toggle-gammastep"
     },
 
     "clock": {
