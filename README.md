@@ -16,7 +16,7 @@ Wallpapers: https://wallhaven.cc/user/43pr
 ## Features
 
 * Waybar
-> Change volume with mouse wheel, mute, play/pause and next
+> Change volume with mouse wheel, mute, play/pause, next and blue light filter
 * Rofi
 > App search, clipboard history and switch opacity
 * Hyprlock
