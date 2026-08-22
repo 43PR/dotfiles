@@ -1,0 +1,146 @@
+[accessibility]
+ui_scale = 1
+
+[bar.default]
+background_opacity = 0.0
+start = [ "group:g1", "notifications"]
+center = [ "clock" ]
+end = [ "media", "network", "tray", "volume", "session" ]
+
+thickness = 30
+scale = 1
+concave_edge_corners = true
+margin_edge = 0
+margin_ends = 0
+radius_bottom_left = 12
+radius_bottom_right = 12
+radius_top_left = 0
+radius_top_right = 0
+
+    [[bar.default.capsule_group]]
+    border = ""
+    fill = "on_secondary"
+    id = "g1"
+    members = [ "temp", "sysmon_2", "sysmon_3" ]
+    opacity = 0.0
+    padding = 6.0
+
+[shell]
+clipboard_image_action_command = "satty -f -"
+launch_apps_as_systemd_services = true
+polkit_agent = true
+settings_show_advanced = true
+
+    [shell.greeter_sync]
+    auto_sync = false
+    
+    [shell.panel]
+    open_near_click_control_center = true
+    session_placement = "floating"
+    session_position = "center"
+    transparency_mode = "glass"
+
+    [shell.screenshot]
+    copy_to_clipboard = false
+    pipe_command = "satty -f -"
+    pipe_to_command = true
+    save_to_file = false
+
+    [[shell.session.actions]]
+    action = "lock"
+    countdown_seconds = 0.0
+    enabled = true
+    shortcut = "1"
+    variant = "default"
+
+    [[shell.session.actions]]
+    action = "logout"
+    countdown_seconds = 0.0
+    enabled = true
+    shortcut = "2"
+    variant = "default"
+
+    [[shell.session.actions]]
+    action = "lock_and_suspend"
+    countdown_seconds = 3.0
+    enabled = true
+    shortcut = "3"
+    variant = "default"
+
+    [[shell.session.actions]]
+    action = "reboot"
+    countdown_seconds = 3.0
+    enabled = true
+    shortcut = "4"
+    variant = "default"
+
+    [[shell.session.actions]]
+    action = "shutdown"
+    countdown_seconds = 3.0
+    enabled = true
+    shortcut = "5"
+    variant = "destructive"
+
+[system.monitor]
+gpu_poll_seconds = 2
+
+[theme]
+mode = "dark"
+source = "wallpaper"
+wallpaper_scheme = "m3-tonal-spot"
+
+    [theme.templates]
+    builtin_ids = [ "btop", "gtk3", "gtk4", "kcolorscheme", "kitty", "qt", "alacritty" ]
+
+[widget.clock]
+color = "secondary"
+format = "{:%H:%M}"
+
+[widget.launcher]
+color = "primary"
+
+[widget.media]
+hide_when_no_media = true
+title_scroll = "on_hover"
+
+[widget.network]
+color = "secondary"
+show_label = false
+
+[widget.notifications]
+color = "secondary"
+
+[widget.session]
+color = "error"
+
+[widget.spacer_1]
+type = "spacer"
+
+[widget.temp]
+show_value = false
+
+[widget.sysmon_2]
+glyph = "gpu-usage"
+show_value = false
+stat = "gpu_temp"
+type = "sysmon"
+
+[widget.sysmon_3]
+glyph = "cpu-2"
+stat = "ram_used"
+type = "sysmon"
+
+[widget.tray]
+capsule = true
+capsule_fill = "on_secondary"
+
+[widget.volume]
+color = "secondary"
+
+[widget.workspaces]
+active_pill_size = 2.5
+capsule = true
+capsule_fill = "on_primary"
+inactive_pill_size = 1.0
+pill_scale = 0.80
+show_labels = false
