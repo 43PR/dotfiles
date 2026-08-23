@@ -1,10 +1,7 @@
 -- ~/.config/hypr/hyprland.lua
 -- Docs: https://wiki.hypr.land/Configuring/Start/
 
---hl.monitor({ output = "eDP-1", disabled = true })
---hl.monitor({ output = "HDMI-A-1", mode = "preferred", position = "auto", scale = 1 })
-
-hl.monitor({ output = "MONITOR1", mode = "preferred", position = "auto", scale = 1 })
+hl.monitor({output = "MONITOR1", mode = "preferred", position = "auto", scale = "1"})
 
 ---- MY PROGRAMS ----
 
