@@ -1,9 +1,8 @@
 {
     "layer": "top",
     "position": "top",
-    "exclusive": true, // "true" to take a space instead
-    "height": 20,
-    "spacing": 1,
+    "exclusive": true, // "false" 
+    "spacing": 0,
 
     "modules-left": ["cpu", "custom/gpu", "memory", "temperature"],
     "modules-center": ["clock"],
