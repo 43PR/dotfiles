@@ -1,7 +1,7 @@
 {
     "layer": "top",
     "position": "top",
-    "exclusive": false, // "true" to take a space instead
+    "exclusive": true, // "true" to take a space instead
     "height": 20,
     "spacing": 1,
 
