@@ -45,7 +45,7 @@ Wallpapers: https://wallhaven.cc/user/43pr
 | `Super + O` | Switch opacity            |
 | `Super + V` | Open clipboard history    |
 ```ini
-hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("quickshell -c hyprquickpaper"))
+hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("quickshell -n -c hyprquickpaper"))
 ```
 ```ini
 hl.bind(mainMod .. " + O", hl.dsp.exec_cmd(home .. "/.config/hypr/scripts/opacity.sh"))
@@ -62,7 +62,7 @@ hl.bind(mainMod .. " + V", hl.dsp.exec_cmd("cliphist list | rofi -dmenu | cliphi
 | `Super + Tab`   | Lock screen         |
 | `Super + Esc`   | Open logout menu    |
 ```ini
-hl.bind(mainMod .. " + Escape", hl.dsp.exec_cmd("wlogout -b 1 -c 20 -r 20 -L 1700 -R 1700 -T 325 -B 325"))
+hl.bind(mainMod .. " + GRAVE", hl.dsp.exec_cmd("pgrep -x wlogout >/dev/null || wlogout -b 1 -c 20 -r 20 -L 1700 -R 1700 -T 325 -B 325"))
 ```
 **Move/resize window with mouse**
 ```ini

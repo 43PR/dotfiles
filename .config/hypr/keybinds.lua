@@ -4,10 +4,11 @@
 --       https://wiki.hypr.land/Configuring/Basics/Dispatchers/
 
 local home = os.getenv("HOME")
+local menu = "rofi -show drun"
 
 -- Launchers
 hl.bind(mainMod .. " + T", hl.dsp.exec_cmd(terminal))
-hl.bind(mainMod .. " + D", hl.dsp.exec_cmd(menu))
+hl.bind(mainMod .. " + D", hl.dsp.exec_cmd("pgrep -x rofi >/dev/null && pkill -x rofi || " .. menu))
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager))
 hl.bind(mainMod .. " + B", hl.dsp.exec_cmd(browser))
 
@@ -27,17 +28,15 @@ hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 -- Toggle waybar
 hl.bind(mainMod .. " + SHIFT + W", hl.dsp.exec_cmd("sh -c 'pgrep -x waybar >/dev/null && pkill waybar || nohup waybar >/dev/null 2>&1 &'"))
 
+-- Clipboard
+hl.bind(mainMod .. " + V", hl.dsp.exec_cmd("pgrep -x rofi >/dev/null && pkill -x rofi || cliphist list | rofi -dmenu -p '' | cliphist decode | wl-copy"))
+
 -- Screenshots
 hl.bind(mainMod .. " + Delete", hl.dsp.exec_cmd("grim " .. home .. "/Pictures/$(date +%s).png"))
 hl.bind("Delete", hl.dsp.exec_cmd('grim -g "$(slurp)" ' .. home .. '/Pictures/$(date +%s).png'))
 
--- Clipboard
-hl.bind(mainMod .. " + V", hl.dsp.exec_cmd(
-    "cliphist list | rofi -dmenu -p '' | cliphist decode | wl-copy"
-))
-
 -- Keyboard layout
-hl.bind(mainMod .. " + Z", hl.dsp.exec_cmd("hyprctl switchxkblayout current next"))
+hl.bind(mainMod .. " + X", hl.dsp.exec_cmd("hyprctl switchxkblayout current next"))
 
 -- Toggle float window, center and rezise
 hl.bind(mainMod .. " + Space", function()
@@ -63,6 +62,24 @@ hl.bind(mainMod .. " + Space", function()
         end
     end
 end)
+
+-- Zoom
+local function zoomfunction(value)
+    local zoomvalue = hl.get_config("cursor:zoom_factor")
+    if (zoomvalue + value) > 3.0 then
+        hl.config({ cursor = { zoom_factor = 3.0 } })
+    elseif (zoomvalue + value) < 1.0 then
+        hl.config({ cursor = { zoom_factor = 1.0 } })
+    else
+        hl.config({ cursor = { zoom_factor = zoomvalue + value } })
+    end
+end
+hl.bind(mainMod .. " + Minus", function() zoomfunction(-0.3) end, { repeating = true})
+hl.bind(mainMod .. " + Plus", function() zoomfunction(0.3) end, { repeating = true })
+
+--# Zoom with keypad
+hl.bind(mainMod .. " + code:82", function() zoomfunction(-0.3) end, { repeating = true })
+hl.bind(mainMod .. " + code:86", function() zoomfunction(0.3) end, { repeating = true })
 
 -- VERIFY: exit dispatcher. Docs explicitly say to double check the exit
 -- dispatcher call when moving to Lua.
