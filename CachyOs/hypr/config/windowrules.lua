@@ -16,18 +16,6 @@ hl.window_rule({
 local gamingApps = "^(steam_app.*|gamescope)$"
 local gamingWorkspace = "name:gaming"
 
--- opacity rules 0.9 all windows except fullscreen
-hl.window_rule({
-    match = { class = ".*" },
-    opacity = "1 override",
-    force_rgbx = true,
-})
-
-hl.window_rule({
-    match = { class = ".*", fullscreen = true },
-    opacity = "1.0 override",
-})
-
 hl.window_rule({ match = { content = "game" }, workspace = gamingWorkspace })
 hl.window_rule({ match = { xdg_tag = "^(.*game.*)$" }, workspace = gamingWorkspace, fullscreen_state = 2, content = "game", sync_fullscreen = true })
 hl.window_rule({ match = { class = gamingApps }, workspace = gamingWorkspace })
@@ -77,6 +65,16 @@ hl.window_rule({
         "max(20, min(cursor_x - (window_w*0.50), monitor_w - window_w + 20))", -- X axis clamping
         "max(20, min(cursor_y - 50, monitor_h - window_h + 20))" -- Y axis clamping
     },
+})
+-- Opacity rules
+hl.window_rule({
+    match = { class = ".*" },
+    opacity = "0.8 override",
+})
+
+hl.window_rule({
+    match = { class = ".*", fullscreen = true },
+    opacity = "1.0 override",
 })
 
 -- Float Utility Windows
