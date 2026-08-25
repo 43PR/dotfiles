@@ -249,26 +249,18 @@ PanelWindow {
 
         Keys.onPressed: function(event) {
             switch (event.key) {
-            case Qt.Key_D:
-                moveSelection(1, 1)
-                break
-
-            case Qt.Key_A:
-                moveSelection(-1, 1)
-                break
-
             case Qt.Key_Space:
                 activateCurrent()
                 break
-
+            case Qt.Key_W:
+                Qt.quit()
+                break    
             case Qt.Key_Escape:
                 Qt.quit()
                 break
-
             default:
                 return
             }
-
             event.accepted = true
         }
     }
