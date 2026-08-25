@@ -102,7 +102,7 @@ PanelWindow {
         anchors.topMargin: 30
 
         radius: 36
-        color: "#801e1e1e"
+        color: "#80000000"
 
         opacity: root.showing ? 1 : 0
         scale: root.showing ? 1 : 0.9
