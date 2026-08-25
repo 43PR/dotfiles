@@ -22,7 +22,7 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("wl-paste --type image --watch cliphist store")
     hl.exec_cmd("/usr/lib/polkit-kde-authentication-agent-1")
     
-    hl.dsp.exec_cmd("qs -d -c volume-osd")
+    hl.dsp.exec_cmd("sleep 2 && qs -d -c volume-osd")
     hl.exec_cmd("awww-daemon")
 end)
 
