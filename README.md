@@ -98,7 +98,7 @@ wl-clipboard
 
 ---
 ## Installation
-> **Note:** Some paths and applications are specific to my setup. You may need to modify the configuration files to match your system.
+> **READ:** Some paths and applications are specific to my setup. You may need to modify the configuration files to match your system.
 
 **Clone the repository and run the installer:**
 
@@ -109,21 +109,9 @@ chmod +x install.sh
 ./install.sh
 ```
 
-### What it does:
-
 The installer will modify your ~/.config directory. 
 
 Existing configuration files that are being replaced will be backed up automatically.
-
-Install the required Arch Linux packages from packages.txt
-
-Back up existing configuration files before replacing them
-
-Copy the dotfiles into ~/.config
-
-Set the required script permissions
-
-Enable the required user services
 
 After the installation finishes, restart Hyprland or log out and back in.
 
