@@ -1,6 +1,5 @@
-/*  ================================
-    ROOT
-    ================================ */
+/*  Update with
+bash: spicetify apply */
 
 /* import */
 /* find more in https://fonts.google.com/?category=Monospace&sort=popularity */
@@ -9,7 +8,7 @@
 
 /* user settings */
 :root {
-    --font-family: "JetBrains Mono", monospace;
+    --font-family: "Roboto Mono", monospace;
     /*
     --font-family: 'Anonymous Pro', monospace;
     --font-family: 'Azeret Mono', monospace;
@@ -44,25 +43,25 @@
     --font-weight: 400; /* 200 : 900 */
     --line-height: 1.2;
 
-    --font-size-lyrics: 14px; /* 1.5em (default) */
+    --font-size-lyrics: 24px; /* 1.5em (default) */
 
     --font-family-header: "asciid";
     --font-size-multiplier-header: 4;
 
     --display-card-image: block; /* none | block */
-    --display-coverart-image: none; /* none | block */
-    --display-header-image: none; /* none | block */
-    --display-sidebar-image: block; /* none | block */
-    display-tracklist-image: block; /* none | block */
-    --display-spicetify-banner-ascii: block; /* none | block */
-    --display-music-banner-ascii: none; /* none | block */
+    --display-coverart-image: none; 
+    --display-header-image: block; 
+    --display-sidebar-image: block;
+    --display-tracklist-image: block; 
+    --display-spicetify-banner-ascii: block; 
+    --display-music-banner-ascii: none; 
 
-    --border-radius: 0px;
+    --border-radius: 8px;
     --border-width: 1px;
     --border-style: solid; /* dotted | dashed | solid | double | groove | ridge | inset | outset */
     --border-transition: 0.2s ease; /* 'none' to disable  */
 
-    --global-nav-margin-top: 50px; /* set to '0px' if you disabled window controls */
+    --global-nav-margin-top: 2px; /* set to '0px' if you disabled window controls */
 }
 
 
@@ -127,7 +126,7 @@
     margin-top: var(--global-nav-margin-top);
 }
 .spotify__container--is-desktop.spotify__os--is-linux .Root__globalNav {
-    margin: 8px 0 0;
+    margin: 1px 0 0;
 }
 .Root__top-container {
     --panel-gap: 16px !important;

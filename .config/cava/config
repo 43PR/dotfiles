@@ -21,7 +21,7 @@ mode = normal
 
 # Manual sensitivity in %. If autosens is enabled, this will only be the initial value.
 # 200 means double height. Accepts only non-negative values.
-sensitivity = 150
+sensitivity = 180
 
 # The number of bars (0-512). 0 sets it to auto (fill up console).
 # Bars' width and space between bars in number of characters.
@@ -260,10 +260,10 @@ max_height = 90
 gradient = 1
 
 # top = black
-gradient_color_1 = '#000000'
-gradient_color_2 = '#111111'
-gradient_color_3 = '#222222'
-gradient_color_4 = '#333333'
+gradient_color_1 = '#111111'
+gradient_color_2 = '#222222'
+gradient_color_3 = '#333333'
+gradient_color_4 = '#444444'
 
 # bottom = white
 gradient_color_5 = '#666666'
