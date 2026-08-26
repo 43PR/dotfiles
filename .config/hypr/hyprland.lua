@@ -1,8 +1,6 @@
 -- ~/.config/hypr/hyprland.lua
 -- Docs: https://wiki.hypr.land/Configuring/Start/
 
-hl.monitor({output = "MONITOR1", mode = "preferred", position = "auto", scale = "1"})
-
 ---- MY PROGRAMS ----
 
 mainMod    = "SUPER"
@@ -21,9 +19,9 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("wl-paste --type text --watch cliphist store")
     hl.exec_cmd("wl-paste --type image --watch cliphist store")
     hl.exec_cmd("/usr/lib/polkit-kde-authentication-agent-1")
-    
-    hl.exec_cmd("qs -d -c volume-osd")
+
     hl.exec_cmd("awww-daemon")
+    hl.exec_cmd("qs -d -c volume-osd")
 end)
 
 ---- ENVIRONMENT VARIABLES ----
@@ -48,6 +46,7 @@ hl.config({
 
 ---- LOOK AND FEEL ----
 
+hl.config({ render = { expand_undersized_textures = false}})
 hl.config({
     general = {
         gaps_in = 3,
@@ -67,7 +66,7 @@ hl.config({
         },
         shadow = {
             enabled = true,
-            range = 12,
+            range = 8,
             render_power = 3,
         },
     },
@@ -82,7 +81,7 @@ hl.animation({ leaf = "windows",    enabled = true, speed = 5, bezier = "easeOut
 hl.animation({ leaf = "windowsOut", enabled = true, speed = 5, bezier = "easeOut" })
 hl.animation({ leaf = "border",     enabled = true, speed = 5, bezier = "default" })
 hl.animation({ leaf = "fade",       enabled = true, speed = 4, bezier = "default" })
-hl.animation({ leaf = "workspaces", enabled = true, speed = 5, bezier = "default" })
+hl.animation({ leaf = "workspaces", enabled = true, speed = 7, bezier = "default", style = "slidefade" })
 
 -- LAYOUT
 hl.config({
@@ -102,5 +101,9 @@ hl.config({
 
 ---- SPLIT-OUT FILES ----
 
+require("monitors")
 require("keybinds")
 require("rules")
+
+-- HyprMod managed settings
+require("hyprland-gui")
