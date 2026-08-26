@@ -90,8 +90,7 @@ tooltip label {
 #temperature,
 #clock,
 #pulseaudio,
-#mpris,
-#custom-power {
+#mpris {
     transition: font-size 0.15s ease;
 }
 
@@ -101,7 +100,6 @@ tooltip label {
 #temperature:hover,
 #clock:hover,
 #pulseaudio:hover,
-#mpris:hover,
-#custom-power:hover {
-    font-size: 14px;
+#mpris:hover {
+    font-size: 13px;
 }

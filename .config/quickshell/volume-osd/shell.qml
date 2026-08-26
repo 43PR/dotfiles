@@ -95,7 +95,7 @@ PanelWindow {
         id: flyout
 
         width: 320
-        height: 35
+        height: 28
 
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
