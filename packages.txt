@@ -1,5 +1,9 @@
 # 43PR/dotfiles
 # Arch Linux packages required for the Hyprland setup
+#
+# Note: some of these (currently: wlogout) live only in the AUR,
+# not in the official repos. install.sh detects this automatically
+# and installs them with paru/yay if one is available.
 
 # --------------------------------------------------
 # Hyprland / desktop
@@ -18,7 +22,7 @@ xorg-xwayland
 # Wallpaper / screenshots
 # --------------------------------------------------
 
-awww
+swww
 grim
 slurp
 
@@ -59,5 +63,3 @@ ttf-font-awesome
 git
 curl
 unzip
-
-
