@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -euo pipefail
+set -uo pipefail
 
 # 43PR/dotfiles installer
 # Arch-compatible Linux + Hyprland
@@ -10,15 +10,16 @@ set -euo pipefail
 #
 # This script:
 #   1. Verifies that the system is Arch-based
-#   2. Detects the available package manager
-#   3. Installs required packages
+#   2. Detects the available package manager(s)
+#   3. Splits packages.txt into "official repo" vs "AUR-only" and
+#      installs each with the right tool, so a single AUR-only or
+#      unresolvable name never aborts the whole install
 #   4. Backs up existing ~/.config
 #   5. Installs this repository's configuration
 #
 # Supported package managers:
-#   - pacman       (Arch, Manjaro, EndeavourOS, CachyOS, etc.)
-#   - paru         (AUR helper)
-#   - yay          (AUR helper)
+#   - pacman       (official repos: Arch, Manjaro, EndeavourOS, CachyOS, etc.)
+#   - paru / yay   (AUR helpers, optional but recommended)
 #
 # Designed to be safe to run more than once.
 
@@ -78,6 +79,11 @@ if ! command -v sudo >/dev/null 2>&1; then
     exit 1
 fi
 
+if ! command -v pacman >/dev/null 2>&1; then
+    error "pacman was not found. This installer requires an Arch-based system."
+    exit 1
+fi
+
 # --------------------------------------------------
 # Package manager detection
 # --------------------------------------------------
@@ -89,44 +95,71 @@ if [[ ! -f "$PACKAGE_FILE" ]]; then
     exit 1
 fi
 
+AUR_HELPER=""
 if command -v paru >/dev/null 2>&1; then
-    PACKAGE_MANAGER="paru"
+    AUR_HELPER="paru"
 elif command -v yay >/dev/null 2>&1; then
-    PACKAGE_MANAGER="yay"
-elif command -v pacman >/dev/null 2>&1; then
-    PACKAGE_MANAGER="pacman"
-else
-    error "No supported package manager found."
-    error "Install pacman, paru, or yay before running this installer."
-    exit 1
+    AUR_HELPER="yay"
 fi
 
 info "Detected distribution: ${PRETTY_NAME:-unknown}"
-info "Using package manager: $PACKAGE_MANAGER"
+if [[ -n "$AUR_HELPER" ]]; then
+    info "AUR helper available: $AUR_HELPER"
+else
+    warning "No AUR helper (paru/yay) found. AUR-only packages will be listed but skipped."
+fi
 
 # --------------------------------------------------
-# Packages
+# Packages: split into official-repo vs AUR-only
 # --------------------------------------------------
 
 mapfile -t PACKAGES < <(
     grep -vE '^[[:space:]]*(#|$)' "$PACKAGE_FILE"
 )
 
+OFFICIAL_PACKAGES=()
+AUR_PACKAGES=()
+UNKNOWN_PACKAGES=()
+
 if [[ "${#PACKAGES[@]}" -eq 0 ]]; then
     warning "packages.txt does not contain any packages."
 else
-    info "Installing required packages..."
+    info "Resolving packages against official repos..."
 
-    case "$PACKAGE_MANAGER" in
-        paru|yay)
-            "$PACKAGE_MANAGER" -S --needed --noconfirm "${PACKAGES[@]}"
-            ;;
-        pacman)
-            sudo pacman -Syu --needed --noconfirm "${PACKAGES[@]}"
-            ;;
-    esac
+    for pkg in "${PACKAGES[@]}"; do
+        if pacman -Si "$pkg" >/dev/null 2>&1; then
+            OFFICIAL_PACKAGES+=("$pkg")
+        elif [[ -n "$AUR_HELPER" ]] && "$AUR_HELPER" -Si "$pkg" >/dev/null 2>&1; then
+            AUR_PACKAGES+=("$pkg")
+        else
+            UNKNOWN_PACKAGES+=("$pkg")
+        fi
+    done
 
-    success "Packages installed."
+    if [[ "${#OFFICIAL_PACKAGES[@]}" -gt 0 ]]; then
+        info "Installing official-repo packages..."
+        if sudo pacman -Syu --needed --noconfirm "${OFFICIAL_PACKAGES[@]}"; then
+            success "Official-repo packages installed."
+        else
+            warning "pacman reported an error installing one or more official-repo packages. Continuing anyway."
+        fi
+    fi
+
+    if [[ "${#AUR_PACKAGES[@]}" -gt 0 ]]; then
+        if [[ -n "$AUR_HELPER" ]]; then
+            info "Installing AUR packages with $AUR_HELPER: ${AUR_PACKAGES[*]}"
+            if "$AUR_HELPER" -S --needed --noconfirm "${AUR_PACKAGES[@]}"; then
+                success "AUR packages installed."
+            else
+                warning "$AUR_HELPER reported an error installing one or more AUR packages. Continuing anyway."
+            fi
+        fi
+    fi
+
+    if [[ "${#UNKNOWN_PACKAGES[@]}" -gt 0 ]]; then
+        warning "Could not resolve the following package(s) in any repo: ${UNKNOWN_PACKAGES[*]}"
+        warning "Check the name with 'pacman -Ss <name>' or https://aur.archlinux.org, then fix packages.txt."
+    fi
 fi
 
 # --------------------------------------------------
@@ -220,11 +253,16 @@ printf '\033[1;32m========================================\033[0m\n'
 printf '\n'
 
 printf 'Distribution:  %s\n' "${PRETTY_NAME:-unknown}"
-printf 'Package mgr:   %s\n' "$PACKAGE_MANAGER"
+printf 'AUR helper:    %s\n' "${AUR_HELPER:-none}"
 printf 'Configuration: %s\n' "$CONFIG_DIR"
 
 if [[ -d "$BACKUP_DIR" ]]; then
     printf 'Backup:        %s\n' "$BACKUP_DIR"
+fi
+
+if [[ "${#UNKNOWN_PACKAGES[@]:-0}" -gt 0 ]]; then
+    printf '\n'
+    warning "Unresolved packages (install manually): ${UNKNOWN_PACKAGES[*]}"
 fi
 
 printf '\n'
@@ -236,4 +274,3 @@ printf '  Hyprland\n'
 
 printf '\n'
 success "Installation complete!"
-
