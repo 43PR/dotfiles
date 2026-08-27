@@ -103,10 +103,29 @@ elif command -v yay >/dev/null 2>&1; then
 fi
 
 info "Detected distribution: ${PRETTY_NAME:-unknown}"
+
 if [[ -n "$AUR_HELPER" ]]; then
     info "AUR helper available: $AUR_HELPER"
 else
-    warning "No AUR helper (paru/yay) found. AUR-only packages will be listed but skipped."
+    info "No AUR helper found. Bootstrapping yay..."
+
+    if sudo pacman -S --needed --noconfirm git base-devel; then
+        YAY_BUILD_DIR="$(mktemp -d)"
+
+        if git clone https://aur.archlinux.org/yay.git "$YAY_BUILD_DIR/yay" \
+            && (cd "$YAY_BUILD_DIR/yay" && makepkg -si --noconfirm); then
+            AUR_HELPER="yay"
+            success "yay installed."
+        else
+            warning "Failed to build/install yay automatically."
+            warning "You can install one manually (paru or yay) and re-run this script."
+        fi
+
+        rm -rf "$YAY_BUILD_DIR"
+    else
+        warning "Failed to install git/base-devel; cannot bootstrap an AUR helper."
+        warning "AUR-only packages will be listed but skipped."
+    fi
 fi
 
 # --------------------------------------------------
