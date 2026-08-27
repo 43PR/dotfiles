@@ -105,5 +105,7 @@ require("monitors")
 require("keybinds")
 require("rules")
 
--- HyprMod managed settings
-require("hyprland-gui")
+local ok, err = pcall(require, "hyprland-gui")
+if not ok then
+    print("hyprland-gui not found, skipping (install HyprMod to enable it)")
+end
