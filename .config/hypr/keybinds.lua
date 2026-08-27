@@ -63,19 +63,24 @@ hl.bind(mainMod .. " + Space", function()
     end
 end)
 
+-- Gpu screen recorder
+hl.bind(mainMod .. " + R", hl.dsp.exec_cmd(
+    "bash -c 'PIDFILE=/tmp/osu-gsr.pid; if [ -f \"$PIDFILE\" ] && kill -0 \"$(cat \"$PIDFILE\")\" 2>/dev/null; then kill -INT \"$(cat \"$PIDFILE\")\"; rm -f \"$PIDFILE\"; else mkdir -p ~/Videos; gpu-screen-recorder -w HDMI-A-1 -f 60 -a default_output -o ~/Videos/$(date +%Y-%m-%d_%H-%M-%S).mp4 & echo $! > \"$PIDFILE\"; fi'"
+))
+
 -- Zoom
 local function zoomfunction(value)
     local zoomvalue = hl.get_config("cursor:zoom_factor")
-    if (zoomvalue + value) > 3.0 then
-        hl.config({ cursor = { zoom_factor = 3.0 } })
+    if (zoomvalue + value) > 1.5 then
+        hl.config({ cursor = { zoom_factor = 1.5 } })
     elseif (zoomvalue + value) < 1.0 then
         hl.config({ cursor = { zoom_factor = 1.0 } })
     else
         hl.config({ cursor = { zoom_factor = zoomvalue + value } })
     end
 end
-hl.bind(mainMod .. " + Minus", function() zoomfunction(-0.3) end, { repeating = true})
-hl.bind(mainMod .. " + Plus", function() zoomfunction(0.3) end, { repeating = true })
+hl.bind(mainMod .. " + mouse_down", function() zoomfunction(-0.5) end, { repeating = true })
+hl.bind(mainMod .. " + mouse_up", function() zoomfunction(0.5) end, { repeating = true })
 
 --# Zoom with keypad
 hl.bind(mainMod .. " + code:82", function() zoomfunction(-0.3) end, { repeating = true })
