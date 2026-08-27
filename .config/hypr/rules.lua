@@ -11,7 +11,7 @@ hl.layer_rule({
 -- Opacity rules: 90% for all windows except fullscreen
 hl.window_rule({
     match = { class = ".*" },
-    opacity = "0.8 override",
+    opacity = "0.9 override",
 })
 
 hl.window_rule({
