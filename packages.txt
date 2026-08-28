@@ -22,7 +22,7 @@ xorg-xwayland
 # Wallpaper / screenshots
 # --------------------------------------------------
 
-swww
+awww
 grim
 slurp
 
