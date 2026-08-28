@@ -1,7 +1,6 @@
-## Simple Hyprland Rice
+## Simple Hyprland Setup
 
 **Full showcase: https://youtu.be/-fGqZo_W268**
-
 **Tutorial: https://youtu.be/eo9MejbzWto**
 
 Simple Hyprland setup focused on practical keybinds, productivity, and a smooth workflow easy to customize
@@ -21,104 +20,65 @@ Wallpapers: https://wallhaven.cc/user/43pr
 > Change volume with mouse wheel, mute, play/pause, next and blue light filter
 * Rofi
 > App search, clipboard history and switch opacity
-* Hyprlock
-* Wlogout
+* Hyprlock (Lock screen)
+* Wlogout (Logout menu)
 * Custom wallpaper selector
 * Custom scripts
-* Spotify + Spicetify. Theme: text darkthemer
+* Spotify + Spicetify. Theme: text by darkthemer (edited)
 
 ### Wallpaper Selector
 
-[hyprquickpaper](https://github.com/iamsurjog/hyprquickpaper)
+> Inspired by
 
-> check out the original source it explains how to setup I just made changes to it 
+[hyprquickpaper](https://github.com/iamsurjog/hyprquickpaper)
 
 ### Most used keybinds
 
 > **$mod = Super / Windows key**
 
-| Keybind     | Action                    |
-| ----------- | ------------------------- |
-| `Super + T` | Open terminal             |
-| `Super + D` | Open application launcher |
-| `Super + E` | Open file manager         |
-| `Super + B` | Open browser              |
-| `Super + W` | Open wallpaper selector   |
-| `Super + O` | Switch opacity            |
-| `Super + V` | Open clipboard history    |
-```ini
-hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("quickshell -n -c hyprquickpaper"))
-```
-```ini
-hl.bind(mainMod .. " + O", hl.dsp.exec_cmd(home .. "/.config/hypr/scripts/opacity.sh"))
-```
-```ini
-hl.bind(mainMod .. " + V", hl.dsp.exec_cmd("cliphist list | rofi -dmenu | cliphist decode | wl-copy"))
-```
-**Window Management and more**
-| Keybind         | Action              |
-| --------------- | ------------------- |
-| `Super + Q`     | Close active window |
-| `Super + F`     | Toggle fullscreen   |
-| `Super + Space` | Toggle floating     |
-| `Super + Tab`   | Lock screen         |
-| `Super + Esc`   | Open logout menu    |
-```ini
-hl.bind(mainMod .. " + GRAVE", hl.dsp.exec_cmd("pgrep -x wlogout >/dev/null || wlogout -b 1 -c 20 -r 20 -L 1700 -R 1700 -T 325 -B 325"))
-```
-**Move/resize window with mouse**
-```ini
-hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
-```
-```ini
-hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
-```
-**Toggle Waybar**
-```ini
-hl.bind(mainMod .. " + SHIFT + W", hl.dsp.exec_cmd("sh -c 'pgrep -x waybar >/dev/null && pkill waybar || nohup waybar >/dev/null 2>&1 &'"))
-```
+| Keybind         | Action                    |
+| -----------     | ------------------------- |
+| `Super + T`     | Open terminal             |
+| `Super + Q`     | Close active window       |
+| `Super + D`     | Open application launcher |
+| `Super + E`     | Open file manager         |
+| `Super + B`     | Open browser              |
+| `Super + W`     | Open wallpaper selector   |
+| `Super + O`     | Switch opacity            |
+| `Super + V`     | Open clipboard history    |          
+| `Super + F`     | Toggle fullscreen         |
+| `Super + Space` | Toggle floating           |
+| `Super + Tab`   | Lock screen               |
+| `Super + Grave` | Logout menu               |
 
 ---
+## Installation 
 
-### Installed Programs:
+> **READ ALL**
 
-```text
-Waybar
-Rofi
-Hyprlock
-Wlogout
-Quickshell
-awww
-Grim
-Slurp
-Cliphist
-wl-clipboard
-```
+You'll need to edit some paths with your username ".config/wlogoutstyle.css".
 
----
-## Installation
-> **READ:** Some paths and applications are specific to my setup. You may need to modify the configuration files to match your system.
+Existing configuration files that are being replaced will be backed up automatically.
+
+You can just clone the repo first and remove packages that you won't need.
+
+Edit default programs in "config/hypr/hyprland.lua".
 
 **Clone the repository and run the installer:**
 
 ```bash
+
+sudo pacman -S git   
+```
+```bash
+
 git clone https://github.com/43PR/dotfiles.git
 cd dotfiles
 chmod +x install.sh
 ./install.sh
 ```
 
-The installer will modify your ~/.config directory. 
-
-Existing configuration files that are being replaced will be backed up automatically.
-
-After the installation finishes, restart Hyprland or log out and back in.
-
-```bash
-hyprctl reload
-```
-
-If you encounter any issues, check the relevant configuration files under: ~/.config/
+> **After the installation finishes edit the paths and log out and back in.**
 
 ---
 
