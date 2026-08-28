@@ -89,7 +89,7 @@ You can clone the repo and remove programs from the packages.txt and then instal
 
 Edit default programs in "config/hypr/hyprland.lua".
 
-## ☕ Support solo Project: "Ko-fi" (https://ko-fi.com/43pr2)
+### ☕ Support solo Project: "Ko-fi" https://ko-fi.com/43pr2
 
 ---
 
