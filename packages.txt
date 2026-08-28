@@ -88,3 +88,4 @@ curl
 unzip
 btop
 fastfetch
+cava
