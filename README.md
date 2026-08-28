@@ -38,16 +38,16 @@ Wallpapers: https://wallhaven.cc/user/43pr
 
 | Keybind                 | Action                    |
 | -----------             | ------------------------- |
-| `Super + T`             | Open terminal             |
+| `Super + T`             | Terminal                  |
 | `Super + Q`             | Close active window       |
 | `Super + 1, 2, 3..`     | Change workspaces         |
 | `Super + Shift + 1, 2..`| Move window to workspace  |
-| `Super + D`             | Open application launcher |
-| `Super + E`             | Open file manager         |
-| `Super + B`             | Open browser              |
-| `Super + W`             | Open wallpaper selector   |
+| `Super + D`             | Application launcher      |
+| `Super + E`             | File manager              |
+| `Super + B`             | Browser                   |
+| `Super + W`             | Wallpaper selector        |
 | `Super + O`             | Switch opacity            |
-| `Super + V`             | Open clipboard history    |          
+| `Super + V`             | Clipboard history         |          
 | `Super + F`             | Toggle fullscreen         |
 | `Super + Space`         | Toggle floating           |
 | `Super + Tab`           | Lock screen               |
