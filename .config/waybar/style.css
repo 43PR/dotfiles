@@ -73,12 +73,12 @@ tooltip {
     color: #ffffff;
     font-weight: bold;
     border: 1px solid rgba(255, 255, 255, 0);
-    border-radius: 25px;
+    border-radius: 10px;
 }
 
 tooltip label {
     color: #ffffff;
-    font-size: 11px;
+    font-size: 13px;
     padding: 0;
     margin: 0;
 }
