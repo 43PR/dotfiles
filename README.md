@@ -36,25 +36,22 @@ Wallpapers: https://wallhaven.cc/user/43pr
 > **$mod = Super = Windows key**
 > **You can modify the binds using HyprMod**
 
-| Keybind         | Action                    |
-| -----------     | ------------------------- |
-| `Super + T`     | Open terminal             |
-| `Super + Q`     | Close active window       |
-| `Super + D`     | Open application launcher |
-| `Super + E`     | Open file manager         |
-| `Super + B`     | Open browser              |
-| `Super + W`     | Open wallpaper selector   |
-| `Super + O`     | Switch opacity            |
-| `Super + V`     | Open clipboard history    |          
-| `Super + F`     | Toggle fullscreen         |
-| `Super + Space` | Toggle floating           |
-| `Super + Tab`   | Lock screen               |
-| `Super + Grave` | Logout menu               |
-
 | Keybind                 | Action                    |
 | -----------             | ------------------------- |
+| `Super + T`             | Open terminal             |
+| `Super + Q`             | Close active window       |
 | `Super + 1, 2, 3..`     | Change workspaces         |
 | `Super + Shift + 1, 2..`| Move window to workspace  |
+| `Super + D`             | Open application launcher |
+| `Super + E`             | Open file manager         |
+| `Super + B`             | Open browser              |
+| `Super + W`             | Open wallpaper selector   |
+| `Super + O`             | Switch opacity            |
+| `Super + V`             | Open clipboard history    |          
+| `Super + F`             | Toggle fullscreen         |
+| `Super + Space`         | Toggle floating           |
+| `Super + Tab`           | Lock screen               |
+| `Super + Grave`         | Logout menu               |
 | `Super + Shift + W`     | Toggle waybar             |
 | `Super + Mouse wheel`   | Zoom                      |
 
