@@ -1,6 +1,6 @@
 {
-    "wallpaper_path": "/home/rp34/Pictures/Wallpapers/",
-    "cache_path": "/home/rp34/.cache/quickshell/thumbs/",
+    "wallpaper_path": "Pictures/Wallpapers/",
+    "cache_path": ".cache/quickshell/thumbs/",
     "number_of_pictures": 10,
     "border_color": "#80FFFFFF",
     "cache_batch_size": 20
