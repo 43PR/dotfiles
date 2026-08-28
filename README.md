@@ -23,6 +23,7 @@ Wallpapers: https://wallhaven.cc/user/43pr
 * Wlogout (Logout menu)
 * Custom wallpaper selector
 * Custom scripts
+* Custom monochrome theme
 * Spotify + Spicetify. Theme: text by darkthemer (edited)
 
 ### Wallpaper Selector
