@@ -8,10 +8,10 @@ Simple Hyprland setup focused on practical keybinds, productivity, and a smooth 
 
 Feel free to use as inspiration or as a starting point for building your own setup.
 
-![](x.png)
-![](lock.png)
-![](z.png)
-![](ww.png)
+![](Wallpapers/Showcase/1.png)
+![](Wallpapers/Showcase/2.png)
+![](Wallpapers/Showcase/3.png)
+![](Wallpapers/Showcase/4.png)
 
 Wallpapers: https://wallhaven.cc/user/43pr
 
@@ -83,7 +83,6 @@ hl.bind(mainMod .. " + SHIFT + W", hl.dsp.exec_cmd("sh -c 'pgrep -x waybar >/dev
 ### Installed Programs:
 
 ```text
-Hyprland
 Waybar
 Rofi
 Hyprlock
