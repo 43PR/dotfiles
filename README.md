@@ -68,7 +68,7 @@ You'll need to edit some paths with your username ".config/wlogoutstyle.css".
 
 Existing configuration files that are being replaced will be backed up automatically.
 
-You can just clone the repo first and remove packages that you won't need.
+You can clone the repo and remove programs from the packages.txt and then install if you want.
 
 Edit default programs in "config/hypr/hyprland.lua".
 
