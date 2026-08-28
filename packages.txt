@@ -87,6 +87,7 @@ ttf-font-awesome
 curl
 unzip
 gammastep
+nvtop
 btop
 fastfetch
 cava
