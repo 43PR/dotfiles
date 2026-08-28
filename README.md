@@ -60,6 +60,8 @@ Wallpapers: https://wallhaven.cc/user/43pr
 ---
 ## Installation 
 
+> Should work for Arch, Manjaro, EndeavourOS, CachyOS, etc. Let me know if there's any issues
+
 > **READ ALL**
 
 You'll need to edit some paths with your username ".config/wlogoutstyle.css".
