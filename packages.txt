@@ -49,6 +49,8 @@ wireplumber
 
 kitty
 thunar
+xed
+spotify-launcher
 
 # --------------------------------------------------
 # Media
@@ -77,4 +79,3 @@ curl
 unzip
 btop
 fastfetch
-xed
