@@ -36,10 +36,16 @@
         "interval": 2,
         "on-click": "~/.config/waybar/scripts/toggle-gammastep"
     },
-
+//  "format": "{:%H:%M}",
     "clock": {
         "format": "{:%H:%M}",
-        "tooltip-format": "<tt>{:%a %d %b %Y}</tt>"
+        "tooltip-format": "<tt><small>{calendar}</small></tt>",
+        "calendar": {
+            "mode": "month",
+            "format": {
+                "today": "<b><u>{}</u></b>"
+            }
+        }
     },
 
     "mpris": {
