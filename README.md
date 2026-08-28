@@ -1,6 +1,7 @@
 ## Simple Hyprland Setup
 
 **Full showcase: https://youtu.be/-fGqZo_W268**
+
 **Tutorial: https://youtu.be/eo9MejbzWto**
 
 Simple Hyprland setup focused on practical keybinds, productivity, and a smooth workflow easy to customize
@@ -16,10 +17,8 @@ Wallpapers: https://wallhaven.cc/user/43pr
 
 ## Features
 
-* Waybar
-> Change volume with mouse wheel, mute, play/pause, next and blue light filter
-* Rofi
-> App search, clipboard history and switch opacity
+* Waybar > Change volume with mouse wheel, mute, play/pause, next and blue light filter
+* Rofi > App search, clipboard history and switch opacity
 * Hyprlock (Lock screen)
 * Wlogout (Logout menu)
 * Custom wallpaper selector
@@ -34,7 +33,8 @@ Wallpapers: https://wallhaven.cc/user/43pr
 
 ### Most used keybinds
 
-> **$mod = Super / Windows key**
+> **$mod = Super = Windows key**
+> **You can modify the binds using HyprMod**
 
 | Keybind         | Action                    |
 | -----------     | ------------------------- |
@@ -50,6 +50,15 @@ Wallpapers: https://wallhaven.cc/user/43pr
 | `Super + Space` | Toggle floating           |
 | `Super + Tab`   | Lock screen               |
 | `Super + Grave` | Logout menu               |
+
+| Keybind                 | Action                    |
+| -----------             | ------------------------- |
+| `Super + 1, 2, 3..`     | Change workspaces         |
+| `Super + Shift + 1, 2..`| Move window to workspace  |
+| `Super + Shift + W`     | Toggle waybar             |
+| `Super + Mouse wheel`   | Zoom                      |
+
+> **All keybinds in config/hypr/keybinds.lua**
 
 ---
 ## Installation 
