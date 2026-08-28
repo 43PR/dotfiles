@@ -46,7 +46,6 @@ wireplumber
 # --------------------------------------------------
 
 kitty
-firefox
 thunar
 
 # --------------------------------------------------
@@ -75,3 +74,6 @@ ttf-font-awesome
 git
 curl
 unzip
+btop
+fastfetch
+xed
