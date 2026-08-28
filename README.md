@@ -1,4 +1,4 @@
-## Simple Hyprland Setup
+0## Simple Hyprland Setup
 
 **Full showcase: https://youtu.be/-fGqZo_W268**
 
@@ -89,8 +89,7 @@ You can clone the repo and remove programs from the packages.txt and then instal
 
 Edit default programs in "config/hypr/hyprland.lua".
 
-
-### **Support: https://ko-fi.com/43pr2**
+## ☕ Support solo Project: "Ko-fi" (https://ko-fi.com/43pr2)
 
 ---
 
