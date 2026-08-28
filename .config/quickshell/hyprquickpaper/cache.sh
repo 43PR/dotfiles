@@ -5,8 +5,8 @@ CONFIG="$1/config.json"
 
 
 
-wallpaper_path=$(jq -r '.wallpaper_path' "$CONFIG")
-cache_path=$(jq -r '.cache_path' "$CONFIG")
+wallpaper_path="$HOME/$(jq -r '.wallpaper_path' "$CONFIG")"
+cache_path="$HOME/$(jq -r '.cache_path' "$CONFIG")"
 cache_batch_size=$(jq -r '.cache_batch_size' "$CONFIG")
 
 mkdir -p "$cache_path"

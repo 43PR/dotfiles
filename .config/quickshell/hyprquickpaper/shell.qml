@@ -16,6 +16,9 @@ PanelWindow {
     property int baseSpacing: 10
     property int startPosition: 20
 
+    // Resolved once, used to expand relative paths from config.json
+    readonly property string homeDir: Quickshell.env("HOME")
+
     implicitHeight: 500
     implicitWidth: Screen.width
     color: "transparent"
@@ -50,7 +53,7 @@ PanelWindow {
     FolderListModel {
         id: folderModel
 
-        folder: "file://" + configs.wallpaper_path
+        folder: "file://" + main.homeDir + "/" + configs.wallpaper_path
         showDirs: false
         nameFilters: ["*.png", "*.jpg"]
         sortField: FolderListModel.Name
@@ -181,6 +184,7 @@ PanelWindow {
                     smooth: true
 
                     source: "file://" +
+                            main.homeDir + "/" +
                             configs.cache_path +
                             fileName
 
