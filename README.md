@@ -60,17 +60,9 @@ Wallpapers: https://wallhaven.cc/user/43pr
 ---
 ## Installation 
 
-> Should work for Arch, Manjaro, EndeavourOS, CachyOS, etc. Let me know if there's any issues
-
 > **READ ALL**
 
-You'll need to edit some paths with your username ".config/wlogoutstyle.css".
-
-Existing configuration files that are being replaced will be backed up automatically.
-
-You can clone the repo and remove programs from the packages.txt and then install if you want.
-
-Edit default programs in "config/hypr/hyprland.lua".
+Should work for Arch, Manjaro, EndeavourOS, CachyOS, etc. Let me know if there's any issues
 
 **Clone the repository and run the installer:**
 
@@ -87,6 +79,14 @@ chmod +x install.sh
 ```
 
 > **After the installation finishes edit the paths and log out and back in.**
+
+You'll need to edit some paths with your username ".config/wlogoutstyle.css".
+
+Existing configuration files that are being replaced will be backed up automatically.
+
+You can clone the repo and remove programs from the packages.txt and then install if you want.
+
+Edit default programs in "config/hypr/hyprland.lua".
 
 ---
 
