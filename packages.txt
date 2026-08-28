@@ -15,6 +15,7 @@ rofi
 hyprlock
 wlogout
 quickshell
+jq
 xdg-desktop-portal-hyprland
 xorg-xwayland
 
@@ -25,6 +26,7 @@ xorg-xwayland
 awww
 grim
 slurp
+imagemagick
 
 # --------------------------------------------------
 # Clipboard
@@ -71,7 +73,6 @@ ttf-font-awesome
 # Utilities
 # --------------------------------------------------
 
-git
 curl
 unzip
 btop
