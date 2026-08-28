@@ -89,5 +89,4 @@ unzip
 gammastep
 nvtop
 btop
-fastfetch
 cava
