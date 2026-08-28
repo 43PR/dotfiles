@@ -1,0 +1,23 @@
+window,
+.background,
+headerbar,
+.sidebar,
+.view,
+.titlebar,
+notebook,
+menu,
+.menu,
+popover,
+.toolbar,
+textview,
+textview text,
+treeview,
+treeview.view,
+treeview.view text {
+    background-color: #000000;
+    background-image: none;
+}
+
+* {
+    color: #ffffff;
+}
