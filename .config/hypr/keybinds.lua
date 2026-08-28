@@ -35,6 +35,10 @@ hl.bind(mainMod .. " + V", hl.dsp.exec_cmd("pgrep -x rofi >/dev/null && pkill -x
 hl.bind(mainMod .. " + Delete", hl.dsp.exec_cmd("grim " .. home .. "/Pictures/$(date +%s).png"))
 hl.bind("Delete", hl.dsp.exec_cmd('grim -g "$(slurp)" ' .. home .. '/Pictures/$(date +%s).png'))
 
+-- Brightness
+hl.bind("XF86MonBrightnessUp",   hl.dsp.exec_cmd("brightnessctl set 5%+"), { locked = true, repeating = true })
+hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("brightnessctl set 5%-"), { locked = true, repeating = true })
+
 -- Keyboard layout
 hl.bind(mainMod .. " + X", hl.dsp.exec_cmd("hyprctl switchxkblayout current next"))
 
