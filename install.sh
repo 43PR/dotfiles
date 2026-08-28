@@ -219,6 +219,26 @@ cp -a "$REPO_DIR/.config/." "$CONFIG_DIR/"
 success "Dotfiles installed."
 
 # --------------------------------------------------
+# Papirus folder color
+# --------------------------------------------------
+
+if [[ -n "$AUR_HELPER" ]]; then
+    info "Installing Papirus folders..."
+
+    if "$AUR_HELPER" -S --needed --noconfirm papirus-folders; then
+        if papirus-folders -C white; then
+            success "Papirus folders set to white."
+        else
+            warning "papirus-folders was installed, but setting the folder color failed."
+        fi
+    else
+        warning "Failed to install papirus-folders."
+    fi
+else
+    warning "No AUR helper available; skipping papirus-folders."
+fi
+
+# --------------------------------------------------
 # Wallpapers
 # --------------------------------------------------
 
