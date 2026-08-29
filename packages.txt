@@ -50,7 +50,6 @@ wireplumber
 kitty
 thunar
 xed
-spotify-launcher
 
 # --------------------------------------------------
 # File manager / thumbnails / icons / GTK
