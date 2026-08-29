@@ -1,4 +1,4 @@
-0## Simple Hyprland Setup
+## Simple Hyprland Setup
 
 Full showcase: https://youtu.be/-fGqZo_W268
 
