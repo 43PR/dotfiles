@@ -59,6 +59,7 @@ spotify-launcher
 tumbler
 ffmpegthumbnailer
 papirus-icon-theme
+papirus-folders
 nwg-look
 
 # --------------------------------------------------
