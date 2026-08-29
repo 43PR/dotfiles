@@ -1,8 +1,10 @@
 0## Simple Hyprland Setup
 
-**Full showcase: https://youtu.be/-fGqZo_W268**
+Full showcase: https://youtu.be/-fGqZo_W268
 
-**Tutorial: https://youtu.be/eo9MejbzWto**
+Setup tutorial: https://youtu.be/DFaSCFysr8s
+
+Full guide CachyOS: https://youtu.be/eo9MejbzWto
 
 Simple Hyprland setup focused on practical keybinds, productivity, and a smooth workflow easy to customize
 
