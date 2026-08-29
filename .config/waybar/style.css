@@ -1,3 +1,5 @@
+@define-color bg-color rgba(20, 20, 20, 0.5);
+
 /* General */
 * {
     font-family: "JetBrainsMono Nerd Font", "Symbols Nerd Font Mono", monospace;
@@ -11,25 +13,13 @@ window#waybar {
     color: #ffffff;
 }
 
-/* LEFT */
-.modules-left {
-    background-color: rgba(20, 20, 20, 0.5);
-    border-radius: 10px;
-    margin: 4px 0 2px 6px;
-}
-
-/* CENTER */
-.modules-center {
-    background-color: rgba(20, 20, 20, 0.5);
-    border-radius: 10px;
-    margin: 4px 0 2px;
-}
-
-/* RIGHT */
+/* MODULES */
+.modules-left,
+.modules-center,
 .modules-right {
-    background-color: rgba(20, 20, 20, 0.5);
+    background-color: @bg-color;
     border-radius: 10px;
-    margin: 4px 6px 2px 0;
+    margin: 4px 0 2px 0;
 }
 
 /* Module spacing */
@@ -69,10 +59,10 @@ window#waybar {
 
 /* Tooltip */
 tooltip {
-    background-color: rgba(20, 20, 20, 0.4);
+    background-color: @bg-color;
     color: #ffffff;
     font-weight: bold;
-    border: 1px solid rgba(255, 255, 255, 0);
+    border: 0px solid rgba(255, 255, 255, 0.5);
     border-radius: 10px;
 }
 
