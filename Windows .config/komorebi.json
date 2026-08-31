@@ -1,0 +1,20 @@
+{
+  "$schema": "https://raw.githubusercontent.com/LGUG2Z/komorebi/master/schema.json",
+
+  "border": true,
+  "border_width": 2,
+
+  "default_workspace_padding": 0,
+  "default_container_padding": 2,
+
+  "workspaces": [
+    "I",
+    "II",
+    "III",
+    "IV",
+    "V",
+    "VI",
+    "VII",
+    "VIII"
+  ]
+}
