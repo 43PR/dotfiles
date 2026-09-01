@@ -38,19 +38,21 @@ Translucent Windows > No configuration changes are needed. Just turn on and off.
 Taskbar tray system icon tweaks
 Taskbar Clock Customization
 
-> After installing programs in the terminal close an reopen it
+> After installing programs in the terminal "reload" (close an reopen it)
 
 ### Cava
 
 Install Cava using WinGet Run:
 winget install karlstav.cava
-command: cava
+reload
+cava
 
 ### Btop
 
 Install btop:
 winget install --id aristocratos.btop4win -e
-command: btop
+reload
+btop
 
 ### YASB status bar
 
