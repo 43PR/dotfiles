@@ -7,10 +7,15 @@ You can copy the configuration files for YASB and Komorebi directly from this re
 Note: The Komorebi configuration is still rough and may contain bugs or unfinished parts. Feel free to skip that section if you just want the other customizations.
 
 YASB — Custom status bar
+
 Komorebi — Tiling window manager configuration
+
 WHKD — Keyboard shortcuts for Komorebi
+
 Spicetify — Spotify customization
+
 Wallpaper picker — Python-based wallpaper tool
+
 
 ### Windows Keybinds
 
