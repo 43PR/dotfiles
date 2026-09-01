@@ -2,10 +2,10 @@
   "$schema": "https://raw.githubusercontent.com/LGUG2Z/komorebi/master/schema.json",
 
   "border": true,
-  "border_width": 2,
+  "border_width": 0,
 
-  "default_workspace_padding": 0,
-  "default_container_padding": 2,
+  "default_workspace_padding": 3,
+  "default_container_padding": 3,
 
   "workspaces": [
     "I",
@@ -16,5 +16,15 @@
     "VI",
     "VII",
     "VIII"
+  ],
+
+  "application_rules": [
+    {
+      "match": {
+        "exe": "brave.exe"
+      },
+      "manage": true,
+      "workspace": "II"
+    }
   ]
 }

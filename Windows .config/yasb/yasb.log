@@ -537,3 +537,488 @@
 2026-08-31 16:44:49,981 [INFO] [MainThread] [root/watcher.py:104]: Created file watcher
 2026-08-31 16:44:50,016 [INFO] [MainThread] [root/update_service.py:434]: Background update checker started
 2026-08-31 16:44:50,026 [INFO] [Dummy-10] [root/windows_notification.py:161]: Notification service started (WNF_SHEL_NOTIFICATION_TOTAL)
+2026-08-31 16:53:23,625 [INFO] [MainThread] [root/controller.py:21]: Reloading Application because of config change.
+2026-08-31 16:53:23,735 [INFO] [MainThread] [cli_server/cli_server.py:114]: Log pipe server stopped
+2026-08-31 16:53:23,767 [INFO] [MainThread] [root/bar_manager.py:93]: Successfully loaded updated config and re-initialised all bars.
+2026-08-31 16:53:23,891 [INFO] [MainThread] [root/bar_manager.py:111]: Stopping HotkeyListener...
+2026-08-31 16:53:23,907 [INFO] [MainThread] [root/bar_manager.py:119]: Stopping WindowsNotificationEventListener...
+2026-08-31 16:53:23,910 [INFO] [Dummy-10] [root/windows_notification.py:97]: Notification service stopped
+2026-08-31 16:53:24,713 [INFO] [MainThread] [root/log.py:104]: YASB v2.0.6
+2026-08-31 16:53:24,714 [INFO] [CLIPipeServer] [cli_server/cli_server.py:216]: CLI server started v1.1.7
+2026-08-31 16:53:24,715 [INFO] [MainThread] [cli_server/cli_server.py:106]: Log pipe server started
+2026-08-31 16:53:25,618 [INFO] [MainThread] [root/service.py:52]: AudioOutputService starting...
+2026-08-31 16:53:25,992 [INFO] [MainThread] [root/bar_manager.py:238]: Starting HotkeyListener...
+2026-08-31 16:53:25,992 [INFO] [MainThread] [root/bar_manager.py:103]: Starting WindowsNotificationEventListener...
+2026-08-31 16:53:25,996 [INFO] [MainThread] [root/watcher.py:65]: Watching directory: c:\users\user\.config\yasb
+2026-08-31 16:53:26,001 [INFO] [MainThread] [root/watcher.py:104]: Created file watcher
+2026-08-31 16:53:26,026 [INFO] [MainThread] [root/update_service.py:434]: Background update checker started
+2026-08-31 16:53:26,032 [INFO] [Dummy-10] [root/windows_notification.py:161]: Notification service started (WNF_SHEL_NOTIFICATION_TOTAL)
+2026-08-31 16:53:37,897 [ERROR] [Thread-11 (_run_after_command)] [root/wallpaper_manager.py:173]: error: El argumento 'C:\Users\User\.config\yasb\scripts\sync_wallpaper_desktops.ps1' para el par�metro -File no existe. Proporcione la ruta de acceso a un archivo '.ps1' existente como argumento para el par�metro -File.
+
+2026-08-31 16:54:52,516 [INFO] [MainThread] [root/controller.py:21]: Reloading Application from tray...
+2026-08-31 16:54:52,632 [INFO] [MainThread] [cli_server/cli_server.py:114]: Log pipe server stopped
+2026-08-31 16:54:52,696 [INFO] [MainThread] [root/bar_manager.py:111]: Stopping HotkeyListener...
+2026-08-31 16:54:52,701 [INFO] [MainThread] [root/bar_manager.py:119]: Stopping WindowsNotificationEventListener...
+2026-08-31 16:54:52,701 [INFO] [Dummy-10] [root/windows_notification.py:97]: Notification service stopped
+2026-08-31 16:54:53,483 [INFO] [MainThread] [root/log.py:104]: YASB v2.0.6
+2026-08-31 16:54:53,484 [INFO] [CLIPipeServer] [cli_server/cli_server.py:216]: CLI server started v1.1.7
+2026-08-31 16:54:53,484 [INFO] [MainThread] [cli_server/cli_server.py:106]: Log pipe server started
+2026-08-31 16:54:54,390 [INFO] [MainThread] [root/service.py:52]: AudioOutputService starting...
+2026-08-31 16:54:54,766 [INFO] [MainThread] [root/bar_manager.py:238]: Starting HotkeyListener...
+2026-08-31 16:54:54,766 [INFO] [MainThread] [root/bar_manager.py:103]: Starting WindowsNotificationEventListener...
+2026-08-31 16:54:54,770 [INFO] [MainThread] [root/watcher.py:65]: Watching directory: c:\users\user\.config\yasb
+2026-08-31 16:54:54,770 [INFO] [MainThread] [root/watcher.py:104]: Created file watcher
+2026-08-31 16:54:54,801 [INFO] [MainThread] [root/update_service.py:434]: Background update checker started
+2026-08-31 16:54:54,831 [INFO] [Dummy-10] [root/windows_notification.py:161]: Notification service started (WNF_SHEL_NOTIFICATION_TOTAL)
+2026-08-31 16:55:26,348 [INFO] [MainThread] [root/bar_helper.py:594]: AppBarManager need to re-register 1 bar
+2026-08-31 16:55:26,995 [INFO] [MainThread] [root/bar_helper.py:603]: Re-registered AppBar for primary-bar_MSI G271_45a31cd0 (space reservation + fullscreen)
+2026-08-31 16:57:12,640 [INFO] [MainThread] [root/controller.py:21]: Reloading Application because of config change.
+2026-08-31 16:57:12,753 [INFO] [MainThread] [cli_server/cli_server.py:114]: Log pipe server stopped
+2026-08-31 16:57:12,765 [INFO] [MainThread] [root/bar_manager.py:93]: Successfully loaded updated config and re-initialised all bars.
+2026-08-31 16:57:12,809 [INFO] [MainThread] [root/bar_manager.py:111]: Stopping HotkeyListener...
+2026-08-31 16:57:12,814 [INFO] [MainThread] [root/bar_manager.py:119]: Stopping WindowsNotificationEventListener...
+2026-08-31 16:57:12,814 [INFO] [Dummy-10] [root/windows_notification.py:97]: Notification service stopped
+2026-08-31 16:57:13,430 [INFO] [MainThread] [root/log.py:104]: YASB v2.0.6
+2026-08-31 16:57:13,430 [INFO] [CLIPipeServer] [cli_server/cli_server.py:216]: CLI server started v1.1.7
+2026-08-31 16:57:13,431 [INFO] [MainThread] [cli_server/cli_server.py:106]: Log pipe server started
+2026-08-31 16:57:14,381 [INFO] [MainThread] [root/service.py:52]: AudioOutputService starting...
+2026-08-31 16:57:14,725 [INFO] [MainThread] [root/bar_manager.py:238]: Starting HotkeyListener...
+2026-08-31 16:57:14,726 [INFO] [MainThread] [root/bar_manager.py:103]: Starting WindowsNotificationEventListener...
+2026-08-31 16:57:14,732 [INFO] [MainThread] [root/watcher.py:65]: Watching directory: c:\users\user\.config\yasb
+2026-08-31 16:57:14,732 [INFO] [MainThread] [root/watcher.py:104]: Created file watcher
+2026-08-31 16:57:14,775 [INFO] [MainThread] [root/update_service.py:434]: Background update checker started
+2026-08-31 16:57:14,777 [INFO] [Dummy-10] [root/windows_notification.py:161]: Notification service started (WNF_SHEL_NOTIFICATION_TOTAL)
+2026-08-31 16:58:19,429 [INFO] [MainThread] [root/controller.py:21]: Reloading Application because of config change.
+2026-08-31 16:58:19,538 [INFO] [MainThread] [cli_server/cli_server.py:114]: Log pipe server stopped
+2026-08-31 16:58:19,548 [INFO] [MainThread] [root/bar_manager.py:93]: Successfully loaded updated config and re-initialised all bars.
+2026-08-31 16:58:19,599 [INFO] [MainThread] [root/bar_manager.py:111]: Stopping HotkeyListener...
+2026-08-31 16:58:19,603 [INFO] [MainThread] [root/bar_manager.py:119]: Stopping WindowsNotificationEventListener...
+2026-08-31 16:58:19,604 [INFO] [Dummy-10] [root/windows_notification.py:97]: Notification service stopped
+Windows fatal exception: access violation
+
+Thread 0x00000990 (most recent call first):
+  <no Python frame>
+
+Thread 0x00000c84 [LogPipeServer] (most recent call first):
+  File "D:\a\yasb\yasb\src\core\utils\win32\bindings\kernel32.py", line 291 in ConnectNamedPipe
+  File "D:\a\yasb\yasb\src\core\utils\cli_server.py", line 138 in _run_server
+  File "C:\hostedtoolcache\windows\Python\3.14.6\x64\Lib\threading.py", line 1024 in run
+  File "C:\hostedtoolcache\windows\Python\3.14.6\x64\Lib\threading.py", line 1082 in _bootstrap_inner
+  File "C:\hostedtoolcache\windows\Python\3.14.6\x64\Lib\threading.py", line 1044 in _bootstrap
+
+Thread 0x00000310 [CLIPipeServer] (most recent call first):
+  File "D:\a\yasb\yasb\src\core\utils\win32\bindings\kernel32.py", line 291 in ConnectNamedPipe
+  File "D:\a\yasb\yasb\src\core\utils\cli_server.py", line 235 in _run_server
+  File "C:\hostedtoolcache\windows\Python\3.14.6\x64\Lib\threading.py", line 1024 in run
+  File "C:\hostedtoolcache\windows\Python\3.14.6\x64\Lib\threading.py", line 1082 in _bootstrap_inner
+  File "C:\hostedtoolcache\windows\Python\3.14.6\x64\Lib\threading.py", line 1044 in _bootstrap
+
+Current thread 0x000010dc (most recent call first):
+  File "main.py", line 203 in <module>
+  File "D:\a\yasb\yasb\venv\Lib\site-packages\freeze_core\initscripts\console.py", line 43 in run
+  File "src/freeze_core/initscripts/__startup__.py", line 147 in run
+2026-08-31 16:58:20,327 [INFO] [MainThread] [root/log.py:104]: YASB v2.0.6
+2026-08-31 16:58:20,328 [INFO] [CLIPipeServer] [cli_server/cli_server.py:216]: CLI server started v1.1.7
+2026-08-31 16:58:20,328 [INFO] [MainThread] [cli_server/cli_server.py:106]: Log pipe server started
+2026-08-31 16:58:20,328 [INFO] [MainThread] [root/main.py:48]: Waiting for previous YASB instance to exit...
+2026-08-31 16:58:23,083 [INFO] [MainThread] [root/main.py:74]: Previous instance exited, continuing startup.
+2026-08-31 16:58:24,107 [INFO] [MainThread] [root/service.py:52]: AudioOutputService starting...
+2026-08-31 16:58:24,593 [INFO] [MainThread] [root/bar_manager.py:238]: Starting HotkeyListener...
+2026-08-31 16:58:24,593 [INFO] [MainThread] [root/bar_manager.py:103]: Starting WindowsNotificationEventListener...
+2026-08-31 16:58:24,598 [INFO] [MainThread] [root/watcher.py:65]: Watching directory: c:\users\user\.config\yasb
+2026-08-31 16:58:24,598 [INFO] [MainThread] [root/watcher.py:104]: Created file watcher
+2026-08-31 16:58:24,622 [INFO] [MainThread] [root/update_service.py:434]: Background update checker started
+2026-08-31 16:58:24,638 [INFO] [Dummy-10] [root/windows_notification.py:161]: Notification service started (WNF_SHEL_NOTIFICATION_TOTAL)
+2026-08-31 17:00:58,542 [INFO] [MainThread] [root/controller.py:21]: Reloading Application because of config change.
+2026-08-31 17:00:58,647 [INFO] [MainThread] [cli_server/cli_server.py:114]: Log pipe server stopped
+2026-08-31 17:00:58,663 [INFO] [MainThread] [root/bar_manager.py:93]: Successfully loaded updated config and re-initialised all bars.
+2026-08-31 17:00:58,713 [INFO] [MainThread] [root/bar_manager.py:111]: Stopping HotkeyListener...
+2026-08-31 17:00:58,719 [INFO] [MainThread] [root/bar_manager.py:119]: Stopping WindowsNotificationEventListener...
+2026-08-31 17:00:58,719 [INFO] [Dummy-10] [root/windows_notification.py:97]: Notification service stopped
+2026-08-31 17:00:59,465 [INFO] [MainThread] [root/log.py:104]: YASB v2.0.6
+2026-08-31 17:00:59,466 [INFO] [CLIPipeServer] [cli_server/cli_server.py:216]: CLI server started v1.1.7
+2026-08-31 17:00:59,466 [INFO] [MainThread] [cli_server/cli_server.py:106]: Log pipe server started
+2026-08-31 17:01:00,399 [INFO] [MainThread] [root/service.py:52]: AudioOutputService starting...
+2026-08-31 17:01:00,792 [INFO] [MainThread] [root/bar_manager.py:238]: Starting HotkeyListener...
+2026-08-31 17:01:00,792 [INFO] [MainThread] [root/bar_manager.py:103]: Starting WindowsNotificationEventListener...
+2026-08-31 17:01:00,796 [INFO] [MainThread] [root/watcher.py:65]: Watching directory: c:\users\user\.config\yasb
+2026-08-31 17:01:00,796 [INFO] [MainThread] [root/watcher.py:104]: Created file watcher
+2026-08-31 17:01:00,824 [INFO] [MainThread] [root/update_service.py:434]: Background update checker started
+2026-08-31 17:01:00,831 [INFO] [Dummy-10] [root/windows_notification.py:161]: Notification service started (WNF_SHEL_NOTIFICATION_TOTAL)
+2026-08-31 17:01:16,499 [INFO] [MainThread] [root/controller.py:21]: Reloading Application because of config change.
+2026-08-31 17:01:16,615 [INFO] [MainThread] [cli_server/cli_server.py:114]: Log pipe server stopped
+2026-08-31 17:01:16,639 [INFO] [MainThread] [root/bar_manager.py:93]: Successfully loaded updated config and re-initialised all bars.
+2026-08-31 17:01:16,688 [INFO] [MainThread] [root/bar_manager.py:111]: Stopping HotkeyListener...
+2026-08-31 17:01:16,691 [INFO] [MainThread] [root/bar_manager.py:119]: Stopping WindowsNotificationEventListener...
+2026-08-31 17:01:16,692 [INFO] [Dummy-10] [root/windows_notification.py:97]: Notification service stopped
+2026-08-31 17:01:17,426 [INFO] [MainThread] [root/log.py:104]: YASB v2.0.6
+2026-08-31 17:01:17,426 [INFO] [CLIPipeServer] [cli_server/cli_server.py:216]: CLI server started v1.1.7
+2026-08-31 17:01:17,427 [INFO] [MainThread] [cli_server/cli_server.py:106]: Log pipe server started
+2026-08-31 17:01:18,330 [INFO] [MainThread] [root/service.py:52]: AudioOutputService starting...
+2026-08-31 17:01:18,707 [INFO] [MainThread] [root/bar_manager.py:238]: Starting HotkeyListener...
+2026-08-31 17:01:18,708 [INFO] [MainThread] [root/bar_manager.py:103]: Starting WindowsNotificationEventListener...
+2026-08-31 17:01:18,711 [INFO] [MainThread] [root/watcher.py:65]: Watching directory: c:\users\user\.config\yasb
+2026-08-31 17:01:18,711 [INFO] [MainThread] [root/watcher.py:104]: Created file watcher
+2026-08-31 17:01:18,737 [INFO] [MainThread] [root/update_service.py:434]: Background update checker started
+2026-08-31 17:01:18,746 [INFO] [Dummy-10] [root/windows_notification.py:161]: Notification service started (WNF_SHEL_NOTIFICATION_TOTAL)
+2026-08-31 17:01:27,384 [INFO] [MainThread] [root/controller.py:21]: Reloading Application because of config change.
+2026-08-31 17:01:27,493 [INFO] [MainThread] [cli_server/cli_server.py:114]: Log pipe server stopped
+2026-08-31 17:01:27,510 [INFO] [MainThread] [root/bar_manager.py:93]: Successfully loaded updated config and re-initialised all bars.
+2026-08-31 17:01:27,554 [INFO] [MainThread] [root/bar_manager.py:111]: Stopping HotkeyListener...
+2026-08-31 17:01:27,558 [INFO] [MainThread] [root/bar_manager.py:119]: Stopping WindowsNotificationEventListener...
+2026-08-31 17:01:27,559 [INFO] [Dummy-10] [root/windows_notification.py:97]: Notification service stopped
+2026-08-31 17:01:28,274 [INFO] [MainThread] [root/log.py:104]: YASB v2.0.6
+2026-08-31 17:01:28,274 [INFO] [CLIPipeServer] [cli_server/cli_server.py:216]: CLI server started v1.1.7
+2026-08-31 17:01:28,275 [INFO] [MainThread] [cli_server/cli_server.py:106]: Log pipe server started
+2026-08-31 17:01:29,385 [INFO] [MainThread] [root/service.py:52]: AudioOutputService starting...
+2026-08-31 17:01:29,816 [INFO] [MainThread] [root/bar_manager.py:238]: Starting HotkeyListener...
+2026-08-31 17:01:29,817 [INFO] [MainThread] [root/bar_manager.py:103]: Starting WindowsNotificationEventListener...
+2026-08-31 17:01:29,821 [INFO] [MainThread] [root/watcher.py:65]: Watching directory: c:\users\user\.config\yasb
+2026-08-31 17:01:29,821 [INFO] [MainThread] [root/watcher.py:104]: Created file watcher
+2026-08-31 17:01:29,858 [INFO] [MainThread] [root/update_service.py:434]: Background update checker started
+2026-08-31 17:01:29,867 [INFO] [Dummy-10] [root/windows_notification.py:161]: Notification service started (WNF_SHEL_NOTIFICATION_TOTAL)
+2026-08-31 17:01:37,781 [INFO] [MainThread] [root/controller.py:21]: Reloading Application because of config change.
+2026-08-31 17:01:37,887 [INFO] [MainThread] [cli_server/cli_server.py:114]: Log pipe server stopped
+2026-08-31 17:01:37,896 [INFO] [MainThread] [root/bar_manager.py:93]: Successfully loaded updated config and re-initialised all bars.
+2026-08-31 17:01:37,940 [INFO] [MainThread] [root/bar_manager.py:111]: Stopping HotkeyListener...
+2026-08-31 17:01:37,946 [INFO] [MainThread] [root/bar_manager.py:119]: Stopping WindowsNotificationEventListener...
+2026-08-31 17:01:37,947 [INFO] [Dummy-10] [root/windows_notification.py:97]: Notification service stopped
+2026-08-31 17:01:38,720 [INFO] [MainThread] [root/log.py:104]: YASB v2.0.6
+2026-08-31 17:01:38,720 [INFO] [CLIPipeServer] [cli_server/cli_server.py:216]: CLI server started v1.1.7
+2026-08-31 17:01:38,721 [INFO] [MainThread] [cli_server/cli_server.py:106]: Log pipe server started
+2026-08-31 17:01:39,862 [INFO] [MainThread] [root/service.py:52]: AudioOutputService starting...
+2026-08-31 17:01:40,671 [INFO] [MainThread] [root/bar_manager.py:238]: Starting HotkeyListener...
+2026-08-31 17:01:40,672 [INFO] [MainThread] [root/bar_manager.py:103]: Starting WindowsNotificationEventListener...
+2026-08-31 17:01:40,680 [INFO] [MainThread] [root/watcher.py:65]: Watching directory: c:\users\user\.config\yasb
+2026-08-31 17:01:40,680 [INFO] [MainThread] [root/watcher.py:104]: Created file watcher
+2026-08-31 17:01:40,766 [INFO] [MainThread] [root/update_service.py:434]: Background update checker started
+2026-08-31 17:01:40,768 [INFO] [Dummy-10] [root/windows_notification.py:161]: Notification service started (WNF_SHEL_NOTIFICATION_TOTAL)
+2026-08-31 17:02:43,427 [INFO] [MainThread] [root/controller.py:21]: Reloading Application because of config change.
+2026-08-31 17:02:43,533 [INFO] [MainThread] [cli_server/cli_server.py:114]: Log pipe server stopped
+2026-08-31 17:02:43,552 [INFO] [MainThread] [root/bar_manager.py:93]: Successfully loaded updated config and re-initialised all bars.
+2026-08-31 17:02:43,602 [INFO] [MainThread] [root/bar_manager.py:111]: Stopping HotkeyListener...
+2026-08-31 17:02:43,607 [INFO] [MainThread] [root/bar_manager.py:119]: Stopping WindowsNotificationEventListener...
+2026-08-31 17:02:43,608 [INFO] [Dummy-10] [root/windows_notification.py:97]: Notification service stopped
+2026-08-31 17:02:44,342 [INFO] [MainThread] [root/log.py:104]: YASB v2.0.6
+2026-08-31 17:02:44,343 [INFO] [CLIPipeServer] [cli_server/cli_server.py:216]: CLI server started v1.1.7
+2026-08-31 17:02:44,343 [INFO] [MainThread] [cli_server/cli_server.py:106]: Log pipe server started
+2026-08-31 17:02:45,257 [INFO] [MainThread] [root/service.py:52]: AudioOutputService starting...
+2026-08-31 17:02:45,694 [INFO] [MainThread] [root/bar_manager.py:238]: Starting HotkeyListener...
+2026-08-31 17:02:45,695 [INFO] [MainThread] [root/bar_manager.py:103]: Starting WindowsNotificationEventListener...
+2026-08-31 17:02:45,698 [INFO] [MainThread] [root/watcher.py:65]: Watching directory: c:\users\user\.config\yasb
+2026-08-31 17:02:45,698 [INFO] [MainThread] [root/watcher.py:104]: Created file watcher
+2026-08-31 17:02:45,721 [INFO] [MainThread] [root/update_service.py:434]: Background update checker started
+2026-08-31 17:02:45,731 [INFO] [Dummy-10] [root/windows_notification.py:161]: Notification service started (WNF_SHEL_NOTIFICATION_TOTAL)
+2026-08-31 17:03:19,437 [INFO] [MainThread] [root/bar_helper.py:594]: AppBarManager need to re-register 1 bar
+2026-08-31 17:03:19,637 [INFO] [MainThread] [root/bar_helper.py:603]: Re-registered AppBar for primary-bar_MSI G271_71d02edc (space reservation + fullscreen)
+2026-08-31 17:07:08,283 [INFO] [MainThread] [root/bar_helper.py:594]: AppBarManager need to re-register 1 bar
+2026-08-31 17:07:08,320 [INFO] [MainThread] [root/bar_helper.py:603]: Re-registered AppBar for primary-bar_MSI G271_71d02edc (space reservation + fullscreen)
+2026-08-31 17:07:49,806 [INFO] [MainThread] [root/controller.py:43]: Exiting Application...
+2026-08-31 17:07:49,915 [INFO] [MainThread] [cli_server/cli_server.py:114]: Log pipe server stopped
+2026-08-31 17:07:49,949 [INFO] [MainThread] [root/bar_manager.py:111]: Stopping HotkeyListener...
+2026-08-31 17:07:49,951 [INFO] [MainThread] [root/bar_manager.py:119]: Stopping WindowsNotificationEventListener...
+2026-08-31 17:07:49,951 [INFO] [Dummy-10] [root/windows_notification.py:97]: Notification service stopped
+2026-08-31 17:08:55,014 [INFO] [MainThread] [root/log.py:104]: YASB v2.0.6
+2026-08-31 17:08:55,015 [INFO] [CLIPipeServer] [cli_server/cli_server.py:216]: CLI server started v1.1.7
+2026-08-31 17:08:55,016 [INFO] [MainThread] [cli_server/cli_server.py:106]: Log pipe server started
+2026-08-31 17:08:58,342 [INFO] [MainThread] [root/service.py:52]: AudioOutputService starting...
+2026-08-31 17:08:59,158 [INFO] [MainThread] [root/bar_manager.py:238]: Starting HotkeyListener...
+2026-08-31 17:08:59,158 [INFO] [MainThread] [root/bar_manager.py:103]: Starting WindowsNotificationEventListener...
+2026-08-31 17:08:59,165 [INFO] [MainThread] [root/watcher.py:65]: Watching directory: c:\users\user\.config\yasb
+2026-08-31 17:08:59,165 [INFO] [MainThread] [root/watcher.py:104]: Created file watcher
+2026-08-31 17:08:59,212 [INFO] [MainThread] [root/update_service.py:434]: Background update checker started
+2026-08-31 17:08:59,353 [INFO] [Dummy-10] [root/windows_notification.py:161]: Notification service started (WNF_SHEL_NOTIFICATION_TOTAL)
+2026-08-31 17:17:42,593 [INFO] [MainThread] [root/controller.py:21]: Reloading Application because of config change.
+2026-08-31 17:17:42,707 [INFO] [MainThread] [cli_server/cli_server.py:114]: Log pipe server stopped
+2026-08-31 17:17:42,717 [INFO] [MainThread] [root/bar_manager.py:93]: Successfully loaded updated config and re-initialised all bars.
+2026-08-31 17:17:42,781 [INFO] [MainThread] [root/bar_manager.py:111]: Stopping HotkeyListener...
+2026-08-31 17:17:42,786 [INFO] [MainThread] [root/bar_manager.py:119]: Stopping WindowsNotificationEventListener...
+2026-08-31 17:17:42,787 [INFO] [Dummy-10] [root/windows_notification.py:97]: Notification service stopped
+2026-08-31 17:17:43,536 [INFO] [MainThread] [root/log.py:104]: YASB v2.0.6
+2026-08-31 17:17:43,537 [INFO] [CLIPipeServer] [cli_server/cli_server.py:216]: CLI server started v1.1.7
+2026-08-31 17:17:43,537 [INFO] [MainThread] [cli_server/cli_server.py:106]: Log pipe server started
+2026-08-31 17:17:44,472 [INFO] [MainThread] [root/service.py:52]: AudioOutputService starting...
+2026-08-31 17:17:44,950 [INFO] [MainThread] [root/bar_manager.py:238]: Starting HotkeyListener...
+2026-08-31 17:17:44,950 [INFO] [MainThread] [root/bar_manager.py:103]: Starting WindowsNotificationEventListener...
+2026-08-31 17:17:44,954 [INFO] [MainThread] [root/watcher.py:65]: Watching directory: c:\users\user\.config\yasb
+2026-08-31 17:17:44,954 [INFO] [MainThread] [root/watcher.py:104]: Created file watcher
+2026-08-31 17:17:44,986 [INFO] [MainThread] [root/update_service.py:434]: Background update checker started
+2026-08-31 17:17:44,992 [INFO] [Dummy-10] [root/windows_notification.py:161]: Notification service started (WNF_SHEL_NOTIFICATION_TOTAL)
+2026-08-31 17:19:35,721 [INFO] [MainThread] [root/controller.py:21]: Reloading Application because of config change.
+2026-08-31 17:19:35,827 [INFO] [MainThread] [cli_server/cli_server.py:114]: Log pipe server stopped
+2026-08-31 17:19:35,831 [INFO] [MainThread] [root/bar_manager.py:93]: Successfully loaded updated config and re-initialised all bars.
+2026-08-31 17:19:35,887 [INFO] [MainThread] [root/bar_manager.py:111]: Stopping HotkeyListener...
+2026-08-31 17:19:35,893 [INFO] [MainThread] [root/bar_manager.py:119]: Stopping WindowsNotificationEventListener...
+2026-08-31 17:19:35,894 [INFO] [Dummy-10] [root/windows_notification.py:97]: Notification service stopped
+2026-08-31 17:19:36,581 [INFO] [MainThread] [root/log.py:104]: YASB v2.0.6
+2026-08-31 17:19:36,581 [INFO] [CLIPipeServer] [cli_server/cli_server.py:216]: CLI server started v1.1.7
+2026-08-31 17:19:36,581 [INFO] [MainThread] [cli_server/cli_server.py:106]: Log pipe server started
+2026-08-31 17:19:37,494 [INFO] [MainThread] [root/service.py:52]: AudioOutputService starting...
+2026-08-31 17:19:37,903 [INFO] [MainThread] [root/bar_manager.py:238]: Starting HotkeyListener...
+2026-08-31 17:19:37,903 [INFO] [MainThread] [root/bar_manager.py:103]: Starting WindowsNotificationEventListener...
+2026-08-31 17:19:37,908 [INFO] [MainThread] [root/watcher.py:65]: Watching directory: c:\users\user\.config\yasb
+2026-08-31 17:19:37,909 [INFO] [MainThread] [root/watcher.py:104]: Created file watcher
+2026-08-31 17:19:37,942 [INFO] [MainThread] [root/update_service.py:434]: Background update checker started
+2026-08-31 17:19:37,951 [INFO] [Dummy-10] [root/windows_notification.py:161]: Notification service started (WNF_SHEL_NOTIFICATION_TOTAL)
+2026-08-31 17:19:47,953 [INFO] [MainThread] [root/controller.py:21]: Reloading Application because of config change.
+2026-08-31 17:19:48,062 [INFO] [MainThread] [cli_server/cli_server.py:114]: Log pipe server stopped
+2026-08-31 17:19:48,066 [INFO] [MainThread] [root/bar_manager.py:93]: Successfully loaded updated config and re-initialised all bars.
+2026-08-31 17:19:48,119 [INFO] [MainThread] [root/bar_manager.py:111]: Stopping HotkeyListener...
+2026-08-31 17:19:48,125 [INFO] [MainThread] [root/bar_manager.py:119]: Stopping WindowsNotificationEventListener...
+2026-08-31 17:19:48,126 [INFO] [Dummy-10] [root/windows_notification.py:97]: Notification service stopped
+2026-08-31 17:19:49,203 [INFO] [MainThread] [root/log.py:104]: YASB v2.0.6
+2026-08-31 17:19:49,204 [INFO] [CLIPipeServer] [cli_server/cli_server.py:216]: CLI server started v1.1.7
+2026-08-31 17:19:49,205 [INFO] [MainThread] [cli_server/cli_server.py:106]: Log pipe server started
+2026-08-31 17:19:50,593 [INFO] [MainThread] [root/service.py:52]: AudioOutputService starting...
+2026-08-31 17:19:51,201 [INFO] [MainThread] [root/bar_manager.py:238]: Starting HotkeyListener...
+2026-08-31 17:19:51,202 [INFO] [MainThread] [root/bar_manager.py:103]: Starting WindowsNotificationEventListener...
+2026-08-31 17:19:51,210 [INFO] [MainThread] [root/watcher.py:65]: Watching directory: c:\users\user\.config\yasb
+2026-08-31 17:19:51,211 [INFO] [MainThread] [root/watcher.py:104]: Created file watcher
+2026-08-31 17:19:51,261 [INFO] [MainThread] [root/update_service.py:434]: Background update checker started
+2026-08-31 17:19:51,273 [INFO] [Dummy-10] [root/windows_notification.py:161]: Notification service started (WNF_SHEL_NOTIFICATION_TOTAL)
+2026-08-31 17:20:59,746 [INFO] [MainThread] [root/controller.py:21]: Reloading Application because of config change.
+2026-08-31 17:20:59,852 [INFO] [MainThread] [cli_server/cli_server.py:114]: Log pipe server stopped
+2026-08-31 17:20:59,861 [INFO] [MainThread] [root/bar_manager.py:93]: Successfully loaded updated config and re-initialised all bars.
+2026-08-31 17:20:59,923 [INFO] [MainThread] [root/bar_manager.py:111]: Stopping HotkeyListener...
+2026-08-31 17:20:59,929 [INFO] [MainThread] [root/bar_manager.py:119]: Stopping WindowsNotificationEventListener...
+2026-08-31 17:20:59,930 [INFO] [Dummy-10] [root/windows_notification.py:97]: Notification service stopped
+2026-08-31 17:21:00,586 [INFO] [MainThread] [root/log.py:104]: YASB v2.0.6
+2026-08-31 17:21:00,587 [INFO] [CLIPipeServer] [cli_server/cli_server.py:216]: CLI server started v1.1.7
+2026-08-31 17:21:00,587 [INFO] [MainThread] [cli_server/cli_server.py:106]: Log pipe server started
+2026-08-31 17:21:01,493 [WARNING] [MainThread] [root/widget_builder.py:39]: No widget config could be found for widget 'notifications
+2026-08-31 17:21:01,820 [INFO] [MainThread] [root/bar_manager.py:238]: Starting HotkeyListener...
+2026-08-31 17:21:01,821 [ERROR] [MainThread] [root/widget_builder.py:100]: Failed to add undefined widget(s)  - The widget "notifications" is undefined.
+2026-08-31 17:21:01,861 [INFO] [MainThread] [root/watcher.py:65]: Watching directory: c:\users\user\.config\yasb
+2026-08-31 17:21:01,861 [INFO] [MainThread] [root/watcher.py:104]: Created file watcher
+2026-08-31 17:21:01,883 [INFO] [MainThread] [root/update_service.py:434]: Background update checker started
+2026-08-31 17:21:14,439 [INFO] [MainThread] [root/controller.py:21]: Reloading Application because of config change.
+2026-08-31 17:21:14,551 [INFO] [MainThread] [cli_server/cli_server.py:114]: Log pipe server stopped
+2026-08-31 17:21:14,559 [INFO] [MainThread] [root/bar_manager.py:93]: Successfully loaded updated config and re-initialised all bars.
+2026-08-31 17:21:14,610 [INFO] [MainThread] [root/bar_manager.py:111]: Stopping HotkeyListener...
+2026-08-31 17:21:15,280 [INFO] [MainThread] [root/log.py:104]: YASB v2.0.6
+2026-08-31 17:21:15,280 [INFO] [CLIPipeServer] [cli_server/cli_server.py:216]: CLI server started v1.1.7
+2026-08-31 17:21:15,281 [INFO] [MainThread] [cli_server/cli_server.py:106]: Log pipe server started
+2026-08-31 17:21:16,101 [INFO] [MainThread] [root/service.py:52]: AudioOutputService starting...
+2026-08-31 17:21:16,581 [INFO] [MainThread] [root/bar_manager.py:238]: Starting HotkeyListener...
+2026-08-31 17:21:16,583 [INFO] [MainThread] [root/watcher.py:65]: Watching directory: c:\users\user\.config\yasb
+2026-08-31 17:21:16,583 [INFO] [MainThread] [root/watcher.py:104]: Created file watcher
+2026-08-31 17:21:16,601 [INFO] [MainThread] [root/update_service.py:434]: Background update checker started
+2026-08-31 17:22:50,134 [INFO] [MainThread] [root/controller.py:21]: Reloading Application because of config change.
+2026-08-31 17:22:50,247 [INFO] [MainThread] [cli_server/cli_server.py:114]: Log pipe server stopped
+2026-08-31 17:22:50,258 [INFO] [MainThread] [root/bar_manager.py:93]: Successfully loaded updated config and re-initialised all bars.
+2026-08-31 17:22:50,321 [INFO] [MainThread] [root/bar_manager.py:111]: Stopping HotkeyListener...
+2026-08-31 17:22:50,993 [INFO] [MainThread] [root/log.py:104]: YASB v2.0.6
+2026-08-31 17:22:50,993 [INFO] [CLIPipeServer] [cli_server/cli_server.py:216]: CLI server started v1.1.7
+2026-08-31 17:22:50,994 [INFO] [MainThread] [cli_server/cli_server.py:106]: Log pipe server started
+2026-08-31 17:22:51,888 [INFO] [MainThread] [root/service.py:52]: AudioOutputService starting...
+2026-08-31 17:22:52,346 [INFO] [MainThread] [root/bar_manager.py:238]: Starting HotkeyListener...
+2026-08-31 17:22:52,348 [INFO] [MainThread] [root/watcher.py:65]: Watching directory: c:\users\user\.config\yasb
+2026-08-31 17:22:52,349 [INFO] [MainThread] [root/watcher.py:104]: Created file watcher
+2026-08-31 17:22:52,383 [INFO] [MainThread] [root/update_service.py:434]: Background update checker started
+2026-08-31 17:23:00,531 [INFO] [MainThread] [root/controller.py:21]: Reloading Application because of config change.
+2026-08-31 17:23:00,640 [INFO] [MainThread] [cli_server/cli_server.py:114]: Log pipe server stopped
+2026-08-31 17:23:00,651 [INFO] [MainThread] [root/bar_manager.py:93]: Successfully loaded updated config and re-initialised all bars.
+2026-08-31 17:23:00,709 [INFO] [MainThread] [root/bar_manager.py:111]: Stopping HotkeyListener...
+2026-08-31 17:23:01,470 [INFO] [MainThread] [root/log.py:104]: YASB v2.0.6
+2026-08-31 17:23:01,471 [INFO] [CLIPipeServer] [cli_server/cli_server.py:216]: CLI server started v1.1.7
+2026-08-31 17:23:01,471 [INFO] [MainThread] [cli_server/cli_server.py:106]: Log pipe server started
+2026-08-31 17:23:02,376 [INFO] [MainThread] [root/service.py:52]: AudioOutputService starting...
+2026-08-31 17:23:02,799 [INFO] [MainThread] [root/bar_manager.py:238]: Starting HotkeyListener...
+2026-08-31 17:23:02,800 [INFO] [MainThread] [root/bar_manager.py:103]: Starting WindowsNotificationEventListener...
+2026-08-31 17:23:02,803 [INFO] [MainThread] [root/watcher.py:65]: Watching directory: c:\users\user\.config\yasb
+2026-08-31 17:23:02,803 [INFO] [MainThread] [root/watcher.py:104]: Created file watcher
+2026-08-31 17:23:02,831 [INFO] [MainThread] [root/update_service.py:434]: Background update checker started
+2026-08-31 17:23:02,839 [INFO] [Dummy-10] [root/windows_notification.py:161]: Notification service started (WNF_SHEL_NOTIFICATION_TOTAL)
+2026-08-31 17:27:37,361 [INFO] [MainThread] [root/controller.py:21]: Reloading Application because of config change.
+2026-08-31 17:27:37,467 [INFO] [MainThread] [cli_server/cli_server.py:114]: Log pipe server stopped
+2026-08-31 17:27:37,474 [INFO] [MainThread] [root/bar_manager.py:93]: Successfully loaded updated config and re-initialised all bars.
+2026-08-31 17:27:37,519 [INFO] [MainThread] [root/bar_manager.py:111]: Stopping HotkeyListener...
+2026-08-31 17:27:37,526 [INFO] [MainThread] [root/bar_manager.py:119]: Stopping WindowsNotificationEventListener...
+2026-08-31 17:27:37,527 [INFO] [Dummy-10] [root/windows_notification.py:97]: Notification service stopped
+2026-08-31 17:27:38,192 [INFO] [MainThread] [root/log.py:104]: YASB v2.0.6
+2026-08-31 17:27:38,192 [INFO] [CLIPipeServer] [cli_server/cli_server.py:216]: CLI server started v1.1.7
+2026-08-31 17:27:38,193 [INFO] [MainThread] [cli_server/cli_server.py:106]: Log pipe server started
+2026-08-31 17:27:38,995 [INFO] [MainThread] [root/service.py:52]: AudioOutputService starting...
+2026-08-31 17:27:39,454 [INFO] [MainThread] [root/bar_manager.py:238]: Starting HotkeyListener...
+2026-08-31 17:27:39,455 [INFO] [MainThread] [root/bar_manager.py:103]: Starting WindowsNotificationEventListener...
+2026-08-31 17:27:39,459 [INFO] [MainThread] [root/watcher.py:65]: Watching directory: c:\users\user\.config\yasb
+2026-08-31 17:27:39,460 [INFO] [MainThread] [root/watcher.py:104]: Created file watcher
+2026-08-31 17:27:39,483 [INFO] [MainThread] [root/update_service.py:434]: Background update checker started
+2026-08-31 17:27:39,496 [INFO] [Dummy-10] [root/windows_notification.py:161]: Notification service started (WNF_SHEL_NOTIFICATION_TOTAL)
+2026-08-31 17:27:59,611 [INFO] [MainThread] [root/controller.py:21]: Reloading Application because of config change.
+2026-08-31 17:27:59,720 [INFO] [MainThread] [cli_server/cli_server.py:114]: Log pipe server stopped
+2026-08-31 17:27:59,727 [INFO] [MainThread] [root/bar_manager.py:93]: Successfully loaded updated config and re-initialised all bars.
+2026-08-31 17:27:59,770 [INFO] [MainThread] [root/bar_manager.py:111]: Stopping HotkeyListener...
+2026-08-31 17:27:59,776 [INFO] [MainThread] [root/bar_manager.py:119]: Stopping WindowsNotificationEventListener...
+2026-08-31 17:27:59,777 [INFO] [Dummy-10] [root/windows_notification.py:97]: Notification service stopped
+2026-08-31 17:28:00,445 [INFO] [MainThread] [root/log.py:104]: YASB v2.0.6
+2026-08-31 17:28:00,446 [INFO] [CLIPipeServer] [cli_server/cli_server.py:216]: CLI server started v1.1.7
+2026-08-31 17:28:00,446 [INFO] [MainThread] [cli_server/cli_server.py:106]: Log pipe server started
+2026-08-31 17:28:01,234 [INFO] [MainThread] [root/service.py:52]: AudioOutputService starting...
+2026-08-31 17:28:01,607 [INFO] [MainThread] [root/bar_manager.py:238]: Starting HotkeyListener...
+2026-08-31 17:28:01,608 [INFO] [MainThread] [root/bar_manager.py:103]: Starting WindowsNotificationEventListener...
+2026-08-31 17:28:01,611 [INFO] [MainThread] [root/watcher.py:65]: Watching directory: c:\users\user\.config\yasb
+2026-08-31 17:28:01,611 [INFO] [MainThread] [root/watcher.py:104]: Created file watcher
+2026-08-31 17:28:01,638 [INFO] [MainThread] [root/update_service.py:434]: Background update checker started
+2026-08-31 17:28:01,652 [INFO] [Dummy-10] [root/windows_notification.py:161]: Notification service started (WNF_SHEL_NOTIFICATION_TOTAL)
+2026-08-31 17:28:18,091 [INFO] [MainThread] [root/controller.py:21]: Reloading Application because of config change.
+2026-08-31 17:28:18,209 [INFO] [MainThread] [cli_server/cli_server.py:114]: Log pipe server stopped
+2026-08-31 17:28:18,216 [INFO] [MainThread] [root/bar_manager.py:93]: Successfully loaded updated config and re-initialised all bars.
+2026-08-31 17:28:18,260 [INFO] [MainThread] [root/bar_manager.py:111]: Stopping HotkeyListener...
+2026-08-31 17:28:18,268 [INFO] [MainThread] [root/bar_manager.py:119]: Stopping WindowsNotificationEventListener...
+2026-08-31 17:28:18,268 [INFO] [Dummy-10] [root/windows_notification.py:97]: Notification service stopped
+2026-08-31 17:28:18,920 [INFO] [MainThread] [root/log.py:104]: YASB v2.0.6
+2026-08-31 17:28:18,921 [INFO] [CLIPipeServer] [cli_server/cli_server.py:216]: CLI server started v1.1.7
+2026-08-31 17:28:18,921 [INFO] [MainThread] [cli_server/cli_server.py:106]: Log pipe server started
+2026-08-31 17:28:19,715 [INFO] [MainThread] [root/service.py:52]: AudioOutputService starting...
+2026-08-31 17:28:20,093 [INFO] [MainThread] [root/bar_manager.py:238]: Starting HotkeyListener...
+2026-08-31 17:28:20,093 [INFO] [MainThread] [root/bar_manager.py:103]: Starting WindowsNotificationEventListener...
+2026-08-31 17:28:20,097 [INFO] [MainThread] [root/watcher.py:65]: Watching directory: c:\users\user\.config\yasb
+2026-08-31 17:28:20,097 [INFO] [MainThread] [root/watcher.py:104]: Created file watcher
+2026-08-31 17:28:20,122 [INFO] [MainThread] [root/update_service.py:434]: Background update checker started
+2026-08-31 17:28:20,136 [INFO] [Dummy-10] [root/windows_notification.py:161]: Notification service started (WNF_SHEL_NOTIFICATION_TOTAL)
+2026-08-31 17:28:37,001 [INFO] [MainThread] [root/bar_helper.py:594]: AppBarManager need to re-register 1 bar
+2026-08-31 17:28:37,329 [INFO] [MainThread] [root/bar_helper.py:603]: Re-registered AppBar for primary-bar_MSI G271_41877326 (space reservation + fullscreen)
+2026-08-31 17:30:42,292 [INFO] [MainThread] [root/controller.py:21]: Reloading Application from tray...
+2026-08-31 17:30:42,393 [INFO] [MainThread] [cli_server/cli_server.py:114]: Log pipe server stopped
+2026-08-31 17:30:42,452 [INFO] [MainThread] [root/bar_manager.py:111]: Stopping HotkeyListener...
+2026-08-31 17:30:42,459 [INFO] [MainThread] [root/bar_manager.py:119]: Stopping WindowsNotificationEventListener...
+2026-08-31 17:30:42,461 [INFO] [Dummy-10] [root/windows_notification.py:97]: Notification service stopped
+2026-08-31 17:30:43,264 [INFO] [MainThread] [root/log.py:104]: YASB v2.0.6
+2026-08-31 17:30:43,264 [INFO] [CLIPipeServer] [cli_server/cli_server.py:216]: CLI server started v1.1.7
+2026-08-31 17:30:43,265 [INFO] [MainThread] [cli_server/cli_server.py:106]: Log pipe server started
+2026-08-31 17:30:44,134 [INFO] [MainThread] [root/service.py:52]: AudioOutputService starting...
+2026-08-31 17:30:44,550 [INFO] [MainThread] [root/bar_manager.py:238]: Starting HotkeyListener...
+2026-08-31 17:30:44,550 [INFO] [MainThread] [root/bar_manager.py:103]: Starting WindowsNotificationEventListener...
+2026-08-31 17:30:44,553 [INFO] [MainThread] [root/watcher.py:65]: Watching directory: c:\users\user\.config\yasb
+2026-08-31 17:30:44,554 [INFO] [MainThread] [root/watcher.py:104]: Created file watcher
+2026-08-31 17:30:44,586 [INFO] [MainThread] [root/update_service.py:434]: Background update checker started
+2026-08-31 17:30:44,596 [INFO] [Dummy-10] [root/windows_notification.py:161]: Notification service started (WNF_SHEL_NOTIFICATION_TOTAL)
+2026-08-31 17:33:26,485 [INFO] [MainThread] [root/controller.py:21]: Reloading Application from tray...
+2026-08-31 17:33:26,594 [INFO] [MainThread] [cli_server/cli_server.py:114]: Log pipe server stopped
+2026-08-31 17:33:26,642 [INFO] [MainThread] [root/bar_manager.py:111]: Stopping HotkeyListener...
+2026-08-31 17:33:26,648 [INFO] [MainThread] [root/bar_manager.py:119]: Stopping WindowsNotificationEventListener...
+2026-08-31 17:33:26,650 [INFO] [Dummy-10] [root/windows_notification.py:97]: Notification service stopped
+2026-08-31 17:33:27,438 [INFO] [MainThread] [root/log.py:104]: YASB v2.0.6
+2026-08-31 17:33:27,438 [INFO] [CLIPipeServer] [cli_server/cli_server.py:216]: CLI server started v1.1.7
+2026-08-31 17:33:27,439 [INFO] [MainThread] [cli_server/cli_server.py:106]: Log pipe server started
+2026-08-31 17:33:28,293 [INFO] [MainThread] [root/service.py:52]: AudioOutputService starting...
+2026-08-31 17:33:28,713 [INFO] [MainThread] [root/bar_manager.py:238]: Starting HotkeyListener...
+2026-08-31 17:33:28,713 [INFO] [MainThread] [root/bar_manager.py:103]: Starting WindowsNotificationEventListener...
+2026-08-31 17:33:28,716 [INFO] [MainThread] [root/watcher.py:65]: Watching directory: c:\users\user\.config\yasb
+2026-08-31 17:33:28,717 [INFO] [MainThread] [root/watcher.py:104]: Created file watcher
+2026-08-31 17:33:28,742 [INFO] [MainThread] [root/update_service.py:434]: Background update checker started
+2026-08-31 17:33:28,754 [INFO] [Dummy-10] [root/windows_notification.py:161]: Notification service started (WNF_SHEL_NOTIFICATION_TOTAL)
+2026-08-31 17:36:41,801 [INFO] [MainThread] [root/controller.py:21]: Reloading Application from tray...
+2026-08-31 17:36:41,913 [INFO] [MainThread] [cli_server/cli_server.py:114]: Log pipe server stopped
+2026-08-31 17:36:41,999 [INFO] [MainThread] [root/bar_manager.py:111]: Stopping HotkeyListener...
+2026-08-31 17:36:42,005 [INFO] [MainThread] [root/bar_manager.py:119]: Stopping WindowsNotificationEventListener...
+2026-08-31 17:36:42,005 [INFO] [Dummy-10] [root/windows_notification.py:97]: Notification service stopped
+2026-08-31 17:36:42,775 [INFO] [MainThread] [root/log.py:104]: YASB v2.0.6
+2026-08-31 17:36:42,776 [INFO] [CLIPipeServer] [cli_server/cli_server.py:216]: CLI server started v1.1.7
+2026-08-31 17:36:42,776 [INFO] [MainThread] [cli_server/cli_server.py:106]: Log pipe server started
+2026-08-31 17:36:43,831 [INFO] [MainThread] [root/service.py:52]: AudioOutputService starting...
+2026-08-31 17:36:44,272 [INFO] [MainThread] [root/bar_manager.py:238]: Starting HotkeyListener...
+2026-08-31 17:36:44,273 [INFO] [MainThread] [root/bar_manager.py:103]: Starting WindowsNotificationEventListener...
+2026-08-31 17:36:44,276 [INFO] [MainThread] [root/watcher.py:65]: Watching directory: c:\users\user\.config\yasb
+2026-08-31 17:36:44,277 [INFO] [MainThread] [root/watcher.py:104]: Created file watcher
+2026-08-31 17:36:44,305 [INFO] [MainThread] [root/update_service.py:434]: Background update checker started
+2026-08-31 17:36:44,319 [INFO] [Dummy-10] [root/windows_notification.py:161]: Notification service started (WNF_SHEL_NOTIFICATION_TOTAL)
+2026-08-31 17:37:23,558 [INFO] [MainThread] [root/bar_helper.py:594]: AppBarManager need to re-register 1 bar
+2026-08-31 17:37:23,743 [INFO] [MainThread] [root/bar_helper.py:603]: Re-registered AppBar for primary-bar_MSI G271_57427301 (space reservation + fullscreen)
+2026-08-31 17:42:44,504 [INFO] [MainThread] [root/controller.py:21]: Reloading Application from tray...
+2026-08-31 17:42:44,606 [INFO] [MainThread] [cli_server/cli_server.py:114]: Log pipe server stopped
+2026-08-31 17:42:44,679 [INFO] [MainThread] [root/bar_manager.py:111]: Stopping HotkeyListener...
+2026-08-31 17:42:44,684 [INFO] [MainThread] [root/bar_manager.py:119]: Stopping WindowsNotificationEventListener...
+2026-08-31 17:42:44,685 [INFO] [Dummy-10] [root/windows_notification.py:97]: Notification service stopped
+2026-08-31 17:42:45,436 [INFO] [MainThread] [root/log.py:104]: YASB v2.0.6
+2026-08-31 17:42:45,437 [INFO] [CLIPipeServer] [cli_server/cli_server.py:216]: CLI server started v1.1.7
+2026-08-31 17:42:45,437 [INFO] [MainThread] [cli_server/cli_server.py:106]: Log pipe server started
+2026-08-31 17:42:46,407 [INFO] [MainThread] [root/service.py:52]: AudioOutputService starting...
+2026-08-31 17:42:46,888 [INFO] [MainThread] [root/bar_manager.py:238]: Starting HotkeyListener...
+2026-08-31 17:42:46,888 [INFO] [MainThread] [root/bar_manager.py:103]: Starting WindowsNotificationEventListener...
+2026-08-31 17:42:46,892 [INFO] [MainThread] [root/watcher.py:65]: Watching directory: c:\users\user\.config\yasb
+2026-08-31 17:42:46,892 [INFO] [MainThread] [root/watcher.py:104]: Created file watcher
+2026-08-31 17:42:46,926 [INFO] [MainThread] [root/update_service.py:434]: Background update checker started
+2026-08-31 17:42:46,935 [INFO] [Dummy-10] [root/windows_notification.py:161]: Notification service started (WNF_SHEL_NOTIFICATION_TOTAL)
+2026-08-31 17:46:09,304 [INFO] [MainThread] [root/controller.py:21]: Reloading Application because of config change.
+2026-08-31 17:46:09,409 [INFO] [MainThread] [cli_server/cli_server.py:114]: Log pipe server stopped
+2026-08-31 17:46:09,412 [INFO] [MainThread] [root/bar_manager.py:93]: Successfully loaded updated config and re-initialised all bars.
+2026-08-31 17:46:09,467 [INFO] [MainThread] [root/bar_manager.py:111]: Stopping HotkeyListener...
+2026-08-31 17:46:09,475 [INFO] [MainThread] [root/bar_manager.py:119]: Stopping WindowsNotificationEventListener...
+2026-08-31 17:46:09,475 [INFO] [Dummy-10] [root/windows_notification.py:97]: Notification service stopped
+2026-08-31 17:46:10,342 [INFO] [MainThread] [root/log.py:104]: YASB v2.0.6
+2026-08-31 17:46:10,343 [INFO] [CLIPipeServer] [cli_server/cli_server.py:216]: CLI server started v1.1.7
+2026-08-31 17:46:10,344 [INFO] [MainThread] [cli_server/cli_server.py:106]: Log pipe server started
+2026-08-31 17:46:11,360 [INFO] [MainThread] [root/service.py:52]: AudioOutputService starting...
+2026-08-31 17:46:11,732 [INFO] [MainThread] [root/bar_manager.py:238]: Starting HotkeyListener...
+2026-08-31 17:46:11,733 [INFO] [MainThread] [root/bar_manager.py:103]: Starting WindowsNotificationEventListener...
+2026-08-31 17:46:11,742 [INFO] [MainThread] [root/watcher.py:65]: Watching directory: c:\users\user\.config\yasb
+2026-08-31 17:46:11,742 [INFO] [MainThread] [root/watcher.py:104]: Created file watcher
+2026-08-31 17:46:11,774 [INFO] [MainThread] [root/update_service.py:434]: Background update checker started
+2026-08-31 17:46:11,782 [INFO] [Dummy-10] [root/windows_notification.py:161]: Notification service started (WNF_SHEL_NOTIFICATION_TOTAL)
+2026-08-31 18:44:55,427 [INFO] [MainThread] [root/bar_helper.py:594]: AppBarManager need to re-register 1 bar
+2026-08-31 18:44:55,754 [INFO] [MainThread] [root/bar_helper.py:603]: Re-registered AppBar for primary-bar_MSI G271_08308f9d (space reservation + fullscreen)
+2026-08-31 18:46:33,519 [INFO] [MainThread] [root/bar_helper.py:594]: AppBarManager need to re-register 1 bar
+2026-08-31 18:46:33,585 [INFO] [MainThread] [root/bar_helper.py:603]: Re-registered AppBar for primary-bar_MSI G271_08308f9d (space reservation + fullscreen)
+2026-08-31 18:49:43,811 [INFO] [MainThread] [root/controller.py:43]: Exiting Application...
+2026-08-31 18:49:43,917 [INFO] [MainThread] [cli_server/cli_server.py:114]: Log pipe server stopped
+2026-08-31 18:49:43,954 [INFO] [MainThread] [root/bar_manager.py:111]: Stopping HotkeyListener...
+2026-08-31 18:49:43,956 [INFO] [MainThread] [root/bar_manager.py:119]: Stopping WindowsNotificationEventListener...
+2026-08-31 18:49:43,957 [INFO] [Dummy-10] [root/windows_notification.py:97]: Notification service stopped
+2026-08-31 18:50:57,570 [INFO] [MainThread] [root/log.py:104]: YASB v2.0.6
+2026-08-31 18:50:57,571 [INFO] [CLIPipeServer] [cli_server/cli_server.py:216]: CLI server started v1.1.7
+2026-08-31 18:50:57,572 [INFO] [MainThread] [cli_server/cli_server.py:106]: Log pipe server started
+2026-08-31 18:51:02,808 [INFO] [MainThread] [root/service.py:52]: AudioOutputService starting...
+2026-08-31 18:51:04,298 [INFO] [MainThread] [root/bar_manager.py:238]: Starting HotkeyListener...
+2026-08-31 18:51:04,300 [INFO] [MainThread] [root/bar_manager.py:103]: Starting WindowsNotificationEventListener...
+2026-08-31 18:51:04,306 [INFO] [MainThread] [root/watcher.py:65]: Watching directory: c:\users\user\.config\yasb
+2026-08-31 18:51:04,307 [INFO] [MainThread] [root/watcher.py:104]: Created file watcher
+2026-08-31 18:51:04,374 [INFO] [MainThread] [root/update_service.py:434]: Background update checker started
+2026-08-31 18:51:04,644 [INFO] [Dummy-10] [root/windows_notification.py:161]: Notification service started (WNF_SHEL_NOTIFICATION_TOTAL)
+2026-08-31 19:06:47,318 [INFO] [MainThread] [root/bar_helper.py:594]: AppBarManager need to re-register 1 bar
+2026-08-31 19:06:47,619 [INFO] [MainThread] [root/bar_helper.py:603]: Re-registered AppBar for primary-bar_MSI G271_e5352b84 (space reservation + fullscreen)
+2026-08-31 19:06:58,615 [INFO] [MainThread] [root/bar_helper.py:594]: AppBarManager need to re-register 1 bar
+2026-08-31 19:06:58,639 [INFO] [MainThread] [root/bar_helper.py:603]: Re-registered AppBar for primary-bar_MSI G271_e5352b84 (space reservation + fullscreen)
+2026-08-31 19:08:21,591 [INFO] [MainThread] [root/bar_helper.py:594]: AppBarManager need to re-register 1 bar
+2026-08-31 19:08:21,645 [INFO] [MainThread] [root/bar_helper.py:603]: Re-registered AppBar for primary-bar_MSI G271_e5352b84 (space reservation + fullscreen)
+2026-08-31 19:10:54,281 [INFO] [MainThread] [root/controller.py:43]: Exiting Application...
+2026-08-31 19:10:54,397 [INFO] [MainThread] [cli_server/cli_server.py:114]: Log pipe server stopped
+2026-08-31 19:10:54,476 [INFO] [MainThread] [root/bar_manager.py:111]: Stopping HotkeyListener...
+2026-08-31 19:10:54,478 [INFO] [MainThread] [root/bar_manager.py:119]: Stopping WindowsNotificationEventListener...
+2026-08-31 19:10:54,479 [INFO] [Dummy-10] [root/windows_notification.py:97]: Notification service stopped
+2026-08-31 19:11:59,296 [INFO] [MainThread] [root/log.py:104]: YASB v2.0.6
+2026-08-31 19:11:59,298 [INFO] [CLIPipeServer] [cli_server/cli_server.py:216]: CLI server started v1.1.7
+2026-08-31 19:11:59,299 [INFO] [MainThread] [cli_server/cli_server.py:106]: Log pipe server started
+2026-08-31 19:12:01,836 [INFO] [MainThread] [root/service.py:52]: AudioOutputService starting...
+2026-08-31 19:12:02,612 [INFO] [MainThread] [root/bar_manager.py:238]: Starting HotkeyListener...
+2026-08-31 19:12:02,613 [INFO] [MainThread] [root/bar_manager.py:103]: Starting WindowsNotificationEventListener...
+2026-08-31 19:12:02,627 [INFO] [MainThread] [root/watcher.py:65]: Watching directory: c:\users\user\.config\yasb
+2026-08-31 19:12:02,627 [INFO] [MainThread] [root/watcher.py:104]: Created file watcher
+2026-08-31 19:12:02,671 [INFO] [MainThread] [root/update_service.py:434]: Background update checker started
+2026-08-31 19:12:02,685 [INFO] [Dummy-10] [root/windows_notification.py:161]: Notification service started (WNF_SHEL_NOTIFICATION_TOTAL)
+2026-08-31 19:17:15,630 [INFO] [MainThread] [root/service.py:223]: Quick Launch rebuilding app list after install/uninstall detected
+2026-08-31 20:57:04,927 [INFO] [MainThread] [root/bar_helper.py:594]: AppBarManager need to re-register 1 bar
+2026-08-31 20:57:08,152 [INFO] [MainThread] [root/bar_helper.py:603]: Re-registered AppBar for primary-bar_MSI G271_2c22d042 (space reservation + fullscreen)
+2026-08-31 21:07:13,497 [INFO] [MainThread] [root/controller.py:43]: Exiting Application...
+2026-08-31 21:07:13,603 [INFO] [MainThread] [cli_server/cli_server.py:114]: Log pipe server stopped
+2026-08-31 21:07:13,667 [INFO] [MainThread] [root/bar_manager.py:111]: Stopping HotkeyListener...
+2026-08-31 21:07:13,669 [INFO] [MainThread] [root/bar_manager.py:119]: Stopping WindowsNotificationEventListener...
+2026-08-31 21:07:13,670 [INFO] [Dummy-10] [root/windows_notification.py:97]: Notification service stopped
+2026-09-01 10:55:57,400 [INFO] [MainThread] [root/log.py:104]: YASB v2.0.6
+2026-09-01 10:55:57,403 [INFO] [CLIPipeServer] [cli_server/cli_server.py:216]: CLI server started v1.1.7
+2026-09-01 10:55:57,403 [INFO] [MainThread] [cli_server/cli_server.py:106]: Log pipe server started
+2026-09-01 10:55:59,647 [INFO] [MainThread] [root/service.py:52]: AudioOutputService starting...
+2026-09-01 10:56:00,309 [INFO] [MainThread] [root/bar_manager.py:238]: Starting HotkeyListener...
+2026-09-01 10:56:00,309 [INFO] [MainThread] [root/bar_manager.py:103]: Starting WindowsNotificationEventListener...
+2026-09-01 10:56:00,324 [INFO] [MainThread] [root/watcher.py:65]: Watching directory: c:\users\user\.config\yasb
+2026-09-01 10:56:00,325 [INFO] [MainThread] [root/watcher.py:104]: Created file watcher
+2026-09-01 10:56:00,379 [INFO] [MainThread] [root/update_service.py:434]: Background update checker started
+2026-09-01 10:56:00,473 [INFO] [Dummy-10] [root/windows_notification.py:161]: Notification service started (WNF_SHEL_NOTIFICATION_TOTAL)
+2026-09-01 11:05:32,945 [INFO] [MainThread] [root/bar_helper.py:594]: AppBarManager need to re-register 1 bar
+2026-09-01 11:05:33,219 [INFO] [MainThread] [root/bar_helper.py:603]: Re-registered AppBar for primary-bar_MSI G271_b3032bb4 (space reservation + fullscreen)
+2026-09-01 12:05:00,216 [INFO] [MainThread] [root/controller.py:43]: Exiting Application from tray...
+2026-09-01 12:05:00,323 [INFO] [MainThread] [cli_server/cli_server.py:114]: Log pipe server stopped
+2026-09-01 12:05:00,405 [INFO] [MainThread] [root/bar_manager.py:111]: Stopping HotkeyListener...
+2026-09-01 12:05:00,410 [INFO] [MainThread] [root/bar_manager.py:119]: Stopping WindowsNotificationEventListener...
+2026-09-01 12:05:00,410 [INFO] [Dummy-10] [root/windows_notification.py:97]: Notification service stopped
