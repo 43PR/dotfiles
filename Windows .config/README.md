@@ -276,8 +276,12 @@ Troubleshooting
 If something doesn't work, check the following first:
 
 Make sure paths use your actual Windows username instead of <YOUR_USERNAME>.
+
 Make sure configuration files are inside the correct .config directory.
 Restart YASB after modifying its configuration.
+
 Make sure Spotify is completely closed before replacing Spicetify files.
+
 Run Spicetify commands without administrator privileges unless specifically required.
+
 If Komorebi behaves unexpectedly, remember that its configuration is still a work in progress.
