@@ -22,11 +22,17 @@ Wallpaper picker — Python-based wallpaper tool
 Some useful Windows shortcuts:
 
 Shortcut	Action
+
 Win + A	Open Quick Settings
+
 Ctrl + Win + D	Create a new virtual desktop
+
 Win + Tab	Open Task View
+
 Ctrl + Win + ← / →	Switch virtual desktops
+
 Win + 1, 2, 3...	Open/switch to applications on the taskbar
+
 Alt + Tab	Switch between windows
 
 
@@ -35,12 +41,19 @@ Alt + Tab	Switch between windows
 https://windhawk.net/
 
 Installed Mods
+
 Windows 11 Taskbar Styler > SimplyTransparent
+
 Windows 11 Start Menu Styler > LiquidGlass Legacy
+
 Windows 11 Notification Center Styler > TranslucentShell
+
 Windows 11 File Explorer Styler > Translucent Explorer11
+
 Translucent Windows > No configuration changes are needed. Just turn on and off.
+
 Taskbar tray system icon tweaks
+
 Taskbar Clock Customization
 
 > After installing programs in the terminal "reload" (close an reopen it)
@@ -48,28 +61,38 @@ Taskbar Clock Customization
 ### Cava
 
 Install Cava using WinGet Run:
+
 winget install karlstav.cava
+
 reload
+
 cava
 
 ### Btop
 
 Install btop:
+
 winget install --id aristocratos.btop4win -e
+
 reload
+
 btop
 
 ### YASB status bar
 
 Install it with WinGet:
+
 winget install --id AmN.yasb
 
 After installing:
 
 Open YASB.
 Select Get Started.
+
 Select Komorebi or don't if you won't use it.
+
 Choose the components/features you want.
+
 Editing the Configuration
 
 The YASB configuration is located at:
@@ -80,19 +103,25 @@ You can bookmark this location.
 Edit the configuration with: VSCodium, Notepad or any other text editor
 
 Autostart
+
 Enable Auto Start from the YASB taskbar tray icon.
+
 You can also reload the YASB bar from the same tray menu after editing the files.
 
 ### Wallpaper Picker
 
 The wallpaper picker requires Python and Pillow.
+
 Install from
+
 https://www.python.org/downloads/windows/
 
 During installation:
 
 Enable Add python.exe to PATH.
+
 Click Install.
+
 2. Install Pillow
 
 Open a terminal and run:
@@ -113,7 +142,8 @@ Reload yasb. If it doesn't work, make sure the folder is in the correct location
 
 Installation. Run the following command in PowerShell:
 
-iwr -useb https://raw.githubusercontent.com/spicetify/cli/main/install.ps1 | iex
+iwr -useb
+ https://raw.githubusercontent.com/spicetify/cli/main/install.ps1 | iex
 
 The default Spicetify directory should be:
 
@@ -128,6 +158,7 @@ You can install the theme from the  marketplace (text by darkthemer) or just cop
 Close Spotify completely.
 
 Replace the corresponding files with the ones from the repository.
+
 https://github.com/43PR/dotfiles/tree/main/.config/spicetify/Themes/text
 
 Make sure the theme folder is named: text
@@ -148,6 +179,7 @@ spicetify restore backup
 The Komorebi configuration is still a work in progress and may have bugs or require additional adjustments. If you don't need a tiling window manager, I recommend skipping this section.
 
 Install Komorebi
+
 winget install --id LGUG2Z.komorebi
 
 Install WHKD
