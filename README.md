@@ -89,8 +89,6 @@ Edit default programs in "config/hypr/hyprland.lua".
 
 Any issues with the wallpaper picker just delete cache pictures ".cache/quickshell/thumbs/"
 
-### ☕ Support solo Project: "Ko-fi" https://ko-fi.com/43pr2
-
 ---
 
 * [hyprquickpaper](https://github.com/iamsurjog/hyprquickpaper)
