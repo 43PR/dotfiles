@@ -1,4 +1,4 @@
-Windows Customization
+## Windows Customization
 
 A collection of the customizations, tools, configs, and tweaks I use to customize Windows.
 
@@ -12,7 +12,7 @@ WHKD — Keyboard shortcuts for Komorebi
 Spicetify — Spotify customization
 Wallpaper picker — Python-based wallpaper tool
 
-⌨️ Windows Keybinds
+### Windows Keybinds
 
 Some useful Windows shortcuts:
 
@@ -25,7 +25,7 @@ Win + 1, 2, 3...	Open/switch to applications on the taskbar
 Alt + Tab	Switch between windows
 
 
-Windhawk
+### Windhawk
 
 https://windhawk.net/
 
@@ -38,20 +38,21 @@ Translucent Windows > No configuration changes are needed. Just turn on and off.
 Taskbar tray system icon tweaks
 Taskbar Clock Customization
 
-After installing programs in the terminal close an reopen it
-Cava
+> After installing programs in the terminal close an reopen it
+
+### Cava
 
 Install Cava using WinGet Run:
 winget install karlstav.cava
 command: cava
 
-Btop
+### Btop
 
 Install btop:
 winget install --id aristocratos.btop4win -e
 command: btop
 
-YASB status bar
+### YASB status bar
 
 Install it with WinGet:
 winget install --id AmN.yasb
@@ -75,7 +76,7 @@ Autostart
 Enable Auto Start from the YASB taskbar tray icon.
 You can also reload the YASB bar from the same tray menu after editing the files.
 
-Wallpaper Picker
+### Wallpaper Picker
 
 The wallpaper picker requires Python and Pillow.
 Install from
@@ -101,7 +102,7 @@ Reload yasb. If it doesn't work, make sure the folder is in the correct location
 
 
 
-Spicetify
+### Spicetify
 
 Installation. Run the following command in PowerShell:
 
@@ -124,12 +125,9 @@ https://github.com/43PR/dotfiles/tree/main/.config/spicetify/Themes/text
 
 Make sure the theme folder is named: text
 
-
 Then run:
 
 spicetify apply
-
-
 
 If something goes wrong and you want to return to the original Spotify setup:
 
@@ -138,7 +136,7 @@ spicetify restore backup
 
 
 
-Komorebi + WHKD
+### Komorebi + WHKD
 
 The Komorebi configuration is still a work in progress and may have bugs or require additional adjustments. If you don't need a tiling window manager, I recommend skipping this section.
 
@@ -244,6 +242,3 @@ Restart YASB after modifying its configuration.
 Make sure Spotify is completely closed before replacing Spicetify files.
 Run Spicetify commands without administrator privileges unless specifically required.
 If Komorebi behaves unexpectedly, remember that its configuration is still a work in progress.
-
-
-Feel free to use, modify, or take inspiration from anything here.
