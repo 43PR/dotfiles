@@ -43,10 +43,10 @@ bars:
       center:
       - clock
       right:
-      - wallpapers
       - media
-      - volume
       - battery
+      - wallpapers
+      - volume
       - notifications
       - power_menu
 widgets:
@@ -85,21 +85,23 @@ widgets:
       engine:
         enabled: true
         animation: circle
+      run_after:
+        - "powershell -NoProfile -ExecutionPolicy Bypass -File \"C:\\Users\\User\\.config\\yasb\\scripts\\sync_wallpaper_desktops.ps1\""
       gallery:
         enabled: true
         blur: true
-        image_width: 220
-        image_per_page: 6
+        image_width: 180
+        image_per_page: 10
         gallery_columns: 0 # 0 = auto, single row matching image_per_page
         horizontal_position: center
         vertical_position: center
         respect_work_area: true
         show_buttons: false
         orientation: portrait
-        image_spacing: 8
+        image_spacing: 6
         lazy_load: true
         lazy_load_fadein: 400
-        image_corner_radius: 12
+        image_corner_radius: 5
       callbacks:
         on_left: toggle_gallery
         on_middle: do_nothing
@@ -156,13 +158,13 @@ widgets:
     type: yasb.notifications.NotificationsWidget
     options:
       label: "<span>\uF2A5</span>"
-      label_alt: '{count} notifications'
-      hide_empty: true
-      tooltip: false
+      label_alt: "{count} notifications"
+      hide_empty: false
+      tooltip: true
       callbacks:
-        on_left: toggle_notification
-        on_right: do_nothing
-        on_middle: do_nothing
+        on_left: "toggle_notification"
+        on_right: "do_nothing"
+        on_middle: "toggle_label"
   battery:
     type: yasb.battery.BatteryWidget
     options:
