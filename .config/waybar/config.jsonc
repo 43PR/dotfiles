@@ -6,7 +6,7 @@
 
     "modules-left": ["cpu", "custom/gpu", "memory", "temperature"],
     "modules-center": ["clock"],
-    "modules-right": ["mpris", "pulseaudio", "custom/power"],
+    "modules-right": ["custom/mpris-marquee", "pulseaudio", "custom/power"],
 
     "cpu": {
         "format": "CPU {usage}%",
@@ -48,12 +48,13 @@
         }
     },
 
-    "mpris": {
-        "format": "{title} - {artist}",
-        "format-paused": "{title} - {artist}",
-        "max-length": 50,
-        "tooltip": false,
-        "interval": 2
+    "custom/mpris-marquee": {
+        "exec": "~/.config/waybar/scripts/mpris-marquee.sh",
+        "return-type": "json",
+        "format": "{}",
+        "on-click": "playerctl play-pause",
+        "on-scroll-up": "playerctl next",
+        "on-scroll-down": "playerctl previous"
     },
 
     "pulseaudio": {
