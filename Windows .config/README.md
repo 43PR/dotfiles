@@ -100,6 +100,7 @@ The YASB configuration is located at:
 C:\Users\<YOUR_USERNAME>\.config\yasb\config.yaml
 
 You can bookmark this location.
+
 Edit the configuration with: VSCodium, Notepad or any other text editor
 
 Autostart
@@ -116,23 +117,18 @@ Install from
 
 https://www.python.org/downloads/windows/
 
-During installation:
+Open installer > Enable Add python.exe to PATH  > Install
 
-Enable Add python.exe to PATH.
-
-Click Install.
-
-2. Install Pillow
 
 Open a terminal and run:
 
 pip install Pillow
 
-3. Copy the YASB Folder
+You can download this repository and copy paste this yasb folder to C:\Users\<YOUR_USERNAME>\.config\
 
-Copy the yasb folder from this repository into:
+Whenever you add, remove, or change wallpapers, run the cache script again:
 
-C:\Users\<YOUR_USERNAME>\.config\
+python $env:USERPROFILE\.config\yasb\scripts\wallpaper_thumb_cache.py
 
 Reload yasb. If it doesn't work, make sure the folder is in the correct location and that the username/path matches your Windows installation.
 
