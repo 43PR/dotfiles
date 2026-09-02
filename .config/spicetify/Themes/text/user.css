@@ -61,7 +61,7 @@ bash: spicetify apply */
     --border-style: solid; /* dotted | dashed | solid | double | groove | ridge | inset | outset */
     --border-transition: 0.2s ease; /* 'none' to disable  */
 
-    --global-nav-margin-top: 40px; /* set to '0px' if you disabled window controls */
+    --global-nav-margin-top: 40px; /* Top margin. Set to '0px' if you disabled window controls */
 }
 
 
@@ -125,6 +125,7 @@ bash: spicetify apply */
     margin: 0;
     margin-top: var(--global-nav-margin-top);
 }
+/* Linux rule to change top margin */
 .spotify__container--is-desktop.spotify__os--is-linux .Root__globalNav {
     margin: 1px 0 0;
 }
