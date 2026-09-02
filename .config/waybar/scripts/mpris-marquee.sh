@@ -1,10 +1,11 @@
+
 #!/usr/bin/env bash
 
-MAX_CHARS=60       # Maximum length of title/artist
-DISPLAY_CHARS=20   # Visible marquee width
-SLEEP=0.15
+MAX_CHARS=60
+DISPLAY_CHARS=20
+SLEEP=0.5
 
-last_text="No music"
+last_text=""
 
 while true; do
     STATUS=$(playerctl status 2>/dev/null)
@@ -15,43 +16,51 @@ while true; do
 
         text="$title - $artist"
 
-        # Limit the actual text length
-        if [ "${#text}" -gt "$MAX_CHARS" ]; then
+        # Limit actual text length
+        if [[ ${#text} -gt $MAX_CHARS ]]; then
             text="${text:0:$((MAX_CHARS - 1))}…"
         fi
 
         last_text="$text"
 
-        # Add enough spaces for the marquee window
+        # Add spacing so the end loops cleanly into the beginning
         marquee="$text     "
 
-        # Make sure the scrolling area is DISPLAY_CHARS wide
-        while [ "${#marquee}" -lt "$DISPLAY_CHARS" ]; do
-            marquee="$marquee "
+        while [[ ${#marquee} -lt $DISPLAY_CHARS ]]; do
+            marquee+=" "
         done
 
         len=${#marquee}
 
+        # Smoothly advance the marquee
         pos=$(( $(date +%s%3N) / 150 % len ))
-        output="${marquee:$pos}${marquee:0:$pos}"
 
-        # Only show DISPLAY_CHARS characters
+        output="${marquee:$pos}${marquee:0:$pos}"
         output="${output:0:$DISPLAY_CHARS}"
 
-        output=$(printf '%s' "$output" | sed 's/\\/\\\\/g; s/"/\\"/g')
-
-        echo "{\"text\":\"♪  $output\",\"class\":\"playing\",\"tooltip\":false}"
+        jq -cn \
+            --arg text "♪  $output" \
+            --arg class "playing" \
+            --arg tooltip "$text" \
+            '{text:$text, class:$class, tooltip:$tooltip}'
 
     elif [[ "$STATUS" == "Paused" ]]; then
-        output=$(printf '%s' "$last_text" | sed 's/\\/\\\\/g; s/"/\\"/g')
 
-        echo "{\"text\":\"♪  $output\",\"class\":\"paused\",\"tooltip\":false}"
+        jq -cn \
+            --arg text "♪  $last_text" \
+            --arg class "paused" \
+            --arg tooltip "$last_text" \
+            '{text:$text, class:$class, tooltip:$tooltip}'
 
     else
-        output=$(printf '%s' "$last_text" | sed 's/\\/\\\\/g; s/"/\\"/g')
 
-        echo "{\"text\":\"♪  $output\",\"class\":\"stopped\",\"tooltip\":false}"
+        jq -cn \
+            --arg text "♪  $last_text" \
+            --arg class "stopped" \
+            --arg tooltip "$last_text" \
+            '{text:$text, class:$class, tooltip:$tooltip}'
     fi
 
     sleep "$SLEEP"
 done
+
