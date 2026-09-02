@@ -80,6 +80,8 @@ btop
 
 ### YASB status bar
 
+To download this repository go to dotfiles > Code > Download zip
+
 Install it with WinGet:
 
 winget install --id AmN.yasb
