@@ -49,13 +49,13 @@ Wallpapers: https://wallhaven.cc/user/43pr
 | `Super + O`             | Switch opacity            |
 | `Super + V`             | Clipboard history         |          
 | `Super + F`             | Toggle fullscreen         |
-| `Super + Space`         | Toggle floating           |
+| `Super + Space`         | Toggle floating window    |
+| `Super + Shift + W`     | Toggle waybar             |
 | `Super + Tab`           | Lock screen               |
 | `Super + Grave`         | Logout menu               |
-| `Super + Shift + W`     | Toggle waybar             |
 | `Super + Mouse wheel`   | Zoom                      |
 
-> **All keybinds in config/hypr/keybinds.lua**
+> **All keybinds: config/hypr/keybinds.lua**
 
 ---
 ## Installation 
