@@ -64,7 +64,7 @@ Wallpapers: https://wallhaven.cc/user/43pr
 
 Should work for Arch, Manjaro, EndeavourOS, CachyOS, etc. Let me know if there's any issues
 
-**Clone the repository and run the installer:**
+**First install git then clone the repository and run the installer:**
 
 ```bash
 
