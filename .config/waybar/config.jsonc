@@ -10,19 +10,17 @@
 
     "cpu": {
         "format": "CPU {usage}%",
-        "interval": 2
     },
 
     "memory": {
         "format": "RAM {percentage}%",
         "tooltip-format": "{used} / {total}GiB",
-        "interval": 2
     },
 
     "custom/gpu": {
         "exec": "~/.config/waybar/scripts/gpu_usage.sh",
-        "interval": 2,
         "format": "GPU {}%",
+        "tooltip": true,
         "tooltip-format": "Skylake-H GT2: {}%"
     },
     
@@ -33,7 +31,6 @@
         "format-critical": " {temperatureC}°C",
         "tooltip": true,
         "tooltip-format": "CPU Temp: {temperatureC}°C",
-        "interval": 2,
         "on-click": "~/.config/waybar/scripts/toggle-gammastep"
     },
 //  "format": "{:%H:%M}",
