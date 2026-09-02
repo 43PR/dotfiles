@@ -1,4 +1,3 @@
-
 #!/usr/bin/env bash
 
 MAX_CHARS=60
@@ -8,9 +7,20 @@ SLEEP=0.5
 last_text=""
 
 while true; do
+
+    # No media players at all → hide the module
+    if ! playerctl -l 2>/dev/null | grep -q .; then
+        jq -cn \
+            '{text:"", class:"empty", tooltip:""}'
+
+        sleep "$SLEEP"
+        continue
+    fi
+
     STATUS=$(playerctl status 2>/dev/null)
 
     if [[ "$STATUS" == "Playing" ]]; then
+
         title="$(playerctl metadata --format '{{ title }}' 2>/dev/null)"
         artist="$(playerctl metadata --format '{{ artist }}' 2>/dev/null)"
 
@@ -54,6 +64,8 @@ while true; do
 
     else
 
+        # Player exists, but isn't playing/paused.
+        # Keep displaying the last known media.
         jq -cn \
             --arg text "♪  $last_text" \
             --arg class "stopped" \
@@ -63,4 +75,3 @@ while true; do
 
     sleep "$SLEEP"
 done
-
