@@ -9,10 +9,12 @@
     "modules-right": ["custom/mpris-marquee", "pulseaudio", "custom/power"],
 
     "cpu": {
+        "interval": 1,
         "format": "CPU {usage}%",
     },
 
     "memory": {
+        "interval": 1,
         "format": "RAM {percentage}%",
         "tooltip-format": "{used} / {total}GiB",
     },
@@ -20,6 +22,7 @@
     "custom/gpu": {
         "exec": "~/.config/waybar/scripts/gpu_usage.sh",
         "format": "GPU {}%",
+        "interval": 1,
         "tooltip": true,
         "tooltip-format": "Skylake-H GT2: {}%"
     },
@@ -27,6 +30,7 @@
     "temperature": {
         "hwmon-path": "/sys/class/hwmon/hwmon5/temp1_input",
         "critical-threshold": 80,
+        "interval": 1,
         "format": " {temperatureC}°C",
         "format-critical": " {temperatureC}°C",
         "tooltip": true,
