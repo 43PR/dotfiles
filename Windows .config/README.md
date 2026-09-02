@@ -89,13 +89,9 @@ After installing:
 Open YASB.
 Select Get Started.
 
-Select Komorebi or don't if you won't use it.
-
 Choose the components/features you want.
 
 Editing the Configuration
-
-The YASB configuration is located at:
 
 C:\Users\<YOUR_USERNAME>\.config\yasb\config.yaml
 
@@ -129,7 +125,8 @@ You can download this repository and copy paste this yasb folder to C:\Users\<YO
 
 Whenever you add, remove, or change wallpapers, run the cache script again:
 
-python $env:USERPROFILE\.config\yasb\scripts\wallpaper_thumb_cache.py
+python $env:USERPROFILE\.config\yasb\scripts\wallpaper_thumb_cache.py
+
 Reload yasb. If it doesn't work, make sure the folder is in the correct location and that the username/path matches your Windows installation.
 
 Remove the ps1 file from scripts if you only use 1 workspace
