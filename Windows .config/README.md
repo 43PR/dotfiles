@@ -121,6 +121,8 @@ Open a terminal and run:
 
 pip install Pillow
 
+Create a folder named "Wallpapers" inside Pictures and add your wallpapers
+
 You can download this repository and copy paste this yasb folder to C:\Users\<YOUR_USERNAME>\.config\
 
 Whenever you add, remove, or change wallpapers, run the cache script again:
