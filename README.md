@@ -21,9 +21,9 @@ Wallpapers: https://wallhaven.cc/user/43pr
 * Rofi > App search, clipboard history and switch opacity
 * Hyprlock (Lock screen)
 * Wlogout (Logout menu)
-* Custom wallpaper selector
 * Custom scripts
 * Custom monochrome theme
+* Custom wallpaper selector (Quickshell)
 * Spotify + Spicetify. Theme: text by darkthemer (edited)
 
 ### Wallpaper Selector
