@@ -63,22 +63,33 @@ Taskbar Clock Customization
 ### Cava
 
 Install Cava using WinGet Run:
+```bash
 
-winget install karlstav.cava
-
+winget install karlstav.cava 
+```
 reload
 
+```bash
+
 cava
+```
 
 ### Btop
 
 Install btop:
 
+```bash
+
 winget install --id aristocratos.btop4win -e
+```
 
 reload
 
+```bash
+
 btop
+```
+
 
 ### YASB status bar
 
@@ -86,7 +97,10 @@ To download this repository go to dotfiles > Code > Download zip
 
 Install YASB with WinGet:
 
+```bash
+
 winget install --id AmN.yasb
+```
 
 After installing:
 
@@ -95,13 +109,15 @@ Select Get Started.
 
 Choose the components/features you want.
 
-Editing the Configuration
+The location should be:
 
 C:\Users\<YOUR_USERNAME>\.config\yasb\config.yaml
 
 You can bookmark this location.
 
-Edit the configuration with: VSCodium, Notepad or any other text editor
+Edit the configuration with: VSCodium, Notepad or any other text editor 
+
+Or download this repo (dotfiles > Code > download zip) and copy the yasb folder
 
 Autostart
 
@@ -123,7 +139,10 @@ Open installer > Enable Add python.exe to PATH  > Install
 
 Open a terminal and run:
 
+```bash
+
 pip install Pillow
+```
 
 Create a folder named "Wallpapers" inside Pictures and add your wallpapers
 
@@ -131,12 +150,14 @@ You can download this repository and copy paste this yasb folder to C:\Users\<YO
 
 Whenever you add, remove, or change wallpapers, run the cache script again:
 
+```bash
+
 python $env:USERPROFILE\.config\yasb\scripts\wallpaper_thumb_cache.py
+```
 
 Reload yasb. If it doesn't work, make sure the folder is in the correct location and that the username/path matches your Windows installation.
 
-Remove the ps1 file from scripts if you only use 1 workspace
-It restarts the file explorer 
+Remove the ps1 file from scripts if you only use 1 workspace. It restarts the file explorer 
 
 
 
@@ -146,8 +167,11 @@ Theme: text by darkthemer (edited)
 
 Installation. Run the following command in PowerShell:
 
+```bash
+
 iwr -useb
  https://raw.githubusercontent.com/spicetify/cli/main/install.ps1 | iex
+```
 
 The default Spicetify directory should be:
 
@@ -155,7 +179,10 @@ C:\Users\<YOUR_USERNAME>\AppData\Local\spicetify
 
 Open a terminal without administrator privileges and run:
 
+```bash
+
 spicetify backup apply
+```
 
 Close Spotify completely.
 
@@ -167,12 +194,17 @@ Make sure the theme folder is named: text
 
 Then run:
 
+```bash
+
 spicetify apply
+```
 
 If something goes wrong and you want to return to the original Spotify setup:
 
-spicetify restore backup
+```bash
 
+spicetify restore backup
+```
 
 
 
@@ -182,46 +214,61 @@ The Komorebi configuration is still a work in progress and may have bugs or requ
 
 Install Komorebi
 
+```bash
+
 winget install --id LGUG2Z.komorebi
+```
 
 Install WHKD
 
 WHKD handles the keyboard shortcuts:
 
+```bash
+
 winget install --id LGUG2Z.whkd
+```
 
 Start Komorebi
 
 Run:
 
+```bash
+
 komorebic start
+```
 
 Create the WHKD Configuration
 
 Create the configuration file:
 
+```bash
+
 New-Item -ItemType File -Force "$HOME\.config\whkdrc"
+```
 
 
 Open it with Notepad:
 
+```bash
+
 notepad "$HOME\.config\whkdrc"
-
-
-The WHKD configuration used by this setup is included in the repository.
+```
 
 Copy the appropriate configuration into the file and save it.
 
 Then start WHKD:
 
-whkd
+```bash
 
-Create the Komorebi Configuration
+whkd
+```
 
 Create the configuration file:
 
-notepad "$HOME\.config\komorebi.json"
+```bash
 
+notepad "$HOME\.config\komorebi.json"
+```
 
 The Komorebi configuration is also included in this repository.
 
@@ -229,49 +276,45 @@ Set the Komorebi Config Path
 
 For the current PowerShell session:
 
-$env:KOMOREBI_CONFIG_HOME = "C:\Users\<YOUR_USERNAME>\.config"
+```bash
 
+$env:KOMOREBI_CONFIG_HOME = "C:\Users\<YOUR_USERNAME>\.config"
+```
 
 To permanently set it for your user account:
+
+Replace <YOUR_USERNAME> with your Windows username.
+
+```bash
 
 [Environment]::SetEnvironmentVariable(
     "KOMOREBI_CONFIG_HOME",
     "C:\Users\<YOUR_USERNAME>\.config",
     "User"
 )
-
-
-Replace <YOUR_USERNAME> with your Windows username.
+```
 
 Start Komorebi With the Config
+
+```bash
+
 komorebi --config "C:\Users\<YOUR_USERNAME>\.config\komorebi.json"
+```
 
+Enable movement animations:
 
-If you need to restart Komorebi:
+```bash
+
+komorebic animation enable --animation-type movement
+```
+
+Other commands:
 
 komorebic stop
 komorebi --config "C:\Users\<YOUR_USERNAME>\.config\komorebi.json"
 komorebic start
 
 
-Enable movement animations:
-
-komorebic animation enable --animation-type movement
-
-Autostart
-
-To start WHKD and the other components automatically when Windows starts:
-
-Press Win + R.
-Enter:
-shell:startup
-
-Add the following startup files:
-start-whkd.bat
-start-whkd.vbs
-
-
-These files are included in the repository.
 
 Troubleshooting
 
