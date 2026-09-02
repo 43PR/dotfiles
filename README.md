@@ -78,13 +78,9 @@ chmod +x install.sh
 ./install.sh
 ```
 
-> **After the installation finishes edit the paths and log out and back in.**
-
-You'll need to edit some paths with your username ".config/wlogoutstyle.css".
+> **After the installation finishes log out and back in.**
 
 Existing configuration files that are being replaced will be backed up automatically.
-
-You can clone the repo and remove programs from the packages.txt and then install if you want.
 
 Edit default programs in "config/hypr/hyprland.lua".
 
