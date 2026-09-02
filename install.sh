@@ -282,6 +282,13 @@ fi
 success "Permissions configured."
 
 # --------------------------------------------------
+# Config Update (Set to current user)
+# --------------------------------------------------
+
+info "Updating Config..."
+sed -i 's/rp34/$USER/g' $HOME/.config/wlogout/style.css
+
+# --------------------------------------------------
 # Finish
 # --------------------------------------------------
 
