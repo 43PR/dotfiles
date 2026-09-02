@@ -157,7 +157,7 @@ python $env:USERPROFILE\.config\yasb\scripts\wallpaper_thumb_cache.py
 
 Reload yasb. If it doesn't work, make sure the folder is in the correct location and that the username/path matches your Windows installation.
 
-Remove the ps1 file from scripts if you only use 1 workspace. It restarts the file explorer 
+Remove the ps1 file from "scripts" folder if you only use 1 workspace. It restarts the file explorer 
 
 
 
