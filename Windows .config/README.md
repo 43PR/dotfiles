@@ -6,6 +6,8 @@ You can copy the configuration files for YASB and Komorebi directly from this re
 
 Note: The Komorebi configuration is still rough and may contain bugs or unfinished parts. Feel free to skip that section if you just want the other customizations.
 
+Open Terminal/PowerShell with administrator privileges when required by the installer.
+
 YASB — Custom status bar
 
 Komorebi — Tiling window manager configuration
@@ -82,7 +84,7 @@ btop
 
 To download this repository go to dotfiles > Code > Download zip
 
-Install it with WinGet:
+Install YASB with WinGet:
 
 winget install --id AmN.yasb
 
