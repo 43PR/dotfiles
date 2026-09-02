@@ -142,6 +142,8 @@ It restarts the file explorer
 
 ### Spicetify
 
+Theme: text by darkthemer (edited)
+
 Installation. Run the following command in PowerShell:
 
 iwr -useb
@@ -154,8 +156,6 @@ C:\Users\<YOUR_USERNAME>\AppData\Local\spicetify
 Open a terminal without administrator privileges and run:
 
 spicetify backup apply
-
-You can install the theme from the  marketplace (text by darkthemer) or just copy the folder from the Themes folder from the repository 
 
 Close Spotify completely.
 
