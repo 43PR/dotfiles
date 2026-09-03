@@ -32,8 +32,6 @@ Wallpapers: https://wallhaven.cc/user/43pr
 
 ### Most used keybinds
 
-> **$mod = Super = Windows key**
-
 > **You can modify the binds using HyprMod**
 
 | Keybind                 | Action                    |
