@@ -1,8 +1,6 @@
 ## Simple Hyprland Setup
 
-Updates: https://www.youtube.com/@43PR2
-
-Setup tutorial: https://youtu.be/DFaSCFysr8s
+Showcase & Guides: https://www.youtube.com/@43PR2
 
 Simple Hyprland setup focused on practical keybinds, productivity, and a smooth workflow easy to customize
 
