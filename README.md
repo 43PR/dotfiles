@@ -1,6 +1,6 @@
 ## Simple Hyprland Setup
 
-Full showcase: https://youtu.be/-fGqZo_W268
+Updates: https://www.youtube.com/@43PR2
 
 Setup tutorial: https://youtu.be/DFaSCFysr8s
 
@@ -32,7 +32,7 @@ Wallpapers: https://wallhaven.cc/user/43pr
 
 ### Most used keybinds
 
-> **You can modify the binds using HyprMod**
+> **You can modify the keybinds using HyprMod**
 
 | Keybind                 | Action                    |
 | -----------             | ------------------------- |
@@ -83,6 +83,8 @@ Existing configuration files that are being replaced will be backed up automatic
 Edit default programs in "config/hypr/hyprland.lua".
 
 Any issues with the wallpaper picker just delete cache pictures ".cache/quickshell/thumbs/"
+
+**Support: https://ko-fi.com/43pr2**
 
 ---
 
