@@ -71,7 +71,7 @@ This is mainly intended for a clean installation. If you already have a desktop 
 
 Should work for Arch, Manjaro, EndeavourOS, CachyOS, etc. Let me know if there's any issues
 
-**First install git then clone the repository and run the installer:**
+> **First install git then clone the repository and run the installer:**
 
 ```bash
 
