@@ -6,6 +6,14 @@ Simple Hyprland setup focused on practical keybinds, productivity, and a smooth 
 
 Feel free to use as inspiration or as a starting point for building your own setup.
 
+### `Recent updates`
+
+```text
++ quickshell   → volume OSD
++ waybar       → media marquee
++ hyprlock     → media controls
+```
+
 ![](Wallpapers/Showcase/1.png)
 ![](Wallpapers/Showcase/2.png)
 ![](Wallpapers/Showcase/3.png)
@@ -83,15 +91,6 @@ Edit default programs in "config/hypr/hyprland.lua".
 Any issues with the wallpaper picker just delete cache pictures ".cache/quickshell/thumbs/"
 
 **☕ Support: https://ko-fi.com/43pr2**
-
----
-### `$ updates`
-
-```text
-+ quickshell   → volume OSD
-+ waybar       → media marquee
-+ hyprlock     → media controls
-```
 
 ---
 
