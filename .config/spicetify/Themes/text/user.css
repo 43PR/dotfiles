@@ -56,12 +56,12 @@ bash: spicetify apply */
     --display-spicetify-banner-ascii: block; 
     --display-music-banner-ascii: none; 
 
-    --border-radius: 8px;
+    --border-radius: 10px;
     --border-width: 1px;
-    --border-style: solid; /* dotted | dashed | solid | double | groove | ridge | inset | outset */
+    --border-style: outset; /* dotted | dashed | solid | double | groove | ridge | inset | outset */
     --border-transition: 0.2s ease; /* 'none' to disable  */
 
-    --global-nav-margin-top: 40px; /* Top margin. Set to '0px' if you disabled window controls */
+    --global-nav-margin-top: 50px; /* set to '0px' if you disabled window controls */
 }
 
 
@@ -125,7 +125,6 @@ bash: spicetify apply */
     margin: 0;
     margin-top: var(--global-nav-margin-top);
 }
-/* Linux rule to change top margin */
 .spotify__container--is-desktop.spotify__os--is-linux .Root__globalNav {
     margin: 1px 0 0;
 }
@@ -381,14 +380,7 @@ img[src*="equaliser"] {
     background-color: var(--spice-main);
     transition: border-color var(--border-transition);
 }
-.Root__globalNav:hover,
-.main-yourLibraryX-entryPoints:hover,
-.Root__main-view:hover,
-.main-nowPlayingBar-container:hover,
-.Root__right-sidebar:has(aside:not(:empty)):hover {
-    border: var(--border-width) var(--border-style);
-    border-color: var(--spice-border-active);
-}
+
 
 /* pane headers */
 .Root__nav-bar .main-yourLibraryX-entryPoints {
