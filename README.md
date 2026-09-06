@@ -10,8 +10,9 @@ Feel free to use as inspiration or as a starting point for building your own set
 
 ```text
 + quickshell   → volume OSD
-+ waybar       → media marquee
-+ hyprlock     → media controls
++ waybar       → media marquee effect
++ hyprlock     → autohide media controls
++ spicetify    → removed hover effect (border-color)
 ```
 
 ![](Wallpapers/Showcase/1.png)
