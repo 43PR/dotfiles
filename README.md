@@ -85,12 +85,13 @@ Any issues with the wallpaper picker just delete cache pictures ".cache/quickshe
 **☕ Support: https://ko-fi.com/43pr2**
 
 ---
-## `$ Recent updates`
+### `$ updates`
 
 ```text
 + quickshell   → volume OSD
 + waybar       → media marquee
 + hyprlock     → media controls
+```
 
 ---
 
