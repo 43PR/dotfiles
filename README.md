@@ -85,6 +85,14 @@ Any issues with the wallpaper picker just delete cache pictures ".cache/quickshe
 **☕ Support: https://ko-fi.com/43pr2**
 
 ---
+## `$ Recent updates`
+
+```text
++ quickshell   → volume OSD
++ waybar       → media marquee
++ hyprlock     → media controls
+
+---
 
 * [hyprquickpaper](https://github.com/iamsurjog/hyprquickpaper)
 * [samaritan-sddm-theme](https://github.com/omerwk/samaritan-sddm-theme)
