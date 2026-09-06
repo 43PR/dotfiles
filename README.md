@@ -67,6 +67,8 @@ Wallpapers: https://wallhaven.cc/user/43pr
 
 > **READ ALL**
 
+This installation is intended for a clean installation. If you already have a desktop configuration, you should implement the configuration manually instead.
+
 Should work for Arch, Manjaro, EndeavourOS, CachyOS, etc. Let me know if there's any issues
 
 **First install git then clone the repository and run the installer:**
