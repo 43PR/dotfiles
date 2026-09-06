@@ -12,7 +12,7 @@ Feel free to use as inspiration or as a starting point for building your own set
 + quickshell   → volume OSD
 + waybar       → media marquee effect
 + hyprlock     → autohide media controls
-+ spicetify    → removed hover effect (border-color)
++ spicetify    → removed hover (border-color)
 ```
 
 ![](Wallpapers/Showcase/1.png)
