@@ -9,10 +9,10 @@ Feel free to use as inspiration or as a starting point for building your own set
 ### `Recent updates`
 
 ```text
-+ quickshell   → volume OSD
-+ waybar       → media marquee effect
-+ hyprlock     → autohide media controls
-+ spicetify    → removed hover (border-color)
+quickshell   → volume OSD 
+waybar       → media marquee effect
+hyprlock     → autohide media controls
+spicetify    → user.css update
 ```
 
 ![](Wallpapers/Showcase/1.png)
