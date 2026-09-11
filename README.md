@@ -13,7 +13,7 @@ quickshell   → volume OSD
 waybar       → media marquee effect
 hyprlock     → autohide media controls
 terminal     → eza icons + starship + zsh shell
-terminal     → autosuggestions + syntax-highlighting
+terminal     → fastfetch + autosuggestions + syntax-highlighting
 ```
 
 ![](Wallpapers/Showcase/1.png)
