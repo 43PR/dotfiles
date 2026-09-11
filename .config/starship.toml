@@ -1,0 +1,19 @@
+format = """
+$directory$git_branch$git_status
+$character
+"""
+
+[directory]
+style = "bold white"
+truncation_length = 3
+
+[git_branch]
+symbol = "󰘬 "
+style = "bright-black"
+
+[git_status]
+style = "bright-black"
+
+[character]
+success_symbol = "[❯](white)"
+error_symbol = "[❯](bold white)"
