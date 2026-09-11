@@ -12,7 +12,7 @@ Feel free to use as inspiration or as a starting point for building your own set
 quickshell   → volume OSD 
 waybar       → media marquee effect
 hyprlock     → autohide media controls
-spicetify    → user.css update
+terminal     → eza icons + starship + zsh shell
 ```
 
 ![](Wallpapers/Showcase/1.png)
