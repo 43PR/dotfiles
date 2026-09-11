@@ -2,12 +2,13 @@
   "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
   "logo": {
     "type": "kitty",
-    "source": "$HOME/.config/fastfetch/pfp.png",
+    "source": "$HOME/.config/fastfetch/pfp2.png",
     "width": 40,
+    "height": 18,
     "padding": {
       "top": 1,
       "left": 0,
-      "right": 4
+      "right": 1
     }
   },
   "display": {
@@ -64,32 +65,6 @@
       "keyColor": "38;5;240"
     },
     {
-      "type": "terminal",
-      "key": " ├─ 󰞷 ",
-      "keyColor": "38;5;240"
-    },
-    {
-      "type": "font",
-      "key": " ├─ 󰛖 ",
-      "keyColor": "38;5;240"
-    },
-    {
-      "type": "shell",
-      "key": " └─ 󰞷 ",
-      "keyColor": "38;5;240"
-    },
-    {
-      "type": "custom",
-      "format": "└───────────────────────────────────────────┘"
-    },
-
-
-    // --- Desktop / WM Section ---
-    {
-      "type": "custom",
-      "format": "┌─────────── Desktop Environment ───────────┐"
-    },
-    {
       "type": "wm",
       "key": " ├─ 󰨇 ",
       "keyColor": "38;5;240"
@@ -105,9 +80,23 @@
       "keyColor": "38;5;240"
     },
     {
+      "type": "font",
+      "key": " ├─ 󰛖 ",
+      "keyColor": "38;5;240"
+    },
+    {
+      "type": "terminal",
+      "key": " ├─ 󰞷 ",
+      "keyColor": "38;5;240"
+    },
+    {
+      "type": "shell",
+      "key": " └─ 󰞷 ",
+      "keyColor": "38;5;240"
+    },
+    {
       "type": "custom",
       "format": "└───────────────────────────────────────────┘"
     },
-
   ]
 }
