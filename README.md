@@ -16,11 +16,12 @@ terminal     → eza icons + starship + zsh shell
 terminal     → fastfetch + autosuggestions + syntax-highlighting
 ```
 
+![](Wallpapers/Showcase/7.png)
 ![](Wallpapers/Showcase/1.png)
 ![](Wallpapers/Showcase/2.png)
 ![](Wallpapers/Showcase/3.png)
 ![](Wallpapers/Showcase/4.png)
-![](Wallpapers/Showcase/6.png)
+
 
 Wallpapers: https://wallhaven.cc/user/43pr
 
