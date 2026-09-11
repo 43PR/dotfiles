@@ -1,0 +1,113 @@
+{
+  "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+  "logo": {
+    "type": "kitty",
+    "source": "$HOME/.config/fastfetch/pfp.png",
+    "width": 40,
+    "padding": {
+      "top": 1,
+      "left": 0,
+      "right": 4
+    }
+  },
+  "display": {
+    "separator": " "
+  },
+  "modules": [
+    // --- Hardware Section ---
+    {
+    "type": "custom",
+    "format": ""
+    },
+    {
+    "type": "custom",
+    "format": ""
+    },
+    {
+      "type": "custom",
+      "format": "┌──────────────── Hardware ────────────────┐"
+    },
+    {
+      "type": "cpu",
+      "key": " ├─  ",
+      "keyColor": "38;5;240"
+    },
+    {
+      "type": "gpu",
+      "key": " ├─ 󰍛 ",
+      "keyColor": "38;5;240"
+    },
+    {
+      "type": "memory",
+      "key": " ├─ 󰘚 ",
+      "keyColor": "38;5;240"
+    },
+    {
+      "type": "custom",
+      "format": "└──────────────────────────────────────────┘"
+    },
+
+
+    // --- Software Section ---
+    {
+      "type": "custom",
+      "format": "┌──────────────── Software ─────────────────┐"
+    },
+    {
+      "type": "os",
+      "key": " ├─ 󰌽 ",
+      "keyColor": "38;5;240"
+    },
+    {
+      "type": "kernel",
+      "key": " ├─  ",
+      "keyColor": "38;5;240"
+    },
+    {
+      "type": "terminal",
+      "key": " ├─ 󰞷 ",
+      "keyColor": "38;5;240"
+    },
+    {
+      "type": "font",
+      "key": " ├─ 󰛖 ",
+      "keyColor": "38;5;240"
+    },
+    {
+      "type": "shell",
+      "key": " └─ 󰞷 ",
+      "keyColor": "38;5;240"
+    },
+    {
+      "type": "custom",
+      "format": "└───────────────────────────────────────────┘"
+    },
+
+
+    // --- Desktop / WM Section ---
+    {
+      "type": "custom",
+      "format": "┌─────────── Desktop Environment ───────────┐"
+    },
+    {
+      "type": "wm",
+      "key": " ├─ 󰨇 ",
+      "keyColor": "38;5;240"
+    },
+    {
+      "type": "theme",
+      "key": " ├─ 󰉼 ",
+      "keyColor": "38;5;240"
+    },
+    {
+      "type": "icons",
+      "key": " └─ 󰀻 ",
+      "keyColor": "38;5;240"
+    },
+    {
+      "type": "custom",
+      "format": "└───────────────────────────────────────────┘"
+    },
+
+  ]
+}
