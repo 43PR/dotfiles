@@ -91,6 +91,7 @@ brightnessctl
 nvtop
 btop
 cava
+fastfetch
 zsh
 zsh-autosuggestions
 zsh-syntax-highlighting
