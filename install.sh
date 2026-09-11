@@ -237,8 +237,11 @@ info "Installing dotfiles..."
 cp -a "$REPO_DIR/.config/." "$CONFIG_DIR/"
 
 # Install ~/.zshrc
-if [[ -f "$REPO_DIR/.zshrc" ]]; then
-    cp -a "$REPO_DIR/.zshrc" "$HOME/.zshrc"
+if [[ -f "$REPO_DIR/.config/.zshrc" ]]; then
+    cp "$REPO_DIR/.config/.zshrc" "$HOME/.zshrc"
+    success "Installed .zshrc."
+else
+    warning ".zshrc not found; skipping."
 fi
 
 success "Dotfiles installed."
