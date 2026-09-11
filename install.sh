@@ -20,8 +20,6 @@ set -uo pipefail
 # Supported package managers:
 #   - pacman       (official repos: Arch, Manjaro, EndeavourOS, CachyOS, etc.)
 #   - paru / yay   (AUR helpers, optional but recommended)
-#
-# Designed to be safe to run more than once.
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_DIR="$HOME/.config"
@@ -182,6 +180,27 @@ else
 fi
 
 # --------------------------------------------------
+# Default shell
+# --------------------------------------------------
+
+if [[ -x /bin/zsh ]]; then
+    if [[ "$SHELL" != "/bin/zsh" ]]; then
+        info "Setting Zsh as the default shell..."
+
+        if chsh -s /bin/zsh; then
+            success "Default shell changed to Zsh."
+            warning "Log out and back in for the shell change to take effect."
+        else
+            warning "Failed to change the default shell to Zsh."
+        fi
+    else
+        info "Zsh is already the default shell."
+    fi
+else
+    warning "Zsh is not installed; skipping default shell configuration."
+fi
+
+# --------------------------------------------------
 # Backup existing configuration
 # --------------------------------------------------
 
@@ -214,7 +233,13 @@ fi
 
 info "Installing dotfiles..."
 
+# Install ~/.config files
 cp -a "$REPO_DIR/.config/." "$CONFIG_DIR/"
+
+# Install ~/.zshrc
+if [[ -f "$REPO_DIR/.zshrc" ]]; then
+    cp -a "$REPO_DIR/.zshrc" "$HOME/.zshrc"
+fi
 
 success "Dotfiles installed."
 
