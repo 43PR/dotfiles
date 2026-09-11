@@ -20,6 +20,7 @@ terminal     → fastfetch + autosuggestions + syntax-highlighting
 ![](Wallpapers/Showcase/2.png)
 ![](Wallpapers/Showcase/3.png)
 ![](Wallpapers/Showcase/4.png)
+![](Wallpapers/Showcase/5.png)
 
 Wallpapers: https://wallhaven.cc/user/43pr
 
