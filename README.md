@@ -16,7 +16,7 @@ terminal     → eza icons + starship + zsh shell
 terminal     → fastfetch + autosuggestions + syntax-highlighting
 ```
 
-![](Wallpapers/Showcase/7.png)
+![](Wallpapers/Showcase/5.png)
 ![](Wallpapers/Showcase/4.png)
 ![](Wallpapers/Showcase/2.png)
 
