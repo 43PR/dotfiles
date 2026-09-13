@@ -82,7 +82,7 @@ Wallpapers: https://wallhaven.cc/user/43pr
 | Screen Lock | hyprlock |
 | Editor | xed |
 
-> All programs in [packages.txt](packages.txt)
+> All programs: [packages.txt](packages.txt)
 
 ---
 ## Installation 
