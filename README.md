@@ -106,7 +106,7 @@ Any issues with the wallpaper picker just delete cache pictures ".cache/quickshe
 
 ### Support 
 
-* <a href="https://ko-fi.com/43pr2">☕ ko-fi.com </a>
-* <a href="https://www.youtube.com/@43PR2">▶️ YouTube </a>
+* **<a href="https://ko-fi.com/43pr2">☕ ko-fi.com </a>**
+* **<a href="https://www.youtube.com/@43PR2">YouTube </a>**
 
 
