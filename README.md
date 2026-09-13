@@ -49,7 +49,7 @@ Wallpapers: https://wallhaven.cc/user/43pr
 
 > Just made some tweaks to it. Give it some love: [hyprquickpaper](https://github.com/iamsurjog/hyprquickpaper)
 
-### Most used keybinds
+## Most used keybinds
 
 > **You can modify the keybinds using HyprMod**
 
