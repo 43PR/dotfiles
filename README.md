@@ -94,7 +94,7 @@ chmod +x install.sh
 
 > **After the installation finishes log out and back in.**
 
-Change the GTK theme to dark if it wasn't changed automatically (SUPER + D to open rofi).
+Change the GTK theme to dark if it wasn't changed automatically
 
 Existing configuration files that are being replaced will be backed up automatically.
 
@@ -104,9 +104,15 @@ Waybar custom gpu is specific to your specs so you can try to implement it or re
 
 Any issues with the wallpaper picker just delete cache pictures ".cache/quickshell/thumbs/"
 
-### Support 
+<div align="center">
 
-* **<a href="https://ko-fi.com/43pr2">☕ ko-fi.com </a>**
-* **<a href="https://www.youtube.com/@43PR2">YouTube </a>**
+## Support
+
+☕ <a href="https://ko-fi.com/43pr2"><strong>Ko-fi</strong></a>
+  ─  
+▶️ <a href="https://www.youtube.com/@43PR2"><strong>YouTube</strong></a>
+
+</div>
+
 
 
