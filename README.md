@@ -6,6 +6,12 @@
 
 Simple Hyprland setup focused on practical keybinds, productivity, and a smooth workflow easy to customize. Feel free to use as inspiration or as a starting point for building your own setup.
 
+<div align="center">
+
+**[Features](#features) ─ [Keybinds](#most-used-keybinds) ─ [Installation](#installation) ─ [Wallpapers](#wallpaper-selector)**
+
+</div>
+
 ### `Recent updates`
 
 </div>
@@ -20,6 +26,7 @@ terminal     → eza icons + starship + zsh shell + autosuggestions + syntax-hig
 ![](Wallpapers/Showcase/9.png)
 ![](Wallpapers/Showcase/4.png)
 ![](Wallpapers/Showcase/2.png)
+
 
 
 Wallpapers: https://wallhaven.cc/user/43pr
