@@ -1,4 +1,8 @@
-## Simple Hyprland Setup
+<div align="center">
+
+## Simple Hyprland Setup by 43pr メ
+
+</div>
 
 Showcase & Guides: https://www.youtube.com/@43PR2
 
