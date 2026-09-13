@@ -71,7 +71,7 @@ Wallpapers: https://wallhaven.cc/user/43pr
 
 > **READ ALL**
 
-This is mainly intended for a clean installation. If you already have a desktop configuration, you should implement it manually instead.
+This is mainly intended for a clean installation. If you already have a desktop configuration I recommend to implement manually.
 
 Should work for Arch, Manjaro, EndeavourOS, CachyOS, etc. Let me know if there's any issues
 
