@@ -47,7 +47,7 @@ Wallpapers: https://wallhaven.cc/user/43pr
 
 ### Wallpaper Selector
 
-> Just made some tweaks to it. Give it some love: [hyprquickpaper](https://github.com/iamsurjog/hyprquickpaper)
+Just made some tweaks to it. Give it some love: [hyprquickpaper](https://github.com/iamsurjog/hyprquickpaper)
 
 ## Most used keybinds
 
@@ -64,7 +64,7 @@ Wallpapers: https://wallhaven.cc/user/43pr
 | `Super + B`             | Browser                   |
 | `Super + W`             | Wallpaper selector        |
 | `Super + O`             | Switch opacity            |
-| `Super + V`             | Clipboard history         |          
+| `Super + V`             | Clipboard history         |
 | `Super + F`             | Toggle fullscreen         |
 | `Super + Space`         | Toggle floating window    |
 | `Super + Shift + W`     | Toggle waybar             |
@@ -77,13 +77,18 @@ Wallpapers: https://wallhaven.cc/user/43pr
 ---
 ## Installation 
 
-> **READ ALL**
-
-This is mainly intended for a clean installation. If you already have a desktop configuration I recommend to implement manually.
+**READ ALL**
 
 Should work for Arch, Manjaro, EndeavourOS, CachyOS, etc. Let me know if there's any issues
 
-> **First install git then clone the repository and run the installer:**
+This is mainly intended for a clean installation. If you already have a desktop configuration I recommend to implement manually.
+
+Existing configuration files that are being replaced will be backed up automatically.
+
+> [!tip]
+> You can clone the repository first and remove programs from the packages.txt and then run the installer or install them manually for example: sudo pacman -S awww grim slurp imagemagick quickshell jq (those are screenshots and wallpaper picker dependencies)
+
+First install git then use the next command and continue the installation until it's finished:
 
 ```bash
 
@@ -97,17 +102,13 @@ chmod +x install.sh
 ./install.sh
 ```
 
-> **After the installation finishes log out and back in.**
+**After the installation finishes log out and back in.**
 
-Change the GTK theme to dark if it wasn't changed automatically
-
-Existing configuration files that are being replaced will be backed up automatically.
-
-Edit default programs in "config/hypr/hyprland.lua".
-
-Waybar custom gpu is specific to your specs so you can try to implement it or remove it.
-
-Any issues with the wallpaper picker just delete cache pictures ".cache/quickshell/thumbs/"
+> [!note]
+> Change the GTK theme to dark if it wasn't changed automatically
+> Edit default programs in "config/hypr/hyprland.lua".
+> Waybar custom gpu is specific to your specs so you can try to implement it or remove it.
+> Any issues with the wallpaper picker just delete cache pictures ".cache/quickshell/thumbs/"
 
 <div align="center">
 
