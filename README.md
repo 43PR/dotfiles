@@ -69,6 +69,21 @@ Wallpapers: https://wallhaven.cc/user/43pr
 
 > **All keybinds: config/hypr/keybinds.lua**
 
+## Installed 
+
+| Component | Program |
+|---|---|
+| Terminal | kitty |
+| App Launcher | rofi |
+| Status Bar | waybar |
+| Shell | zsh + starship |
+| File Manager | thunar |
+| Wallpaper | awww |
+| Screen Lock | hyprlock |
+| Editor | xed |
+
+> [All programs in packages.txt](packages.txt)
+
 ---
 ## Installation 
 
