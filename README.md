@@ -2,8 +2,6 @@
 
 ## Hyprland Setup by 43pr メ
 
-</div>
-
 Showcase & Guides: https://www.youtube.com/@43PR2
 
 Simple Hyprland setup focused on practical keybinds, productivity, and a smooth workflow easy to customize
@@ -18,6 +16,8 @@ waybar       → media marquee effect + improved scripts
 hyprlock     → autohide media controls + improved scripts
 terminal     → eza icons + starship + zsh shell + autosuggestions + syntax-highlighting
 ```
+
+</div>
 
 ![](Wallpapers/Showcase/9.png)
 ![](Wallpapers/Showcase/4.png)
