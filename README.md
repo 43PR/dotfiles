@@ -105,9 +105,12 @@ chmod +x install.sh
 **After the installation finishes log out and back in.**
 
 > [!note]
-> Change the GTK theme to dark if it wasn't changed automatically
+> Change the GTK theme to dark if it wasn't changed automatically.
+>
 > Edit default programs in "config/hypr/hyprland.lua".
+>
 > Waybar custom gpu is specific to your specs so you can try to implement it or remove it.
+>
 > Any issues with the wallpaper picker just delete cache pictures ".cache/quickshell/thumbs/"
 
 <div align="center">
