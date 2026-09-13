@@ -19,7 +19,7 @@ terminal     → eza icons + starship + zsh shell + autosuggestions + syntax-hig
 
 <div align="center">
 
-**[Features](#features) ─ [Keybinds](#most-used-keybinds) ─ [Installation](#installation)**
+**[Features](#features) ─ [Keybinds](#most-used-keybinds) ─ [Installation](#installation) ─ [Installation](#installation)**
 
 </div>
 
@@ -104,7 +104,10 @@ Waybar custom gpu is specific to your specs so you can try to implement it or re
 
 Any issues with the wallpaper picker just delete cache pictures ".cache/quickshell/thumbs/"
 
-### **☕ Support: https://ko-fi.com/43pr2**
+#### Support 
+
+* <a href="https://ko-fi.com/43pr2">☕ ko-fi.com </a>
+* <a href="https://www.youtube.com/@43PR2">▶️ YouTube </a>
 
 ---
 
