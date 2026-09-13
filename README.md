@@ -86,7 +86,8 @@ This is mainly intended for a clean installation. If you already have a desktop 
 Existing configuration files that are being replaced will be backed up automatically.
 
 > [!tip]
-> You can clone the repository first and remove programs from the packages.txt and then run the installer or install them manually for example: "sudo pacman -S awww grim slurp imagemagick quickshell jq" (those are screenshots and wallpaper picker dependencies)
+> You can clone the repository first and remove programs from the packages.txt and then run the installer or install them manually for example: "sudo pacman -S awww grim slurp imagemagick quickshell jq" 
+(those are screenshots and wallpaper picker dependencies)
 
 First install git then use the next command and continue the installation until it's finished:
 
