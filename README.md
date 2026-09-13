@@ -2,7 +2,7 @@
 
 ## Hyprland Setup by 43pr メ
 
-<a href="https://www.youtube.com/@43PR2">▶️ YouTube Guides & Showcase</a>
+<a href="https://www.youtube.com/@43PR2">▷ YouTube Guides & Showcase</a>
 
 Simple Hyprland setup focused on practical keybinds, productivity, and a smooth workflow easy to customize. Feel free to use as inspiration or as a starting point for building your own setup.
 
@@ -86,7 +86,9 @@ This is mainly intended for a clean installation. If you already have a desktop 
 Existing configuration files that are being replaced will be backed up automatically.
 
 > [!tip]
-> You can clone the repository first and remove programs from the packages.txt and then run the installer or install them manually for example: "sudo pacman -S awww grim slurp imagemagick quickshell jq" 
+> You can clone the repository first and remove programs from the packages.txt and then run the installer or install them manually for example: 
+>
+>sudo pacman -S awww grim slurp imagemagick quickshell jq
 
 First install git then use the next command and continue the installation until it's finished:
 
