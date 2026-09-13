@@ -35,9 +35,7 @@ Wallpapers: https://wallhaven.cc/user/43pr
 
 ### Wallpaper Selector
 
-Just made some tweaks to it. Give it some love 
-
-> Inspired by [hyprquickpaper](https://github.com/iamsurjog/hyprquickpaper)
+> Just made some tweaks to it. Give it some love: [hyprquickpaper](https://github.com/iamsurjog/hyprquickpaper)
 
 ### Most used keybinds
 
