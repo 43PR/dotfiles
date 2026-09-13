@@ -17,15 +17,15 @@ hyprlock     → autohide media controls + improved scripts
 terminal     → eza icons + starship + zsh shell + autosuggestions + syntax-highlighting
 ```
 
-![](Wallpapers/Showcase/9.png)
-![](Wallpapers/Showcase/4.png)
-![](Wallpapers/Showcase/2.png)
-
 <div align="center">
 
 **[Features](#features) ─ [Keybinds](#most-used-keybinds) ─ [Installation](#installation)**
 
 </div>
+
+![](Wallpapers/Showcase/9.png)
+![](Wallpapers/Showcase/4.png)
+![](Wallpapers/Showcase/2.png)
 
 Wallpapers: https://wallhaven.cc/user/43pr
 
