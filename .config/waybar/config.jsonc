@@ -53,9 +53,9 @@
         "exec": "~/.config/waybar/scripts/mpris-marquee.sh",
         "return-type": "json",
         "format": "{}",
-        "on-click": "playerctl play-pause",
-        "on-scroll-up": "playerctl next",
-        "on-scroll-down": "playerctl previous"
+        "on-click": "playerctl --player=\"$(~/.config/waybar/scripts/playerctl-active.sh)\" play-pause",
+        "on-click-right": "playerctl --player=\"$(~/.config/waybar/scripts/playerctl-active.sh)\" next",
+        "on-click-middle": "playerctl --player=\"$(~/.config/waybar/scripts/playerctl-active.sh)\" previous"
     },
 
     "pulseaudio": {
