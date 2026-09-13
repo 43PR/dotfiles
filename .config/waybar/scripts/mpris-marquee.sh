@@ -5,24 +5,25 @@ DISPLAY_CHARS=20
 SLEEP=0.5
 
 last_text=""
+last_player=""
 
 while true; do
 
-    # No media players at all → hide the module
-    if ! playerctl -l 2>/dev/null | grep -q .; then
-        jq -cn \
-            '{text:"", class:"empty", tooltip:""}'
+    # Find the currently playing player
+    PLAYER=""
 
-        sleep "$SLEEP"
-        continue
-    fi
+    while read -r p; do
+        if [[ "$(playerctl --player="$p" status 2>/dev/null)" == "Playing" ]]; then
+            PLAYER="$p"
+            break
+        fi
+    done < <(playerctl -l 2>/dev/null)
 
-    STATUS=$(playerctl status 2>/dev/null)
+    # If something is playing, use that player
+    if [[ -n "$PLAYER" ]]; then
 
-    if [[ "$STATUS" == "Playing" ]]; then
-
-        title="$(playerctl metadata --format '{{ title }}' 2>/dev/null)"
-        artist="$(playerctl metadata --format '{{ artist }}' 2>/dev/null)"
+        title="$(playerctl --player="$PLAYER" metadata --format '{{ title }}' 2>/dev/null)"
+        artist="$(playerctl --player="$PLAYER" metadata --format '{{ artist }}' 2>/dev/null)"
 
         text="$title - $artist"
 
@@ -32,6 +33,7 @@ while true; do
         fi
 
         last_text="$text"
+        last_player="$PLAYER"
 
         # Add spacing so the end loops cleanly into the beginning
         marquee="$text     "
@@ -54,23 +56,37 @@ while true; do
             --arg tooltip "$text" \
             '{text:$text, class:$class, tooltip:$tooltip}'
 
-    elif [[ "$STATUS" == "Paused" ]]; then
-
-        jq -cn \
-            --arg text "♪  $last_text" \
-            --arg class "paused" \
-            --arg tooltip "$last_text" \
-            '{text:$text, class:$class, tooltip:$tooltip}'
-
     else
 
-        # Player exists, but isn't playing/paused.
-        # Keep displaying the last known media.
-        jq -cn \
-            --arg text "♪  $last_text" \
-            --arg class "stopped" \
-            --arg tooltip "$last_text" \
-            '{text:$text, class:$class, tooltip:$tooltip}'
+        # Nothing is currently playing.
+        # If we have a previously detected player, check its state.
+        if [[ -n "$last_player" ]]; then
+
+            STATUS=$(playerctl --player="$last_player" status 2>/dev/null)
+
+            if [[ "$STATUS" == "Paused" ]]; then
+
+                jq -cn \
+                    --arg text "♪  $last_text" \
+                    --arg class "paused" \
+                    --arg tooltip "$last_text" \
+                    '{text:$text, class:$class, tooltip:$tooltip}'
+
+            else
+
+                jq -cn \
+                    --arg text "♪  $last_text" \
+                    --arg class "stopped" \
+                    --arg tooltip "$last_text" \
+                    '{text:$text, class:$class, tooltip:$tooltip}'
+            fi
+
+        else
+
+            # No player has ever been detected
+            jq -cn \
+                '{text:"", class:"empty", tooltip:""}'
+        fi
     fi
 
     sleep "$SLEEP"

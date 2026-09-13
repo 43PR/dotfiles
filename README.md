@@ -12,8 +12,8 @@ Feel free to use as inspiration or as a starting point for building your own set
 quickshell   → volume OSD 
 waybar       → media marquee effect
 hyprlock     → autohide media controls
-terminal     → eza icons + starship + zsh shell
-terminal     → fastfetch + autosuggestions + syntax-highlighting
+terminal     → eza icons + starship + zsh shell + autosuggestions + syntax-highlighting
+waybar       → improved media controls 
 ```
 
 ![](Wallpapers/Showcase/9.png)
