@@ -1,12 +1,12 @@
 <div align="center">
 
-## Simple Hyprland Setup by 43pr メ
+## Hyprland Setup by 43pr メ
 
 </div>
 
 Showcase & Guides: https://www.youtube.com/@43PR2
 
-Hyprland setup focused on practical keybinds, productivity, and a smooth workflow easy to customize
+Simple Hyprland setup focused on practical keybinds, productivity, and a smooth workflow easy to customize
 
 Feel free to use as inspiration or as a starting point for building your own setup.
 
