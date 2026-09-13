@@ -33,12 +33,17 @@ Wallpapers: https://wallhaven.cc/user/43pr
 
 * **Waybar** > Change volume with mouse wheel, mute, play/pause, next and blue light filter
 * **Rofi** > App search, clipboard history and switch opacity
+* **Zsh shell + starship** (Customizable command-line shell)
+* **Custom wallpaper selector** (Awww + Quickshell)
 * **Hyprlock** (Lock screen)
 * **Wlogout** (Logout menu)
 * **Custom scripts**
 * **Custom monochrome theme**
-* **Custom wallpaper selector** (Quickshell)
 * **Spotify + Spicetify Theme:** text by darkthemer (edited)
+
+* **Terminal: kitty, File manager: thunar, Editor: xed**
+
+> All programs: [packages.txt](packages.txt)
 
 ### Wallpaper Selector
 
@@ -68,21 +73,6 @@ Wallpapers: https://wallhaven.cc/user/43pr
 | `Super + Mouse wheel`   | Zoom                      |
 
 > All keybinds: [config/hypr/keybinds.lua](config/hypr/keybinds.lua)
-
-## Installed 
-
-| Component | Program |
-|---|---|
-| Terminal | kitty |
-| App Launcher | rofi |
-| Status Bar | waybar |
-| Shell | zsh + starship |
-| File Manager | thunar |
-| Wallpaper | awww |
-| Screen Lock | hyprlock |
-| Editor | xed |
-
-> All programs: [packages.txt](packages.txt)
 
 ---
 ## Installation 
