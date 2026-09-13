@@ -67,7 +67,7 @@ Wallpapers: https://wallhaven.cc/user/43pr
 | `Super + Grave`         | Logout menu               |
 | `Super + Mouse wheel`   | Zoom                      |
 
-> **All keybinds: config/hypr/keybinds.lua**
+> All keybinds: [config/hypr/keybinds.lua](config/hypr/keybinds.lua)
 
 ## Installed 
 
@@ -82,7 +82,7 @@ Wallpapers: https://wallhaven.cc/user/43pr
 | Screen Lock | hyprlock |
 | Editor | xed |
 
-> [All programs in packages.txt](packages.txt)
+> All programs in [packages.txt](packages.txt)
 
 ---
 ## Installation 
