@@ -10,10 +10,9 @@ Feel free to use as inspiration or as a starting point for building your own set
 
 ```text
 quickshell   → volume OSD 
-waybar       → media marquee effect
-hyprlock     → autohide media controls
+waybar       → media marquee effect + improved scripts
+hyprlock     → autohide media controls + improved scripts
 terminal     → eza icons + starship + zsh shell + autosuggestions + syntax-highlighting
-waybar       → improved media controls 
 ```
 
 ![](Wallpapers/Showcase/9.png)
