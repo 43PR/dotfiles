@@ -11,7 +11,7 @@ Simple Hyprland setup focused on practical keybinds, productivity, and a smooth 
 </div>
 
 ```text
-quickshell   → volume OSD 
+**quickshell**   → volume OSD 
 waybar       → media marquee effect + improved scripts
 hyprlock     → autohide media controls + improved scripts
 terminal     → eza icons + starship + zsh shell + autosuggestions + syntax-highlighting
