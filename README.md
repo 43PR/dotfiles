@@ -11,7 +11,7 @@ Simple Hyprland setup focused on practical keybinds, productivity, and a smooth 
 </div>
 
 ```text
-**quickshell**   → volume OSD 
+quickshell   → volume OSD 
 waybar       → media marquee effect + improved scripts
 hyprlock     → autohide media controls + improved scripts
 terminal     → eza icons + starship + zsh shell + autosuggestions + syntax-highlighting
@@ -26,14 +26,14 @@ Wallpapers: https://wallhaven.cc/user/43pr
 
 ## Features
 
-* Waybar > Change volume with mouse wheel, mute, play/pause, next and blue light filter
-* Rofi > App search, clipboard history and switch opacity
-* Hyprlock (Lock screen)
-* Wlogout (Logout menu)
-* Custom scripts
-* Custom monochrome theme
-* Custom wallpaper selector (Quickshell)
-* Spotify + Spicetify. Theme: text by darkthemer (edited)
+* **Waybar** > Change volume with mouse wheel, mute, play/pause, next and blue light filter
+* **Rofi** > App search, clipboard history and switch opacity
+* **Hyprlock** (Lock screen)
+* **Wlogout** (Logout menu)
+* **Custom scripts**
+* **Custom monochrome theme**
+* **Custom wallpaper selector** (Quickshell)
+* **Spotify + Spicetify Theme:** text by darkthemer (edited)
 
 ### Wallpaper Selector
 
@@ -95,7 +95,7 @@ Edit default programs in "config/hypr/hyprland.lua".
 
 Any issues with the wallpaper picker just delete cache pictures ".cache/quickshell/thumbs/"
 
-**☕ Support: https://ko-fi.com/43pr2**
+### **☕ Support: https://ko-fi.com/43pr2**
 
 ---
 
