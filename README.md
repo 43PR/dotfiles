@@ -41,7 +41,7 @@ Wallpapers: https://wallhaven.cc/user/43pr
 * **Custom monochrome theme**
 * **Spotify + Spicetify Theme:** text by darkthemer (edited)
 
-* **Terminal: kitty, File manager: thunar, Editor: xed**
+* **Terminal:** kitty, **File manager:** thunar, **Editor:** xed
 
 > All programs: [packages.txt](packages.txt)
 
