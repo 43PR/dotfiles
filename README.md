@@ -89,6 +89,8 @@ Existing configuration files that are being replaced will be backed up automatic
 > You can clone the repository first and remove programs from the packages.txt and then run the installer or install them manually for example: 
 >
 >sudo pacman -S awww grim slurp imagemagick quickshell jq
+>
+> For beginners I recommend trying noctalia and then implement parts of this setup (no install.sh). It's installed in CachyOs by default
 
 First install git then use the next command and continue the installation until it's finished:
 
