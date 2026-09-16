@@ -90,7 +90,7 @@ Existing configuration files that are being replaced will be backed up automatic
 >
 >sudo pacman -S awww grim slurp imagemagick quickshell jq
 >
-> For beginners I recommend trying noctalia and then implement parts of this setup (no install.sh). It's installed in CachyOs by default
+> For beginners I recommend trying noctalia and then implement parts of this setup. It's installed in CachyOs by default and if you really want this specific setup then you can follow the installation.
 
 First install git then use the next command and continue the installation until it's finished:
 
