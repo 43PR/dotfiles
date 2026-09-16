@@ -86,11 +86,7 @@ This is mainly intended for a clean installation. If you already have a desktop 
 Existing configuration files that are being replaced will be backed up automatically.
 
 > [!tip]
-> You can clone the repository first and remove programs from the packages.txt and then run the installer or install them manually for example: 
->
->sudo pacman -S awww grim slurp imagemagick quickshell jq
->
-> For beginners I recommend trying noctalia and then implement parts of this setup. It's installed in CachyOs by default and if you really want this specific setup then you can follow the installation.
+> For beginners I recommend trying **noctalia** and then implement parts of this setup. It's installed in **CachyOs** by default and if you really want this specific setup then you can follow the installation.
 
 First install git then use the next command and continue the installation until it's finished:
 
