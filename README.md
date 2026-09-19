@@ -39,6 +39,7 @@ Wallpapers: https://wallhaven.cc/user/43pr
 * **Rofi** > App search, clipboard history and switch opacity
 * **Zsh shell + starship** (Customizable command-line shell)
 * **Custom wallpaper selector** (Awww + Quickshell)
+* **Custom settings menu** (System info, Sound, switch output, app audio, Monitors, Network, Bluetooth)
 * **Hyprlock** (Lock screen)
 * **Wlogout** (Logout menu)
 * **Custom scripts**
