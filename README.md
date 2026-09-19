@@ -66,6 +66,7 @@ Just made some tweaks to it. Give it some love: [hyprquickpaper](https://github.
 | `Super + E`             | File manager              |
 | `Super + B`             | Browser                   |
 | `Super + W`             | Wallpaper selector        |
+| `Super + I`             | Settings menu             |
 | `Super + O`             | Switch opacity            |
 | `Super + V`             | Clipboard history         |
 | `Super + F`             | Toggle fullscreen         |
