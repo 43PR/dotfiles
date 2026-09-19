@@ -34,8 +34,8 @@ Wallpapers: https://wallhaven.cc/user/43pr
 ## Features
 
 * **Waybar** > Change volume with mouse wheel, mute, play/pause, next and blue light filter
-* * **Custom wallpaper selector** > (Awww + Quickshell)
 * **Custom settings menu** > System info, Network, Bluetooth, Monitors, Sound: switch output, per app volume.
+* **Custom wallpaper selector** > (Awww + Quickshell)
 * **Rofi** > App search, clipboard history and switch opacity
 * **Zsh shell + starship** > (Customizable command-line shell)
 * **Spotify + Spicetify Theme:** > text by darkthemer (edited)
