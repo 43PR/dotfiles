@@ -21,6 +21,8 @@ terminal     → eza icons + starship + zsh shell + autosuggestions + syntax-hig
 
 **[Features](#features) ─ [Keybinds](#most-used-keybinds) ─ [Installation](#installation) ─ [Support](#support)**
 
+<video src="Wallpapers/Showcase/v1.mp4" controls width="800"></video>
+
 </div>
 
 ![](Wallpapers/Showcase/9.png)
