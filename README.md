@@ -34,16 +34,18 @@ Wallpapers: https://wallhaven.cc/user/43pr
 ## Features
 
 * **Waybar** > Change volume with mouse wheel, mute, play/pause, next and blue light filter
+* * **Custom wallpaper selector** > (Awww + Quickshell)
+* **Custom settings menu** > System info, Network, Bluetooth, Monitors, Sound: switch output, per app volume.
 * **Rofi** > App search, clipboard history and switch opacity
-* **Zsh shell + starship** (Customizable command-line shell)
-* **Custom wallpaper selector** (Awww + Quickshell)
-* **Custom settings menu** System info, Network, Bluetooth, Monitors, Sound: switch output, per app volume.
-* **Spotify + Spicetify Theme:** text by darkthemer (edited)
-* **Hyprlock** (Lock screen)
-* **Wlogout** (Logout menu)
+* **Zsh shell + starship** > (Customizable command-line shell)
+* **Spotify + Spicetify Theme:** > text by darkthemer (edited)
+* **Hyprlock** > (Lock screen)
+* **Wlogout** > (Logout menu)
 * **Custom scripts** 
 * **Custom monochrome theme**
-* **Terminal:** kitty, **File manager:** thunar, **Editor:** xed, vscodium
+* **Terminal:** Kitty
+* **File manager:** Thunar
+* **Editor:** Xed, VSCodium
   
 > All programs: [packages.txt](packages.txt)
 
