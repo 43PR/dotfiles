@@ -11,10 +11,10 @@ Simple Hyprland setup focused on practical keybinds, productivity, and a smooth 
 </div>
 
 ```text
-quickshell   → settings: system, sound, monitors, network, bluetooth (the monitors page still needs some work) 
+quickshell   → settings: system, sound, monitors, network, bluetooth (the monitors page still needs some work)
+terminal     → eza icons + starship + zsh shell + autosuggestions + syntax-highlighting
 waybar       → media marquee effect + improved scripts
 hyprlock     → autohide media controls + improved scripts
-terminal     → eza icons + starship + zsh shell + autosuggestions + syntax-highlighting
 ```
 
 <div align="center">
