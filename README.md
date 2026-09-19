@@ -21,7 +21,7 @@ terminal     → eza icons + starship + zsh shell + autosuggestions + syntax-hig
 
 **[Features](#features) ─ [Keybinds](#most-used-keybinds) ─ [Installation](#installation) ─ [Support](#support)**
 
-https://github.com/user-attachments/assets/b16db39e-b93d-4c09-8c38-82456dcc2468
+https://github.com/user-attachments/assets/053b5e09-ef99-4032-9ce2-a49c331a48ff
 
 </div>
 
