@@ -23,6 +23,8 @@ terminal     → eza icons + starship + zsh shell + autosuggestions + syntax-hig
 
 <video src="Wallpapers/Showcase/v1.mp4" controls width="800"></video>
 
+https://github.com/user-attachments/assets/fd7f38e4-b17f-4d84-a22c-1ab5351080a0
+
 </div>
 
 ![](Wallpapers/Showcase/9.png)
