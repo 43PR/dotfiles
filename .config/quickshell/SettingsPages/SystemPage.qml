@@ -5,6 +5,8 @@ import "../"
 Item {
     id: page
 
+    property string homeDir: ""
+
     property string hostname: "..."
     property string uptime: "..."
     property string os: "..."
@@ -25,16 +27,40 @@ Item {
     property int hardwareTextSize: 12
 
     // ------------------------------------------------------------
+    // HOME DIRECTORY
+    // ------------------------------------------------------------
+
+    Process {
+        id: pHome
+
+        command: [
+            "sh",
+            "-c",
+            "printf '%s' \"$HOME\""
+        ]
+
+        running: true
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                page.homeDir = text.trim()
+            }
+        }
+    }
+
+    // ------------------------------------------------------------
     // SYSTEM INFO
     // ------------------------------------------------------------
 
     Process {
         id: pHost
+
         command: [
             "sh",
             "-c",
             "hostnamectl --static 2>/dev/null || cat /etc/hostname"
         ]
+
         running: true
 
         stdout: StdioCollector {
@@ -44,7 +70,12 @@ Item {
 
     Process {
         id: pUptime
-        command: ["uptime", "-p"]
+
+        command: [
+            "uptime",
+            "-p"
+        ]
+
         running: true
 
         stdout: StdioCollector {
@@ -54,11 +85,13 @@ Item {
 
     Process {
         id: pOs
+
         command: [
             "sh",
             "-c",
             "grep PRETTY_NAME /etc/os-release | cut -d= -f2 | tr -d '\"'"
         ]
+
         running: true
 
         stdout: StdioCollector {
@@ -206,7 +239,9 @@ Item {
                 Image {
                     anchors.centerIn: parent
 
-                    source: "file:///home/rp34/.config/fastfetch/pfp3.png"
+                    source: page.homeDir !== ""
+                        ? "file://" + page.homeDir + "/.config/fastfetch/pfp3.png"
+                        : ""
 
                     width: 140
                     height: 140
@@ -229,6 +264,7 @@ Item {
 
                     Text {
                         text: "󰒋  HOSTNAME"
+
                         color: Theme.accent
 
                         font.family: "JetBrainsMono Nerd Font"
@@ -238,6 +274,7 @@ Item {
 
                     Text {
                         text: page.hostname
+
                         color: Theme.text
 
                         font.family: Theme.fontFamily
@@ -250,6 +287,7 @@ Item {
 
                     Text {
                         text: "󰣇  OS"
+
                         color: Theme.accent
 
                         font.family: "JetBrainsMono Nerd Font"
@@ -259,6 +297,7 @@ Item {
 
                     Text {
                         text: page.os
+
                         color: Theme.text
 
                         font.family: Theme.fontFamily
@@ -274,6 +313,7 @@ Item {
 
                     Text {
                         text: "󰔛  UPTIME"
+
                         color: Theme.accent
 
                         font.family: "JetBrainsMono Nerd Font"
@@ -283,6 +323,7 @@ Item {
 
                     Text {
                         text: page.uptime
+
                         color: Theme.text
 
                         font.family: Theme.fontFamily
@@ -310,6 +351,7 @@ Item {
 
                 Text {
                     text: "󰍛  CPU"
+
                     color: Theme.accent
 
                     font.family: "JetBrainsMono Nerd Font"
@@ -319,6 +361,7 @@ Item {
 
                 Text {
                     text: page.cpu
+
                     color: Theme.text
 
                     font.family: Theme.fontFamily
@@ -339,6 +382,7 @@ Item {
 
                 Text {
                     text: "󰢮  GPU"
+
                     color: Theme.accent
 
                     font.family: "JetBrainsMono Nerd Font"
@@ -348,6 +392,7 @@ Item {
 
                 Text {
                     text: page.gpu
+
                     color: Theme.text
 
                     font.family: Theme.fontFamily
@@ -368,6 +413,7 @@ Item {
 
                 Text {
                     text: "󰘚  MEMORY"
+
                     color: Theme.accent
 
                     font.family: "JetBrainsMono Nerd Font"
@@ -377,6 +423,7 @@ Item {
 
                 Text {
                     text: page.memory
+
                     color: Theme.text
 
                     font.family: Theme.fontFamily
@@ -394,6 +441,7 @@ Item {
 
                 Text {
                     text: "󰋊  STORAGE"
+
                     color: Theme.accent
 
                     font.family: "JetBrainsMono Nerd Font"
@@ -403,6 +451,7 @@ Item {
 
                 Text {
                     text: page.storage
+
                     color: Theme.text
 
                     font.family: Theme.fontFamily
