@@ -98,3 +98,11 @@ zsh-syntax-highlighting
 starship
 eza
 
+# --------------------------------------------------
+# Networking / Bluetooth
+# --------------------------------------------------
+
+networkmanager
+bluez
+bluez-utils
+
