@@ -1,831 +1,378 @@
 import QtQuick
 import Quickshell
 import Quickshell.Bluetooth
+import Quickshell.Io
 import "../"
 
 Item {
     id: page
-
-    // ------------------------------------------------------------
-    // State
-    // ------------------------------------------------------------
-
     readonly property BluetoothAdapter adapter: Bluetooth.defaultAdapter
-
-    readonly property bool powered:
-        adapter ? adapter.enabled : false
-
-    readonly property bool scanning:
-        adapter ? adapter.discovering : false
-
+    readonly property bool powered: adapter ? adapter.enabled : false
+    readonly property bool scanning: adapter ? adapter.discovering : false
     property string statusText: ""
-    property int contentMargin: 20
-
+    property int contentMargin: 0
+    property int contentRightMargin: 48
+    property int contentTopMargin: 0
+    property int contentBottomMargin: 0
+    property var removingDevices: ({})
+    FileView {
+        id: removedDevicesFile
+        path: Quickshell.dataDir + "/removed-bluetooth-devices.json"
+        blockLoading: true
+        onLoaded: page.loadRemovingDevices()
+    }
+    function loadRemovingDevices() {
+        var text = removedDevicesFile.text()
+        if (!text)
+            return
+        try {
+            var saved = JSON.parse(text)
+            if (saved && typeof saved === "object")
+                page.removingDevices = saved
+        } catch (error) {
+            console.log("Failed to load removed Bluetooth devices:", error)
+        }
+    }
+    function saveRemovingDevices() {
+        removedDevicesFile.setText(JSON.stringify(page.removingDevices))
+    }
     function setStatus(text) {
         page.statusText = text
         statusTimer.restart()
     }
-
     Timer {
         id: statusTimer
-
         interval: 3000
-        repeat: false
-
         onTriggered: page.statusText = ""
     }
-
-    // ------------------------------------------------------------
-    // Power
-    // ------------------------------------------------------------
-
+    function setDiscovering(on) {
+        if (!page.adapter || !page.powered || (on && !page.visible))
+            return
+        page.adapter.discovering = on
+    }
     function togglePower() {
         if (!page.adapter)
             return
-
         var on = !page.adapter.enabled
-
-        // Stop discovery before powering Bluetooth off.
         if (!on)
             setDiscovering(false)
-
         page.adapter.enabled = on
-
-        setStatus(
-            on
-                ? "Enabling Bluetooth..."
-                : "Disabling Bluetooth..."
-        )
     }
-
-    // ------------------------------------------------------------
-    // Discovery
-    // ------------------------------------------------------------
-
-    function setDiscovering(on) {
-        if (!page.adapter || !page.adapter.enabled)
-            return
-
-        // Don't start discovery if the page isn't visible.
-        if (on && !page.visible)
-            return
-
-        page.adapter.discovering = on
-    }
-
-    function toggleScan() {
-        if (!page.adapter || !page.powered)
-            return
-
-        var newState = !page.scanning
-
-        setDiscovering(newState)
-
-        setStatus(
-            newState
-                ? "Scanning for devices..."
-                : "Scan stopped"
-        )
-    }
-
-    // ------------------------------------------------------------
-    // Page visibility
-    //
-    // Discovery is active while the page is visible.
-    // It is stopped when the page disappears.
-    // ------------------------------------------------------------
-
-    onVisibleChanged: {
-        if (page.visible && page.powered) {
-            setDiscovering(true)
-        } else {
-            setDiscovering(false)
-        }
-    }
-
-    Component.onCompleted: {
-        if (page.visible && page.powered)
-            setDiscovering(true)
-    }
-
-    Component.onDestruction: {
-        setDiscovering(false)
-    }
-
-    onPoweredChanged: {
-        if (page.powered && page.visible)
-            setDiscovering(true)
-        else
-            setDiscovering(false)
-    }
-
-    // ------------------------------------------------------------
-    // Reset scan animation when discovery actually stops.
-    // ------------------------------------------------------------
-
-    onScanningChanged: {
-        if (!page.scanning)
-            scanIcon.rotation = 0
-    }
-
-    // ------------------------------------------------------------
-    // Device actions
-    //
-    // IMPORTANT:
-    //
-    // We do NOT explicitly call dev.pair() anymore.
-    //
-    // bluetoothctl successfully handled the MINI using:
-    //
-    //     connect 41:42:98:02:9E:88
-    //
-    // BlueZ then reported:
-    //
-    //     Connected: yes
-    //     Paired: yes
-    //
-    // Therefore we let BlueZ perform pairing as part of the
-    // connection attempt.
-    // ------------------------------------------------------------
-
     function deviceAction(dev) {
         if (!dev)
             return
-
-        var deviceName =
-            dev.name || dev.address || "device"
-
-        // --------------------------------------------------------
-        // Already connected -> disconnect
-        // --------------------------------------------------------
-
+        var name = dev.name || dev.address || "device"
         if (dev.state === BluetoothDeviceState.Connected) {
-            setStatus(
-                "Disconnecting " + deviceName + "..."
-            )
-
+            setStatus("Disconnecting " + name + "...")
             dev.disconnect()
             return
         }
-
-        // --------------------------------------------------------
-        // Already connecting
-        // --------------------------------------------------------
-
         if (dev.state === BluetoothDeviceState.Connecting) {
-            setStatus(
-                "Connecting to " + deviceName + "..."
-            )
-
+            setStatus("Connecting to " + name + "...")
             return
         }
-
-        // --------------------------------------------------------
-        // Currently disconnecting
-        // --------------------------------------------------------
-
         if (dev.state === BluetoothDeviceState.Disconnecting) {
-            setStatus(
-                "Disconnecting " + deviceName + "..."
-            )
-
+            setStatus("Disconnecting " + name + "...")
             return
         }
-
-        // --------------------------------------------------------
-        // Stop discovery before connecting.
-        //
-        // This prevents:
-        //
-        //     Resource Not Ready
-        //
-        // from BlueZ when discovery and connection operations
-        // overlap.
-        // --------------------------------------------------------
-
         setDiscovering(false)
-
-        // --------------------------------------------------------
-        // Trust the device.
-        //
-        // This is safe for the user's explicitly selected device
-        // and allows BlueZ to reconnect it later.
-        // --------------------------------------------------------
-
         dev.trusted = true
-
-        // --------------------------------------------------------
-        // Connect.
-        //
-        // Do NOT call dev.pair() first.
-        //
-        // BlueZ will perform the required pairing/bonding as part
-        // of the connection operation, matching the successful
-        // bluetoothctl test.
-        // --------------------------------------------------------
-
-        setStatus(
-            "Connecting to " + deviceName + "..."
-        )
-
+        setStatus("Connecting to " + name + "...")
         dev.connect()
     }
-
-    // ------------------------------------------------------------
-    // Action label
-    // ------------------------------------------------------------
-
+    function removeDevice(dev) {
+        if (!dev)
+            return
+        var name = dev.name || dev.address || "device"
+        var key = dev.address || name
+        var updated = Object.assign({}, page.removingDevices)
+        updated[key] = true
+        page.removingDevices = updated
+        saveRemovingDevices()
+        if (dev.state === BluetoothDeviceState.Connected ||
+            dev.state === BluetoothDeviceState.Connecting ||
+            dev.state === BluetoothDeviceState.Disconnecting) {
+            dev.disconnect()
+        }
+        dev.forget()
+    }
     function actionLabel(dev) {
         if (!dev)
             return ""
-
         if (dev.pairing)
             return "PAIRING..."
-
         switch (dev.state) {
         case BluetoothDeviceState.Connected:
             return "DISCONNECT"
-
         case BluetoothDeviceState.Connecting:
             return "CONNECTING..."
-
         case BluetoothDeviceState.Disconnecting:
             return "DISCONNECTING..."
-
         default:
             return "CONNECT"
         }
     }
-
-    // ------------------------------------------------------------
-    // UI
-    // ------------------------------------------------------------
-
+    onVisibleChanged: setDiscovering(page.visible && page.powered)
+    onPoweredChanged: setDiscovering(page.visible && page.powered)
+    Component.onCompleted: {
+        if (page.visible && page.powered)
+            setDiscovering(true)
+    }
+    Component.onDestruction: setDiscovering(false)
     Column {
         anchors.fill: parent
-
         anchors.leftMargin: page.contentMargin
-        anchors.rightMargin: page.contentMargin
-        anchors.topMargin: page.contentMargin
-        anchors.bottomMargin: page.contentMargin
-
-        spacing: 18
-
-        // --------------------------------------------------------
-        // Header
-        // --------------------------------------------------------
-
+        anchors.rightMargin: page.contentRightMargin
+        anchors.topMargin: page.contentTopMargin
+        anchors.bottomMargin: page.contentBottomMargin
+        spacing: 8
         Row {
+            id: header
             width: parent.width
-            height: 30
-
-            spacing: 16
-
+            height: 36
             Text {
                 text: "BLUETOOTH"
-
                 color: Theme.text
-
                 font.family: Theme.fontFamily
                 font.pixelSize: 18
-                font.bold: true
                 font.letterSpacing: 3
-
                 anchors.verticalCenter: parent.verticalCenter
             }
-
-            Item {
-                width: Math.max(
-                    0,
-                    parent.width - 250
-                )
-
-                height: 1
-            }
-
-            Text {
-                id: scanIcon
-
-                text: "󰑐"
-
-                color: page.scanning
-                    ? Theme.accent
-                    : Theme.textDim
-
-                opacity: page.powered
-                    ? 1.0
-                    : 0.4
-
-                font.family: Theme.fontFamily
-                font.pixelSize: 22
-
-                anchors.verticalCenter: parent.verticalCenter
-
-                // ------------------------------------------------
-                // Continuous scan animation
-                // ------------------------------------------------
-
-                RotationAnimation on rotation {
-                    running: page.scanning
-
-                    loops: Animation.Infinite
-
-                    from: 0
-                    to: 360
-
-                    duration: 1600
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-
-                    cursorShape: Qt.PointingHandCursor
-
-                    onClicked: {
-                        page.toggleScan()
-                    }
-                }
-            }
-
-            // ----------------------------------------------------
-            // Bluetooth power switch
-            // ----------------------------------------------------
-
             Rectangle {
-                width: 44
-                height: 22
-
-                radius: 11
-
+                id: bluetoothToggle
+                anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
-
-                color: page.powered
-                    ? Theme.accent
-                    : Theme.trackBg
-
-                border.color: Theme.border
+                width: 70
+                height: 36
+                radius: Theme.radius
+                color: page.powered ? Theme.alpha(Theme.accent, 0.1) : Theme.alpha("#A0A0A0", 0.15)
                 border.width: 1
-
-                Rectangle {
-                    width: 16
-                    height: 16
-
-                    radius: 8
-
-                    color: Theme.text
-
-                    anchors.verticalCenter:
-                        parent.verticalCenter
-
-                    x: page.powered
-                        ? parent.width - width - 3
-                        : 3
-
-                    Behavior on x {
-                        NumberAnimation {
-                            duration: Theme.animFast
-                        }
-                    }
+                border.color: page.powered ? Theme.accent : "#A0A0A0"
+                Text {
+                    anchors.centerIn: parent
+                    text: page.powered ? "ON" : "OFF"
+                    color: page.powered ? Theme.accent : "#A0A0A0"
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 10
+                    font.bold: true
                 }
-
                 MouseArea {
                     anchors.fill: parent
-
                     cursorShape: Qt.PointingHandCursor
-
-                    onClicked: {
-                        page.togglePower()
-                    }
+                    onClicked: page.togglePower()
                 }
             }
         }
-
-        // --------------------------------------------------------
-        // Divider
-        // --------------------------------------------------------
-
         Rectangle {
             width: parent.width
             height: 1
-
             color: Theme.border
         }
-
-        // --------------------------------------------------------
-        // Status
-        // --------------------------------------------------------
-
         Text {
             width: parent.width
-
-            visible:
-                page.statusText !== ""
-
+            visible: page.statusText !== ""
             text: page.statusText
-
             color: Theme.accent
-
             font.family: Theme.fontFamily
             font.pixelSize: 10
-
-            horizontalAlignment:
-                Text.AlignHCenter
+            horizontalAlignment: Text.AlignHCenter
         }
-
-        // --------------------------------------------------------
-        // Device list
-        // --------------------------------------------------------
-
         Flickable {
             id: flick
-
             width: parent.width
             height: parent.height - 70
-
             clip: true
-
             contentWidth: width
             contentHeight: list.height
-
-            boundsBehavior:
-                Flickable.StopAtBounds
-
+            boundsBehavior: Flickable.StopAtBounds
             Column {
                 id: list
-
                 width: flick.width
-
                 spacing: 6
-
-                // ------------------------------------------------
-                // No adapter
-                // ------------------------------------------------
-
                 Item {
                     width: list.width
                     height: 100
-
-                    visible:
-                        !page.adapter
-
+                    visible: !page.adapter
                     Text {
-                        anchors.centerIn:
-                            parent
-
-                        text:
-                            "NO BLUETOOTH ADAPTER"
-
-                        color:
-                            Theme.textDim
-
-                        font.family:
-                            Theme.fontFamily
-
+                        anchors.centerIn: parent
+                        text: "NO BLUETOOTH ADAPTER"
+                        color: Theme.textDim
+                        font.family: Theme.fontFamily
                         font.pixelSize: 11
-
                         font.letterSpacing: 1
                     }
                 }
-
-                // ------------------------------------------------
-                // Bluetooth off
-                // ------------------------------------------------
-
                 Item {
                     width: list.width
                     height: 100
-
-                    visible:
-                        page.adapter
-                        && !page.powered
-
+                    visible: page.adapter && !page.powered
                     Column {
-                        anchors.centerIn:
-                            parent
-
+                        anchors.centerIn: parent
                         spacing: 8
-
                         Text {
-                            anchors.horizontalCenter:
-                                parent.horizontalCenter
-
+                            anchors.horizontalCenter: parent.horizontalCenter
                             text: "\uf294"
-
-                            color:
-                                Theme.textDim
-
-                            font.family:
-                                Theme.iconFont
-
+                            color: Theme.textDim
+                            font.family: Theme.iconFont
                             font.pixelSize: 24
                         }
-
                         Text {
-                            anchors.horizontalCenter:
-                                parent.horizontalCenter
-
-                            text:
-                                "BLUETOOTH IS OFF"
-
-                            color:
-                                Theme.textDim
-
-                            font.family:
-                                Theme.fontFamily
-
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: "BLUETOOTH IS OFF"
+                            color: Theme.textDim
+                            font.family: Theme.fontFamily
                             font.pixelSize: 11
-
                             font.letterSpacing: 1
                         }
-
                         Text {
-                            anchors.horizontalCenter:
-                                parent.horizontalCenter
-
-                            text:
-                                "Turn it on to see devices."
-
-                            color:
-                                Theme.textFaint
-
-                            font.family:
-                                Theme.fontFamily
-
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: "Turn it on to see devices."
+                            color: Theme.textFaint
+                            font.family: Theme.fontFamily
                             font.pixelSize: 9
                         }
                     }
                 }
-
-                // ------------------------------------------------
-                // Empty
-                // ------------------------------------------------
-
                 Item {
                     width: list.width
                     height: 100
-
-                    visible:
-                        page.powered
-                        && repeater.count === 0
-
+                    visible: page.powered && repeater.count === 0
                     Column {
-                        anchors.centerIn:
-                            parent
-
+                        anchors.centerIn: parent
                         spacing: 8
-
                         Text {
-                            anchors.horizontalCenter:
-                                parent.horizontalCenter
-
+                            anchors.horizontalCenter: parent.horizontalCenter
                             text: "\uf1eb"
-
-                            color:
-                                Theme.textDim
-
-                            font.family:
-                                Theme.iconFont
-
+                            color: Theme.textDim
+                            font.family: Theme.iconFont
                             font.pixelSize: 22
                         }
-
                         Text {
-                            anchors.horizontalCenter:
-                                parent.horizontalCenter
-
-                            text:
-                                page.scanning
-                                ? "SCANNING FOR DEVICES..."
-                                : "NO DEVICES FOUND"
-
-                            color:
-                                Theme.textDim
-
-                            font.family:
-                                Theme.fontFamily
-
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: "SCANNING FOR DEVICES..."
+                            color: Theme.textDim
+                            font.family: Theme.fontFamily
                             font.pixelSize: 11
-
                             font.letterSpacing: 1
                         }
-
                         Text {
-                            anchors.horizontalCenter:
-                                parent.horizontalCenter
-
-                            text:
-                                page.scanning
-                                ? "Keep this open while devices appear."
-                                : "Tap the refresh icon to scan."
-
-                            color:
-                                Theme.textFaint
-
-                            font.family:
-                                Theme.fontFamily
-
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: "Keep this open while devices appear."
+                            color: Theme.textFaint
+                            font.family: Theme.fontFamily
                             font.pixelSize: 9
                         }
                     }
                 }
-
-                // ------------------------------------------------
-                // Devices
-                // ------------------------------------------------
-
                 Repeater {
                     id: repeater
-
-                    model:
-                        page.adapter
-                        ? page.adapter.devices
-                        : null
-
+                    model: page.adapter ? page.adapter.devices : null
                     delegate: Rectangle {
                         id: card
-
                         required property BluetoothDevice modelData
-
-                        readonly property bool isConnected:
-                            modelData.state
-                            === BluetoothDeviceState.Connected
-
-                        width:
-                            list.width
-
-                        height: 52
-
-                        radius:
-                            Theme.radius
-
-                        color:
-                            isConnected
-                            ? Theme.alpha(
-                                Theme.accent,
-                                0.10
-                              )
-                            : Theme.alpha(
-                                Theme.text,
-                                0.025
-                              )
-
+                        readonly property bool isConnected: modelData.state === BluetoothDeviceState.Connected
+                        readonly property string deviceKey: modelData.address || modelData.name || ""
+                        visible: !page.removingDevices[deviceKey]
+                        width: list.width
+                        height: visible ? 52 : 0
+                        radius: Theme.radius
+                        color: isConnected
+                            ? Theme.alpha(Theme.accent, 0.10)
+                            : Theme.alpha(Theme.text, 0.025)
                         border.width: 1
-
-                        border.color:
-                            isConnected
-                            ? Theme.accent
-                            : Theme.border
-
-                        // ------------------------------------------------
-                        // Device information
-                        // ------------------------------------------------
-
+                        border.color: isConnected ? Theme.accent : Theme.border
                         Row {
-                            anchors.left:
-                                parent.left
-
-                            anchors.leftMargin:
-                                14
-
-                            anchors.verticalCenter:
-                                parent.verticalCenter
-
+                            anchors.left: parent.left
+                            anchors.leftMargin: 14
+                            anchors.verticalCenter: parent.verticalCenter
                             spacing: 10
-
                             Text {
                                 text: "\uf294"
-
-                                color:
-                                    card.isConnected
-                                    ? Theme.accent
-                                    : Theme.textDim
-
-                                font.family:
-                                    Theme.iconFont
-
+                                color: card.isConnected ? Theme.accent : Theme.textDim
+                                font.family: Theme.iconFont
                                 font.pixelSize: 15
-
-                                anchors.verticalCenter:
-                                    parent.verticalCenter
+                                anchors.verticalCenter: parent.verticalCenter
                             }
-
                             Column {
                                 spacing: 2
-
-                                anchors.verticalCenter:
-                                    parent.verticalCenter
-
+                                anchors.verticalCenter: parent.verticalCenter
                                 Text {
-                                    width:
-                                        Math.max(
-                                            100,
-                                            list.width - 210
-                                        )
-
-                                    text:
-                                        card.modelData.name
-                                        || card.modelData.address
-
-                                    elide:
-                                        Text.ElideRight
-
-                                    color:
-                                        Theme.text
-
-                                    font.family:
-                                        Theme.fontFamily
-
+                                    width: Math.max(100, list.width - 210)
+                                    text: card.modelData.name || card.modelData.address
+                                    elide: Text.ElideRight
+                                    color: Theme.text
+                                    font.family: Theme.fontFamily
                                     font.pixelSize: 12
                                 }
-
                                 Text {
                                     text: {
-                                        var parts = [
-                                            card.modelData.address
-                                        ]
-
-                                        if (card.isConnected) {
-                                            parts.push(
-                                                "connected"
-                                            )
-                                        } else if (
-                                            card.modelData.paired
-                                        ) {
-                                            parts.push(
-                                                "paired"
-                                            )
-                                        }
-
-                                        if (
-                                            card.modelData
-                                            .batteryAvailable
-                                        ) {
-                                            parts.push(
-                                                Math.round(
-                                                    card.modelData
-                                                    .battery * 100
-                                                ) + "%"
-                                            )
-                                        }
-
-                                        return parts.join(
-                                            "  •  "
-                                        )
+                                        var parts = [card.modelData.address]
+                                        if (card.isConnected)
+                                            parts.push("connected")
+                                        else if (card.modelData.paired)
+                                            parts.push("paired")
+                                        if (card.modelData.batteryAvailable)
+                                            parts.push(Math.round(card.modelData.battery * 100) + "%")
+                                        return parts.join("  •  ")
                                     }
-
-                                    color:
-                                        card.isConnected
-                                        ? Theme.accent
-                                        : Theme.textFaint
-
-                                    font.family:
-                                        Theme.fontFamily
-
+                                    color: card.isConnected ? Theme.accent : Theme.textFaint
+                                    font.family: Theme.fontFamily
                                     font.pixelSize: 9
                                 }
                             }
                         }
-
-                        // ------------------------------------------------
-                        // Action button
-                        // ------------------------------------------------
-
-                        Text {
-                            anchors.right:
-                                parent.right
-
-                            anchors.rightMargin:
-                                14
-
-                            anchors.verticalCenter:
-                                parent.verticalCenter
-
-                            text:
-                                page.actionLabel(
-                                    card.modelData
-                                )
-
-                            color:
-                                card.isConnected
-                                ? Theme.danger
-                                : Theme.accent
-
-                            font.family:
-                                Theme.fontFamily
-
-                            font.pixelSize: 10
-
-                            MouseArea {
-                                anchors.fill:
-                                    parent
-
-                                cursorShape:
-                                    Qt.PointingHandCursor
-
-                                onClicked: {
-                                    page.deviceAction(
-                                        card.modelData
-                                    )
+                        Row {
+                            anchors.right: parent.right
+                            anchors.rightMargin: 14
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: 12
+                            Text {
+                                text: page.actionLabel(card.modelData)
+                                color: card.isConnected ? Theme.danger : Theme.accent
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 10
+                                anchors.verticalCenter: parent.verticalCenter
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: page.deviceAction(card.modelData)
+                                }
+                            }
+                            Item {
+                                width: 28
+                                height: 28
+                                anchors.verticalCenter: parent.verticalCenter
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "\uf293"
+                                    color: Theme.textDim
+                                    font.family: Theme.iconFont
+                                    font.pixelSize: 16
+                                }
+                                MouseArea {
+                                    id: unpairMouseArea
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    hoverEnabled: true
+                                    onClicked: page.removeDevice(card.modelData)
+                                }
+                                Rectangle { 
+                                    visible: unpairMouseArea.containsMouse 
+                                    z: 100 
+                                    x: -8 
+                                    y: height + 6 
+                                    width: tooltipText.width + 16 
+                                    height: 24 
+                                    radius: 4 
+                                    color: "transparent" 
+                                    Text { 
+                                        id: tooltipText 
+                                        anchors.centerIn: parent 
+                                        text: "Unpair" 
+                                        color: "white" 
+                                        font.family: Theme.fontFamily 
+                                        font.pixelSize: 10 
+                                    } 
                                 }
                             }
                         }

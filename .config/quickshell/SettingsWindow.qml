@@ -127,7 +127,7 @@ PanelWindow {
                 // ---------------- Sidebar ----------------
                 Column {
                     id: sidebar
-                    width: 220
+                    width: 150
                     height: parent.height
                     spacing: 22
 
