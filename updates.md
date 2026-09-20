@@ -3,7 +3,8 @@
 ### Dependencies
 
 ```bash
-sudo pacman -S quickshell jq networkmanager bluez bluez-utils dmidecode brightnessctl gammastep \
+sudo pacman -S quickshell qt6-declarative pipewire wireplumber \
+    jq networkmanager bluez bluez-utils dmidecode brightnessctl gammastep \
     procps-ng ttf-nerd-fonts-symbols-mono ttf-jetbrains-mono
 ```
 
