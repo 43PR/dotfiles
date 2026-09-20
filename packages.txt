@@ -99,10 +99,10 @@ starship
 eza
 
 # --------------------------------------------------
-# Networking / Bluetooth
+# Settings / Networking / Bluetooth 
 # --------------------------------------------------
 
 networkmanager
 bluez
 bluez-utils
-
+dmidecode
