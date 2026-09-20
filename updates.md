@@ -12,8 +12,10 @@ OPEN TERMINAL AND RUN:
 sudo EDITOR=nano visudo -f /etc/sudoers.d/quickshell-dmidecode
 ```
 
-PASTE AND SAVE WITH CTRL + O
+PASTE 
 
 ```bash
 rp34 ALL=(root) NOPASSWD: /usr/bin/dmidecode
 ```
+
+SAVE WITH CTRL + O
