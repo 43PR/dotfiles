@@ -21,7 +21,7 @@ hyprlock     → autohide media controls + improved scripts
 
 **[Features](#features) ─ [Keybinds](#most-used-keybinds) ─ [Installation](#installation) ─ [Support](#support)**
 
-https://github.com/user-attachments/assets/053b5e09-ef99-4032-9ce2-a49c331a48ff
+https://github.com/user-attachments/assets/2978b7ed-703e-4ccb-b266-9da6cc491454
 
 </div>
 
