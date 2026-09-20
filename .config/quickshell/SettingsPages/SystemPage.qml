@@ -12,6 +12,7 @@ Item {
     property string cpu: "Loading..."
     property string gpu: "Loading..."
     property string memory: "Loading..."
+    property string ramSpeed: "Loading..."
 
     property real cpuUsage: 0
     property real gpuUsage: 0
@@ -329,6 +330,59 @@ Item {
         }
     }
 
+    Process {
+        id: pRamSpeed
+
+        command: [
+            "sudo",
+            "-n",
+            "/usr/bin/dmidecode",
+            "-t",
+            "memory"
+        ]
+
+        running: true
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var lines = text.split("\n")
+                var speed = ""
+
+                for (var i = 0; i < lines.length; i++) {
+                    var line = lines[i].trim()
+
+                    if (line.indexOf("Configured Memory Speed:") === 0) {
+                        var parts = line.split(/\s+/)
+
+                        if (parts.length >= 4 &&
+                            /^[0-9]+$/.test(parts[3])) {
+                            speed = parts[3] + " " + parts[4]
+                            break
+                        }
+                    }
+                }
+
+                if (!speed) {
+                    for (var j = 0; j < lines.length; j++) {
+                        var line2 = lines[j].trim()
+
+                        if (line2.indexOf("Speed:") === 0) {
+                            var parts2 = line2.split(/\s+/)
+
+                            if (parts2.length >= 3 &&
+                                /^[0-9]+$/.test(parts2[1])) {
+                                speed = parts2[1] + " " + parts2[2]
+                                break
+                            }
+                        }
+                    }
+                }
+
+                page.ramSpeed = speed || "Unknown"
+            }
+        }
+    }
+
     Timer {
         interval: 1000
         running: true
@@ -364,6 +418,7 @@ Item {
 
     Component.onCompleted: {
         page.updateClock()
+        pRamSpeed.running = true
     }
 
     Flickable {
@@ -749,6 +804,15 @@ Item {
                         font.family: page.mono
                         font.pixelSize: page.hardwareLabelSize
                         font.letterSpacing: 2
+
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+
+                    Text {
+                        text: "SPEED  " + page.ramSpeed
+                        color: Theme.text
+                        font.family: page.mono
+                        font.pixelSize: 11
 
                         anchors.verticalCenter: parent.verticalCenter
                     }
