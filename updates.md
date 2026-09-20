@@ -1,5 +1,6 @@
 > [!note]
-> Work in progress
+> Work in progress 
+> 
 > Monitors page still needs some work 
 
 ## Settings menu
