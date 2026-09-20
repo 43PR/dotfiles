@@ -111,11 +111,8 @@ After the installation finishes log out and back in.
 
 > [!note]
 > Change the GTK theme to dark if it wasn't changed automatically.
->
 > Waybar custom-gpu is specific to my PC so you can remove it or implement.
->
 > Any issues with the wallpaper picker just delete cache pictures ".cache/quickshell/thumbs/"
->
 > Edit default programs in "config/hypr/hyprland.lua".
 
 <div align="center">
