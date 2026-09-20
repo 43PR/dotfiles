@@ -6,16 +6,18 @@
 sudo pacman -S jq networkmanager bluez bluez-utils dmidecode brightnessctl
 ```
 
-OPEN TERMINAL AND RUN:
+RAM SPEED
+
+Open terminal and run:
 
 ```bash
 sudo EDITOR=nano visudo -f /etc/sudoers.d/quickshell-dmidecode
 ```
 
-PASTE 
+Paste:
 
 ```bash
 rp34 ALL=(root) NOPASSWD: /usr/bin/dmidecode
 ```
 
-SAVE WITH CTRL + O
+Save with Ctrl + O
