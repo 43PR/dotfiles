@@ -5,20 +5,14 @@ import "../"
 Item {
     id: page
 
-    // =========================
-    // Global layout controls
-    // =========================
     property real marginLeft: 0
     property real marginRight: 30
     property real marginTop: 0
     property real marginBottom: 0
-
-    // General spacing controls
     property real contentSpacing: 10
     property real sectionSpacing: 6
 
     PwObjectTracker {
-        // Track every audio node so .audio / .description are populated
         objects: Pipewire.nodes.values
     }
 
@@ -32,19 +26,15 @@ Item {
         ? sink.audio.muted
         : false
 
-    // Physical / virtual output devices
-    property var outputSinks:
-        Pipewire.nodes.values.filter(
-            n => n.isSink &&
-                 !n.isStream &&
-                 n.audio
-        )
+    property var outputSinks: Pipewire.nodes.values.filter(
+        n => n.isSink &&
+             !n.isStream &&
+             n.audio
+    )
 
-    // Active application audio streams
-    property var appStreams:
-        Pipewire.nodes.values.filter(
-            n => n.isStream && n.isSink
-        )
+    property var appStreams: Pipewire.nodes.values.filter(
+        n => n.isStream && n.isSink
+    )
 
     Column {
         anchors {
@@ -59,20 +49,13 @@ Item {
             bottomMargin: page.marginBottom
         }
 
-        spacing: page.contentSpacing
-
-        // =========================
-        // SOUND
-        // =========================
+        spacing: 20
 
         Text {
             text: "SOUND"
-
             color: Theme.text
-
-            font.family: Theme.fontFamily
+            font.family: "JetBrainsMono Nerd Font"
             font.pixelSize: 18
-            font.bold: true
             font.letterSpacing: 3
         }
 
@@ -82,10 +65,6 @@ Item {
             color: Theme.border
         }
 
-        // =========================
-        // OUTPUT VOLUME
-        // =========================
-
         Row {
             width: parent.width
             spacing: 2
@@ -93,24 +72,14 @@ Item {
             Rectangle {
                 width: 28
                 height: 28
-
                 radius: Theme.radius
-
-                anchors.verticalCenter:
-                    parent.verticalCenter
+                anchors.verticalCenter: parent.verticalCenter
 
                 color: page.muted
-                    ? Theme.alpha(
-                          Theme.danger,
-                          0.15
-                      )
-                    : Theme.alpha(
-                          Theme.accent,
-                          0.10
-                      )
+                    ? Theme.alpha(Theme.danger, 0.15)
+                    : Theme.alpha(Theme.accent, 0.10)
 
                 border.width: 1
-
                 border.color: page.muted
                     ? Theme.danger
                     : Theme.border
@@ -126,22 +95,16 @@ Item {
                         ? Theme.danger
                         : Theme.accent
 
-                    font.family:
-                        Theme.iconFont
-
+                    font.family: Theme.iconFont
                     font.pixelSize: 12
                 }
 
                 MouseArea {
                     anchors.fill: parent
-
-                    cursorShape:
-                        Qt.PointingHandCursor
+                    cursorShape: Qt.PointingHandCursor
 
                     onClicked: {
-                        if (page.sink &&
-                            page.sink.audio) {
-
+                        if (page.sink && page.sink.audio) {
                             page.sink.audio.muted =
                                 !page.sink.audio.muted
                         }
@@ -151,9 +114,7 @@ Item {
 
             Text {
                 width: 82
-
-                anchors.verticalCenter:
-                    parent.verticalCenter
+                anchors.verticalCenter: parent.verticalCenter
 
                 text: " VOLUME"
 
@@ -161,25 +122,15 @@ Item {
                     ? Theme.textDim
                     : Theme.text
 
-                font.family:
-                    Theme.fontFamily
-
-                font.pixelSize: 11
-
-                elide:
-                    Text.ElideRight
+                font.family: Theme.fontFamily
+                font.pixelSize: 15
+                elide: Text.ElideRight
             }
 
             Slider {
-                width: parent.width -
-                       28 -
-                       82 -
-                       12
-
+                width: parent.width - 28 - 82 - 12
                 height: 72
-
-                anchors.verticalCenter:
-                    parent.verticalCenter
+                anchors.verticalCenter: parent.verticalCenter
 
                 label: ""
                 icon: ""
@@ -189,9 +140,7 @@ Item {
                     : page.volume
 
                 onCommitted: (v) => {
-                    if (page.sink &&
-                        page.sink.audio) {
-
+                    if (page.sink && page.sink.audio) {
                         page.sink.audio.muted = false
                         page.sink.audio.volume = v
                     }
@@ -199,39 +148,19 @@ Item {
             }
         }
 
-        Rectangle {
-            width: parent.width
-            height: 1
-            color: Theme.border
-        }
-
-        // =========================
-        // OUTPUT DEVICE
-        // =========================
-
         Row {
             width: parent.width
-            spacing: 10
+            spacing: 5
 
             Text {
                 text: "OUTPUT"
-
                 color: Theme.accent
-
                 font.family: Theme.fontFamily
-                font.pixelSize: 11
+                font.pixelSize: 15
                 font.letterSpacing: 2
-
-                anchors.verticalCenter:
-                    parent.verticalCenter
+                anchors.verticalCenter: parent.verticalCenter
             }
-
-            
         }
-
-        // =========================
-        // OUTPUT SELECTOR
-        // =========================
 
         Column {
             width: parent.width
@@ -245,11 +174,9 @@ Item {
 
                     width: parent.width
                     height: 40
-
                     radius: Theme.radius
 
-                    property var output:
-                        modelData
+                    property var output: modelData
 
                     property bool active:
                         page.sink &&
@@ -257,31 +184,23 @@ Item {
                         page.sink.id === output.id
 
                     color: active
-                        ? Theme.alpha(
-                              Theme.accent,
-                              0.10
-                          )
+                        ? Theme.alpha(Theme.accent, 0.10)
                         : "transparent"
 
                     border.width: 1
-
                     border.color: active
                         ? Theme.accent
                         : Theme.border
 
                     Row {
                         anchors.fill: parent
-
                         anchors.leftMargin: 10
                         anchors.rightMargin: 10
-
                         spacing: 8
 
                         Text {
                             width: 20
-
-                            anchors.verticalCenter:
-                                parent.verticalCenter
+                            anchors.verticalCenter: parent.verticalCenter
 
                             text: active
                                 ? "\uf192"
@@ -291,17 +210,13 @@ Item {
                                 ? Theme.accent
                                 : Theme.textFaint
 
-                            font.family:
-                                Theme.iconFont
-
+                            font.family: Theme.iconFont
                             font.pixelSize: 11
                         }
 
                         Text {
                             width: parent.width - 28
-
-                            anchors.verticalCenter:
-                                parent.verticalCenter
+                            anchors.verticalCenter: parent.verticalCenter
 
                             text: (
                                 output.description ||
@@ -314,21 +229,15 @@ Item {
                                 ? Theme.accent
                                 : Theme.text
 
-                            font.family:
-                                Theme.fontFamily
-
+                            font.family: Theme.fontFamily
                             font.pixelSize: 10
-
-                            elide:
-                                Text.ElideRight
+                            elide: Text.ElideRight
                         }
                     }
 
                     MouseArea {
                         anchors.fill: parent
-
-                        cursorShape:
-                            Qt.PointingHandCursor
+                        cursorShape: Qt.PointingHandCursor
 
                         onClicked: {
                             if (output) {
@@ -341,19 +250,13 @@ Item {
             }
 
             Text {
-                visible:
-                    page.outputSinks.length === 0
+                visible: page.outputSinks.length === 0
 
-                text:
-                    "NO AUDIO OUTPUTS"
+                text: "NO AUDIO OUTPUTS"
 
                 color: Theme.textFaint
-
-                font.family:
-                    Theme.fontFamily
-
+                font.family: Theme.fontFamily
                 font.pixelSize: 10
-
                 font.letterSpacing: 1.5
 
                 leftPadding: 4
@@ -366,10 +269,6 @@ Item {
             color: Theme.border
         }
 
-        // =========================
-        // PER-APP AUDIO
-        // =========================
-
         Row {
             width: parent.width
             spacing: 10
@@ -378,25 +277,21 @@ Item {
                 text: "PLAYING APPS"
 
                 color: Theme.accent
-
                 font.family: Theme.fontFamily
-                font.pixelSize: 11
+                font.pixelSize: 14
                 font.letterSpacing: 2
 
-                anchors.verticalCenter:
-                    parent.verticalCenter
+                anchors.verticalCenter: parent.verticalCenter
             }
 
             Text {
                 text: page.appStreams.length
 
                 color: Theme.textFaint
-
                 font.family: Theme.fontFamily
                 font.pixelSize: 10
 
-                anchors.verticalCenter:
-                    parent.verticalCenter
+                anchors.verticalCenter: parent.verticalCenter
             }
         }
 
@@ -412,11 +307,9 @@ Item {
 
                     width: parent.width
                     height: 48
-
                     radius: Theme.radius
 
-                    property var stream:
-                        modelData
+                    property var stream: modelData
 
                     property bool streamMuted:
                         stream &&
@@ -424,56 +317,36 @@ Item {
                         stream.audio.muted
 
                     property real streamVolume:
-                        stream &&
-                        stream.audio
+                        stream && stream.audio
                             ? stream.audio.volume
                             : 0
 
                     color: streamMuted
-                        ? Theme.alpha(
-                              Theme.danger,
-                              0.06
-                          )
+                        ? Theme.alpha(Theme.danger, 0.06)
                         : "transparent"
 
                     border.width: 1
-
                     border.color: streamMuted
-                        ? Theme.alpha(
-                              Theme.danger,
-                              0.5
-                          )
+                        ? Theme.alpha(Theme.danger, 0.5)
                         : Theme.border
 
                     Row {
                         anchors.fill: parent
-
                         anchors.leftMargin: 10
                         anchors.rightMargin: 14
-
                         spacing: 6
 
                         Rectangle {
                             width: 28
                             height: 28
-
                             radius: Theme.radius
-
-                            anchors.verticalCenter:
-                                parent.verticalCenter
+                            anchors.verticalCenter: parent.verticalCenter
 
                             color: streamMuted
-                                ? Theme.alpha(
-                                      Theme.danger,
-                                      0.15
-                                  )
-                                : Theme.alpha(
-                                      Theme.accent,
-                                      0.10
-                                  )
+                                ? Theme.alpha(Theme.danger, 0.15)
+                                : Theme.alpha(Theme.accent, 0.10)
 
                             border.width: 1
-
                             border.color: streamMuted
                                 ? Theme.danger
                                 : Theme.border
@@ -489,22 +362,16 @@ Item {
                                     ? Theme.danger
                                     : Theme.accent
 
-                                font.family:
-                                    Theme.iconFont
-
+                                font.family: Theme.iconFont
                                 font.pixelSize: 12
                             }
 
                             MouseArea {
                                 anchors.fill: parent
-
-                                cursorShape:
-                                    Qt.PointingHandCursor
+                                cursorShape: Qt.PointingHandCursor
 
                                 onClicked: {
-                                    if (stream &&
-                                        stream.audio) {
-
+                                    if (stream && stream.audio) {
                                         stream.audio.muted =
                                             !stream.audio.muted
                                     }
@@ -514,9 +381,7 @@ Item {
 
                         Text {
                             width: 82
-
-                            anchors.verticalCenter:
-                                parent.verticalCenter
+                            anchors.verticalCenter: parent.verticalCenter
 
                             text: (
                                 stream.description ||
@@ -528,25 +393,15 @@ Item {
                                 ? Theme.textDim
                                 : Theme.text
 
-                            font.family:
-                                Theme.fontFamily
-
+                            font.family: Theme.fontFamily
                             font.pixelSize: 11
-
-                            elide:
-                                Text.ElideRight
+                            elide: Text.ElideRight
                         }
 
                         Slider {
-                            width: parent.width -
-                                   28 -
-                                   82 -
-                                   12
-
+                            width: parent.width - 28 - 82 - 12
                             height: 72
-
-                            anchors.verticalCenter:
-                                parent.verticalCenter
+                            anchors.verticalCenter: parent.verticalCenter
 
                             label: ""
                             icon: ""
@@ -556,9 +411,7 @@ Item {
                                 : streamVolume
 
                             onCommitted: (v) => {
-                                if (stream &&
-                                    stream.audio) {
-
+                                if (stream && stream.audio) {
                                     stream.audio.muted = false
                                     stream.audio.volume = v
                                 }
@@ -569,19 +422,13 @@ Item {
             }
 
             Text {
-                visible:
-                    page.appStreams.length === 0
+                visible: page.appStreams.length === 0
 
-                text:
-                    "NO ACTIVE AUDIO STREAMS"
+                text: "NO ACTIVE AUDIO STREAMS"
 
                 color: Theme.textFaint
-
-                font.family:
-                    Theme.fontFamily
-
+                font.family: Theme.fontFamily
                 font.pixelSize: 10
-
                 font.letterSpacing: 1.5
 
                 leftPadding: 4
