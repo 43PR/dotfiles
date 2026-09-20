@@ -90,10 +90,7 @@ This is mainly intended for a clean installation. If you already have a desktop 
 
 Existing configuration files that are being replaced will be backed up automatically.
 
-> [!tip]
-> For beginners I recommend trying [**noctalia**](https://github.com/noctalia-dev/noctalia) and then implementing parts of this setup. It's installed in **CachyOS** by default, and if you really want this specific setup you can follow the installation.
-
-First install git then use the next command and continue the installation until it's finished:
+**First install git then use the next command and continue the installation until it's finished:**
 
 ```bash
 
