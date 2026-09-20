@@ -20,4 +20,4 @@ Paste:
 rp34 ALL=(root) NOPASSWD: /usr/bin/dmidecode
 ```
 
-Save with Ctrl + O
+Save with Ctrl + O then Enter
