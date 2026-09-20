@@ -3,7 +3,8 @@
 ### Dependencies
 
 ```bash
-sudo pacman -S jq networkmanager bluez bluez-utils dmidecode brightnessctl
+sudo pacman -S jq networkmanager bluez bluez-utils dmidecode brightnessctl gammastep \
+    procps-ng ttf-nerd-fonts-symbols-mono ttf-jetbrains-mono
 ```
 
 RAM SPEED
