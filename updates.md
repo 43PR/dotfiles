@@ -1,3 +1,7 @@
+> [!note]
+> Work in progress
+
+
 ## Settings menu
 
 ### Dependencies
@@ -41,3 +45,13 @@ rp34 ALL=(root) NOPASSWD: /usr/bin/dmidecode
 ```
 
 Save with Ctrl + O then Enter
+
+## Terminal
+
+### Dependencies
+
+```bash
+sudo pacman -S ttf-jetbrains-mono-nerd zsh starship eza zsh-autosuggestions zsh-syntax-highlighting
+```
+
+chsh -s /bin/zsh
