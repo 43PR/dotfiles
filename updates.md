@@ -82,5 +82,3 @@ Save with Ctrl + O then Enter
 
 
 
-
-chsh -s /bin/zsh
