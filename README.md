@@ -8,7 +8,7 @@
 
 ### [Recent updates (documentation)](updates.md)
 
-**[Features](#features)  -  [Keybinds](#most-used-keybinds)  -  [Installation](#installation)  -  [Support](#support)**
+### **[Features](#features)  -  [Keybinds](#most-used-keybinds)  -  [Installation](#installation)  -  [Support](#support)**
 
 </div>
 
