@@ -8,12 +8,7 @@ Simple Hyprland setup focused on practical keybinds, productivity, and a smooth 
 Feel free to use as inspiration or as a starting point for building your own setup.
 
 #### [Recent updates (documentation)](updates.md)
--
-- **Quickshell** — System, Sound, Monitor, Network & Bluetooth 
-- **Terminal** — Eza icons, Starship, Zsh, autosuggestions & syntax highlighting
-- **Waybar** — Media marquee effect & improved scripts
-- **Hyprlock** — Autohide media controls & improved scripts
--
+
 **[Features](#features) ─ [Keybinds](#most-used-keybinds) ─ [Installation](#installation) ─ [Support](#support)**
 
 https://github.com/user-attachments/assets/2978b7ed-703e-4ccb-b266-9da6cc491454
