@@ -1,12 +1,21 @@
 #!/usr/bin/env bash
 
-
 CONFIG="$1/config.json"
 
+expand_home() {
+    local path="$1"
 
+    if [[ "$path" == '$HOME' ]]; then
+        printf '%s\n' "$HOME"
+    elif [[ "$path" == '$HOME/'* ]]; then
+        printf '%s/%s\n' "$HOME" "${path#'$HOME/'}"
+    else
+        printf '%s\n' "$path"
+    fi
+}
 
-wallpaper_path=$(jq -r '.wallpaper_path' "$CONFIG")
-cache_path=$(jq -r '.cache_path' "$CONFIG")
+wallpaper_path=$(expand_home "$(jq -r '.wallpaper_path' "$CONFIG")")
+cache_path=$(expand_home "$(jq -r '.cache_path' "$CONFIG")")
 cache_batch_size=$(jq -r '.cache_batch_size' "$CONFIG")
 
 mkdir -p "$cache_path"
@@ -28,19 +37,14 @@ find "$wallpaper_path" -type f \( \
     fi
 
     echo "Generating thumbnail for $filename"
-
-
     convert "$img" -thumbnail x500 -strip -quality 85 "$out" &
 
-    # Only limit jobs if batch_size > 0
     if (( cache_batch_size > 0 )); then
         while (( $(jobs -rp | wc -l) >= cache_batch_size )); do
             wait -n
         done
     fi
-
 done
 
 wait
-
 echo "Thumbnail generation complete."
