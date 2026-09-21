@@ -20,11 +20,6 @@ sudo pacman -S quickshell qt6-declarative pipewire wireplumber \
 
 ### Dependencies by feature
 
-Wallpaper picker
-```bash
-sudo pacman -S quickshell jq imagemagick awww
-```
-
 Quickshell / Settings menu
 ```bash
 sudo pacman -S quickshell qt6-declarative pipewire wireplumber \
@@ -36,6 +31,11 @@ Terminal
 ```bash
 sudo pacman -S ttf-jetbrains-mono-nerd zsh starship eza \
     zsh-autosuggestions zsh-syntax-highlighting
+```
+
+Wallpaper picker
+```bash
+sudo pacman -S quickshell jq imagemagick awww
 ```
 
 Make sure all dependencies are installed
