@@ -1,7 +1,9 @@
 > [!note]
 > Work in progress 
 > 
-> Monitors page still needs some work 
+> Monitors page still needs some work 
+
+Download and unzip this repository to your downloads
 
 ## Settings menu
 
@@ -13,7 +15,7 @@ sudo pacman -S quickshell qt6-declarative pipewire wireplumber \
     procps-ng ttf-nerd-fonts-symbols-mono ttf-jetbrains-mono
 ```
 
-Download and unzip this repository then copy paste the quickshell folder to .config
+Copy paste the quickshell folder to .config
 
 Replace/add keybinds (.config/hypr/keybinds.lua):
 
@@ -46,6 +48,32 @@ rp34 ALL=(root) NOPASSWD: /usr/bin/dmidecode
 ```
 
 Save with Ctrl + O then Enter
+
+## Wallpaper picker
+
+> **To update**
+
+Copy paste the quickshell folder to .config
+
+Replace/add keybind (.config/hypr/hyprland.lua):
+
+```bash
+hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("qs -n -p ~/.config/quickshell/hyprquickpaper"))
+```
+
+Replace/add (.config/hypr/hyprland.lua):
+
+---- AUTOSTART ----
+
+```bash
+hl.exec_cmd("sleep 2 && qs")
+```
+
+### Dependiencies
+
+```bash
+sudo pacman -S quickshell jq imagemagick awww
+```
 
 ## Terminal
 
