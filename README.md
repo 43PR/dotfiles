@@ -7,9 +7,9 @@ Feel free to use as inspiration or as a starting point for building your own set
 
 #### [Recent updates (documentation)](updates.md)
 
-#### <a href="https://www.youtube.com/@43PR2">▷ YouTube Guides & Showcase</a>
-
 **[Features](#features)  -  [Keybinds](#most-used-keybinds)  -  [Installation](#installation)  -  [Support](#support)**
+
+## <a href="https://www.youtube.com/@43PR2">▷ YouTube Guides & Showcase</a>
 
 https://github.com/user-attachments/assets/2978b7ed-703e-4ccb-b266-9da6cc491454
 
