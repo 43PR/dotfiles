@@ -5,25 +5,69 @@
 
 Download and unzip this repository to your downloads
 
-## Settings menu
+## Update Quickshell Settings menu / Wallpaper pickerr
 
 ### Dependencies
 
 ```bash
 sudo pacman -S quickshell qt6-declarative pipewire wireplumber \
     jq networkmanager bluez bluez-utils dmidecode brightnessctl gammastep \
-    procps-ng ttf-nerd-fonts-symbols-mono ttf-jetbrains-mono
+    procps-ng ttf-nerd-fonts-symbols-mono ttf-jetbrains-mono \
+    ttf-jetbrains-mono-nerd zsh starship eza \
+    zsh-autosuggestions zsh-syntax-highlighting \
+    imagemagick awww
 ```
 
+### Dependencies by feature
+
+```text
+Quickshell / Settings menu
+quickshell
+qt6-declarative
+pipewire
+wireplumber
+jq
+networkmanager
+bluez
+bluez-utils
+dmidecode
+brightnessctl
+gammastep
+procps-ng
+ttf-nerd-fonts-symbols-mono
+ttf-jetbrains-mono
+
+Wallpaper picker
+quickshell
+jq
+imagemagick
+awww
+
+Terminal
+ttf-jetbrains-mono-nerd
+zsh
+starship
+eza
+zsh-autosuggestions
+zsh-syntax-highlighting
+```
+
+Make sure all dependencies are installed
+
 Copy paste the quickshell folder to .config
+
+### Add keybinds
 
 Replace/add keybinds (.config/hypr/keybinds.lua):
 
 ```bash
+-- Settings menu (Close with the same bind or click outside)
 hl.bind(mainMod .. " + I", hl.dsp.exec_cmd("qs ipc call settings toggle"))
-
+-- Wallpaper picker (Close with "W" key)
 hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("qs -n -p ~/.config/quickshell/hyprquickpaper"))
 ```
+
+### Start Quickshell automatically
 
 Replace/add (.config/hypr/hyprland.lua):
 
@@ -33,7 +77,7 @@ Replace/add (.config/hypr/hyprland.lua):
 hl.exec_cmd("sleep 2 && qs")
 ```
 
-RAM SPEED
+### Allow Quickshell to read RAM speed
 
 Open terminal and run:
 
@@ -49,38 +93,8 @@ rp34 ALL=(root) NOPASSWD: /usr/bin/dmidecode
 
 Save with Ctrl + O then Enter
 
-## Wallpaper picker
 
-> **To update**
 
-Copy paste the quickshell folder to .config
 
-Replace/add keybind (.config/hypr/hyprland.lua):
-
-```bash
-hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("qs -n -p ~/.config/quickshell/hyprquickpaper"))
-```
-
-Replace/add (.config/hypr/hyprland.lua):
-
----- AUTOSTART ----
-
-```bash
-hl.exec_cmd("sleep 2 && qs")
-```
-
-### Dependiencies
-
-```bash
-sudo pacman -S quickshell jq imagemagick awww
-```
-
-## Terminal
-
-### Dependencies
-
-```bash
-sudo pacman -S ttf-jetbrains-mono-nerd zsh starship eza zsh-autosuggestions zsh-syntax-highlighting
-```
 
 chsh -s /bin/zsh
