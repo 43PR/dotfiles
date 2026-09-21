@@ -40,11 +40,11 @@ sudo pacman -S quickshell jq imagemagick awww
 
 Make sure all dependencies are installed
 
-Copy paste the quickshell folder to .config
+Copy paste the quickshell folder to: .config
 
 ### Add keybinds
 
-Replace/add keybinds (.config/hypr/keybinds.lua):
+Replace/add keybinds to: (.config/hypr/keybinds.lua)
 
 ```bash
 -- Settings menu (Close with the same bind or click outside)
@@ -55,9 +55,7 @@ hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("qs -n -p ~/.config/quickshell/hyprqu
 
 ### Start Quickshell automatically
 
-Replace/add (.config/hypr/hyprland.lua):
-
----- AUTOSTART ----
+Replace/add to autostart section in: .config/hypr/hyprland.lua
 
 ```bash
 hl.exec_cmd("sleep 2 && qs")
@@ -65,7 +63,7 @@ hl.exec_cmd("sleep 2 && qs")
 
 ### Allow Quickshell to read RAM speed
 
-Open terminal and run:
+Run:
 
 ```bash
 sudo EDITOR=nano visudo -f /etc/sudoers.d/quickshell-dmidecode
