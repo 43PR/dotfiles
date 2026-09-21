@@ -7,7 +7,7 @@
 Simple Hyprland setup focused on practical keybinds, productivity, and a smooth workflow easy to customize. 
 Feel free to use as inspiration or as a starting point for building your own setup.
 
-### [Recent updates](updates.md)
+### [Recent updates (guide)](updates.md)
 
 </div>
 
