@@ -15,7 +15,7 @@ Feel free to use as inspiration or as a starting point for building your own set
 quickshell   → settings: system, sound, monitors, network, bluetooth 
 terminal     → eza icons + starship + zsh shell + autosuggestions + syntax-highlighting
 waybar       → media marquee effect + improved scripts
-hyprlock     → autohide media controls + improved scripts
+hyprlock     → autohide media controls + (.config/hypr) improved scripts
 ```
 
 <div align="center">
