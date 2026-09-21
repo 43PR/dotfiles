@@ -5,6 +5,9 @@
 >
 > **Download and unzip this repository to your downloads**
 
+### **[Keybinds](#add-keybinds) - [Autostart](#autostart) - [Allow Quickshell to read RAM speed](#allow-quickshell-to-read-ram-speed) - [Change your default shell to Zsh](#change-your-default-shell-to-zsh)**
+
+
 ## Update quickshell settings menu & wallpaper picker
 
 ### Dependencies
@@ -53,7 +56,7 @@ hl.bind(mainMod .. " + I", hl.dsp.exec_cmd("qs ipc call settings toggle"))
 hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("qs -n -p ~/.config/quickshell/hyprquickpaper"))
 ```
 
-### Start Quickshell automatically
+### Autostart
 
 Replace/add to autostart section in: .config/hypr/hyprland.lua
 
