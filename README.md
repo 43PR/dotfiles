@@ -6,9 +6,9 @@
 
 ### [Recent updates (documentation)](updates.md)
 
-**[Features](#features)  -  [Keybinds](#most-used-keybinds)  -  [Installation](#installation)  -  [Support](#support)**
+### <a href="https://www.youtube.com/@43PR2">▷ YouTube Guides & Showcase</a>
 
-## <a href="https://www.youtube.com/@43PR2">▷ YouTube Guides & Showcase</a>
+**[Features](#features)  -  [Keybinds](#most-used-keybinds)  -  [Installation](#installation)  -  [Support](#support)**
 
 </div>
 
