@@ -20,36 +20,22 @@ sudo pacman -S quickshell qt6-declarative pipewire wireplumber \
 
 ### Dependencies by feature
 
-```text
 Quickshell / Settings menu
-quickshell
-qt6-declarative
-pipewire
-wireplumber
-jq
-networkmanager
-bluez
-bluez-utils
-dmidecode
-brightnessctl
-gammastep
-procps-ng
-ttf-nerd-fonts-symbols-mono
-ttf-jetbrains-mono
+```bash
+sudo pacman -S quickshell qt6-declarative pipewire wireplumber \
+    jq networkmanager bluez bluez-utils dmidecode brightnessctl gammastep \
+    procps-ng ttf-nerd-fonts-symbols-mono ttf-jetbrains-mono
+```
 
 Wallpaper picker
-quickshell
-jq
-imagemagick
-awww
+```bash
+sudo pacman -S quickshell jq imagemagick awww
+```
 
 Terminal
-ttf-jetbrains-mono-nerd
-zsh
-starship
-eza
-zsh-autosuggestions
-zsh-syntax-highlighting
+```bash
+sudo pacman -S ttf-jetbrains-mono-nerd zsh starship eza \
+    zsh-autosuggestions zsh-syntax-highlighting
 ```
 
 Make sure all dependencies are installed
