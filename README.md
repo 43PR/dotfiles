@@ -2,8 +2,7 @@
 
 ## Hyprland Setup by 43pr メ
 
-Simple Hyprland setup focused on practical keybinds, productivity, easy to customize. 
-Feel free to use as inspiration or as a starting point for building your own setup.
+**Simple Hyprland setup focused on practical keybinds, productivity, easy to customize. Feel free to use as inspiration or as a starting point for building your own setup.**
 
 #### [Recent updates (documentation)](updates.md)
 
@@ -11,10 +10,9 @@ Feel free to use as inspiration or as a starting point for building your own set
 
 ## <a href="https://www.youtube.com/@43PR2">▷ YouTube Guides & Showcase</a>
 
-https://github.com/user-attachments/assets/2978b7ed-703e-4ccb-b266-9da6cc491454
-
 </div>
 
+https://github.com/user-attachments/assets/2978b7ed-703e-4ccb-b266-9da6cc491454
 ![](Wallpapers/Showcase/9.png)
 ![](Wallpapers/Showcase/4.png)
 ![](Wallpapers/Showcase/2.png)
