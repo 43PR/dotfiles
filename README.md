@@ -9,13 +9,12 @@ Feel free to use as inspiration or as a starting point for building your own set
 
 #### [Recent updates (documentation)](updates.md)
 
-| Component | Update |
-|:--|:--|
-| `quickshell` | System, sound, monitor, network & Bluetooth settings |
-| `terminal` | Eza icons, Starship, Zsh, autosuggestions & syntax highlighting |
-| `waybar` | Media marquee effect & improved scripts |
-| `hyprlock` | Autohide media controls & improved `.config/hypr` scripts |
+> **Latest changes**
 
+- **Quickshell** — system, sound, monitor, network & Bluetooth settings
+- **Terminal** — eza icons, Starship, Zsh, autosuggestions & syntax highlighting
+- **Waybar** — media marquee effect & improved scripts
+- **Hyprlock** — autohide media controls & improved scripts
 
 **[Features](#features) ─ [Keybinds](#most-used-keybinds) ─ [Installation](#installation) ─ [Support](#support)**
 
