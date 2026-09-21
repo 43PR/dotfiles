@@ -44,7 +44,7 @@ Copy paste the quickshell folder to: .config
 
 ### Add keybinds
 
-Replace/add keybinds to: (.config/hypr/keybinds.lua)
+Replace/add keybinds to: .config/hypr/keybinds.lua
 
 ```bash
 -- Settings menu (Close with the same bind or click outside)
