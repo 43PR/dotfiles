@@ -2,12 +2,12 @@
 
 ## Hyprland Setup by 43pr メ
 
-### <a href="https://www.youtube.com/@43PR2">▷ YouTube Guides & Showcase</a>
+#### <a href="https://www.youtube.com/@43PR2">▷ YouTube Guides & Showcase</a>
 
 Simple Hyprland setup focused on practical keybinds, productivity, and a smooth workflow easy to customize. 
 Feel free to use as inspiration or as a starting point for building your own setup.
 
-### [Recent updates (documentation)](updates.md)
+#### [Recent updates (documentation)](updates.md)
 
 </div>
 
