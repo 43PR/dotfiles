@@ -5,7 +5,7 @@
 
 Download and unzip this repository to your downloads
 
-## Update Quickshell Settings menu / Wallpaper pickerr
+## Update Quickshell Settings menu / Wallpaper picker
 
 ### Dependencies
 
