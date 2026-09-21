@@ -9,7 +9,7 @@ Feel free to use as inspiration or as a starting point for building your own set
 
 #### [Recent updates (documentation)](updates.md)
 
-> **Latest changes**
+**Latest changes**
 
 - **Quickshell** — system, sound, monitor, network & Bluetooth settings
 - **Terminal** — eza icons, Starship, Zsh, autosuggestions & syntax highlighting
