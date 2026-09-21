@@ -71,7 +71,7 @@ Open terminal and run:
 sudo EDITOR=nano visudo -f /etc/sudoers.d/quickshell-dmidecode
 ```
 
-Replace user with your Linux username then paste:
+Replace "user" with your username then paste:
 
 ```bash
 user ALL=(root) NOPASSWD: /usr/bin/dmidecode
