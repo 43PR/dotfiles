@@ -2,8 +2,8 @@
 > Work in progress 
 > 
 > Monitors page still needs some work 
-
-Download and unzip this repository to your downloads
+>
+> **Download and unzip this repository to your downloads**
 
 ## Update quickshell settings menu & wallpaper picker
 
