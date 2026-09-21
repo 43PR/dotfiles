@@ -9,10 +9,12 @@ Feel free to use as inspiration or as a starting point for building your own set
 
 #### [Recent updates (documentation)](updates.md)
 
+
 - **Quickshell** — System, Sound, Monitor, Network & Bluetooth 
 - **Terminal** — Eza icons, Starship, Zsh, autosuggestions & syntax highlighting
 - **Waybar** — Media marquee effect & improved scripts
 - **Hyprlock** — Autohide media controls & improved scripts
+
 
 **[Features](#features) ─ [Keybinds](#most-used-keybinds) ─ [Installation](#installation) ─ [Support](#support)**
 
