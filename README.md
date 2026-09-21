@@ -12,7 +12,7 @@ Feel free to use as inspiration or as a starting point for building your own set
 </div>
 
 ```text
-quickshell   → settings: system, sound, monitors, network, bluetooth (monitors page still needs some work)
+quickshell   → settings: system, sound, monitors, network, bluetooth 
 terminal     → eza icons + starship + zsh shell + autosuggestions + syntax-highlighting
 waybar       → media marquee effect + improved scripts
 hyprlock     → autohide media controls + improved scripts
