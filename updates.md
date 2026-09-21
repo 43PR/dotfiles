@@ -20,16 +20,16 @@ sudo pacman -S quickshell qt6-declarative pipewire wireplumber \
 
 ### Dependencies by feature
 
+Wallpaper picker
+```bash
+sudo pacman -S quickshell jq imagemagick awww
+```
+
 Quickshell / Settings menu
 ```bash
 sudo pacman -S quickshell qt6-declarative pipewire wireplumber \
     jq networkmanager bluez bluez-utils dmidecode brightnessctl gammastep \
     procps-ng ttf-nerd-fonts-symbols-mono ttf-jetbrains-mono
-```
-
-Wallpaper picker
-```bash
-sudo pacman -S quickshell jq imagemagick awww
 ```
 
 Terminal
