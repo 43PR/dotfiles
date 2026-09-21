@@ -71,14 +71,22 @@ Open terminal and run:
 sudo EDITOR=nano visudo -f /etc/sudoers.d/quickshell-dmidecode
 ```
 
-Paste:
+Replace user with your Linux username then paste:
 
 ```bash
-rp34 ALL=(root) NOPASSWD: /usr/bin/dmidecode
+user ALL=(root) NOPASSWD: /usr/bin/dmidecode
 ```
 
 Save with Ctrl + O then Enter
 
+### Change your default shell to Zsh
 
+Run:
+
+```bash
+chsh -s /bin/zsh
+```
+
+Log out and back in for the change to take effect.
 
 
