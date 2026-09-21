@@ -16,6 +16,9 @@ PanelWindow {
     property int baseSpacing: 10
     property int startPosition: 20
 
+    property string wallpaperPath: configs.wallpaper_path.replace("$HOME", Quickshell.env("HOME"))
+    property string cachePath: configs.cache_path.replace("$HOME", Quickshell.env("HOME"))
+
     implicitHeight: 500
     implicitWidth: Screen.width
     color: "transparent"
@@ -50,7 +53,7 @@ PanelWindow {
     FolderListModel {
         id: folderModel
 
-        folder: "file://" + configs.wallpaper_path
+        folder: "file://" + main.wallpaperPath
         showDirs: false
         nameFilters: ["*.png", "*.jpg"]
         sortField: FolderListModel.Name
@@ -181,7 +184,7 @@ PanelWindow {
                     smooth: true
 
                     source: "file://" +
-                            configs.cache_path +
+                            main.cachePath +
                             fileName
 
                     // Decode once at max zoomed size.
