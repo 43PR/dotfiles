@@ -2,13 +2,15 @@
 > Work in progress 
 > 
 > Monitors page still needs some work 
->
-> **Download and unzip this repository to your downloads**
+> 
+> All programs: [packages.txt](packages.txt)
 
 **[Keybinds](#add-keybinds) - [Autostart](#autostart) - [Allow Quickshell to read RAM speed](#allow-quickshell-to-read-ram-speed) - [Change your default shell to Zsh](#change-your-default-shell-to-zsh)**
 
 
 ## Update quickshell settings menu & wallpaper picker
+
+**Download and unzip this repository to your downloads**
 
 ### Dependencies
 
