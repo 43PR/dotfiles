@@ -29,19 +29,24 @@ slurp
 imagemagick
 
 # --------------------------------------------------
+# Settings / Networking / Bluetooth / Audio
+# --------------------------------------------------
+
+networkmanager
+bluez
+bluez-utils
+dmidecode
+pipewire
+pipewire-audio
+pipewire-pulse
+wireplumber
+
+# --------------------------------------------------
 # Clipboard
 # --------------------------------------------------
 
 cliphist
 wl-clipboard
-
-# --------------------------------------------------
-# Audio
-# --------------------------------------------------
-
-pipewire
-pipewire-pulse
-wireplumber
 
 # --------------------------------------------------
 # Terminal / applications
@@ -98,11 +103,5 @@ zsh-syntax-highlighting
 starship
 eza
 
-# --------------------------------------------------
-# Settings / Networking / Bluetooth 
-# --------------------------------------------------
 
-networkmanager
-bluez
-bluez-utils
-dmidecode
+
