@@ -12,7 +12,7 @@ Simple Hyprland setup focused on practical keybinds, productivity and easy to cu
 
 </div>
 
-https://github.com/user-attachments/assets/9dcf5cc0-731a-4f87-9d8a-56eb8dbadbe6
+https://github.com/user-attachments/assets/00b6b5de-93f6-4178-9ebb-ac608b1ad05e
 
 ![](Wallpapers/Showcase/9.png)
 ![](Wallpapers/Showcase/4.png)
