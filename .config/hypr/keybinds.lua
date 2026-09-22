@@ -17,6 +17,20 @@ hl.bind(mainMod .. " + GRAVE", hl.dsp.exec_cmd("pgrep -x wlogout >/dev/null || w
 hl.bind(mainMod .. " + I", hl.dsp.exec_cmd("qs ipc call settings toggle")) -- Quick settings
 hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("qs -n -p ~/.config/quickshell/hyprquickpaper")) -- Wallpaper picker
 
+-- Launchers
+hl.bind(mainMod .. " + T", hl.dsp.exec_cmd(terminal))
+hl.bind(mainMod .. " + D", hl.dsp.exec_cmd("pgrep -x rofi >/dev/null && pkill -x rofi || " .. menu))
+hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager))
+hl.bind(mainMod .. " + B", hl.dsp.exec_cmd(browser))
+hl.bind(mainMod .. " + Q", hl.dsp.window.close())
+
+hl.bind(mainMod .. " + Tab", hl.dsp.exec_cmd("hyprlock"))
+
+hl.bind(mainMod .. " + GRAVE", hl.dsp.exec_cmd("pgrep -x wlogout >/dev/null || wlogout -b 1 -c 20 -r 20 -L 1700 -R 1700 -T 325 -B 325"))
+
+hl.bind(mainMod .. " + I", hl.dsp.exec_cmd("qs ipc call settings toggle"))
+
+
 hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen({ mode = 0 })) -- Fullscreen
 hl.bind(mainMod .. " + O", hl.dsp.exec_cmd(home .. "/.config/hypr/scripts/opacity.sh")) -- Window opacity
 
