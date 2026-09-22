@@ -2,8 +2,6 @@
 > Work in progress 
 > 
 > Monitors page still needs some work 
->
-> Recent added dependencies: ncdu
 > 
 > All programs: [packages.txt](packages.txt)
 
@@ -22,7 +20,7 @@ sudo pacman -S quickshell qt6-declarative pipewire wireplumber \
     procps-ng ttf-nerd-fonts-symbols-mono ttf-jetbrains-mono \
     ttf-jetbrains-mono-nerd zsh starship eza \
     zsh-autosuggestions zsh-syntax-highlighting \
-    imagemagick awww
+    imagemagick awww ncdu
 ```
 
 ### Dependencies by feature
