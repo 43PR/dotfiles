@@ -92,4 +92,21 @@ chsh -s /bin/zsh
 
 Log out and back in for the change to take effect.
 
+## Troubleshooting
+
+### Wlogout (Logout menu)
+
+Run:
+
+```bash
+nano ~/.config/wlogout/style.css
+```
+
+Replace each sutdown, reboot, logout background-image: url with YOUR username
+
+#shutdown {
+    background-image: url("/home/user/.config/wlogout/icons/shutdown.png");
+}
+
+Make sure the keybind is the same as this repository
 
