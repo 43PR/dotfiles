@@ -6,7 +6,7 @@ Item {
     id: page
 
     property real marginLeft: 0
-    property real marginRight: 30
+    property real marginRight: 35
     property real marginTop: 0
     property real marginBottom: 0
     property real contentSpacing: 10
@@ -52,10 +52,10 @@ Item {
         spacing: 20
 
         Text {
-            text: "SOUND"
+            text: "AUDIO"
             color: Theme.text
-            font.family: "JetBrainsMono Nerd Font"
-            font.pixelSize: 18
+            font.family: Theme.fontFamily
+            font.pixelSize: 19
             font.letterSpacing: 3
         }
 

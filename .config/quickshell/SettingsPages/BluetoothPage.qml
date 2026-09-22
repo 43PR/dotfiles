@@ -125,7 +125,7 @@ Item {
         anchors.rightMargin: page.contentRightMargin
         anchors.topMargin: page.contentTopMargin
         anchors.bottomMargin: page.contentBottomMargin
-        spacing: 8
+        spacing: 9
         Row {
             id: header
             width: parent.width
@@ -137,6 +137,7 @@ Item {
                 font.pixelSize: 18
                 font.letterSpacing: 3
                 anchors.verticalCenter: parent.verticalCenter
+                anchors.verticalCenterOffset: -6
             }
             Rectangle {
                 id: bluetoothToggle

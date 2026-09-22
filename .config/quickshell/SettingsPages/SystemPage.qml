@@ -470,8 +470,8 @@ Item {
             Text {
                 text: "SYSTEM"
                 color: Theme.text
-                font.family: page.mono
-                font.pixelSize: 18
+                font.family: Theme.fontFamily
+                font.pixelSize: 19
                 font.letterSpacing: 3
             }
 
