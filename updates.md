@@ -4,6 +4,7 @@
 > Monitors page still needs some work 
 >
 > Recent added dependencies: ncdu
+> 
 > All programs: [packages.txt](packages.txt)
 
 **[Keybinds](#add-keybinds) - [Autostart](#autostart) - [Allow Quickshell to read RAM speed](#allow-quickshell-to-read-ram-speed) - [Change your default shell to Zsh](#change-your-default-shell-to-zsh)**
