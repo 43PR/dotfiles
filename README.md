@@ -66,7 +66,7 @@ Just made some tweaks to it. Give it some love: [hyprquickpaper](https://github.
 | `Super + Grave`         | Logout menu               |
 | `Super + Mouse wheel`   | Zoom                      |
 
-> All keybinds: [config/hypr/keybinds.lua](config/hypr/keybinds.lua)
+> All keybinds: [.config/hypr/keybinds.lua](.config/hypr/keybinds.lua)
 
 ---
 ## Installation 
