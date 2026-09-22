@@ -47,7 +47,7 @@ Copy paste the quickshell folder to: .config
 
 ### Add keybinds
 
-Replace/add keybinds to: .config/hypr/keybinds.lua
+Replace/add keybinds: .config/hypr/keybinds.lua
 
 ```bash
 -- Settings menu (Close with the same bind or click outside)
@@ -58,7 +58,7 @@ hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("qs -n -p ~/.config/quickshell/hyprqu
 
 ### Autostart
 
-Replace/add to autostart section in: .config/hypr/hyprland.lua
+Replace/add to autostart section: .config/hypr/hyprland.lua
 
 ```bash
 hl.exec_cmd("sleep 2 && qs")
