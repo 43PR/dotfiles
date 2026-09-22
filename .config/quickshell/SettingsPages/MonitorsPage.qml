@@ -344,17 +344,20 @@ Item {
             top: parent.top
             bottom: parent.bottom
         }
-        spacing: 13
+        spacing: 9
 
         Row {
             width: parent.width
+            height: 36
 
             Text {
-                text: "MONITORS"
+                text: "DISPLAY"
                 color: Theme.text
                 font.family: Theme.fontFamily
-                font.pixelSize: 18
+                font.pixelSize: 19
                 font.letterSpacing: 3
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.verticalCenterOffset: -6
             }
 
             Item {

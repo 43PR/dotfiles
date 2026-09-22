@@ -119,9 +119,10 @@ Item {
                 text: "NETWORK"
                 color: Theme.text
                 font.family: Theme.fontFamily
-                font.pixelSize: 18
+                font.pixelSize: 19
                 font.letterSpacing: 3
                 anchors.verticalCenter: parent.verticalCenter
+                anchors.verticalCenterOffset: -6
             }
 
             Rectangle {

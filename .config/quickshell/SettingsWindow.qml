@@ -1,4 +1,3 @@
-
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
@@ -67,9 +66,10 @@ PanelWindow {
     // -------------------------
     property var navItems: [
         { name: "System",     icon: "󰒓", page: "SystemPage" },
-        { name: "Sound",      icon: "\uf028", page: "SoundPage" },
-        { name: "Monitors",   icon: "\uf108", page: "MonitorsPage" },
-        { name: "Network",    icon: "\uf1eb", page: "NetworkPage" },
+        { name: "Storage", icon: "󰋊", page: "StoragePage" },
+        { name: "Audio",      icon: "\uf028", page: "SoundPage" },
+        { name: "Display",   icon: "\uf108", page: "MonitorsPage" },
+        { name: "Network",   icon: "\uf1eb", page: "NetworkPage" },
         { name: "Bluetooth",  icon: "󰂯", page: "BluetoothPage" }
     ]
 
@@ -183,8 +183,14 @@ PanelWindow {
                                     anchors.left: parent.left
                                     anchors.leftMargin: 16
                                     spacing: 12
+                                    height: 20
 
                                     Text {
+                                        width: 18
+                                        height: parent.height
+                                        verticalAlignment: Text.AlignVCenter
+                                        horizontalAlignment: Text.AlignHCenter
+
                                         text: modelData.icon
                                         font.family: Theme.iconFont
                                         font.pixelSize: 14
@@ -194,6 +200,9 @@ PanelWindow {
                                     }
 
                                     Text {
+                                        height: parent.height
+                                        verticalAlignment: Text.AlignVCenter
+
                                         text: modelData.name
                                         font.family: Theme.fontFamily
                                         font.pixelSize: 13
@@ -261,5 +270,3 @@ PanelWindow {
         }
     }
 }
-
-
