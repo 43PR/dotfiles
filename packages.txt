@@ -40,6 +40,8 @@ pipewire
 pipewire-audio
 pipewire-pulse
 wireplumber
+flatpak
+ncdu 
 
 # --------------------------------------------------
 # Clipboard
