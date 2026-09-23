@@ -13,11 +13,8 @@ hl.bind(mainMod .. " + B", hl.dsp.exec_cmd(browser)) -- Browser
 hl.bind(mainMod .. " + Q", hl.dsp.window.close()) -- Close window
 
 hl.bind("SUPER + Tab", hl.dsp.exec_cmd("hyprlock")) -- Lock screen
-
-hl.bind(mainMod .. " + GRAVE", hl.dsp.exec_cmd("pgrep -x wlogout >/dev/null || wlogout -b 1 -c 20 -r 20 -L 1700 -R 1700 -T 325 -B 325")) -- Power menu
-
+hl.bind(mainMod .. " + GRAVE", hl.dsp.exec_cmd(home .. "/.config/hypr/scripts/wlogout.sh")) -- Power menu
 hl.bind(mainMod .. " + I", hl.dsp.exec_cmd("qs ipc call settings toggle")) -- Quick settings
-
 hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("qs -n -p ~/.config/quickshell/hyprquickpaper")) -- Wallpaper picker
 
 hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen({ mode = 0 })) -- Fullscreen
