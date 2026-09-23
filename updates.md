@@ -108,7 +108,7 @@ nano ~/.config/wlogout/style.css
 
 Edit the file and replace rp34 with your username:  /home/rp34/.config/spotify/prefs
 
-### Wlogout
+## Wlogout
 
 Run:
 
@@ -123,4 +123,18 @@ Replace each sutdown, reboot, logout background-image: url with YOUR username
 }
 
 Make sure the keybind is the same as this repository
+
+### Recent PR merged
+
+https://github.com/43PR/dotfiles/pull/11/changes
+
+Updated keybinds.lua, waybar/config.jsonc
+
+Added: .config/hypr/scripts/wlogout.sh
+
+Run:
+
+```bash
+chmod +x ~/.config/hypr/scripts/wlogout.sh
+```
 
