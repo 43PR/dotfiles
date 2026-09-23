@@ -314,7 +314,7 @@ success "Permissions configured."
 # --------------------------------------------------
 
 info "Updating Config..."
-sed -i 's/rp34/$USER/g' $HOME/.config/wlogout/style.css
+sed -i "s/rp34/$USER/g" "$HOME/.config/wlogout/style.css"
 
 # --------------------------------------------------
 # Finish
