@@ -9,7 +9,7 @@
 Latest updates: Settings Storage (dependencies: ncdu) 
 ```
 
-**[Keybinds](#add-keybinds) - [Autostart](#autostart) - [Allow Quickshell to read RAM speed](#allow-quickshell-to-read-ram-speed) - [Change your default shell to Zsh](#change-your-default-shell-to-zsh)**
+**[Keybinds](#add-keybinds) - [Autostart](#autostart) - [Allow Quickshell to read RAM speed](#allow-quickshell-to-read-ram-speed) - [Change your default shell to Zsh](#change-your-default-shell-to-zsh) - [Troubleshooting](#troubleshooting)**
 
 
 ## Update quickshell settings menu & wallpaper picker
