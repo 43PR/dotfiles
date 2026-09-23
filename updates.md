@@ -3,9 +3,9 @@
 > 
 > Monitors page still needs some work 
 > 
-> All programs: [packages.txt](packages.txt)
+> **All programs: [packages.txt](packages.txt)**
 >
-> > All keybinds: [.config/hypr/keybinds.lua](.config/hypr/keybinds.lua)
+> **All keybinds: [.config/hypr/keybinds.lua](.config/hypr/keybinds.lua)**
 
 ### [Keybinds](#add-keybinds) - [Autostart](#autostart) - [Wlogout](#wlogout) - [Spicetify](#spicetify)
 
