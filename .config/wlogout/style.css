@@ -1,4 +1,4 @@
-/* bind = $mod, Escape, exec, wlogout -b 1 -c 20 -r 20 -L 1700 -R 1700 -T 325 -B 325 */
+/* bind = $mod, Grave, exec, ~/.config/hypr/scripts/wlogout.sh (see script for dynamic margins) */
 * { 
     background-image: none;
     box-shadow: none;
