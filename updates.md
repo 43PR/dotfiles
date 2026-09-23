@@ -3,13 +3,11 @@
 > 
 > Monitors page still needs some work 
 > 
-> All programs: [packages.txt](packages.txt)
+> **All programs: [packages.txt](packages.txt)**
+>
+> **All keybinds: [.config/hypr/keybinds.lua](.config/hypr/keybinds.lua)**
 
-```text
-Latest updates: Settings Storage (dependencies: ncdu) 
-```
-
-**[Keybinds](#add-keybinds) - [Autostart](#autostart) - [Allow Quickshell to read RAM speed](#allow-quickshell-to-read-ram-speed) - [Change your default shell to Zsh](#change-your-default-shell-to-zsh)**
+### [Keybinds](#add-keybinds) - [Autostart](#autostart) - [Wlogout](#wlogout) - [Spicetify](#spicetify)
 
 
 ## Update quickshell settings menu & wallpaper picker
@@ -98,9 +96,19 @@ chsh -s /bin/zsh
 
 Log out and back in for the change to take effect.
 
-## Troubleshooting
+## Spicetify 
 
-### Wlogout (Logout menu)
+https://youtu.be/Y3i96F1-E_Q
+
+Copy paste the spicetify folder to: (.config)
+
+```bash
+nano ~/.config/wlogout/style.css
+```
+
+Edit the file and replace rp34 with your username:  /home/rp34/.config/spotify/prefs
+
+### Wlogout
 
 Run:
 
