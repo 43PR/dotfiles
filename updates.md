@@ -102,7 +102,7 @@ Log out and back in for the change to take effect.
 
 https://youtu.be/Y3i96F1-E_Q
 
-Copy paste the spicetify folder o (.config)
+Copy paste the spicetify folder to: (.config)
 
 ```bash
 nano ~/.config/wlogout/style.css
