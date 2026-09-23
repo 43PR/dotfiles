@@ -5,7 +5,7 @@
 > 
 > All programs: [packages.txt](packages.txt)
 
-**[Keybinds](#add-keybinds) - [Autostart](#autostart) - [Wlogout](#wlogout) - [Spicetify](#spicetify)* - [Allow Quickshell to read RAM speed](#allow-quickshell-to-read-ram-speed) - [Change your default shell to Zsh](#change-your-default-shell-to-zsh)*
+### [Keybinds](#add-keybinds) - [Autostart](#autostart) - [Wlogout](#wlogout) - [Spicetify](#spicetify)
 
 
 ## Update quickshell settings menu & wallpaper picker
