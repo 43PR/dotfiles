@@ -9,7 +9,7 @@ Simple Hyprland setup focused on practical keybinds, productivity and easy to cu
 ### [Recent Updates & Troubleshooting](updates.md)
 
 ```bash
-Planning: > Quickshell menu: Finish display page > Add input page (mouse and keyboard) > Update wallpaper picker, wlogout > Create a release?
+Planning: > Quickshell menu: Finish display page (screen res & monitor mode) > Add input page (mouse and keyboard) > Update quickshell menu & wallpaper picker, wlogout > Create a release?
 ```
 
 ### **[Features](#features)  -  [Keybinds](#most-used-keybinds)  -  [Installation](#installation)  -  [Support](#support)**
