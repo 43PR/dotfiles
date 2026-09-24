@@ -11,8 +11,21 @@
     "keybind" : "r"
 }
 {
+    "label" : "suspend",
+    "action" : "systemctl suspend",
+    "text" : "Z",
+    "keybind" : "z"
+}
+{
     "label" : "logout",
-    "action": "hyprctl dispatch 'hl.dsp.exit()'",
+    "action" : "hyprctl dispatch 'hl.dsp.exit()'",
     "text" : "E",
     "keybind" : "e"
 }
+{
+    "label" : "hibernate",
+    "action" : "systemctl hibernate",
+    "text" : "H",
+    "keybind" : "h"
+}
+

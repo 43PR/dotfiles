@@ -82,3 +82,4 @@ pgrep -x wlogout >/dev/null && exit 0
 exec wlogout -b "$PER_ROW" -c "$COL_SPACING" -r "$ROW_SPACING" \
     -L "$L" -R "$R" -T "$T" -B "$B" \
     -l "$LAYOUT" -C "$CSS"
+
