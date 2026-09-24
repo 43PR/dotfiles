@@ -11,7 +11,7 @@
 
 ## Features added
 
-* Quickshell hover border: Hyprlock, Settings, Apps launcher, Wallpaper picker, Logout menu
+* Hover border to open/run: Hyprlock, Settings, Apps launcher, Wallpaper picker, Logout menu (Quickshell)
 * Settings menu: System, Audio, Display, Network, Bluetooth, Storage, Configs (I tried to add most important stats and controls)
 
 ## Update quickshell settings menu & wallpaper picker
