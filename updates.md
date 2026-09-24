@@ -1,8 +1,6 @@
 > [!note]
 > Work in progress 
 > 
-> Monitors page still needs some work 
-> 
 > **All programs: [packages.txt](packages.txt)**
 >
 > **All keybinds: [.config/hypr/keybinds.lua](.config/hypr/keybinds.lua)**
