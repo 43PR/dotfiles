@@ -16,7 +16,7 @@ Planning: > Update Quickshell settings > Add Appearance, Keybinds, Configs Page 
 
 </div>
 
-https://github.com/user-attachments/assets/00b6b5de-93f6-4178-9ebb-ac608b1ad05e
+https://github.com/user-attachments/assets/3c746b34-94e9-4186-bfa0-00fc68e2c32f
 
 ![](Wallpapers/Showcase/9.png)
 ![](Wallpapers/Showcase/4.png)
