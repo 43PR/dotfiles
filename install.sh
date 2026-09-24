@@ -299,15 +299,14 @@ fi
 # Permissions
 # --------------------------------------------------
 
-info "Setting executable permissions on scripts..."
+info "Setting executable permissions on shell scripts..."
 
-if [[ -d "$CONFIG_DIR/hypr/scripts" ]]; then
-    find "$CONFIG_DIR/hypr/scripts" \
-        -type f \
-        -exec chmod +x {} \;
-fi
+find "$CONFIG_DIR" \
+    -type f \
+    -name "*.sh" \
+    -exec chmod +x {} \;
 
-success "Permissions configured."
+success "Shell script permissions configured."
 
 # --------------------------------------------------
 # Config Update (Set to current user)

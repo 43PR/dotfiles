@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell
 import Quickshell.Io
 import "../"
 
@@ -6,24 +7,22 @@ Item {
     id: page
 
     property var monitors: []
-    property int rightMargin: 36
+    property int rightMargin: 50
     property real brightnessValue: 0.6
     property real nightlightValue: 0.5
     property bool nightlightEnabled: false
-    property string monitorSequence: ""
-    property int monitorStep: 0
+    property real sliderMarginRight: 10
+    property real labelWidth: 96
 
     Process {
         id: brightnessGet
         command: ["brightnessctl", "-m"]
-
         stdout: StdioCollector {
             onStreamFinished: {
                 const parts = text.trim().split(",")
                 if (parts.length >= 4) {
                     const pct = parseInt(parts[3])
-                    if (!isNaN(pct))
-                        page.brightnessValue = pct / 100
+                    if (!isNaN(pct)) page.brightnessValue = pct / 100
                 }
             }
         }
@@ -32,37 +31,27 @@ Item {
     Process { id: brightnessSet }
 
     function commitBrightness(value) {
-        brightnessSet.command = [
-            "brightnessctl",
-            "set",
-            Math.round(value * 100) + "%"
-        ]
+        const pct = Math.round(value * 100) + "%"
+        brightnessSet.command = ["brightnessctl", "set", pct]
         brightnessSet.running = true
     }
 
     Process { id: nightlightProcess }
 
-    function nightlightTemperature(value) {
-        return Math.round(2500 + value * 4000)
-    }
+    function nightlightTemperature(value) { return Math.round(2500 + value * 4000) }
 
     function startNightlight(value, delay) {
+        const temp = nightlightTemperature(value)
         nightlightProcess.command = [
-            "sh",
-            "-c",
+            "sh", "-c",
             "pkill -x gammastep 2>/dev/null; " +
             "sleep " + delay + "; " +
-            "nohup gammastep -O " +
-            nightlightTemperature(value) +
-            " >/dev/null 2>&1 &"
+            "nohup gammastep -O " + temp + " >/dev/null 2>&1 &"
         ]
         nightlightProcess.running = true
     }
 
-    function nightlightOn() {
-        nightlightEnabled = true
-        startNightlight(nightlightValue, "0.05")
-    }
+    function nightlightOn() { nightlightEnabled = true; startNightlight(nightlightValue, "0.05") }
 
     function nightlightOff() {
         nightlightEnabled = false
@@ -72,65 +61,50 @@ Item {
 
     function commitNightlight(value) {
         nightlightValue = value
-        if (nightlightEnabled)
-            startNightlight(value, "0.03")
+        nightlightSaveTimer.restart()
+        if (nightlightEnabled) startNightlight(value, "0.03")
     }
 
-    function isInternalMonitor(mon) {
-        return mon.name.indexOf("eDP") === 0 ||
-               mon.name.indexOf("LVDS") === 0
+    FileView {
+        id: nightlightFile
+        path: Quickshell.dataDir + "/nightlight.json"
+        blockLoading: true
     }
 
-    function findMonitors() {
-        let internal = null
-        let external = null
+    function loadNightlight() {
+        try {
+            const saved = JSON.parse(nightlightFile.text())
+            if (typeof saved.value === "number") nightlightValue = saved.value
+        } catch (error) {}
+    }
 
-        for (const mon of monitors) {
-            if (isInternalMonitor(mon))
-                internal = mon
-            else if (!external)
-                external = mon
+    Timer {
+        id: nightlightSaveTimer
+        interval: 300
+        onTriggered: {
+            nightlightFile.setText(JSON.stringify({ value: page.nightlightValue }))
         }
-
-        return { internal, external }
     }
 
-    function monitorMode(mon) {
-        return mon.width + "x" +
-               mon.height + "@" +
-               mon.refreshRate.toFixed(2)
+    Process {
+        id: nightlightCheck
+        command: ["pgrep", "-x", "gammastep"]
+        onExited: exitCode => {
+            page.nightlightEnabled = exitCode === 0
+        }
     }
 
-    function luaString(value) {
-        return String(value)
-            .replace(/\\/g, "\\\\")
-            .replace(/"/g, "\\\"")
-    }
+    function monitorMode(mon) { return mon.width + "x" + mon.height + "@" + mon.refreshRate.toFixed(2) }
+
+    function luaString(value) { return String(value).replace(/\\/g, "\\\\").replace(/"/g, "\\\"") }
 
     function monitorLua(mon, options = {}) {
-        const values = [
-            "output = \"" + luaString(mon.name) + "\""
-        ]
-
-        if (options.mode !== undefined)
-            values.push("mode = \"" + luaString(options.mode) + "\"")
-
-        if (options.position !== undefined)
-            values.push("position = \"" + luaString(options.position) + "\"")
-
-        if (options.scale !== undefined)
-            values.push("scale = " + options.scale)
-
-        if (options.disabled !== undefined)
-            values.push("disabled = " + options.disabled)
-
-        if (options.mirrorOf !== undefined)
-            values.push(
-                "mirrorOf = \"" +
-                luaString(options.mirrorOf) +
-                "\""
-            )
-
+        const values = ["output = \"" + luaString(mon.name) + "\""]
+        if (options.mode !== undefined) values.push("mode = \"" + luaString(options.mode) + "\"")
+        if (options.position !== undefined) values.push("position = \"" + luaString(options.position) + "\"")
+        if (options.scale !== undefined) values.push("scale = " + options.scale)
+        if (options.disabled !== undefined) values.push("disabled = " + options.disabled)
+        if (options.mirrorOf !== undefined) values.push("mirrorOf = \"" + luaString(options.mirrorOf) + "\"")
         return "hl.monitor({" + values.join(",") + "})"
     }
 
@@ -138,7 +112,6 @@ Item {
         id: pList
         command: ["hyprctl", "monitors", "-j"]
         running: true
-
         stdout: StdioCollector {
             onStreamFinished: {
                 try {
@@ -148,464 +121,311 @@ Item {
                 }
             }
         }
+        stderr: StdioCollector {
+            onStreamFinished: {}
+        }
     }
 
     function refresh() {
         pList.running = true
     }
 
-    Process { id: pApply }
+    Process {
+        id: pApply
+        property var pendingMon: null
 
-    function setScale(mon, scale) {
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const out = text.trim()
+                if (out.length === 0) return
+
+                const match = out.match(/using suggested scale:\s*([\d.]+)/i)
+                if (match && pApply.pendingMon) {
+                    const suggested = parseFloat(match[1])
+                    page.setScale(pApply.pendingMon, suggested, true)
+                }
+            }
+        }
+        stderr: StdioCollector {
+            onStreamFinished: {}
+        }
+        onExited: exitCode => {
+            refreshTimer.restart()
+        }
+    }
+
+    function gcd(a, b) { while (b) { [a, b] = [b, a % b] }; return a }
+
+    function validScale(mon, requested) {
+        const width = mon.width
+        const height = mon.height
+        let best = requested
+        let bestDistance = Infinity
+
+        for (let i = 84; i <= 1560; i++) {
+            const scale = i / 120
+            if (scale < 0.7 || scale > 1.3) continue
+
+            const logicalWidth = width / scale
+            const logicalHeight = height / scale
+
+            if (Math.abs(logicalWidth - Math.round(logicalWidth)) < 0.0001 &&
+                Math.abs(logicalHeight - Math.round(logicalHeight)) < 0.0001) {
+                const distance = Math.abs(scale - requested)
+                if (distance < bestDistance) {
+                    best = scale
+                    bestDistance = distance
+                }
+            }
+        }
+
+        return best
+    }
+
+    function setScale(mon, scale, isRetry = false) {
+        const requested = scale
+        const applied = isRetry ? scale : validScale(mon, requested)
+
+        const idx = page.monitors.findIndex(m => m.name === mon.name)
+        if (idx !== -1) {
+            const updated = page.monitors.slice()
+            updated[idx] = Object.assign({}, updated[idx], { scale: applied })
+            page.monitors = updated
+        }
+
+        pApply.pendingMon = mon
         pApply.command = [
-            "hyprctl",
-            "eval",
-            monitorLua(mon, {
-                mode: monitorMode(mon),
-                position: mon.x + "x" + mon.y,
-                scale: scale.toFixed(2)
-            })
+            "hyprctl", "eval",
+            monitorLua(mon, { mode: monitorMode(mon), position: mon.x + "x" + mon.y, scale: applied })
         ]
         pApply.running = true
     }
 
     Process {
-        id: pMode
-
-        onExited: {
+        id: pResolution
+        stdout: StdioCollector {
+            onStreamFinished: {}
+        }
+        stderr: StdioCollector {
+            onStreamFinished: {}
+        }
+        onExited: exitCode => {
             refreshTimer.restart()
         }
     }
 
-    Timer {
-        id: refreshTimer
-        interval: 250
-
-        onTriggered: page.refresh()
-    }
-
-    function runMonitorLua(lua) {
-        pMode.command = ["hyprctl", "eval", lua]
-        pMode.running = true
-    }
-
-    function applyMonitorMode(mode) {
-        if (monitors.length === 0) {
-            refresh()
+    function setResolution(mon, resolution) {
+        if (!mon || !mon.name || !resolution) {
             return
         }
-
-        const { internal, external } = findMonitors()
-
-        if (!internal || !external)
-            return
-
-        monitorSequence = mode
-        monitorStep = 0
-
-        if (mode === "first") {
-            runMonitorLua(monitorLua(internal, {
-                mode: monitorMode(internal),
-                position: "0x0",
-                scale: internal.scale
-            }))
-        } else if (mode === "second") {
-            runMonitorLua(monitorLua(external, {
-                mode: monitorMode(external),
-                position: "0x0",
-                scale: external.scale
-            }))
-        } else if (mode === "extend") {
-            runMonitorLua(monitorLua(external, {
-                mode: monitorMode(external),
-                position: "0x0",
-                scale: external.scale
-            }))
-        } else if (mode === "duplicate") {
-            runMonitorLua(monitorLua(internal, {
-                mode: monitorMode(internal),
-                position: "0x0",
-                scale: internal.scale
-            }))
-        } else {
-            return
-        }
-
-        monitorSequenceTimer.restart()
+        const lua = monitorLua(mon, {
+            mode: resolution,
+            position: mon.x + "x" + mon.y,
+            scale: mon.scale !== undefined ? mon.scale : 1
+        })
+        try {
+            pResolution.command = ["hyprctl", "eval", lua]
+            pResolution.running = true
+        } catch (error) {}
     }
 
-    Timer {
-        id: monitorSequenceTimer
-        interval: 100
+    Timer { id: refreshTimer; interval: 250; onTriggered: page.refresh() }
 
-        onTriggered: {
-            const displays = findMonitors()
-            const internal = displays.internal
-            const external = displays.external
+    Process {
+        id: pEditConfig
+        command: ["sh", "-c", "xed ~/.config/hypr/monitors.lua"]
+        onExited: exitCode => {}
+    }
 
-            if (!internal || !external)
-                return
-
-            if (monitorSequence === "first") {
-                if (monitorStep === 0) {
-                    runMonitorLua(monitorLua(external, {
-                        disabled: true
-                    }))
-                    return
-                }
-            }
-
-            if (monitorSequence === "second") {
-                if (monitorStep === 0) {
-                    refresh()
-                    monitorStep = 1
-                    interval = 200
-                    restart()
-                    return
-                }
-
-                if (monitorStep === 1) {
-                    runMonitorLua(monitorLua(external, {
-                        mode: "preferred",
-                        position: "0x0",
-                        scale: "\"auto\""
-                    }))
-                    return
-                }
-            }
-
-            if (monitorSequence === "extend") {
-                if (monitorStep === 0) {
-                    refresh()
-                    monitorStep = 1
-                    interval = 200
-                    restart()
-                    return
-                }
-
-                if (monitorStep === 1) {
-                    runMonitorLua(monitorLua(external, {
-                        mode: monitorMode(external),
-                        position: "0x0",
-                        scale: external.scale
-                    }))
-                    monitorStep = 2
-                    interval = 100
-                    restart()
-                    return
-                }
-
-                if (monitorStep === 2) {
-                    refresh()
-                    monitorStep = 3
-                    interval = 200
-                    restart()
-                    return
-                }
-
-                if (monitorStep === 3) {
-                    runMonitorLua(monitorLua(internal, {
-                        mode: monitorMode(internal),
-                        position: external.width + "x0",
-                        scale: internal.scale
-                    }))
-                    return
-                }
-            }
-
-            if (monitorSequence === "duplicate") {
-                if (monitorStep === 0) {
-                    refresh()
-                    monitorStep = 1
-                    interval = 200
-                    restart()
-                    return
-                }
-
-                if (monitorStep === 1) {
-                    runMonitorLua(monitorLua(external, {
-                        mode: monitorMode(internal),
-                        position: "0x0",
-                        scale: external.scale,
-                        mirrorOf: internal.name
-                    }))
-                }
-            }
-
-            interval = 100
+    function editConfig() {
+        if (pEditConfig.running) {
+            return
         }
+        pEditConfig.running = true
     }
 
     Column {
-        anchors {
-            left: parent.left
-            right: parent.right
-            rightMargin: page.rightMargin
-            top: parent.top
-            bottom: parent.bottom
-        }
+        anchors { left: parent.left; right: parent.right; rightMargin: page.rightMargin; top: parent.top; bottom: parent.bottom }
         spacing: 9
 
         Row {
-            width: parent.width
-            height: 36
+            width: parent.width; height: 36
 
             Text {
-                text: "DISPLAY"
-                color: Theme.text
-                font.family: Theme.fontFamily
-                font.pixelSize: 19
-                font.letterSpacing: 3
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.verticalCenterOffset: -6
+                text: "DISPLAY"; color: Theme.text
+                font.family: Theme.fontFamily; font.pixelSize: 19; font.letterSpacing: 3
+                anchors.verticalCenter: parent.verticalCenter; anchors.verticalCenterOffset: -6
             }
 
-            Item {
-                width: parent.width - 150
-                height: 1
-            }
+            Item { width: parent.width - 150; height: 1 }
+        }
 
-            Text {
-                text: "󰑐"
-                color: Theme.accent
-                font.family: Theme.fontFamily
-                font.pixelSize: 22
+        Rectangle { width: parent.width; height: 1; color: Theme.border }
 
-                MouseArea {
-                    anchors.fill: parent
-                    onClicked: page.refresh()
+        Row {
+            width: parent.width; height: 38; spacing: 8
+
+            Rectangle {
+                width: 28; height: 28; radius: Theme.radius; anchors.verticalCenter: parent.verticalCenter
+                color: Theme.alpha(Theme.accent2, 0.10); border.width: 1; border.color: Theme.border
+                Text {
+                    anchors.centerIn: parent; text: "\uf185"; color: Theme.accent2
+                    font.family: Theme.iconFont; font.pixelSize: 12
                 }
             }
-        }
-
-        Rectangle {
-            width: parent.width
-            height: 1
-            color: Theme.border
-        }
-
-        Column {
-            width: parent.width
-            spacing: 10
 
             Text {
-                text: "MONITOR MODE"
-                color: Theme.text
-                font.family: Theme.fontFamily
-                font.pixelSize: 15
-                font.bold: true
-                font.letterSpacing: 2
+                width: page.labelWidth; anchors.verticalCenter: parent.verticalCenter
+                text: "BRIGHTNESS"; color: Theme.text
+                font.family: Theme.fontFamily; font.pixelSize: 15
             }
-
-            Row {
-                width: parent.width
-                spacing: 10
-
-                Repeater {
-                    model: [
-                        { name: "FIRST", mode: "first" },
-                        { name: "SECOND", mode: "second" },
-                        { name: "EXTEND", mode: "extend" },
-                        { name: "DUPLICATE", mode: "duplicate" }
-                    ]
-
-                    delegate: Rectangle {
-                        required property var modelData
-
-                        width: (parent.width - parent.spacing * 3) / 4
-                        height: 42
-                        radius: Theme.radius
-                        color: "#00000000"
-                        border.width: 1
-                        border.color: Theme.border
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: modelData.name
-                            color: Theme.text
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 10
-                            font.bold: true
-                            font.letterSpacing: 1
-                        }
-
-                        MouseArea {
-                            anchors.fill: parent
-                            hoverEnabled: true
-
-                            onEntered: {
-                                parent.color = Theme.alpha(
-                                    Theme.accent,
-                                    0.08
-                                )
-                                parent.border.color = Theme.accent
-                            }
-
-                            onExited: {
-                                parent.color = "#00000000"
-                                parent.border.color = Theme.border
-                            }
-
-                            onClicked: page.applyMonitorMode(
-                                modelData.mode
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        Item {
-            width: parent.width
-            height: 58
 
             Slider {
-                anchors.fill: parent
-                label: "BRIGHTNESS"
-                icon: "\uf185"
-                value: page.brightnessValue
-                accentColor: Theme.accent2
-
-                onCommitted: value =>
-                    page.commitBrightness(value)
+                width: parent.width - 28 - page.labelWidth - 16 - page.sliderMarginRight
+                height: 72; anchors.verticalCenter: parent.verticalCenter
+                label: ""; icon: ""; value: page.brightnessValue; accentColor: Theme.accent2
+                onCommitted: value => page.commitBrightness(value)
             }
         }
 
-        Item {
-            width: parent.width
-            height: 58
-            property int controlMargin: 25
+        Row {
+            width: parent.width; height: 38; spacing: 10
 
-            Row {
-                anchors.fill: parent
-                spacing: parent.controlMargin
-
-                Slider {
-                    width: parent.width - 70 - parent.spacing
-                    height: parent.height
-                    label: "NIGHT LIGHT"
-                    icon: "\uf186"
-                    value: page.nightlightValue
-                    accentColor: "#ffffff"
-
-                    onMoved: value =>
-                        page.commitNightlight(value)
+            Rectangle {
+                width: 28; height: 28; radius: Theme.radius; anchors.verticalCenter: parent.verticalCenter
+                color: page.nightlightEnabled ? Theme.alpha(Theme.accent, 0.10) : Theme.alpha("#A0A0A0", 0.15)
+                border.width: 1; border.color: page.nightlightEnabled ? Theme.accent : Theme.border
+                Text {
+                    anchors.centerIn: parent; text: "\uf186"
+                    color: page.nightlightEnabled ? Theme.accent : "#A0A0A0"
+                    font.family: Theme.iconFont; font.pixelSize: 12
                 }
-
-                Rectangle {
-                    width: 70
-                    height: 36
-                    radius: Theme.radius
-                    anchors.verticalCenter: parent.verticalCenter
-
-                    color: page.nightlightEnabled
-                        ? Theme.alpha(Theme.accent, 0.1)
-                        : Theme.alpha("#A0A0A0", 0.15)
-
-                    border.width: 1
-                    border.color: page.nightlightEnabled
-                        ? Theme.accent
-                        : "#A0A0A0"
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: page.nightlightEnabled ? "ON" : "OFF"
-                        color: page.nightlightEnabled
-                            ? Theme.accent
-                            : "#A0A0A0"
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 10
-                        font.bold: true
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-
-                        onClicked: page.nightlightEnabled
-                            ? page.nightlightOff()
-                            : page.nightlightOn()
-                    }
+                MouseArea {
+                    anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                    onClicked: page.nightlightEnabled ? page.nightlightOff() : page.nightlightOn()
                 }
+            }
+
+            Text {
+                width: page.labelWidth; anchors.verticalCenter: parent.verticalCenter
+                text: "NIGHTLIGHT"; color: page.nightlightEnabled ? Theme.text : Theme.text
+                font.family: Theme.fontFamily; font.pixelSize: 15
+            }
+
+            Slider {
+                width: parent.width - 28 - page.labelWidth - 16 - page.sliderMarginRight
+                height: 72; anchors.verticalCenter: parent.verticalCenter
+                label: ""; icon: ""; value: page.nightlightValue; accentColor: "#ffffff"
+                onMoved: value => page.commitNightlight(value)
             }
         }
 
         Column {
-            width: parent.width
-            spacing: 16
+            width: parent.width; spacing: 16
 
             Repeater {
                 model: page.monitors
 
                 delegate: Rectangle {
                     required property var modelData
-
-                    width: parent.width
-                    height: 100
-                    radius: Theme.radius
-                    color: "#00000000"
-                    border.width: 1
-                    border.color: modelData.focused
-                        ? "#454545"
-                        : Theme.border
+                    width: parent.width; height: 100; radius: Theme.radius
+                    color: "#00000000"; border.width: 1
+                    border.color: modelData.focused ? "#454545" : Theme.border
 
                     Column {
                         anchors.fill: parent
                         anchors.margins: 14
                         spacing: 8
-
                         Row {
                             spacing: 10
 
                             Text {
-                                text: modelData.name
-                                color: Theme.text
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 14
-                                font.bold: true
+                                text: modelData.name; color: Theme.text
+                                font.family: Theme.fontFamily; font.pixelSize: 14; font.bold: true
                             }
 
                             Text {
-                                text: modelData.width +
-                                      "x" +
-                                      modelData.height +
-                                      " @ " +
-                                      Math.round(
-                                          modelData.refreshRate
-                                      ) +
-                                      "Hz"
-
-                                color: Theme.textDim
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 12
+                                text: modelData.width + "x" + modelData.height + " @ " + Math.round(modelData.refreshRate) + "Hz"
+                                color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: 12
                             }
 
                             Text {
-                                visible: modelData.focused
-                                text: "ACTIVE"
-                                color: Theme.accent2
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 10
+                                visible: modelData.focused; text: "ACTIVE"; color: Theme.accent2
+                                font.family: Theme.fontFamily; font.pixelSize: 10
                             }
                         }
 
-                        Slider {
+                        Item {
                             width: parent.width
+                            height: scaleLabel.implicitHeight
+                            Text {
+                                id: scaleLabel
+                                anchors.left: parent.left
+                                text: "SCALE"
+                                color: Theme.textDim
+                                font.family: Theme.fontFamily; font.pixelSize: 11
+                                }
+                            Text {
+                                anchors.right: parent.right
+                                text: modelData.scale.toFixed(2) + "x"
+                                color: Theme.text
+                                font.family: Theme.fontFamily; font.pixelSize: 11
+                                }
+                            }
+                            Slider {
+                                width: parent.width
+                                icon: "\uf00e"
+                                value: Math.max(0, Math.min(1, (modelData.scale - 0.7) / 0.6))
+                                onCommitted: value => page.setScale(modelData, 0.7 + value * 0.6)
+                        }
+                    }
+                }
+            }
+        }
 
-                            label: "SCALE (" +
-                                   modelData.scale.toFixed(2) +
-                                   "x)"
+        Column {
+            width: parent.width; spacing: 10
+            topPadding: 6
+            bottomPadding: 6
 
-                            icon: "\uf00e"
+            Text {
+                text: "RESOLUTION"; color: Theme.text
+                font.family: Theme.fontFamily; font.pixelSize: 15; font.bold: true; font.letterSpacing: 2
+            }
 
-                            value: (
-                                modelData.scale - 0.5
-                            ) / 1.5
+            Row {
+                width: parent.width; spacing: 10
+                topPadding: 6
+                bottomPadding: 6
+                Repeater {
+                    model: [
+                        "1920x1080",
+                        "2560x1440",
+                        "3840x2160",
+                        "1280x720"
+                    ]
 
-                            onCommitted: value =>
-                                page.setScale(
-                                    modelData,
-                                    0.5 + value * 1.5
-                                )
+                    delegate: Rectangle {
+                        required property string modelData
+                        width: (parent.width - parent.spacing * 3) / 4; height: 42; radius: Theme.radius
+                        color: "#00000000"; border.width: 1; border.color: Theme.border
+
+                        Text {
+                            anchors.centerIn: parent; text: modelData; color: Theme.text
+                            font.family: Theme.fontFamily; font.pixelSize: 12; font.bold: true; font.letterSpacing: 1
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent; hoverEnabled: true
+                            onEntered: { parent.color = Theme.alpha(Theme.accent, 0.08); parent.border.color = Theme.accent }
+                            onExited: { parent.color = "#00000000"; parent.border.color = Theme.border }
+                            onClicked: {
+                                if (page.monitors.length === 0) {
+                                    page.refresh()
+                                    return
+                                }
+                                page.setResolution(page.monitors[0], modelData + "@60")
+                            }
                         }
                     }
                 }
@@ -613,5 +433,9 @@ Item {
         }
     }
 
-    Component.onCompleted: brightnessGet.running = true
+    Component.onCompleted: {
+        brightnessGet.running = true
+        loadNightlight()
+        nightlightCheck.running = true
+    }
 }

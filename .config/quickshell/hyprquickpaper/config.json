@@ -2,6 +2,6 @@
     "wallpaper_path": "$HOME/Pictures/Wallpapers/",
     "cache_path": "$HOME/.cache/quickshell/thumbs/",
     "number_of_pictures": 10,
-    "border_color": "#80FFFFFF",
+    "border_color": "transparent",
     "cache_batch_size": 20
 }

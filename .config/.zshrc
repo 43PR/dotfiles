@@ -32,6 +32,20 @@ zstyle ':completion:*' list-colors \
 # Autosuggestions — dark gray
 ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=8'
 
+# --------------------------------------------------
+# History
+# --------------------------------------------------
+
+HISTFILE="$HOME/.zsh_history"
+HISTSIZE=10000
+SAVEHIST=10000
+
+setopt APPEND_HISTORY
+setopt SHARE_HISTORY
+setopt HIST_IGNORE_DUPS
+setopt HIST_IGNORE_SPACE
+setopt HIST_REDUCE_BLANKS
+
 source /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh
 
 # Syntax highlighting

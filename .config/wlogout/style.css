@@ -1,12 +1,12 @@
 /* bind = $mod, Grave, exec, ~/.config/hypr/scripts/wlogout.sh (see script for dynamic margins) */
-* { 
+* {
     background-image: none;
     box-shadow: none;
     font-size: 0px;
 }
 
 window {
-    background-color: rgba(12, 12, 12, 0.3);
+    background-color: rgba(12, 12, 12, 0.2);
 }
 
 button {
@@ -14,9 +14,9 @@ button {
 
     min-width: 100px;
     min-height: 100px;
-
-    border-radius: 100px;
-    border: 1px solid transparent;
+    padding: 0;
+    border-radius: 50%;
+    border: 0;
 
     color: #FFFFFF;
     background-color: rgba(12, 12, 12, 0.4);
@@ -25,17 +25,44 @@ button {
     background-position: center;
     background-size: 20%;
 
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
 
     transition: all 0.2s ease;
 }
 
-button:hover,
-button:focus,
-button:active {
+/* Mouse hover: only the button under the cursor lights up */
+button:hover {
     background-color: rgba(255, 255, 255, 0.12);
     box-shadow: 0 10px 24px rgba(0, 0, 0, 0.6);
+}
+
+/* Mouse press feedback */
+button:active {
+    background-color: rgba(255, 255, 255, 0.18);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+button:focus:not(:hover) {
     outline: none;
+    animation: focus-ring-fade 3s ease-out forwards;
+}
+
+@keyframes focus-ring-fade {
+    0% {
+        box-shadow:
+            0 0 0 3px rgba(255, 255, 255, 0.85),
+            0 6px 18px rgba(0, 0, 0, 0.4);
+    }
+    60% {
+        box-shadow:
+            0 0 0 3px rgba(255, 255, 255, 0.85),
+            0 6px 18px rgba(0, 0, 0, 0.4);
+    }
+    100% {
+        box-shadow:
+            0 0 0 0 rgba(255, 255, 255, 0),
+            0 6px 18px rgba(0, 0, 0, 0.4);
+    }
 }
 
 #shutdown {
@@ -50,3 +77,10 @@ button:active {
     background-image: url("/home/rp34/.config/wlogout/icons/logout.png");
 }
 
+#suspend {
+    background-image: url("/home/rp34/.config/wlogout/icons/suspend.png");
+}
+
+#hibernate {
+    background-image: url("/home/rp34/.config/wlogout/icons/hibernate.png");
+}
