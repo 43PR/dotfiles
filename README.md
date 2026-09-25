@@ -21,6 +21,7 @@ New discrod server for help, discussions, showcases, tips/ideas
 https://github.com/user-attachments/assets/c332e894-b357-44db-aa38-a4b0bdd1e2cc
 
 ![](Wallpapers/Showcase/9.png)
+![](Wallpapers/Showcase/hover-areas.png)
 ![](Wallpapers/Showcase/4.png)
 ![](Wallpapers/Showcase/2.png)
 
