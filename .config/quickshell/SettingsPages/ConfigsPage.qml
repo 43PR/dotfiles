@@ -1,6 +1,6 @@
 import QtQuick
 import QtQuick.Controls
-import Quickshell.Io
+import Quickshell
 import "../"
 
 Item {
@@ -14,14 +14,10 @@ Item {
     property real sectionSpacing: 6
 
     function editConfig(path) {
-        const proc = Qt.createQmlObject(`
-            import Quickshell.Io
-            Process {
-                command: ["sh", "-c", "xed " + ${JSON.stringify(path)}]
-            }
-        `, page)
-
-        proc.running = true
+        Quickshell.execDetached([
+            "xed",
+            path.replace(/^~/, Quickshell.env("HOME"))
+        ])
     }
 
     component ConfigButton: Rectangle {
@@ -31,7 +27,7 @@ Item {
         width: parent.width
         height: 42
         radius: Theme.radius
-        color: '#00000000'
+        color: "#00000000"
         border.width: 1
         border.color: Theme.border
 
@@ -39,7 +35,6 @@ Item {
             anchors.left: parent.left
             anchors.leftMargin: 14
             anchors.verticalCenter: parent.verticalCenter
-
             text: label
             color: Theme.textDim
             font.family: Theme.fontFamily
@@ -52,7 +47,6 @@ Item {
             anchors.right: parent.right
             anchors.rightMargin: 14
             anchors.verticalCenter: parent.verticalCenter
-
             spacing: 8
 
             Text {
@@ -94,17 +88,14 @@ Item {
 
     Flickable {
         id: flick
-
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.bottom: parent.bottom
-
         anchors.leftMargin: page.marginLeft
         anchors.rightMargin: page.marginRight
         anchors.topMargin: page.marginTop
         anchors.bottomMargin: page.marginBottom
-
         contentWidth: width
         contentHeight: content.height
         clip: true
@@ -126,7 +117,6 @@ Item {
 
         Column {
             id: content
-
             width: flick.width
             spacing: 14
 
@@ -168,6 +158,11 @@ Item {
                 }
 
                 ConfigButton {
+                    label: "MONITORS - WORKSPACES"
+                    path: "~/.config/hypr/monitors.lua"
+                }
+
+                ConfigButton {
                     label: "LOOK AND FEEL"
                     path: "~/.config/hypr/look.lua"
                 }
@@ -183,11 +178,6 @@ Item {
                 }
 
                 ConfigButton {
-                    label: "MONITORS"
-                    path: "~/.config/hypr/monitors.lua"
-                }
-
-                ConfigButton {
                     label: "LOCK SCREEN"
                     path: "~/.config/hypr/hyprlock.conf"
                 }
@@ -196,6 +186,7 @@ Item {
                     label: "APPS LAUNCHER"
                     path: "~/.config/rofi/config.rasi"
                 }
+
                 ConfigButton {
                     label: "SETTINGS THEME"
                     path: "~/.config/quickshell/Theme.qml"

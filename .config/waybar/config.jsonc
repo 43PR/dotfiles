@@ -4,9 +4,9 @@
     "exclusive": true, // "false" 
     "spacing": 0,
 
-    "modules-left": ["cpu", "custom/gpu", "memory", "temperature"],
+    "modules-left": ["cpu", "custom/gpu", "memory", "temperature", "hyprland/workspaces"],
     "modules-center": ["clock"],
-    "modules-right": ["custom/mpris-marquee", "pulseaudio", "custom/power"],
+    "modules-right": ["custom/mpris-marquee", "pulseaudio", "network", "custom/power"],
 
     "cpu": {
         "interval": 1,
@@ -37,6 +37,22 @@
         "tooltip-format": "CPU Temp: {temperatureC}°C",
         "on-click": "~/.config/waybar/scripts/toggle-gammastep"
     },
+
+    "hyprland/workspaces": {
+        "active-only": false,
+        "all-outputs": true,
+
+        "format": "{icon}",
+
+        "format-icons": {
+            "urgent": "",
+            "active": "",
+            "default": ""
+        },
+        "on-scroll-up": "hyprctl dispatch 'hl.dsp.focus({workspace=\"e+1\"})'",
+        "on-scroll-down": "hyprctl dispatch 'hl.dsp.focus({workspace=\"e-1\"})'"
+
+    },
 //  "format": "{:%H:%M}",
     "clock": {
         "format": "{:%H:%M}",
@@ -65,8 +81,16 @@
             "default": ["", "", ""]
         },
         "tooltip": false,
-        "on-click": "pavucontrol",
+        "on-click": "qs ipc call settings sound",
         "on-click-right": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
+    },
+
+    "network": {
+        "format-wifi": "",
+        "format-ethernet": "",
+        "format-disconnected": "󰖪",
+        "tooltip-format": "{ifname}\n{essid}\nSignal: {signalStrength}%",
+        "on-click": "qs ipc call settings network"
     },
 
     "custom/power": {
