@@ -8,7 +8,7 @@ Simple Hyprland setup focused on practical keybinds, productivity and easy to cu
 
 ### [Recent Updates & Troubleshooting](updates.md)
 
-### Join the Discord Community 
+### Join Discord Server 
 
 New discrod server for help, discussions, showcases, tips/ideas
 
