@@ -66,6 +66,8 @@ Just made some tweaks to it. Give it some love: [hyprquickpaper](https://github.
 | `Super + Grave`         | Logout menu               |
 | `Super + Mouse wheel`   | Zoom                      |
 
+> To close wlogout, wallpaper picker, setting menu just click outside or Esc key. Toggle (same keybind to open/close) for app launcher and waybar
+
 > All keybinds: [.config/hypr/keybinds.lua](.config/hypr/keybinds.lua)
 
 ---
