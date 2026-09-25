@@ -85,7 +85,9 @@ hyprmod
 # --------------------------------------------------
 
 ttf-jetbrains-mono-nerd
+ttf-iosevka-nerd
 ttf-font-awesome
+ttf-roboto-mono
 
 # --------------------------------------------------
 # Utilities
