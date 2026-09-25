@@ -70,7 +70,9 @@ Just made some tweaks to it. Give it some love: [hyprquickpaper](https://github.
 | `Super + Shift + W`     | Toggle waybar             |
 | `Super + Tab`           | Lock screen               |
 | `Super + Grave`         | Logout menu               |
-| `Super + Mouse wheel`   | Zoom                      |
+| `Delete`                | Screenshot fullscreen     |
+| `SHIFT + Delete`        | Screenshot area select    |
+| `Super + Mouse wheel`   | Zoom in/out               |
 
 > To close wlogout, wallpaper picker, setting menu just click outside or Esc key. Toggle (same keybind to open/close) for app launcher and waybar
 

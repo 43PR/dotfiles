@@ -7,6 +7,7 @@ import Quickshell
 
 ShellRoot {
     VolumeOsd {}
+    ScreenshotOsd {}
     SettingsWindow {}
     SettingsCornerTrigger {}
 }

@@ -9,71 +9,69 @@ import "SettingsPages"
 PanelWindow {
     id: root
 
-    anchors {
-        top: true
-        left: true
-        right: true
-        bottom: true
-    }
-
+    anchors { top: true; left: true; right: true; bottom: true }
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
 
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: showing
-        ? WlrKeyboardFocus.OnDemand
-        : WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: root.showing ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
+    // Only actually grab input/paint when open - mirrors the OSD's mask trick
+    // so the window is a no-op on the compositor while closed.
     mask: Region {
-        item: showing ? backdrop : null
+        item: root.showing ? backdrop : null
     }
 
     property bool showing: false
 
-    function show() {
-        showing = true
+    function show()   { showing = true }
+    function hide()   { showing = false }
+    function toggle() { showing = !showing }
+
+    // Bind a Hyprland key to this, e.g. in hyprland.conf:
+    //   bind = SUPER, S, exec, qs ipc call settings toggle
+IpcHandler {
+    target: "settings"
+
+    function toggle(): void {
+        root.toggle()
     }
 
-    function hide() {
-        showing = false
+    function show(): void {
+        root.show()
     }
 
-    function toggle() {
-        showing = !showing
+    function hide(): void {
+        root.hide()
     }
 
-    IpcHandler {
-        target: "settings"
-
-        function toggle(): void {
-            root.toggle()
-        }
-
-        function show(): void {
-            root.show()
-        }
-
-        function hide(): void {
-            root.hide()
-        }
+    function sound(): void {
+        root.selectedIndex = 1
+        root.show()
     }
 
-    PwObjectTracker {
-        objects: [Pipewire.defaultAudioSink]
+    function network(): void {
+        root.selectedIndex = 3
+        root.show()
     }
-
+}
+    // -------------------------
+    // PipeWire (for volume)
+    // -------------------------
+    PwObjectTracker { objects: [Pipewire.defaultAudioSink] }
     property var sink: Pipewire.defaultAudioSink
-    property real pwVolume: sink && sink.audio ? sink.audio.volume : 0
-    property bool pwMuted: sink && sink.audio ? sink.audio.muted : false
+    property real pwVolume: (sink && sink.audio) ? sink.audio.volume : 0
+    property bool pwMuted: (sink && sink.audio) ? sink.audio.muted : false
 
+    // -------------------------
+    // Backdrop (click-outside-to-close)
+    // -------------------------
     Rectangle {
         id: backdrop
-
         anchors.fill: parent
-
         color: "transparent"
-        focus: root.showing
 
+        focus: root.showing
         Keys.onEscapePressed: root.hide()
 
         MouseArea {
