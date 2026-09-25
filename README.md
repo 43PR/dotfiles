@@ -8,6 +8,8 @@ Simple Hyprland setup focused on practical keybinds, productivity and easy to cu
 
 ### [Recent Updates & Troubleshooting](updates.md)
 
+#### New discord server hope it helps: https://discord.gg/ajaRkHt8u
+
 ### **[Features](#features)  -  [Keybinds](#most-used-keybinds)  -  [Installation](#installation)  -  [Support](#support)**
 
 </div>
