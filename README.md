@@ -8,7 +8,9 @@ Simple Hyprland setup focused on practical keybinds, productivity and easy to cu
 
 ### [Recent Updates & Troubleshooting](updates.md)
 
-#### New discord server hope it helps: https://discord.gg/ajaRkHt8u
+### 💬 Join the Discord Community 
+
+[![Discord](https://img.shields.io/badge/Discord-Join%20the%20Server-5865F2?logo=discord&logoColor=white)](https://discord.gg/ajaRkHt8u)
 
 ### **[Features](#features)  -  [Keybinds](#most-used-keybinds)  -  [Installation](#installation)  -  [Support](#support)**
 
