@@ -18,6 +18,9 @@ Spicetify — Spotify customization
 
 Wallpaper picker — Python-based wallpaper tool
 
+Forgot to try but you can use PowerShell with Everforest
+(color scheme with focus mode to remove title bar and acrylic
+enabled)
 
 ### Windows Keybinds
 
