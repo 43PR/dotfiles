@@ -193,6 +193,10 @@ Item {
                 }
 
                 ConfigButton {
+                    label: "APPS LAUNCHER"
+                    path: "~/.config/rofi/config.rasi"
+                }
+                ConfigButton {
                     label: "SETTINGS THEME"
                     path: "~/.config/quickshell/Theme.qml"
                 }

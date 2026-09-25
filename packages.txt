@@ -91,6 +91,8 @@ ttf-font-awesome
 # Utilities
 # --------------------------------------------------
 
+dunst
+nm-applet
 curl
 unzip
 gammastep

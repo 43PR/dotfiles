@@ -4,7 +4,7 @@ import QtQuick
 QtObject {
     readonly property color bg: Qt.rgba(0, 0, 0, 0.7)
     readonly property color text: '#ffffff'
-    readonly property color textDim: '#949494'
+    readonly property color textDim: '#c2c2c2'
     readonly property int radius: 3
 
     readonly property color danger: "#ff003c" //red
