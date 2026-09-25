@@ -5,24 +5,24 @@ import QtQuick
 Item {
     id: root
     property int triggerHeight: 10
-    property color triggerColor: '#00000000'
+    property color triggerColor: '#0037ff00'
 
     // Each trigger occupies a fixed % range of the screen width.
     // Ranges are non-overlapping by construction — adjust freely,
     // just keep each "From" >= previous "To".
     property real hyprlockFrom: 0.0
-    property real hyprlockTo: 0.15
+    property real hyprlockTo: 0.01
 
-    property real settingsFrom: 0.17
-    property real settingsTo: 0.35
+    property real settingsFrom: 0.25
+    property real settingsTo: 0.40
 
-    property real rofiFrom: 0.39
-    property real rofiTo: 0.61
+    property real rofiFrom: 0.45
+    property real rofiTo: 0.55
+    
+    property real wallpaperFrom: 0.60
+    property real wallpaperTo: 0.75
 
-    property real wallpaperFrom: 0.65
-    property real wallpaperTo: 0.90
-
-    property real wlogoutFrom: 0.92
+    property real wlogoutFrom: 0.99
     property real wlogoutTo: 1.0
 
     PanelWindow {
