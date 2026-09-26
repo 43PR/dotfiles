@@ -1,17 +1,21 @@
+// Theme.qml
 pragma Singleton
 import QtQuick
 
 QtObject {
+    // Main properties you can tweak
     readonly property color bg: Qt.rgba(0, 0, 0, 0.7)
     readonly property color text: '#ffffff'
     readonly property color textDim: '#c2c2c2'
-    readonly property int radius: 3
+    readonly property int radius: 5
+    readonly property real tiltStrength: 8   
 
-    readonly property color danger: "#ff003c" //red
+    readonly property color danger: "#ff003c" 
     readonly property color accent: '#ffffff'   
     readonly property color accent2: "#ffffff"  
     readonly property color border: '#151515' 
     
+
     readonly property color bgPanel: "#050505"
     readonly property color bgCard: "#0d0d0d"
     readonly property color borderAccent: "#2a2a2a"

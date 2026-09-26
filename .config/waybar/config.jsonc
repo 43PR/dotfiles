@@ -4,19 +4,19 @@
     "exclusive": true, // "false" 
     "spacing": 0,
 
-    "modules-left": ["cpu", "custom/gpu", "memory", "temperature", "hyprland/workspaces"],
+    "modules-left": ["cpu", "custom/gpu", "memory", "hyprland/workspaces"],
     "modules-center": ["clock"],
     "modules-right": ["custom/mpris-marquee", "pulseaudio", "network", "custom/power"],
 
     "cpu": {
         "interval": 1,
-        "format": "CPU {usage}%",
+        "format": "CPU {usage}%"
     },
 
     "memory": {
         "interval": 1,
         "format": "RAM {percentage}%",
-        "tooltip-format": "{used} / {total}GiB",
+        "tooltip-format": "{used} / {total}GiB"
     },
 
     "custom/gpu": {
@@ -27,16 +27,16 @@
         "tooltip-format": "Skylake-H GT2: {}%"
     },
     
-    "temperature": {
-        "hwmon-path": "/sys/class/hwmon/hwmon5/temp1_input",
-        "critical-threshold": 80,
-        "interval": 1,
-        "format": " {temperatureC}°C",
-        "format-critical": " {temperatureC}°C",
-        "tooltip": true,
-        "tooltip-format": "CPU Temp: {temperatureC}°C",
-        "on-click": "~/.config/waybar/scripts/toggle-gammastep"
-    },
+    // "temperature": {
+    //     "hwmon-path": "/sys/class/hwmon/hwmon5/temp1_input",
+    //     "critical-threshold": 80,
+    //     "interval": 1,
+    //     "format": " {temperatureC}°C",
+    //     "format-critical": " {temperatureC}°C",
+    //     "tooltip": true,
+    //     "tooltip-format": "CPU Temp: {temperatureC}°C",
+    //     "on-click": "~/.config/waybar/scripts/toggle-gammastep"
+    // },
 
     "hyprland/workspaces": {
         "active-only": false,
@@ -56,7 +56,7 @@
 //  "format": "{:%H:%M}",
     "clock": {
         "format": "{:%H:%M}",
-        "tooltip-format": "<tt><small>{calendar}</small></tt>",
+        "tooltip-format": "<tt>{calendar}</tt>",
         "calendar": {
             "mode": "month",
             "format": {

@@ -179,7 +179,7 @@ tooltip label {
     transition: font-size 0.15s ease;
     padding: 0 10px;
     margin: 0 2px;
-    font-size: 15px;
+    font-size: 13px;
 }
 #pulseaudio {
     font-size: 13px;

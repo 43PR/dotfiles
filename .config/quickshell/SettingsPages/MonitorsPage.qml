@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 import Quickshell
 import Quickshell.Io
 import "../"
@@ -244,187 +245,216 @@ Item {
         pEditConfig.running = true
     }
 
-    Column {
-        anchors { left: parent.left; right: parent.right; rightMargin: page.rightMargin; top: parent.top; bottom: parent.bottom }
-        spacing: 9
+    Flickable {
+        id: flick
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.rightMargin: page.rightMargin
+        contentWidth: width
+        contentHeight: content.implicitHeight
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
 
-        Row {
-            width: parent.width; height: 36
+        ScrollBar.vertical: ScrollBar {
+            id: scrollBar
 
-            Text {
-                text: "DISPLAY"; color: Theme.text
-                font.family: Theme.fontFamily; font.pixelSize: 19; font.letterSpacing: 3
-                anchors.verticalCenter: parent.verticalCenter; anchors.verticalCenterOffset: -6
+            background: Rectangle {
+                color: "transparent"
+                radius: width / 2
             }
 
-            Item { width: parent.width - 150; height: 1 }
-        }
-
-        Rectangle { width: parent.width; height: 1; color: Theme.border }
-
-        Row {
-            width: parent.width; height: 38; spacing: 8
-
-            Rectangle {
-                width: 28; height: 28; radius: Theme.radius; anchors.verticalCenter: parent.verticalCenter
-                color: Theme.alpha(Theme.accent2, 0.10); border.width: 1; border.color: Theme.border
-                Text {
-                    anchors.centerIn: parent; text: "\uf185"; color: Theme.accent2
-                    font.family: Theme.iconFont; font.pixelSize: 12
-                }
-            }
-
-            Text {
-                width: page.labelWidth; anchors.verticalCenter: parent.verticalCenter
-                text: "BRIGHTNESS"; color: Theme.text
-                font.family: Theme.fontFamily; font.pixelSize: 15
-            }
-
-            Slider {
-                width: parent.width - 28 - page.labelWidth - 16 - page.sliderMarginRight
-                height: 72; anchors.verticalCenter: parent.verticalCenter
-                label: ""; icon: ""; value: page.brightnessValue; accentColor: Theme.accent2
-                onCommitted: value => page.commitBrightness(value)
-            }
-        }
-
-        Row {
-            width: parent.width; height: 38; spacing: 10
-
-            Rectangle {
-                width: 28; height: 28; radius: Theme.radius; anchors.verticalCenter: parent.verticalCenter
-                color: page.nightlightEnabled ? Theme.alpha(Theme.accent, 0.10) : Theme.alpha("#A0A0A0", 0.15)
-                border.width: 1; border.color: page.nightlightEnabled ? Theme.accent : Theme.border
-                Text {
-                    anchors.centerIn: parent; text: "\uf186"
-                    color: page.nightlightEnabled ? Theme.accent : "#A0A0A0"
-                    font.family: Theme.iconFont; font.pixelSize: 12
-                }
-                MouseArea {
-                    anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                    onClicked: page.nightlightEnabled ? page.nightlightOff() : page.nightlightOn()
-                }
-            }
-
-            Text {
-                width: page.labelWidth; anchors.verticalCenter: parent.verticalCenter
-                text: "NIGHTLIGHT"; color: page.nightlightEnabled ? Theme.text : Theme.text
-                font.family: Theme.fontFamily; font.pixelSize: 15
-            }
-
-            Slider {
-                width: parent.width - 28 - page.labelWidth - 16 - page.sliderMarginRight
-                height: 72; anchors.verticalCenter: parent.verticalCenter
-                label: ""; icon: ""; value: page.nightlightValue; accentColor: "#ffffff"
-                onMoved: value => page.commitNightlight(value)
+            contentItem: Rectangle {
+                color: "transparent"
+                radius: width / 2
             }
         }
 
         Column {
-            width: parent.width; spacing: 16
+            id: content
+            width: flick.width
+            spacing: 9
 
-            Repeater {
-                model: page.monitors
+            Row {
+                width: parent.width; height: 36
 
-                delegate: Rectangle {
-                    required property var modelData
-                    width: parent.width; height: 100; radius: Theme.radius
-                    color: "#00000000"; border.width: 1
-                    border.color: modelData.focused ? "#454545" : Theme.border
+                Text {
+                    text: "DISPLAY"; color: Theme.text
+                    font.family: Theme.fontFamily; font.pixelSize: 19; font.letterSpacing: 3
+                    anchors.verticalCenter: parent.verticalCenter; anchors.verticalCenterOffset: -6
+                }
 
-                    Column {
-                        anchors.fill: parent
-                        anchors.margins: 14
-                        spacing: 8
-                        Row {
-                            spacing: 10
+                Item { width: parent.width - 150; height: 1 }
+            }
 
-                            Text {
-                                text: modelData.name; color: Theme.text
-                                font.family: Theme.fontFamily; font.pixelSize: 14; font.bold: true
-                            }
+            Rectangle { width: parent.width; height: 1; color: Theme.border }
 
-                            Text {
-                                text: modelData.width + "x" + modelData.height + " @ " + Math.round(modelData.refreshRate) + "Hz"
-                                color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: 12
-                            }
+            Row {
+                width: parent.width; height: 38; spacing: 8
 
-                            Text {
-                                visible: modelData.focused; text: "ACTIVE"; color: Theme.accent2
-                                font.family: Theme.fontFamily; font.pixelSize: 10
-                            }
-                        }
+                Rectangle {
+                    width: 28; height: 28; radius: Theme.radius; anchors.verticalCenter: parent.verticalCenter
+                    color: Theme.alpha(Theme.accent2, 0.10); border.width: 1; border.color: Theme.border
+                    Text {
+                        anchors.centerIn: parent; text: "\uf185"; color: Theme.accent2
+                        font.family: Theme.iconFont; font.pixelSize: 12
+                    }
+                }
 
-                        Item {
-                            width: parent.width
-                            height: scaleLabel.implicitHeight
-                            Text {
-                                id: scaleLabel
-                                anchors.left: parent.left
-                                text: "SCALE"
-                                color: Theme.textDim
-                                font.family: Theme.fontFamily; font.pixelSize: 11
+                Text {
+                    width: page.labelWidth; anchors.verticalCenter: parent.verticalCenter
+                    text: "BRIGHTNESS"; color: Theme.text
+                    font.family: Theme.fontFamily; font.pixelSize: 15
+                }
+
+                Slider {
+                    width: parent.width - 28 - page.labelWidth - 16 - page.sliderMarginRight
+                    height: 72; anchors.verticalCenter: parent.verticalCenter
+                    label: ""; icon: ""; value: page.brightnessValue; accentColor: Theme.accent2
+                    onCommitted: value => page.commitBrightness(value)
+                }
+            }
+
+            Row {
+                width: parent.width; height: 38; spacing: 10
+
+                Rectangle {
+                    width: 28; height: 28; radius: Theme.radius; anchors.verticalCenter: parent.verticalCenter
+                    color: page.nightlightEnabled ? Theme.alpha(Theme.accent, 0.10) : Theme.alpha("#A0A0A0", 0.15)
+                    border.width: 1; border.color: page.nightlightEnabled ? Theme.accent : Theme.border
+                    Text {
+                        anchors.centerIn: parent; text: "\uf186"
+                        color: page.nightlightEnabled ? Theme.accent : "#A0A0A0"
+                        font.family: Theme.iconFont; font.pixelSize: 12
+                    }
+                    MouseArea {
+                        anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                        onClicked: page.nightlightEnabled ? page.nightlightOff() : page.nightlightOn()
+                    }
+                }
+
+                Text {
+                    width: page.labelWidth; anchors.verticalCenter: parent.verticalCenter
+                    text: "NIGHTLIGHT"; color: page.nightlightEnabled ? Theme.text : Theme.text
+                    font.family: Theme.fontFamily; font.pixelSize: 15
+                }
+
+                Slider {
+                    width: parent.width - 28 - page.labelWidth - 16 - page.sliderMarginRight
+                    height: 72; anchors.verticalCenter: parent.verticalCenter
+                    label: ""; icon: ""; value: page.nightlightValue; accentColor: "#ffffff"
+                    onMoved: value => page.commitNightlight(value)
+                }
+            }
+
+            Column {
+                width: parent.width; spacing: 16
+
+                Repeater {
+                    model: page.monitors
+
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: parent.width; height: 100; radius: Theme.radius
+                        color: "#00000000"; border.width: 1
+                        border.color: modelData.focused ? "#454545" : Theme.border
+
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 14
+                            spacing: 8
+                            Row {
+                                spacing: 10
+
+                                Text {
+                                    text: modelData.name; color: Theme.text
+                                    font.family: Theme.fontFamily; font.pixelSize: 14; font.bold: true
                                 }
-                            Text {
-                                anchors.right: parent.right
-                                text: modelData.scale.toFixed(2) + "x"
-                                color: Theme.text
-                                font.family: Theme.fontFamily; font.pixelSize: 11
+
+                                Text {
+                                    text: modelData.width + "x" + modelData.height + " @ " + Math.round(modelData.refreshRate) + "Hz"
+                                    color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: 12
+                                }
+
+                                Text {
+                                    visible: modelData.focused; text: "ACTIVE"; color: Theme.accent2
+                                    font.family: Theme.fontFamily; font.pixelSize: 10
                                 }
                             }
+
+                            Item {
+                                width: parent.width
+                                height: scaleLabel.implicitHeight
+                                Text {
+                                    id: scaleLabel
+                                    anchors.left: parent.left
+                                    text: "SCALE"
+                                    color: Theme.textDim
+                                    font.family: Theme.fontFamily; font.pixelSize: 11
+                                }
+                                Text {
+                                    anchors.right: parent.right
+                                    text: modelData.scale.toFixed(2) + "x"
+                                    color: Theme.text
+                                    font.family: Theme.fontFamily; font.pixelSize: 11
+                                }
+                            }
+
                             Slider {
                                 width: parent.width
                                 icon: "\uf00e"
                                 value: Math.max(0, Math.min(1, (modelData.scale - 0.7) / 0.6))
                                 onCommitted: value => page.setScale(modelData, 0.7 + value * 0.6)
+                            }
                         }
                     }
                 }
             }
-        }
 
-        Column {
-            width: parent.width; spacing: 10
-            topPadding: 6
-            bottomPadding: 6
-
-            Text {
-                text: "RESOLUTION"; color: Theme.text
-                font.family: Theme.fontFamily; font.pixelSize: 15; font.bold: true; font.letterSpacing: 2
-            }
-
-            Row {
+            Column {
                 width: parent.width; spacing: 10
                 topPadding: 6
                 bottomPadding: 6
-                Repeater {
-                    model: [
-                        "1920x1080",
-                        "2560x1440",
-                        "3840x2160",
-                        "1280x720"
-                    ]
 
-                    delegate: Rectangle {
-                        required property string modelData
-                        width: (parent.width - parent.spacing * 3) / 4; height: 42; radius: Theme.radius
-                        color: "#00000000"; border.width: 1; border.color: Theme.border
+                Text {
+                    text: "RESOLUTION"; color: Theme.text
+                    font.family: Theme.fontFamily; font.pixelSize: 15; font.bold: true; font.letterSpacing: 2
+                }
 
-                        Text {
-                            anchors.centerIn: parent; text: modelData; color: Theme.text
-                            font.family: Theme.fontFamily; font.pixelSize: 12; font.bold: true; font.letterSpacing: 1
-                        }
+                Row {
+                    width: parent.width; spacing: 10
+                    topPadding: 6
+                    bottomPadding: 6
+                    Repeater {
+                        model: [
+                            "1920x1080",
+                            "2560x1440",
+                            "3840x2160",
+                            "1280x720"
+                        ]
 
-                        MouseArea {
-                            anchors.fill: parent; hoverEnabled: true
-                            onEntered: { parent.color = Theme.alpha(Theme.accent, 0.08); parent.border.color = Theme.accent }
-                            onExited: { parent.color = "#00000000"; parent.border.color = Theme.border }
-                            onClicked: {
-                                if (page.monitors.length === 0) {
-                                    page.refresh()
-                                    return
+                        delegate: Rectangle {
+                            required property string modelData
+                            width: (parent.width - parent.spacing * 3) / 4; height: 42; radius: Theme.radius
+                            color: "#00000000"; border.width: 1; border.color: Theme.border
+
+                            Text {
+                                anchors.centerIn: parent; text: modelData; color: Theme.text
+                                font.family: Theme.fontFamily; font.pixelSize: 12; font.bold: true; font.letterSpacing: 1
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent; hoverEnabled: true
+                                onEntered: { parent.color = Theme.alpha(Theme.accent, 0.08); parent.border.color = Theme.accent }
+                                onExited: { parent.color = "#00000000"; parent.border.color = Theme.border }
+                                onClicked: {
+                                    if (page.monitors.length === 0) {
+                                        page.refresh()
+                                        return
+                                    }
+                                    page.setResolution(page.monitors[0], modelData + "@60")
                                 }
-                                page.setResolution(page.monitors[0], modelData + "@60")
                             }
                         }
                     }

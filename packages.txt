@@ -1,26 +1,27 @@
 # 43PR/dotfiles
-# Arch Linux packages required for the Hyprland setup
-#
-# Note: some of these (currently: wlogout) live only in the AUR,
-# not in the official repos. install.sh detects this automatically
-# and installs them with paru/yay if one is available.
+# Install e.g.: sudo pacman -S cava
+# Remove e.g.: sudo pacman -R cava
 
 # --------------------------------------------------
-# Hyprland / desktop
+# Hyprland / Wayland / Desktop
 # --------------------------------------------------
 
 hyprland
-waybar
-rofi
 hyprlock
 wlogout
 quickshell
-jq
+waybar
+rofi
+
+# --------------------------------------------------
+# Wayland / X11 Compatibility / Desktop Portals
+# --------------------------------------------------
+
 xdg-desktop-portal-hyprland
 xorg-xwayland
 
 # --------------------------------------------------
-# Wallpaper / screenshots
+# Wallpaper / Screenshots / Image Tools
 # --------------------------------------------------
 
 awww
@@ -29,19 +30,22 @@ slurp
 imagemagick
 
 # --------------------------------------------------
-# Settings / Networking / Bluetooth / Audio
+# Networking / Bluetooth
 # --------------------------------------------------
 
 networkmanager
+nm-applet
 bluez
 bluez-utils
-dmidecode
+
+# --------------------------------------------------
+# Audio
+# --------------------------------------------------
+
 pipewire
 pipewire-audio
 pipewire-pulse
 wireplumber
-flatpak
-ncdu 
 
 # --------------------------------------------------
 # Clipboard
@@ -51,19 +55,30 @@ cliphist
 wl-clipboard
 
 # --------------------------------------------------
-# Terminal / applications
+# Terminal / Shell
 # --------------------------------------------------
 
 kitty
+zsh
+zsh-autosuggestions
+zsh-syntax-highlighting
+starship
+eza
+
+# --------------------------------------------------
+# File Manager / File Utilities
+# --------------------------------------------------
+
 thunar
 xed
-
-# --------------------------------------------------
-# File manager / thumbnails / icons / GTK
-# --------------------------------------------------
-
 tumbler
 ffmpegthumbnailer
+ncdu
+
+# --------------------------------------------------
+# GTK / Icons / Appearance
+# --------------------------------------------------
+
 papirus-icon-theme
 papirus-folders
 nwg-look
@@ -75,10 +90,28 @@ nwg-look
 mpv
 
 # --------------------------------------------------
-# Hyprland companion apps (AUR)
+# System Monitoring / Hardware
 # --------------------------------------------------
 
-hyprmod
+btop
+nvtop
+dmidecode
+brightnessctl
+gammastep
+
+# --------------------------------------------------
+# Desktop Notifications
+# --------------------------------------------------
+
+dunst
+
+# --------------------------------------------------
+# Terminal / System Visualizers
+# --------------------------------------------------
+
+cava
+fastfetch
+cmatrix
 
 # --------------------------------------------------
 # Fonts
@@ -90,24 +123,16 @@ ttf-font-awesome
 ttf-roboto-mono
 
 # --------------------------------------------------
-# Utilities
+# Package / Application Utilities
 # --------------------------------------------------
 
-dunst
-nm-applet
+flatpak
 curl
 unzip
-gammastep
-brightnessctl
-nvtop
-btop
-cava
-fastfetch
-zsh
-zsh-autosuggestions
-zsh-syntax-highlighting
-starship
-eza
 
+# --------------------------------------------------
+# Hyprland Companion Apps (AUR)
+# --------------------------------------------------
 
+hyprmod
 

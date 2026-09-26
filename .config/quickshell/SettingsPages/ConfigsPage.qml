@@ -188,7 +188,7 @@ Item {
                 }
 
                 ConfigButton {
-                    label: "SETTINGS THEME"
+                    label: "SETTINGS MENU"
                     path: "~/.config/quickshell/Theme.qml"
                 }
             }
