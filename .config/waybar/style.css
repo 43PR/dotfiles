@@ -105,7 +105,7 @@ tooltip label {
 #pulseaudio:hover,
 #network:hover,
 #custom-mpris-marquee:hover {
-    font-size: 17px;
+    font-size: 15px;
 }
 
 #workspaces {
