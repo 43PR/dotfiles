@@ -313,7 +313,7 @@ success "Shell script permissions configured."
 # --------------------------------------------------
 
 info "Updating Config..."
-sed -i 's/rp34/$USER/g' $HOME/.config/wlogout/style.css
+sed -i "s/rp34/$USER/g" "$HOME/.config/wlogout/style.css"
 
 # --------------------------------------------------
 # Finish
@@ -333,7 +333,7 @@ if [[ -d "$BACKUP_DIR" ]]; then
     printf 'Backup:        %s\n' "$BACKUP_DIR"
 fi
 
-if [[ "${#UNKNOWN_PACKAGES[@]:-0}" -gt 0 ]]; then
+if [[ "${#UNKNOWN_PACKAGES[@]}" -gt 0 ]]; then
     printf '\n'
     warning "Unresolved packages (install manually): ${UNKNOWN_PACKAGES[*]}"
 fi
