@@ -105,10 +105,11 @@ https://youtu.be/Y3i96F1-E_Q
 Copy paste the spicetify folder to: (.config)
 
 ```bash
-nano ~/.config/wlogout/style.css
+nano ~/.config/spicetify/config-xpui.ini
 ```
+Edit the file and replace rp34 with your username
 
-Edit the file and replace rp34 with your username:  /home/rp34/.config/spotify/prefs
+If you want the old version change the name of the file for: user.css
 
 ## Wlogout
 
