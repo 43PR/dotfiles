@@ -109,7 +109,7 @@ nano ~/.config/spicetify/config-xpui.ini
 ```
 Edit the file and replace rp34 with your username
 
-If you want the old version change the name of the file for: user.css
+If you want the old version change the name of the file for: user.css (spicetify/Themes/text/)
 
 ## Wlogout
 
