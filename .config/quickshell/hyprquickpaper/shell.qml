@@ -65,6 +65,41 @@ PanelWindow {
         onClicked: Qt.quit()
     }
 
+    // --- Empty state ---
+    Column {
+        id: emptyState
+        anchors.centerIn: parent
+        spacing: 10
+        z: 2
+        visible: folderModel.count === 0
+
+        Text {
+            text: "No wallpapers found"
+            color: "#ffffff"
+            font.pixelSize: 22
+            font.bold: true
+            anchors.horizontalCenter: parent.horizontalCenter
+        }
+
+        Text {
+            text: "Add images to:"
+            color: "#aaaaaa"
+            font.pixelSize: 13
+            anchors.horizontalCenter: parent.horizontalCenter
+        }
+
+        TextEdit {
+            id: pathText
+            text: main.wallpaperPath
+            color: "#dddddd"
+            font.pixelSize: 14
+            readOnly: true
+            selectByMouse: true
+            anchors.horizontalCenter: parent.horizontalCenter
+            horizontalAlignment: Text.AlignHCenter
+        }
+    }
+
     ListView {
         id: list
         width: parent.width
