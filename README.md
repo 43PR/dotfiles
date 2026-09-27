@@ -2,23 +2,20 @@
 
 ## Hyprland Setup by 43pr メ
 
-### <a href="https://www.youtube.com/@43PR2">▷ YouTube Guides & Showcase</a>
+Simple setup focused on keyboard and mouse workflows, practical keybinds, productivity, and easy to customize. Feel free to use as inspiration or as a starting point for building your own setup.
 
-Simple Hyprland setup focused on practical keybinds, productivity and easy to customize. Feel free to use as inspiration or as a starting point for building your own setup.
+![Hyprland](https://img.shields.io/badge/Hyprland-0.56.2-8b9aaf?style=for-the-badge&labelColor=101418)
+![GitHub last commit](https://img.shields.io/github/last-commit/43PR/dotfiles?style=for-the-badge&labelColor=101418&color=8b9aaf)
+![GitHub repo size](https://img.shields.io/github/repo-size/43PR/dotfiles?style=for-the-badge&labelColor=101418&color=7f8c9a)
+[![Discord](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Finvites%2FHQwU9SzHj%3Fwith_counts%3Dtrue&query=%24.approximate_member_count&style=for-the-badge&logo=discord&logoColor=ffffff&label=discord&labelColor=101418&color=7289a8)](https://discord.gg/HQwU9SzHj)
+[![YouTube](https://img.shields.io/badge/youtube-subscribe-b05a63?style=for-the-badge&logo=youtube&logoColor=ffffff&labelColor=101418)](https://www.youtube.com/@43PR2)
+[![Ko-Fi donate](https://img.shields.io/badge/donate-kofi?style=for-the-badge&logo=ko-fi&logoColor=ffffff&label=ko-fi&labelColor=101418&color=9a6570)](https://ko-fi.com/43pr)
 
-### [Recent Updates & Troubleshooting](updates.md)
-
-### Join Discord Server 
-
-New discrod server for help, discussions, showcases, tips/ideas
-
-[![Discord](https://img.shields.io/badge/Discord-Join%20the%20Server-5865F2?logo=discord&logoColor=white)](https://discord.gg/ajaRkHt8u)
-
-### **[Features](#features)  -  [Keybinds](#most-used-keybinds)  -  [Installation](#installation)  -  [Support](#support)**
+### **[Features](#features)  -  [Keybinds](#most-used-keybinds)  -  [Installation](#installation)**
 
 </div>
 
-https://github.com/user-attachments/assets/c332e894-b357-44db-aa38-a4b0bdd1e2cc
+https://github.com/user-attachments/assets/f56103b4-534c-4148-89ec-201d75acf7aa
 
 ![](Wallpapers/Showcase/9.png)
 ![](Wallpapers/Showcase/hover-areas.png)
@@ -104,26 +101,13 @@ chmod +x install.sh
 ./install.sh
 ```
 
+Open GTX Settings and change Color scheme to Prefer dark - Apply.
+
 After the installation finishes log out and back in.
 
 > [!note]
-> Change the GTK theme to dark if it wasn't changed automatically.
 > 
 > Waybar custom-gpu is specific to my PC so you can remove it or implement.
 >
-> Any issues with the wallpaper picker just delete cache pictures ".cache/quickshell/thumbs/"
->
-> Edit default programs in "config/hypr/hyprland.lua".
-
-<div align="center">
-
-## Support
-
-<a href="https://ko-fi.com/43pr2"><strong>☕ 𝙆𝙤-𝙛𝙞</strong></a>
-  ─  
- <a href="https://www.youtube.com/@43PR2"><strong>▷ 𝙔𝙤𝙪𝙏𝙪𝙗𝙚</strong></a>
-
-</div>
-
-
+> If you’re having any issues with the wallpaper picker, you can clear the cache from the Storage page in Settings.
 

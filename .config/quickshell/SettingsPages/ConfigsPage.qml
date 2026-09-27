@@ -151,45 +151,29 @@ Item {
             Column {
                 width: parent.width
                 spacing: page.sectionSpacing
-
                 ConfigButton {
                     label: "PROGRAMS - AUTOSTART - INPUT"
                     path: "~/.config/hypr/hyprland.lua"
                 }
-
                 ConfigButton {
                     label: "MONITORS - WORKSPACES"
                     path: "~/.config/hypr/monitors.lua"
                 }
-
                 ConfigButton {
                     label: "LOOK AND FEEL"
                     path: "~/.config/hypr/look.lua"
                 }
-
                 ConfigButton {
                     label: "KEYBINDS"
                     path: "~/.config/hypr/keybinds.lua"
                 }
-
                 ConfigButton {
                     label: "RULES"
                     path: "~/.config/hypr/rules.lua"
                 }
-
                 ConfigButton {
                     label: "LOCK SCREEN"
                     path: "~/.config/hypr/hyprlock.conf"
-                }
-
-                ConfigButton {
-                    label: "APPS LAUNCHER"
-                    path: "~/.config/rofi/config.rasi"
-                }
-
-                ConfigButton {
-                    label: "SETTINGS MENU"
-                    path: "~/.config/quickshell/Theme.qml"
                 }
             }
 
@@ -248,6 +232,46 @@ Item {
                 ConfigButton {
                     label: "LAYOUT"
                     path: "~/.config/wlogout/layout"
+                }
+            }
+            Text {
+                text: "ROFI"
+                color: Theme.text
+                font.family: Theme.fontFamily
+                font.pixelSize: 16
+                font.letterSpacing: 3
+            }
+            Rectangle {
+                width: parent.width
+                height: 1
+                color: Theme.border
+            }
+            Column {
+                width: parent.width
+                spacing: page.sectionSpacing
+                ConfigButton {
+                    label: "CONFIG"
+                    path: "~/.config/rofi/config.rasi"
+                }
+            }
+            Text {
+                text: "SETTINGS"
+                color: Theme.text
+                font.family: Theme.fontFamily
+                font.pixelSize: 16
+                font.letterSpacing: 3
+            }
+            Rectangle {
+                width: parent.width
+                height: 1
+                color: Theme.border
+            }
+            Column {
+                width: parent.width
+                spacing: page.sectionSpacing
+                ConfigButton {
+                    label: "COLORS - TEAKS"
+                    path: "~/.config/quickshell/Theme.qml"
                 }
             }
         }

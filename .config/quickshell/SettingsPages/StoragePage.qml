@@ -7,7 +7,7 @@ Item {
     id: page
     property var drives: []
     property var filesystems: []
-    property var cleanupInfo: ({yay:0, pacman:0, journal:0, trash:0, flatpak:0, cliphist:0})
+    property var cleanupInfo: ({yay:0, pacman:0, journal:0, trash:0, flatpak:0, cliphist:0, thumbs:0})
     property var sdaUsageData: null
     property int contentMargin: 0
     property int contentRightMargin: 46
@@ -17,7 +17,7 @@ Item {
     property string pendingTitle: ""
     property string pendingMessage: ""
 
-    readonly property var cleanupDefaults: ({yay:0, pacman:0, journal:0, trash:0, flatpak:0, cliphist:0})
+    readonly property var cleanupDefaults: ({yay:0, pacman:0, journal:0, trash:0, flatpak:0, cliphist:0, thumbs:0})
     readonly property var sizeUnits: ({
         B:1, K:1024, KB:1024, KIB:1024,
         M:1048576, MB:1048576, MIB:1048576,
@@ -123,11 +123,12 @@ Item {
             "printf 'JOURNAL '; journalctl --disk-usage 2>/dev/null | grep -oE '[0-9.]+ (B|K|M|G|T)' | tail -1; " +
             "printf 'TRASH '; du -sb \"$HOME/.local/share/Trash\" 2>/dev/null | awk '{print $1}'; " +
             "printf 'FLATPAK '; flatpak uninstall --unused --assumeno 2>/dev/null | grep -oE '[0-9.]+ (kB|MB|GB|TB)' | tail -1; " +
-            "printf 'CLIPHIST '; cliphist list 2>/dev/null | wc -l"
+            "printf 'CLIPHIST '; cliphist list 2>/dev/null | wc -l; " +
+            "printf 'THUMBS '; du -sb \"$HOME/.cache/quickshell/thumbs\" 2>/dev/null | awk '{print $1}'"
         ]
         stdout: StdioCollector {
             onStreamFinished: {
-                var info = {yay: 0, pacman: 0, journal: 0, trash: 0, flatpak: 0, cliphist: 0}
+                var info = {yay: 0, pacman: 0, journal: 0, trash: 0, flatpak: 0, cliphist: 0, thumbs: 0}
                 var lines = text.trim().split("\n")
                 for (var i = 0; i < lines.length; ++i) {
                     var p = lines[i].trim().split(/\s+/)
@@ -359,6 +360,11 @@ Item {
                                 key: "cliphist", label: "CLIPHIST", action: "WIPE", title: "WIPE CLIPBOARD HISTORY?",
                                 message: "This permanently clears your entire clipboard history (cliphist).",
                                 command: "cliphist wipe"
+                            },
+                            {
+                                key: "thumbs", label: "WALLPAPER PICKER", action: "CLEAR", title: "CLEAR THUMBNAIL CACHE?",
+                                message: "This permanently deletes everything in ~/.cache/quickshell/thumbs.",
+                                command: "rm -rf -- \"$HOME/.cache/quickshell/thumbs/\"*"
                             },
                             {
                                 key: "yay", label: "YAY CACHE", action: "CLEAN", title: "CLEAR YAY CACHE?",

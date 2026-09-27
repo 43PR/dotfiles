@@ -229,7 +229,7 @@ PanelWindow {
 
                 width: 150
                 height: 16
-                radius: 8
+                radius: Theme.radius
 
                 color: Theme.bg
                 border.color: Theme.accent

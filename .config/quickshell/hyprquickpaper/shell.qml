@@ -184,7 +184,7 @@ PanelWindow {
                 Image {
                     id: img
                     anchors.fill: parent
-                    opacity: 0.8
+                    opacity: 0.95
                     fillMode: Image.PreserveAspectCrop
                     asynchronous: true
                     cache: false
