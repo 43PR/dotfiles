@@ -25,6 +25,20 @@ PanelWindow {
     property string wallpaperPath: configs.wallpaper_path.replace("$HOME", Quickshell.env("HOME"))
     property string cachePath: configs.cache_path.replace("$HOME", Quickshell.env("HOME"))
 
+    property bool showEmpty: false
+    readonly property bool looksEmpty: wallpaperPath !== ""
+                                       && folderModel.status === FolderListModel.Ready
+                                       && folderModel.count === 0
+
+    onLooksEmptyChanged: {
+        if (looksEmpty) {
+            emptyDelay.restart()
+        } else {
+            emptyDelay.stop()
+            showEmpty = false
+        }
+    }
+
     implicitHeight: Screen.height
     implicitWidth: Screen.width
     color: "transparent"
@@ -65,13 +79,18 @@ PanelWindow {
         onClicked: Qt.quit()
     }
 
-    // --- Empty state ---
+    Timer {
+        id: emptyDelay
+        interval: 300
+        onTriggered: main.showEmpty = main.looksEmpty
+    }
+
     Column {
         id: emptyState
         anchors.centerIn: parent
         spacing: 10
         z: 2
-        visible: folderModel.count === 0
+        visible: main.showEmpty
 
         Text {
             text: "No wallpapers found"
@@ -259,25 +278,17 @@ PanelWindow {
                 onClicked: list.activateCurrent()
                 onWheel: function(wheel) { list.flick(-wheel.angleDelta.y * 8, 0); wheel.accepted = true }
             }
-            
         }
-        
 
         Keys.onPressed: function(event) {
             if (event.key === Qt.Key_Space) {
                 activateCurrent()
-                } else if (event.key === Qt.Key_W || event.key === Qt.Key_Escape) {
-                    Qt.quit()    
-                } else if (event.key === Qt.Key_A) {
-                        userMoved = true
-                        moveSelection(-1, 1)
-                } else if (event.key === Qt.Key_D) {
-                            userMoved = true
-                            moveSelection(1, 1)
-                } else {
-                    return
-                }
-                event.accepted = true
+            } else if (event.key === Qt.Key_W || event.key === Qt.Key_Escape) {
+                Qt.quit()
+            } else {
+                return
+            }
+            event.accepted = true
         }
     }
 }
