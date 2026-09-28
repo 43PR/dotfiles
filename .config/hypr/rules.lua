@@ -48,3 +48,11 @@ hl.window_rule({
     match = { title = "^(Save File)$" },
     float = true,
 })
+
+hl.window_rule({
+    name = "kitty-no-fullscreen",
+    match = { class = "^kitty$" },
+    fullscreen = false,
+    fullscreen_state = "0 0",
+    suppress_event = "fullscreen",
+})
