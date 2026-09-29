@@ -17,6 +17,8 @@ Simple setup focused on keyboard and mouse workflows, practical keybinds, produc
 
 https://github.com/user-attachments/assets/f56103b4-534c-4148-89ec-201d75acf7aa
 
+<img width="1920" height="1080" alt="1790717154" src="https://github.com/user-attachments/assets/53a7a2ff-4050-450b-8218-b3e42ac2e0f2" />
+
 <img width="1920" height="1080" alt="9" src="https://github.com/user-attachments/assets/0a1fc782-8111-4efd-bc8c-684b3556ebd1" />
 
 Wallpapers: https://wallhaven.cc/user/43pr
