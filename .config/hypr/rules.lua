@@ -48,3 +48,8 @@ hl.window_rule({
     match = { title = "^(Save File)$" },
     float = true,
 })
+
+hl.window_rule({
+    match = { class = "kitty" },
+    suppress_event = "maximize",
+}) 
