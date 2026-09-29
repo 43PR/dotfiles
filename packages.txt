@@ -29,6 +29,7 @@ grim
 slurp
 imagemagick
 matugen
+python
 
 # --------------------------------------------------
 # Networking / Bluetooth

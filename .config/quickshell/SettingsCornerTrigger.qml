@@ -4,12 +4,14 @@ import QtQuick
 
 Item {
     id: root
+    property bool hyprlockEnabled: true
+    property bool settingsEnabled: true
+    property bool rofiEnabled: true
+    property bool wallpaperEnabled: true
+    property bool wlogoutEnabled: true
+
     property int triggerHeight: 10
     property color triggerColor: '#0037ff00'
-
-    // Each trigger occupies a fixed % range of the screen width.
-    // Ranges are non-overlapping by construction — adjust freely,
-    // just keep each "From" >= previous "To".
     property real hyprlockFrom: 0.0
     property real hyprlockTo: 0.01
 
@@ -27,6 +29,7 @@ Item {
 
     PanelWindow {
         id: hyprlockTrigger
+        visible: root.hyprlockEnabled
         anchors { top: true; left: true }
         implicitHeight: root.triggerHeight
         implicitWidth: screen ? Math.round(screen.width * (root.hyprlockTo - root.hyprlockFrom)) : 0
@@ -49,6 +52,7 @@ Item {
 
     PanelWindow {
         id: settingsTrigger
+        visible: root.settingsEnabled
         anchors { top: true; left: true }
         implicitHeight: root.triggerHeight
         implicitWidth: screen ? Math.round(screen.width * (root.settingsTo - root.settingsFrom)) : 0
@@ -71,6 +75,7 @@ Item {
 
     PanelWindow {
         id: rofiTrigger
+        visible: root.rofiEnabled
         anchors { top: true; left: true }
         implicitHeight: root.triggerHeight
         implicitWidth: screen ? Math.round(screen.width * (root.rofiTo - root.rofiFrom)) : 0
@@ -93,6 +98,7 @@ Item {
 
     PanelWindow {
         id: wallpaperTrigger
+        visible: root.wallpaperEnabled
         anchors { top: true; left: true }
         implicitHeight: root.triggerHeight
         implicitWidth: screen ? Math.round(screen.width * (root.wallpaperTo - root.wallpaperFrom)) : 0
@@ -115,6 +121,7 @@ Item {
 
     PanelWindow {
         id: wlogoutTrigger
+        visible: root.wlogoutEnabled
         anchors { top: true; left: true }
         implicitHeight: root.triggerHeight
         implicitWidth: screen ? Math.round(screen.width * (root.wlogoutTo - root.wlogoutFrom)) : 0
