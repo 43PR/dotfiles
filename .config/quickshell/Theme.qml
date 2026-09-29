@@ -7,7 +7,7 @@ import Quickshell.Io
 QtObject {
     id: root
 
-    readonly property int radius: 5
+    readonly property int radius: 10
     readonly property real tiltStrength: 8
     readonly property string fontFamily: "JetBrains Mono"
     property string iconFont: "JetBrainsMono Nerd Font"
