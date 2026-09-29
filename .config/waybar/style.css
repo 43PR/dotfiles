@@ -1,4 +1,4 @@
-/* General */
+@import "colors.css";
 * {
     font-family: "JetBrainsMono Nerd Font", "Symbols Nerd Font Mono", monospace;
     font-size: 11px;
@@ -8,26 +8,26 @@
 window#waybar {
     min-height: 10px;
     background-color: rgba(20, 20, 20, 0);
-    color: #ffffff;
+    color: @wb_text;
 }
 
 /* LEFT */
 .modules-left {
-    background-color: rgba(20, 20, 20, 0.5);
+    background-color: @wb_panel_bg;
     border-radius: 10px;
     margin: 4px 0 2px 6px;
 }
 
 /* CENTER */
 .modules-center {
-    background-color: rgba(20, 20, 20, 0.5);
+    background-color: @wb_panel_bg;
     border-radius: 10px;
     margin: 4px 0 2px;
 }
 
 /* RIGHT */
 .modules-right {
-    background-color: rgba(20, 20, 20, 0.5);
+    background-color: @wb_panel_bg;
     border-radius: 10px;
     margin: 4px 6px 2px 0;
 }
@@ -49,37 +49,39 @@ window#waybar {
 
 /* Power */
 #custom-power {
-    color: #ffffff;
+    color: @wb_text;
     font-size: 15px;
     margin-right: 10px;
 }
 
 /* MPRIS */
 #custom-mpris-marquee {
+    color: @wb_text;
     padding: 0 10px;
 }
 
 /* Clock */
 #clock {
+    color: @wb_text;
     font-weight: bold;
 }
 
 /* Temperature */
 #temperature.critical {
-    color: #ff5555;
+    color: @wb_critical;
 }
 
 /* Tooltip */
 tooltip {
-    background-color: rgba(20, 20, 20, 0.4);
-    color: #ffffff;
+    background-color: @wb_panel_bg; 
+    color: @wb_text;
     font-weight: bold;
     border: 1px solid rgba(255, 255, 255, 0);
     border-radius: 10px;
 }
 
 tooltip label {
-    color: #ffffff;
+    color: @wb_text;
     font-size: 13px;
     padding: 0;
     margin: 0;
@@ -126,7 +128,7 @@ tooltip label {
     border-radius: 5px;
     text-shadow: none;
 
-    background: rgba(255, 255, 255, 0.18);
+    background: @wb_ws_idle;
 
     color: transparent;
 
@@ -144,46 +146,50 @@ tooltip label {
 #workspaces button.active {
     min-width: 32px;
     min-height: 10px;
-
-    background: rgba(255, 255, 255, 0.65);
-
+    background: @wb_ws_active_glow; 
     border-radius: 5px;
-
-    box-shadow:
-        0 0 8px rgba(255, 255, 255, 0.35);
+    box-shadow: 0 0 8px @wb_ws_active_glow;
 }
 
 #workspaces button:hover {
-    background: rgba(255, 255, 255, 0.5);
-
-    box-shadow:
-        0 0 6px rgba(255, 255, 255, 0.2);
+    background: @wb_ws_hover; 
+    box-shadow: 0 0 6px @wb_ws_idle;
 }
 
 #workspaces button.empty {
-    background: rgba(255, 255, 255, 0.10);
+    background: @wb_ws_empty;
 }
 
 #workspaces button:not(.empty):not(.active) {
-    background: rgba(255, 255, 255, 0.28);
+    background: @wb_ws_filled;
 }
 
 #workspaces button.urgent {
-    background: rgba(255, 70, 70, 0.8);
-
-    box-shadow:
-        0 0 8px rgba(255, 70, 70, 0.4);
+    background: @wb_ws_urgent; 
+    box-shadow: 0 0 8px @wb_ws_urgent;
 }
 
 #network {
+    color: @wb_text;
     transition: font-size 0.15s ease;
     padding: 0 10px;
     margin: 0 2px;
     font-size: 13px;
 }
 #pulseaudio {
+    color: @wb_text;
     font-size: 13px;
     padding-right: 0;
     margin-right: 0;
 
 }
+#cpu {
+    color: @wb_text;
+}
+#custom-gpu {
+    color: @wb_text;
+}
+#memory {
+    color: @wb_text;
+}
+

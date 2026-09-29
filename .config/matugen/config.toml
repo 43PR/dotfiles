@@ -1,0 +1,5 @@
+[config]
+
+[templates.semantic]
+input_path  = '~/.config/matugen/templates/semantic.json'
+output_path = '~/.cache/43pr/matugen/semantic.json'

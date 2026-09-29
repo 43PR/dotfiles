@@ -76,7 +76,7 @@ PanelWindow {
         anchors.topMargin: 30
 
         radius: 20
-        color: "#80000000"
+        color: Theme.alpha(Theme.bg, 0.5)   // was: "#80000000"
 
         opacity: root.showing ? 1 : 0
         scale: root.showing ? 1 : 0.9
@@ -123,7 +123,7 @@ PanelWindow {
                     text: "󰄀"
                     font.family: "Symbols Nerd Font"
                     font.pixelSize: 22
-                    color: "white"
+                    color: Theme.text
                 }
             }
 
@@ -136,13 +136,13 @@ PanelWindow {
                     text: "Screenshot saved"
                     font.pixelSize: 13
                     font.bold: true
-                    color: "white"
+                    color: Theme.text
                 }
 
                 Text {
                     text: root.imagePath.split("/").pop()
                     font.pixelSize: 11
-                    color: "#cccccc"
+                    color: Theme.textDim
                     elide: Text.ElideMiddle
                     width: parent.width
                 }
@@ -150,7 +150,7 @@ PanelWindow {
                 Text {
                     text: "Copied to clipboard"
                     font.pixelSize: 10
-                    color: "#999999"
+                    color: Theme.textDim
                 }
             }
         }

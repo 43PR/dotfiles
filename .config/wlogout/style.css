@@ -1,4 +1,4 @@
-/* bind = $mod, Grave, exec, ~/.config/hypr/scripts/wlogout.sh (see script for dynamic margins) */
+@import "colors.css";
 * {
     background-image: none;
     box-shadow: none;
@@ -6,7 +6,7 @@
 }
 
 window {
-    background-color: rgba(12, 12, 12, 0.2);
+    background-color: @wl_window_bg;
 }
 
 button {
@@ -18,8 +18,8 @@ button {
     border-radius: 50%;
     border: 0;
 
-    color: #FFFFFF;
-    background-color: rgba(12, 12, 12, 0.4);
+    color: @wl_text;
+    background-color: @wl_button_bg;
 
     background-repeat: no-repeat;
     background-position: center;
@@ -32,13 +32,13 @@ button {
 
 /* Mouse hover: only the button under the cursor lights up */
 button:hover {
-    background-color: rgba(255, 255, 255, 0.12);
+    background-color: @wl_hover_bg;
     box-shadow: 0 10px 24px rgba(0, 0, 0, 0.6);
 }
 
 /* Mouse press feedback */
 button:active {
-    background-color: rgba(255, 255, 255, 0.18);
+    background-color: @wl_active_bg;
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
 }
 
@@ -50,37 +50,22 @@ button:focus:not(:hover) {
 @keyframes focus-ring-fade {
     0% {
         box-shadow:
-            0 0 0 3px rgba(255, 255, 255, 0.85),
+            0 0 0 3px @wl_focus_ring_full,
             0 6px 18px rgba(0, 0, 0, 0.4);
     }
     60% {
         box-shadow:
-            0 0 0 3px rgba(255, 255, 255, 0.85),
+            0 0 0 3px @wl_focus_ring_full,
             0 6px 18px rgba(0, 0, 0, 0.4);
     }
     100% {
         box-shadow:
-            0 0 0 0 rgba(255, 255, 255, 0),
+            0 0 0 0 @wl_focus_ring_zero,
             0 6px 18px rgba(0, 0, 0, 0.4);
     }
 }
 
-#shutdown {
-    background-image: url("/home/rp34/.config/wlogout/icons/shutdown.png");
-}
 
-#reboot {
-    background-image: url("/home/rp34/.config/wlogout/icons/reboot.png");
-}
 
-#logout {
-    background-image: url("/home/rp34/.config/wlogout/icons/logout.png");
-}
 
-#suspend {
-    background-image: url("/home/rp34/.config/wlogout/icons/suspend.png");
-}
 
-#hibernate {
-    background-image: url("/home/rp34/.config/wlogout/icons/hibernate.png");
-}

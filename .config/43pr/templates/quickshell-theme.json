@@ -1,0 +1,16 @@
+{
+  "bg": "#{{qs_bg|strip}}",
+  "bgAlpha": 0.7,
+  "text": "#{{qs_text|strip}}",
+  "textDim": "#{{qs_text_dim|strip}}",
+  "danger": "#{{qs_danger|strip}}",
+  "accent": "#{{qs_accent|strip}}",
+  "accent2": "#{{qs_accent2|strip}}",
+  "border": "#{{qs_border|strip}}",
+  "bgPanel": "#{{qs_bg_panel|strip}}",
+  "bgCard": "#{{qs_bg_card|strip}}",
+  "borderAccent": "#{{qs_border_accent|strip}}",
+  "textFaint": "#{{qs_text_faint|strip}}",
+  "ok": "#{{qs_ok|strip}}",
+  "trackBg": "#{{qs_track_bg|strip}}"
+}

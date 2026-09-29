@@ -152,16 +152,16 @@ Item {
         id: confirmPopup
         visible: false; anchors.centerIn: parent; z: 100
         width: Math.min(parent.width - 30, 420); height: 190; radius: Theme.radius
-        color: "#000000"; border.width: 1; border.color: Theme.border
+        color: "#00000000"; border.width: 1; border.color: Theme.border
 
         Column {
             anchors.fill: parent; anchors.margins: 18; spacing: 12
             Text {
-                text: page.pendingTitle; color: "#fff"
+                text: page.pendingTitle; color: Theme.text
                 font.family: Theme.fontFamily; font.pixelSize: 17; font.bold: true
             }
             Text {
-                width: parent.width; text: page.pendingMessage; color: "#fff"
+                width: parent.width; text: page.pendingMessage; color: Theme.textDim
                 font.family: Theme.fontFamily; font.pixelSize: 13; wrapMode: Text.WordWrap
             }
             Item { width: 1; height: 1 }
@@ -212,8 +212,8 @@ Item {
                 ScrollBar.vertical: ScrollBar {
                     id: scrollBar
                     background: Rectangle {
-                    color: Theme.alpha(Theme.border, 0.3)
-                    radius: width / 2
+                        color: Theme.alpha(Theme.border, 0.3)
+                        radius: width / 2
                     }
                     contentItem: Rectangle {
                         color: Theme.accent
@@ -412,68 +412,88 @@ Item {
         property string label: ""
         property bool accent: false
         signal clicked()
-        height: 38; radius: Theme.radius; color: "transparent"
-        border.width: 1; border.color: "transparent"
+        height: 38; radius: Theme.radius; color: "#00000000"
+        border.width: 1; border.color: Theme.border
 
         Text {
             anchors.centerIn: parent; text: parent.label
-            color: parent.accent ? Theme.accent : Theme.text
+            color: parent.accent ? Theme.accent : Theme.textDim
             font.family: Theme.fontFamily; font.pixelSize: 11; font.bold: true; font.letterSpacing: .5
         }
 
         MouseArea {
             anchors.fill: parent; hoverEnabled: true
-            onEntered: parent.border.color = "#ffffff"
-            onExited: parent.border.color = "transparent"
+            onEntered: { parent.color = Theme.alpha(Theme.accent, 0.08); parent.border.color = Theme.accent }
+            onExited: { parent.color = "#00000000"; parent.border.color = Theme.border }
             onClicked: parent.clicked()
         }
     }
 
-    component CleanupButton: Item {
+    component CleanupButton: Rectangle {
         id: cleanupRoot
-        property string label: ""
-        property string value: ""
-        property string actionText: ""
+        required property string label
+        required property string value
+        required property string actionText
         signal clicked()
-        height: 38
 
-        Rectangle {
-            id: cleanupHoverBorder
-            anchors.fill: parent; radius: Theme.radius; color: "transparent"
-            border.width: 1; border.color: "transparent"
+        width: parent.width
+        height: 42
+        radius: Theme.radius
+        color: "#00000000"
+        border.width: 1
+        border.color: Theme.border
+
+        Text {
+            anchors.left: parent.left
+            anchors.leftMargin: 14
+            anchors.verticalCenter: parent.verticalCenter
+            text: cleanupRoot.label
+            color: Theme.textDim
+            font.family: Theme.fontFamily
+            font.pixelSize: 13
+            font.bold: true
+            font.letterSpacing: 2
+        }
+
+        Row {
+            anchors.right: parent.right
+            anchors.rightMargin: 14
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 8
 
             Text {
-                anchors.left: parent.left; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter
-                text: cleanupRoot.label; color: Theme.text
-                font.family: Theme.fontFamily; font.pixelSize: 11; font.bold: true; font.letterSpacing: .5
+                text: cleanupRoot.value
+                color: Theme.textDim
+                font.family: Theme.fontFamily
+                font.pixelSize: 12
+                anchors.verticalCenter: parent.verticalCenter
             }
 
             Text {
-                id: cleanupValue
-                anchors.right: actionTextItem.left; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter
-                text: cleanupRoot.value; color: Theme.text; horizontalAlignment: Text.AlignRight
-                font.family: Theme.fontFamily; font.pixelSize: 11
-            }
-
-            Text {
-                id: actionTextItem
-                anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter
-                text: cleanupRoot.actionText; color: Theme.text
-                font.family: Theme.fontFamily; font.pixelSize: 11; font.bold: true; font.letterSpacing: .5
-
-                MouseArea {
-                    anchors.fill: parent; anchors.margins: -8; hoverEnabled: true
-                    onEntered: { cleanupHoverBorder.border.color = "#ffffff"; actionTextItem.color = Theme.accent }
-                    onExited: { cleanupHoverBorder.border.color = "transparent"; actionTextItem.color = Theme.text }
-                    onClicked: cleanupRoot.clicked()
-                }
+                text: cleanupRoot.actionText
+                color: Theme.textDim
+                font.family: Theme.fontFamily
+                font.pixelSize: 12
+                font.bold: true
+                font.letterSpacing: 1
+                anchors.verticalCenter: parent.verticalCenter
             }
         }
 
         MouseArea {
-            anchors.fill: parent; z: -1; hoverEnabled: true
-            onEntered: cleanupHoverBorder.border.color = "#ffffff"
-            onExited: cleanupHoverBorder.border.color = "transparent"
+            anchors.fill: parent
+            hoverEnabled: true
+
+            onEntered: {
+                parent.color = Theme.alpha(Theme.accent, 0.08)
+                parent.border.color = Theme.accent
+            }
+
+            onExited: {
+                parent.color = "#00000000"
+                parent.border.color = Theme.border
+            }
+
             onClicked: cleanupRoot.clicked()
         }
     }

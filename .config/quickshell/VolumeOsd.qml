@@ -101,7 +101,7 @@ PanelWindow {
         anchors.topMargin: 30
 
         radius: 36
-        color: "#80000000"
+        color: Theme.alpha(Theme.bg, 0.5)   // was: "#80000000"
 
         opacity: root.showing ? 1 : 0
         scale: root.showing ? 1 : 0.9
@@ -142,7 +142,7 @@ PanelWindow {
             font.family: "Symbols Nerd Font"
             font.pixelSize: 20
 
-            color: "white"
+            color: Theme.text
         }
 
         Text {
@@ -157,7 +157,7 @@ PanelWindow {
             font.pixelSize: 12
             font.bold: true
 
-            color: "white"
+            color: Theme.text
         }
 
         Rectangle {
@@ -182,7 +182,7 @@ PanelWindow {
                 height: parent.height
                 radius: 4
 
-                color: "white"
+                color: Theme.text
 
                 Behavior on width {
                     NumberAnimation {

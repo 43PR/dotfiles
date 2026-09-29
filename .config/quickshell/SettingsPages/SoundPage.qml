@@ -85,7 +85,7 @@ Item {
                 }
                 Text {
                     width: 76; anchors.verticalCenter: parent.verticalCenter
-                    text: "OUTPUT"; color: page.muted ? Theme.textDim : Theme.accent
+                    text: "OUTPUT"; color: Theme.text
                     font.family: Theme.fontFamily; font.pixelSize: 15; font.letterSpacing: 2
                 }
                 Slider {
@@ -156,7 +156,7 @@ Item {
                 }
                 Text {
                     width: 76; anchors.verticalCenter: parent.verticalCenter
-                    text: "INPUT"; color: page.inputMuted ? Theme.textDim : Theme.accent
+                    text: "INPUT"; color: Theme.text
                     font.family: Theme.fontFamily; font.pixelSize: 15; font.letterSpacing: 2
                 }
                 Slider {
@@ -213,7 +213,7 @@ Item {
                 width: parent.width; spacing: 10
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "PER-APP VOLUME"; color: Theme.accent
+                    text: "PER-APP VOLUME"; color: Theme.text
                     font.family: Theme.fontFamily; font.pixelSize: 14; font.letterSpacing: 2
                 }
                 Text {

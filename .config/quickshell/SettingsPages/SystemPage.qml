@@ -139,7 +139,7 @@ Item {
         ctx.lineTo(w, h)
         ctx.closePath()
 
-        ctx.fillStyle = Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.10)
+        ctx.fillStyle = Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.10)
         ctx.fill()
 
         ctx.beginPath()
@@ -150,7 +150,7 @@ Item {
             else ctx.moveTo(x, y)
         }
 
-        ctx.strokeStyle = Theme.text
+        ctx.strokeStyle = Theme.accent
         ctx.lineWidth = 2
         ctx.lineJoin = "round"
         ctx.lineCap = "round"

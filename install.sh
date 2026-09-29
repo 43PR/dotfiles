@@ -301,19 +301,21 @@ fi
 
 info "Setting executable permissions on shell scripts..."
 
-find "$CONFIG_DIR" \
-    -type f \
-    -name "*.sh" \
-    -exec chmod +x {} \;
+find "$CONFIG_DIR" -type f \( -name "*.sh" -o -name "*.py" \) -exec chmod +x {} \;
 
 success "Shell script permissions configured."
 
 # --------------------------------------------------
-# Config Update (Set to current user)
+# Initial theme (generates the files the configs include)
 # --------------------------------------------------
 
-info "Updating Config..."
-sed -i "s/rp34/$USER/g" "$HOME/.config/wlogout/style.css"
+if command -v python3 >/dev/null 2>&1; then
+    info "Generating initial theme..."
+    python3 "$CONFIG_DIR/43pr/bin/theme.py" apply \
+        || warning "Initial theme generation failed."
+else
+    warning "python3 not found; skipping initial theme generation. Configs will use the committed fallback colors until you install python3 and run 'theme apply'."
+fi
 
 # --------------------------------------------------
 # Finish

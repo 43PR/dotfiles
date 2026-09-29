@@ -28,6 +28,7 @@ awww
 grim
 slurp
 imagemagick
+matugen
 
 # --------------------------------------------------
 # Networking / Bluetooth

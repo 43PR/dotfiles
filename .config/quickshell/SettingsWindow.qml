@@ -124,7 +124,8 @@ PanelWindow {
         { name: "Network", icon: "\uf1eb", page: "NetworkPage" },
         { name: "Bluetooth", icon: "󰂯", page: "BluetoothPage" },
         { name: "Storage", icon: "󰋊", page: "StoragePage" },
-        { name: "Configs", icon: "󰧮",  page: "ConfigsPage" }
+        { name: "Configs", icon: "󰧮",  page: "ConfigsPage" },
+        { name: "Themes", icon: "󰉼",  page: "ThemesPage" }
     ]
 
     property int selectedIndex: 0
@@ -217,13 +218,6 @@ PanelWindow {
                     margins: 14
                 }
             }
-
-            // -------------------------
-            // Position handle (top-center tab)
-            // -------------------------
-            // Pill sitting on the top border. Click the pill body to snap
-            // to top; the five glyphs inside pick an exact spot in order:
-            // left, top, center, bottom, right.
             Rectangle {
                 id: positionHandle
 
@@ -322,11 +316,13 @@ PanelWindow {
                 anchors.fill: parent
                 anchors.margins: 28
                 spacing: 28
+
                 Column {
                     id: sidebar
                     width: 130
                     height: parent.height
                     spacing: 12
+
                     Text {
                         text: " SETTINGS"
                         color: Theme.text
@@ -342,67 +338,91 @@ PanelWindow {
                         color: Theme.border
                     }
 
-                    Column {
+                    Flickable {
+                        id: sidebarFlickable
                         width: parent.width
-                        spacing: 4
-                        Repeater {
-                            model: root.navItems
-                            delegate: Rectangle {
-                                required property var modelData
-                                required property int index
-                                width: sidebar.width
-                                height: 38
-                                radius: Theme.radius
-                                color: root.selectedIndex === index
-                                    ? Theme.alpha(Theme.accent, 0.12)
-                                    : "transparent"
-                                border.width: root.selectedIndex === index ? 1 : 0
-                                border.color: Theme.accent
-                                Rectangle {
-                                    visible: root.selectedIndex === index
-                                    width: 3
-                                    height: parent.height - 10
-                                    anchors {
-                                        verticalCenter: parent.verticalCenter
-                                        left: parent.left
-                                    }
-                                    color: Theme.accent2
-                                }
-                                Row {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    anchors.left: parent.left
-                                    anchors.leftMargin: 16
-                                    spacing: 12
-                                    height: 20
-                                    Text {
-                                        width: 18
-                                        height: parent.height
-                                        verticalAlignment: Text.AlignVCenter
-                                        horizontalAlignment: Text.AlignHCenter
-                                        text: modelData.icon
-                                        font.family: Theme.iconFont
-                                        font.pixelSize: 14
-                                        // Icon color
-                                        color: root.selectedIndex === index
-                                            ? Theme.text
-                                            : Theme.textDim
+                        height: Math.max(0, parent.height - 48)
+                        contentWidth: width
+                        contentHeight: navColumn.height
+                        clip: true
+                        boundsBehavior: Flickable.StopAtBounds
+                        interactive: contentHeight > height
+
+                        WheelHandler {
+                            target: sidebarFlickable
+                            property: "contentY"
+                            onActiveChanged: {
+                                if (!active)
+                                    sidebarFlickable.returnToBounds()
+                            }
+                        }
+
+                        Column {
+                            id: navColumn
+                            width: sidebarFlickable.width
+                            spacing: 4
+
+                            Repeater {
+                                model: root.navItems
+                                delegate: Rectangle {
+                                    required property var modelData
+                                    required property int index
+                                    width: sidebar.width
+                                    height: 38
+                                    radius: Theme.radius
+                                    color: root.selectedIndex === index
+                                        ? Theme.alpha(Theme.accent, 0.12)
+                                        : "transparent"
+                                    border.width: root.selectedIndex === index ? 1 : 0
+                                    border.color: Theme.accent
+
+                                    Rectangle {
+                                        visible: root.selectedIndex === index
+                                        width: 3
+                                        height: parent.height - 10
+                                        anchors {
+                                            verticalCenter: parent.verticalCenter
+                                            left: parent.left
+                                        }
+                                        color: Theme.accent2
                                     }
 
-                                    Text {
-                                        height: parent.height
-                                        verticalAlignment: Text.AlignVCenter
-                                        text: modelData.name
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: 13
-                                        color: root.selectedIndex === index
-                                            ? Theme.text
-                                            : Theme.textDim
-                                    }
-                                }
+                                    Row {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        anchors.left: parent.left
+                                        anchors.leftMargin: 16
+                                        spacing: 12
+                                        height: 20
 
-                                MouseArea {
-                                    anchors.fill: parent
-                                    onClicked: root.selectedIndex = index
+                                        Text {
+                                            width: 18
+                                            height: parent.height
+                                            verticalAlignment: Text.AlignVCenter
+                                            horizontalAlignment: Text.AlignHCenter
+                                            text: modelData.icon
+                                            font.family: Theme.iconFont
+                                            font.pixelSize: 14
+                                            color: root.selectedIndex === index
+                                                ? Theme.text
+                                                : Theme.textDim
+                                        }
+
+                                        Text {
+                                            height: parent.height
+                                            verticalAlignment: Text.AlignVCenter
+                                            text: modelData.name
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 13
+                                            color: root.selectedIndex === index
+                                                ? Theme.text
+                                                : Theme.textDim
+                                        }
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        onClicked: root.selectedIndex = index
+                                    }
                                 }
                             }
                         }
@@ -419,6 +439,7 @@ PanelWindow {
                     width: parent.width - sidebar.width - 29
                     height: parent.height
                     clip: true
+
                     Loader {
                         id: pageLoader
                         anchors.fill: parent
@@ -428,6 +449,7 @@ PanelWindow {
                         opacity: 0
                         Component.onCompleted: opacity = 1
                         onSourceChanged: fadeIn.restart()
+
                         Behavior on opacity {
                             NumberAnimation {
                                 duration: Theme.animMed
@@ -436,11 +458,13 @@ PanelWindow {
 
                         SequentialAnimation {
                             id: fadeIn
+
                             PropertyAction {
                                 target: pageLoader
                                 property: "opacity"
                                 value: 0
                             }
+
                             NumberAnimation {
                                 target: pageLoader
                                 property: "opacity"

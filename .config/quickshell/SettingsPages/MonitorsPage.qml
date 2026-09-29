@@ -343,7 +343,7 @@ Item {
                 Slider {
                     width: parent.width - 28 - page.labelWidth - 16 - page.sliderMarginRight
                     height: 72; anchors.verticalCenter: parent.verticalCenter
-                    label: ""; icon: ""; value: page.nightlightValue; accentColor: "#ffffff"
+                    label: ""; icon: ""; value: page.nightlightValue; accentColor: Theme.accent2
                     onMoved: value => page.commitNightlight(value)
                 }
             }

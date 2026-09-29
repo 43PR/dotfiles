@@ -1,5 +1,4 @@
--- ~/.config/hypr/rules.lua
--- Migrated from rules.conf
+
 -- Docs: https://wiki.hypr.land/Configuring/Basics/Window-Rules/
 
 hl.layer_rule({
@@ -11,7 +10,12 @@ hl.layer_rule({
 -- Opacity rules: 90% for all windows except fullscreen
 hl.window_rule({
     match = { class = ".*" },
-    opacity = "0.9 override",
+    opacity = "1.0 override",
+})
+
+hl.window_rule({
+    match = { class = "kitty" },
+    suppress_event = "maximize",
 })
 
 hl.window_rule({

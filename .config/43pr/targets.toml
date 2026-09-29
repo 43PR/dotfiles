@@ -1,0 +1,29 @@
+# Each target: input template -> output file. Optional `reload` is an argv list
+# that runs once after ALL targets were written successfully.
+
+[kitty]
+input  = "~/.config/43pr/templates/kitty.conf"
+output = "~/.config/kitty/matugen.conf"
+reload = ["pkill", "-USR1", "-x", "kitty"]
+[rofi]
+input  = "~/.config/43pr/templates/rofi-colors.rasi"
+output = "~/.config/rofi/colors.rasi"
+[waybar]
+input  = "~/.config/43pr/templates/waybar-colors.css"
+output = "~/.config/waybar/colors.css"
+reload = ["pkill", "-SIGUSR2", "waybar"]
+[hyprlock]
+input  = "~/.config/43pr/templates/hyprlock-colors.conf"
+output = "~/.config/hypr/hyprlock-colors.conf"
+[wlogout]
+input  = "~/.config/43pr/templates/wlogout-colors.css"
+output = "~/.config/wlogout/colors.css"
+[gtk3]
+input  = "~/.config/43pr/templates/gtk-colors.css"
+output = "~/.config/gtk-3.0/colors.css"
+[gtk4]
+input  = "~/.config/43pr/templates/gtk-colors.css"
+output = "~/.config/gtk-4.0/colors.css"
+[quickshell]
+input  = "~/.config/43pr/templates/quickshell-theme.json"
+output = "~/.cache/43pr/quickshell-theme.json"

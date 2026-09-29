@@ -1,0 +1,4 @@
+bg={{bg}}
+bg_alpha70={{bg|alpha=70}}
+fg_rgb={{fg|rgb}}
+accent_stripped={{accent|strip}}

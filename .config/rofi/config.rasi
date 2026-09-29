@@ -1,4 +1,4 @@
-
+@import "colors.rasi"
 configuration {
     modes: "combi";
     combi-modes: "window,run,drun";
@@ -28,19 +28,7 @@ configuration {
     display-ssh: "";
 }
 
-* {
-    bg: #00000070;
-    border-color: #FFFFFF;
-    bg-alt: #00000000;
-    bg-hover: #242832FF;
-    bg-selected: #FFFFFF00;
-    fg: #E6EAF2FF;
-    fg-muted: #8B93A7FF;
-    fg-dark: #6f6f6f;
-    accent: #7AA2F7FF;
-    accent-soft: #7AA2F733;
-    urgent: #F7768EFF;
-    
+* {    
     background-color: transparent;
     text-color: @fg;
     margin: 0;
@@ -55,7 +43,7 @@ window {
     background-color: @bg;
     border: 1px;
     border-color: @border-color;
-    border-radius: 5px;
+    border-radius: 10px;
     padding: 10;
 }
 
@@ -69,7 +57,7 @@ inputbar {
     background-color: @bg-alt;
     border: 1px;
     border-color: transparent;
-    border-radius: 5px;
+    border-radius: 10px;
     padding: 5px 15px;
     spacing: 12px;
     children: [prompt, entry];
@@ -78,7 +66,7 @@ inputbar {
 prompt {
     enabled: true;
     background-color: transparent;
-    text-color: @accent;
+    text-color: @border-color;
     font: "Iosevka Nerd Font 12";
     padding: 0;
     vertical-align: 0.5;
@@ -86,7 +74,7 @@ prompt {
 
 entry {
     background-color: transparent;
-    text-color: @fg;
+    text-color: @border-color;
     font: "Iosevka 12";
     placeholder: "";
     placeholder-color: @fg-muted;
@@ -109,7 +97,7 @@ listview {
 element {
     background-color: transparent;
     border: 0;
-    border-radius: 5px;
+    border-radius: 10px;
     padding: 10px 14px;
     spacing: 14px;
 }
@@ -136,7 +124,7 @@ element alternate.normal {
 element normal.active,
 element alternate.active {
     background-color: transparent;
-    text-color: @accent;
+    text-color: @border-color;
 }
 
 element normal.urgent,
@@ -149,8 +137,8 @@ element selected.normal,
 element selected.active {
     background-color: @bg-selected;
     border: 1px;
-    border-color: #FFFFFF;
-    text-color: #FFFFFF;
+    border-color: @border-color;
+    text-color: @border-color;
 }
 
 element selected.urgent {
@@ -182,7 +170,7 @@ button {
     text-color: @fg-muted;
     border: 1px;
     border-color: @border-color;
-    border-radius: 5px;
+    border-radius: 10px;
     padding: 10px 14px;
     margin: 2px;
 }
