@@ -27,10 +27,10 @@ Item {
     property real lastTx: -1
     property real lastTs: 0
 
-    property int contentMargin: 0
-    property int contentRightMargin: 48
-    property int contentTopMargin: 0
-    property int contentBottomMargin: 0
+    property real marginLeft: 0
+    property real marginRight: 55
+    property real marginTop: 0
+    property real marginBottom: 0
 
     // Nerd Font glyphs
     readonly property string icDown: "\uf019"
@@ -267,35 +267,17 @@ Item {
 
     Column {
         anchors.fill: parent
-        anchors.leftMargin: page.contentMargin
-        anchors.rightMargin: page.contentRightMargin
-        anchors.topMargin: page.contentTopMargin
-        anchors.bottomMargin: page.contentBottomMargin
-        spacing: 9
+        anchors.leftMargin: page.marginLeft; anchors.rightMargin: page.marginRight
+        anchors.topMargin: page.marginTop; anchors.bottomMargin: page.marginBottom
+        spacing: 14
 
         // ── Header ───────────────────────────────────────────────
-        Item {
-            id: header
-            width: parent.width
-            height: 36
-
-            Text {
-                text: "NETWORK"
-                color: Theme.text
-                font.family: page.monoFont
-                font.pixelSize: 19
-                font.letterSpacing: 3
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.verticalCenterOffset: -6
-            }
+        Text {
+            text: "NETWORK"; color: Theme.text
+            font.family: page.monoFont; font.pixelSize: 19; font.letterSpacing: 3
         }
 
-        Rectangle {
-            width: parent.width
-            height: 1
-            color: Theme.border
-        }
+        Rectangle { width: parent.width; height: 1; color: Theme.border }
 
         // ── Wi-Fi toggle + speed stats ──────────────────────────
         Column {
@@ -451,7 +433,7 @@ Item {
         Item {
             id: listContainer
             width: parent.width
-            height: parent.height - header.height - 1 - statsRow.height - ethCard.height - 4 * 9
+            height: parent.height - y
 
             Flickable {
                 anchors.fill: parent

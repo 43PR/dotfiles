@@ -1,3 +1,4 @@
+// .config/quickshell/SettingsPages/ConfigsPage.qml
 import QtQuick
 import QtQuick.Controls
 import Quickshell
@@ -5,7 +6,6 @@ import "../"
 
 Item {
     id: page
-
     property real marginLeft: 0
     property real marginRight: 55
     property real marginTop: 0
@@ -255,7 +255,7 @@ Item {
                 }
             }
             Text {
-                text: "SETTINGS"
+                text: "BINDS"
                 color: Theme.text
                 font.family: Theme.fontFamily
                 font.pixelSize: 16
@@ -270,8 +270,8 @@ Item {
                 width: parent.width
                 spacing: page.sectionSpacing
                 ConfigButton {
-                    label: "COLORS - TEAKS"
-                    path: "~/.config/quickshell/Theme.qml"
+                    label: "MOUSE HOVER TRIGGERS"
+                    path: "~/.config/quickshell/SettingsCornerTrigger.qml"
                 }
             }
         }

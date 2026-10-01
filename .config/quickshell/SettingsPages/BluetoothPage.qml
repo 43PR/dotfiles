@@ -11,10 +11,10 @@ Item {
     readonly property bool powered: adapter ? adapter.enabled : false
     readonly property bool scanning: adapter ? adapter.discovering : false
     property string statusText: ""
-    property int contentMargin: 0
-    property int contentRightMargin: 48
-    property int contentTopMargin: 0
-    property int contentBottomMargin: 0
+    property real marginLeft: 0
+    property real marginRight: 55
+    property real marginTop: 0
+    property real marginBottom: 0
 
     // key -> timestamp (ms) the device was hidden after "unpair".
     // Entries are pruned automatically (see pruneRemovingDevices) so a
@@ -222,33 +222,16 @@ Item {
 
     Column {
         anchors.fill: parent
-        anchors.leftMargin: page.contentMargin
-        anchors.rightMargin: page.contentRightMargin
-        anchors.topMargin: page.contentTopMargin
-        anchors.bottomMargin: page.contentBottomMargin
-        spacing: 9
+        anchors.leftMargin: page.marginLeft; anchors.rightMargin: page.marginRight
+        anchors.topMargin: page.marginTop; anchors.bottomMargin: page.marginBottom
+        spacing: 14
 
-        Item {
-            id: header
-            width: parent.width
-            height: 36
-
-            Text {
-                text: "BLUETOOTH"
-                color: Theme.text
-                font.family: Theme.fontFamily
-                font.pixelSize: 18
-                font.letterSpacing: 3
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.verticalCenterOffset: -6
-            }
+        Text {
+            text: "BLUETOOTH"; color: Theme.text
+            font.family: Theme.fontFamily; font.pixelSize: 19; font.letterSpacing: 3
         }
 
-        Rectangle {
-            width: parent.width
-            height: 1
-            color: Theme.border
-        }
+        Rectangle { width: parent.width; height: 1; color: Theme.border }
 
         Rectangle {
             id: bluetoothToggle
@@ -291,7 +274,7 @@ Item {
         Flickable {
             id: flick
             width: parent.width
-            height: parent.height - header.height - 1 - bluetoothToggle.height - 3 * 9
+            height: parent.height - y
             clip: true
             contentWidth: width
             contentHeight: list.height

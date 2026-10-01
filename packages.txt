@@ -1,6 +1,9 @@
 # 43PR/dotfiles
 # Install e.g.: sudo pacman -S cava
 # Remove e.g.: sudo pacman -R cava
+#
+# Names that aren't in the official repos are installed from the AUR
+# automatically by install.sh (if an AUR helper is available).
 
 # --------------------------------------------------
 # Hyprland / Wayland / Desktop
@@ -8,17 +11,23 @@
 
 hyprland
 hyprlock
+hyprpolkitagent
 wlogout
 quickshell
 waybar
 rofi
+polkit
+qt6-wayland
 
 # --------------------------------------------------
-# Wayland / X11 Compatibility / Desktop Portals
+# Desktop Portals / X11 Compatibility / User Dirs
 # --------------------------------------------------
 
 xdg-desktop-portal-hyprland
+xdg-desktop-portal-gtk
 xorg-xwayland
+xdg-user-dirs
+xdg-utils
 
 # --------------------------------------------------
 # Wallpaper / Screenshots / Image Tools
@@ -29,14 +38,13 @@ grim
 slurp
 imagemagick
 matugen
-python
 
 # --------------------------------------------------
 # Networking / Bluetooth
 # --------------------------------------------------
 
 networkmanager
-nm-applet
+network-manager-applet
 bluez
 bluez-utils
 
@@ -72,15 +80,24 @@ eza
 # --------------------------------------------------
 
 thunar
-xed
+thunar-volman
+thunar-archive-plugin
+gvfs
 tumbler
 ffmpegthumbnailer
+xed
 ncdu
 
 # --------------------------------------------------
-# GTK / Icons / Appearance
+# GTK / Theming / Icons / Appearance
 # --------------------------------------------------
 
+gtk3
+gtk4
+glib2
+dconf
+gsettings-desktop-schemas
+adw-gtk-theme
 papirus-icon-theme
 papirus-folders
 nwg-look
@@ -106,6 +123,7 @@ gammastep
 # --------------------------------------------------
 
 dunst
+libnotify
 
 # --------------------------------------------------
 # Terminal / System Visualizers
@@ -125,9 +143,11 @@ ttf-font-awesome
 ttf-roboto-mono
 
 # --------------------------------------------------
-# Package / Application Utilities
+# Scripting / Package / Application Utilities
 # --------------------------------------------------
 
+python
+jq
 flatpak
 curl
 unzip
@@ -137,4 +157,3 @@ unzip
 # --------------------------------------------------
 
 hyprmod
-

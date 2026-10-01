@@ -270,13 +270,20 @@ fi
 # Wallpapers
 # --------------------------------------------------
 
+info "Creating user directories..."
+
+if command -v xdg-user-dirs-update >/dev/null 2>&1; then
+    xdg-user-dirs-update
+fi
+
+mkdir -p "$HOME/Pictures/Wallpapers"
+
 if [[ -d "$REPO_DIR/Wallpapers" ]]; then
     info "Installing wallpapers..."
-
-    mkdir -p "$HOME/Pictures/Wallpapers"
     cp -a "$REPO_DIR/Wallpapers/." "$HOME/Pictures/Wallpapers/"
-
     success "Wallpapers installed."
+else
+    warning "No Wallpapers directory in the repo; created an empty ~/Pictures/Wallpapers."
 fi
 
 # --------------------------------------------------
@@ -316,6 +323,42 @@ if command -v python3 >/dev/null 2>&1; then
 else
     warning "python3 not found; skipping initial theme generation. Configs will use the committed fallback colors until you install python3 and run 'theme apply'."
 fi
+
+# --------------------------------------------------
+# Dark color scheme (GTK / libadwaita / portals)
+# --------------------------------------------------
+
+info "Setting dark color scheme preference..."
+
+gset() {
+    if [[ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]]; then
+        gsettings set "$1" "$2" "$3"
+    else
+        dbus-run-session -- gsettings set "$1" "$2" "$3"
+    fi
+}
+
+if command -v gsettings >/dev/null 2>&1; then
+    gset org.gnome.desktop.interface color-scheme 'prefer-dark' \
+        && success "color-scheme set to prefer-dark." \
+        || warning "gsettings failed (is dconf installed?)."
+    gset org.gnome.desktop.interface gtk-theme 'adw-gtk3-dark' || true
+    gset org.gnome.desktop.interface icon-theme 'Papirus-Dark' || true
+else
+    warning "gsettings not found; install glib2 and dconf."
+fi
+
+# Fallback that works without a session bus
+for v in 3 4; do
+    f="$CONFIG_DIR/gtk-$v.0/settings.ini"
+    mkdir -p "$(dirname "$f")"
+    [[ -f "$f" ]] || printf '[Settings]\n' > "$f"
+    if grep -q '^gtk-application-prefer-dark-theme' "$f"; then
+        sed -i 's/^gtk-application-prefer-dark-theme.*/gtk-application-prefer-dark-theme=1/' "$f"
+    else
+        printf 'gtk-application-prefer-dark-theme=1\n' >> "$f"
+    fi
+done
 
 # --------------------------------------------------
 # Finish

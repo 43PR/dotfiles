@@ -1,7 +1,7 @@
 [general]
 mode = normal
 framerate = 60
-sensitivity = 200
+sensitivity = 100
 autosens = 0
 bar_width = 1.5
 bar_spacing = 0.4
@@ -26,5 +26,5 @@ gradient_color_7 = '#BBBBBB'
 gradient_color_8 = '#FFFFFF'
 
 [smoothing]
-noise_reduction = 75
+noise_reduction = 90
 

@@ -5,33 +5,37 @@ import "../"
 
 Item {
     id: page
-
     property real marginLeft: 0
     property real marginRight: 55
     property real marginTop: 0
     property real marginBottom: 0
     property real sectionSpacing: 6
 
+    function editConfig(path) {
+        Quickshell.execDetached([
+            "xed",
+            path.replace(/^~/, Quickshell.env("HOME"))
+        ])
+    }
+
     function runTheme(themeName) {
         console.log("Running theme:", themeName)
-
         Quickshell.execDetached([
-            "python3",
-            "/home/rp34/.config/43pr/bin/theme.py",
+            "/bin/sh",
+            "-c",
+            "python3 \"$HOME/.config/43pr/bin/theme.py\" \"$1\"",
+            "theme",
             themeName
         ])
     }
 
-    component ThemeButton: Rectangle {
-        id: button
-
+    component ConfigButton: Rectangle {
         required property string label
-        required property string command
+        required property string path
 
         width: parent.width
         height: 42
         radius: Theme.radius
-
         color: "#00000000"
         border.width: 1
         border.color: Theme.border
@@ -40,8 +44,73 @@ Item {
             anchors.left: parent.left
             anchors.leftMargin: 14
             anchors.verticalCenter: parent.verticalCenter
+            text: label
+            color: Theme.textDim
+            font.family: Theme.fontFamily
+            font.pixelSize: 13
+            font.bold: true
+            font.letterSpacing: 2
+        }
 
-            text: button.label
+        Row {
+            anchors.right: parent.right
+            anchors.rightMargin: 14
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 8
+
+            Text {
+                text: "\uf120"
+                color: Theme.textDim
+                font.family: Theme.iconFont
+                font.pixelSize: 13
+                anchors.verticalCenter: parent.verticalCenter
+            }
+
+            Text {
+                text: "EDIT " + path.split("/").pop().toUpperCase()
+                color: Theme.textDim
+                font.family: Theme.fontFamily
+                font.pixelSize: 12
+                font.bold: true
+                font.letterSpacing: 1
+                anchors.verticalCenter: parent.verticalCenter
+            }
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            hoverEnabled: true
+
+            onEntered: {
+                parent.color = Theme.alpha(Theme.accent, 0.08)
+                parent.border.color = Theme.accent
+            }
+
+            onExited: {
+                parent.color = "#00000000"
+                parent.border.color = Theme.border
+            }
+
+            onClicked: page.editConfig(path)
+        }
+    }
+
+    component ThemeButton: Rectangle {
+        required property string label
+        required property string command
+
+        width: parent.width
+        height: 42
+        radius: Theme.radius
+        color: "#00000000"
+        border.width: 1
+        border.color: Theme.border
+
+        Text {
+            anchors.left: parent.left
+            anchors.leftMargin: 14
+            anchors.verticalCenter: parent.verticalCenter
+            text: label
             color: Theme.textDim
             font.family: Theme.fontFamily
             font.pixelSize: 13
@@ -64,7 +133,7 @@ Item {
             }
 
             Text {
-                text: button.command.toUpperCase()
+                text: command.toUpperCase()
                 color: Theme.textDim
                 font.family: Theme.fontFamily
                 font.pixelSize: 12
@@ -79,38 +148,31 @@ Item {
             hoverEnabled: true
 
             onEntered: {
-                button.color = Theme.alpha(Theme.accent, 0.08)
-                button.border.color = Theme.accent
+                parent.color = Theme.alpha(Theme.accent, 0.08)
+                parent.border.color = Theme.accent
             }
 
             onExited: {
-                button.color = "#00000000"
-                button.border.color = Theme.border
+                parent.color = "#00000000"
+                parent.border.color = Theme.border
             }
 
-            onClicked: {
-                console.log("Theme button clicked:", button.command)
-                page.runTheme(button.command)
-            }
+            onClicked: page.runTheme(command)
         }
     }
 
     Flickable {
         id: flick
-
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.bottom: parent.bottom
-
         anchors.leftMargin: page.marginLeft
         anchors.rightMargin: page.marginRight
         anchors.topMargin: page.marginTop
         anchors.bottomMargin: page.marginBottom
-
         contentWidth: width
         contentHeight: content.height
-
         clip: true
         boundsBehavior: Flickable.StopAtBounds
 
@@ -130,7 +192,6 @@ Item {
 
         Column {
             id: content
-
             width: flick.width
             spacing: 14
 
@@ -148,8 +209,18 @@ Item {
                 color: Theme.border
             }
 
+            Column {
+                width: parent.width
+                spacing: page.sectionSpacing
+
+                ThemeButton {
+                    label: "DEFAULT THEME"
+                    command: "default"
+                }
+            }
+
             Text {
-                text: "CREATED"
+                text: "SETTINGS MENU"
                 color: Theme.text
                 font.family: Theme.fontFamily
                 font.pixelSize: 16
@@ -166,9 +237,14 @@ Item {
                 width: parent.width
                 spacing: page.sectionSpacing
 
-                ThemeButton {
-                    label: "DEFAULT"
-                    command: "default"
+                ConfigButton {
+                    label: "OPACITY"
+                    path: "~/.config/43pr/templates/quickshell-theme.json"
+                }
+
+                ConfigButton {
+                    label: "THEME"
+                    path: "~/.config/quickshell/Theme.qml"
                 }
             }
         }

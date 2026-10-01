@@ -2,7 +2,7 @@
 
 ## Hyprland Setup by 43pr メ
 
-Simple setup focused on keyboard and mouse workflows, practical keybinds, productivity, and easy to customize. Feel free to use as inspiration or as a starting point for building your own setup.
+Simple setup focused on practical keybinds, productivity, and easy to customize. Feel free to use as inspiration or as a starting point for building your own setup.
 
 ![Hyprland](https://img.shields.io/badge/Hyprland-0.56.2-8b9aaf?style=for-the-badge&labelColor=101418)
 ![GitHub last commit](https://img.shields.io/github/last-commit/43PR/dotfiles?style=for-the-badge&labelColor=101418&color=8b9aaf)
@@ -25,20 +25,21 @@ Wallpapers: https://wallhaven.cc/user/43pr
 
 ## Features
 
-* **Waybar** > Change volume with mouse wheel, mute, play/pause, next and blue light filter
-* **Custom settings menu** > System info, Network, Bluetooth, Monitors, Sound: switch output, per app volume
-* **Custom wallpaper selector** > (Awww + Quickshell)
-* **App launcher (Rofi)** > App search/open, clipboard history and switch opacity
-* **Zsh shell + starship** > (Customizable command-line shell)
-* **Spotify + Spicetify Theme:** > text by darkthemer (edited)
-* **Custom monochrome theme**
-* **Custom scripts** 
-* **Hyprlock** > (Lock screen)
-* **Wlogout** > (Logout menu)
-* **Terminal:** Kitty
-* **File manager:** Thunar
-* **Editor:** Xed, VSCodium
-  
+- **Waybar** — Volume control, mute, and media playback controls.
+- **Quickshell Settings** — System, network, bluetooth, display, audio, storage, and more.
+- **Dynamic Colors** — Wallpaper-based color generation with **Matugen**.
+- **Wallpaper Selector** — Custom wallpaper picker powered by **Awww + Quickshell**.
+- **App Launcher** — **Rofi** for application search, clipboard history, and opacity control.
+- **Zsh + Starship** — Customizable shell with autocompletion, history, and a polished prompt.
+- **Spotify + Spicetify** — Custom theme based on **Darkthemer**, with personal modifications.
+- **Monochrome Theme** — Custom monochrome styling across the desktop.
+- **Custom Scripts** — A collection of scripts for workflow and system management.
+- **Hyprlock** — Custom lock screen.
+- **Wlogout** — Custom logout/power menu.
+- **Terminal** — Kitty.
+- **File Manager** — Thunar.
+- **Text Editor** — Xed.
+
 > All programs: [packages.txt](packages.txt)
 
 ### Wallpaper Selector
@@ -109,4 +110,19 @@ After the installation finishes log out and back in.
 > Waybar custom-gpu is specific to my PC so you can remove it or implement.
 >
 > If you’re having any issues with the wallpaper picker, you can clear the cache from the Storage page in Settings.
+
+---
+## Updating
+
+To pull the latest changes and update your configuration, run the updater from the dotfiles folder:
+
+```bash
+cd dotfiles
+chmod +x update.sh
+./update.sh
+```
+
+Existing configuration files that are replaced will be backed up automatically.
+
+After the update finishes, log out and back in so all changes are applied.
 

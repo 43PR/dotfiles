@@ -4,10 +4,11 @@ import QtQuick
 
 Item {
     id: root
-    property bool hyprlockEnabled: true
+    // top left corner: wlogout - top center: settings, rofi, wallpaper picker - top right: logoutmenu
+    property bool hyprlockEnabled: true 
     property bool settingsEnabled: true
-    property bool rofiEnabled: true
-    property bool wallpaperEnabled: true
+    property bool rofiEnabled: false
+    property bool wallpaperEnabled: false
     property bool wlogoutEnabled: true
 
     property int triggerHeight: 10

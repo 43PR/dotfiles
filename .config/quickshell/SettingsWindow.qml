@@ -3,6 +3,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Services.Pipewire
 import QtQuick
+import QtQuick.Shapes
 import "SettingsPages"
 
 PanelWindow {
@@ -20,18 +21,18 @@ PanelWindow {
     function show()   { showing = true }
     function hide()   { showing = false }
     function toggle() { showing = !showing }
-    
+
     property real cardMargin: 40
 
     property real cardHeightCenter: Math.min(640, root.height - cardMargin * 2)
-    property real cardHeightSnapped: cardHeightCenter * 0.6   // 40% smaller when pinned top/bottom
+    property real cardHeightSnapped: cardHeightCenter * 0.6
     property real cardHeight: cardHeightCenter
     property real cardCenterY: (root.height - cardHeight) / 2
     property real cardY: cardCenterY
 
     property real cardWidthCenter: Math.min(980, root.width - cardMargin * 2)
-    property real cardWidthSnapped: cardWidthCenter * 0.85    // width when pinned left/right
-    property real cardHeightSideSnapped: cardHeightCenter * 1.4   // height when pinned left/right (taller than top/bottom snap)
+    property real cardWidthSnapped: cardWidthCenter * 0.85
+    property real cardHeightSideSnapped: cardHeightCenter * 1.4
     property real cardWidth: cardWidthCenter
     property real cardCenterX: (root.width - cardWidth) / 2
     property real cardX: cardCenterX
@@ -119,8 +120,8 @@ PanelWindow {
 
     property var navItems: [
         { name: "System", icon: "󰒓", page: "SystemPage" },
-        { name: "Audio", icon: "\uf028", page: "SoundPage" },
-        { name: "Display", icon: "\uf108", page: "MonitorsPage" },
+        { name: "Audio", icon: "\uf028", page: "AudioPage" },
+        { name: "Display", icon: "\uf108", page: "DisplayPage" },
         { name: "Network", icon: "\uf1eb", page: "NetworkPage" },
         { name: "Bluetooth", icon: "󰂯", page: "BluetoothPage" },
         { name: "Storage", icon: "󰋊", page: "StoragePage" },
@@ -218,31 +219,65 @@ PanelWindow {
                     margins: 14
                 }
             }
-            Rectangle {
+
+            Item {
                 id: positionHandle
-
-                width: 150
-                height: 16
-                radius: Theme.radius
-
-                color: Theme.bg
-                border.color: Theme.accent
-                border.width: 1
-
+                width: 140
+                height: 13
                 anchors {
                     top: parent.top
                     horizontalCenter: parent.horizontalCenter
-                    topMargin: -8
                 }
 
-                MouseArea {
-                    // Clicking the pill body (not the glyphs) snaps to top.
+                Shape {
                     anchors.fill: parent
-                    onClicked: root.snapTop()
+                    preferredRendererType: Shape.CurveRenderer
+
+                    ShapePath {
+                        id: tabPath
+                        property real w: positionHandle.width
+                        property real h: positionHandle.height
+                        property real r: 10
+                        property real fx: 30
+                        property real fy: 0
+
+                        strokeColor: Theme.accent
+                        strokeWidth: 1
+                        fillColor: "transparent"
+                        capStyle: ShapePath.FlatCap
+
+                        startX: 0.5 - fx
+                        startY: 0.5
+
+                        PathArc {
+                            x: 0.5; y: tabPath.fy + 0.5
+                            radiusX: tabPath.fx; radiusY: tabPath.fy
+                            direction: PathArc.Clockwise
+                        }
+                        PathLine { x: 0.5; y: tabPath.h - tabPath.r }
+                        PathArc {
+                            x: tabPath.r + 0.5; y: tabPath.h - 0.5
+                            radiusX: tabPath.r; radiusY: tabPath.r
+                            direction: PathArc.Counterclockwise
+                        }
+                        PathLine { x: tabPath.w - tabPath.r - 0.5; y: tabPath.h - 0.5 }
+                        PathArc {
+                            x: tabPath.w - 0.5; y: tabPath.h - tabPath.r
+                            radiusX: tabPath.r; radiusY: tabPath.r
+                            direction: PathArc.Counterclockwise
+                        }
+                        PathLine { x: tabPath.w - 0.5; y: tabPath.fy + 0.5 }
+                        PathArc {
+                            x: tabPath.w - 0.5 + tabPath.fx; y: 0.5
+                            radiusX: tabPath.fx; radiusY: tabPath.fy
+                            direction: PathArc.Clockwise
+                        }
+                    }
                 }
 
                 Row {
                     anchors.centerIn: parent
+                    anchors.verticalCenterOffset: -1
                     spacing: 20
 
                     Text {
@@ -250,64 +285,40 @@ PanelWindow {
                         font.family: Theme.fontFamily
                         font.pixelSize: 7
                         color: Theme.textDim
-
-                        MouseArea {
-                            anchors.fill: parent
-                            anchors.margins: -4
-                            onClicked: root.snapLeft()
-                        }
+                        anchors.verticalCenter: parent.verticalCenter
+                        MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: root.snapLeft() }
                     }
-
                     Text {
                         text: "▲"
                         font.family: Theme.fontFamily
                         font.pixelSize: 10
                         color: Theme.textDim
-
-                        MouseArea {
-                            anchors.fill: parent
-                            anchors.margins: -4
-                            onClicked: root.snapTop()
-                        }
+                        anchors.verticalCenter: parent.verticalCenter
+                        MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: root.snapTop() }
                     }
-
                     Text {
                         text: "●"
                         font.family: Theme.fontFamily
                         font.pixelSize: 10
                         color: Theme.textDim
-
-                        MouseArea {
-                            anchors.fill: parent
-                            anchors.margins: -4
-                            onClicked: root.snapCenter()
-                        }
+                        anchors.verticalCenter: parent.verticalCenter
+                        MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: root.snapCenter() }
                     }
-
                     Text {
                         text: "▼"
                         font.family: Theme.fontFamily
                         font.pixelSize: 10
                         color: Theme.textDim
-
-                        MouseArea {
-                            anchors.fill: parent
-                            anchors.margins: -4
-                            onClicked: root.snapBottom()
-                        }
+                        anchors.verticalCenter: parent.verticalCenter
+                        MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: root.snapBottom() }
                     }
-
                     Text {
                         text: "▶"
                         font.family: Theme.fontFamily
                         font.pixelSize: 7
                         color: Theme.textDim
-
-                        MouseArea {
-                            anchors.fill: parent
-                            anchors.margins: -4
-                            onClicked: root.snapRight()
-                        }
+                        anchors.verticalCenter: parent.verticalCenter
+                        MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: root.snapRight() }
                     }
                 }
             }

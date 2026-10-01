@@ -9,10 +9,10 @@ Item {
     property var filesystems: []
     property var cleanupInfo: ({yay:0, pacman:0, journal:0, trash:0, flatpak:0, cliphist:0, thumbs:0})
     property var sdaUsageData: null
-    property int contentMargin: 0
-    property int contentRightMargin: 46
-    property int contentTopMargin: 0
-    property int contentBottomMargin: 0
+    property real marginLeft: 0
+    property real marginRight: 55
+    property real marginTop: 0
+    property real marginBottom: 0
     property string pendingAction: ""
     property string pendingTitle: ""
     property string pendingMessage: ""
@@ -41,9 +41,11 @@ Item {
 
     function parseSize(v) {
         if (!v) return 0
-        var p = v.trim().split(/\s+/)
-        var n = parseFloat(p[0])
-        return isNaN(n) ? 0 : n * (p.length > 1 ? (sizeUnits[p[1].toUpperCase()] || 1) : 1)
+        var m = v.trim().match(/^([0-9.]+)\s*([A-Za-z]*)$/)
+        if (!m) return 0
+        var n = parseFloat(m[1])
+        if (isNaN(n)) return 0
+        return n * (m[2] ? (sizeUnits[m[2].toUpperCase()] || 1) : 1)
     }
 
     function usageColor(p) { return p >= 90 ? Theme.danger : p >= 75 ? Theme.accent2 : Theme.accent }
@@ -118,13 +120,14 @@ Item {
         id: pCleanup
         command: [
             "sh", "-c",
-            "printf 'YAY '; du -sb \"$HOME/.cache/yay\" 2>/dev/null | awk '{print $1}'; " +
-            "printf 'PACMAN '; du -sb /var/cache/pacman/pkg 2>/dev/null | awk '{print $1}'; " +
-            "printf 'JOURNAL '; journalctl --disk-usage 2>/dev/null | grep -oE '[0-9.]+ (B|K|M|G|T)' | tail -1; " +
-            "printf 'TRASH '; du -sb \"$HOME/.local/share/Trash\" 2>/dev/null | awk '{print $1}'; " +
-            "printf 'FLATPAK '; flatpak uninstall --unused --assumeno 2>/dev/null | grep -oE '[0-9.]+ (kB|MB|GB|TB)' | tail -1; " +
-            "printf 'CLIPHIST '; cliphist list 2>/dev/null | wc -l; " +
-            "printf 'THUMBS '; du -sb \"$HOME/.cache/quickshell/thumbs\" 2>/dev/null | awk '{print $1}'"
+            "p() { printf '%s %s\\n' \"$1\" \"${2:-0}\"; }; " +
+            "p YAY \"$(du -sb \"$HOME/.cache/yay\" 2>/dev/null | awk '{print $1}')\"; " +
+            "p PACMAN \"$(du -sb /var/cache/pacman/pkg 2>/dev/null | awk '{print $1}')\"; " +
+            "p JOURNAL \"$(journalctl --disk-usage 2>/dev/null | grep -oE '[0-9.]+ ?[BKMGT]' | tail -1 | tr -d ' ')\"; " +
+            "p TRASH \"$(du -sb \"$HOME/.local/share/Trash\" 2>/dev/null | awk '{print $1}')\"; " +
+            "p FLATPAK \"$(flatpak uninstall --unused --assumeno 2>/dev/null | grep -oE '[0-9.]+ ?(kB|MB|GB|TB)' | tail -1 | tr -d ' ')\"; " +
+            "p CLIPHIST \"$(cliphist list 2>/dev/null | wc -l)\"; " +
+            "p THUMBS \"$(du -sb \"$HOME/.cache/quickshell/thumbs\" 2>/dev/null | awk '{print $1}')\""
         ]
         stdout: StdioCollector {
             onStreamFinished: {
@@ -152,7 +155,7 @@ Item {
         id: confirmPopup
         visible: false; anchors.centerIn: parent; z: 100
         width: Math.min(parent.width - 30, 420); height: 190; radius: Theme.radius
-        color: "#00000000"; border.width: 1; border.color: Theme.border
+        color: Theme.bg; border.width: 1; border.color: Theme.accent
 
         Column {
             anchors.fill: parent; anchors.margins: 18; spacing: 12
@@ -184,24 +187,19 @@ Item {
 
     Column {
         anchors.fill: parent
-        anchors.leftMargin: page.contentMargin; anchors.rightMargin: page.contentRightMargin
-        anchors.topMargin: page.contentTopMargin; anchors.bottomMargin: page.contentBottomMargin
-        spacing: 10
+        anchors.leftMargin: page.marginLeft; anchors.rightMargin: page.marginRight
+        anchors.topMargin: page.marginTop; anchors.bottomMargin: page.marginBottom
+        spacing: 14
 
-        Row {
-            id: header
-            width: parent.width; height: 36
-            Text {
-                text: "STORAGE"; color: Theme.text
-                font.family: Theme.fontFamily; font.pixelSize: 19; font.letterSpacing: 3
-                anchors.verticalCenter: parent.verticalCenter; anchors.verticalCenterOffset: -6
-            }
+        Text {
+            text: "STORAGE"; color: Theme.text
+            font.family: Theme.fontFamily; font.pixelSize: 19; font.letterSpacing: 3
         }
 
         Rectangle { width: parent.width; height: 1; color: Theme.border }
 
         Item {
-            width: parent.width; height: parent.height - header.height - 10
+            width: parent.width; height: parent.height - y
 
             Flickable {
                 id: flick
@@ -288,7 +286,7 @@ Item {
                     }
 
                     Text {
-                        text: "FILESYSTEMS"; color: Theme.text; topPadding: 4
+                        text: "FILESYSTEM"; color: Theme.text; topPadding: 4
                         font.family: Theme.fontFamily; font.pixelSize: 15; font.bold: true; font.letterSpacing: 2
                     }
 

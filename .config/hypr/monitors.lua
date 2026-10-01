@@ -1,4 +1,4 @@
--- To check names run: hyprctl monitors 
+-- run: hyprctl monitors 
 
 -- 1. First monitor
 -- hl.monitor({ output = "eDP-1", mode = "preferred", position = "auto", scale = 1 })
