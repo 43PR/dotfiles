@@ -12,7 +12,6 @@
 hyprland
 hyprlock
 hyprpolkitagent
-wlogout
 quickshell
 waybar
 rofi
@@ -139,7 +138,6 @@ cmatrix
 
 ttf-jetbrains-mono-nerd
 ttf-iosevka-nerd
-ttf-font-awesome
 ttf-roboto-mono
 
 # --------------------------------------------------

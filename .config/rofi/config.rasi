@@ -1,5 +1,6 @@
 @import "colors.rasi"
 configuration {
+    terminal: "kitty";
     modes: "combi";
     combi-modes: "window,run,drun";
 

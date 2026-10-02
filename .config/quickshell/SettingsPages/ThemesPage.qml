@@ -18,14 +18,13 @@ Item {
         ])
     }
 
-    function runTheme(themeName) {
-        console.log("Running theme:", themeName)
+    function runTheme(themeCommand) {
+        console.log("Running theme:", themeCommand)
+
         Quickshell.execDetached([
             "/bin/sh",
             "-c",
-            "python3 \"$HOME/.config/43pr/bin/theme.py\" \"$1\"",
-            "theme",
-            themeName
+            "python3 \"$HOME/.config/43pr/bin/theme.py\" " + themeCommand
         ])
     }
 
@@ -216,6 +215,22 @@ Item {
                 ThemeButton {
                     label: "DEFAULT THEME"
                     command: "default"
+                }
+                ThemeButton {
+                    label: "NORD"
+                    command: "preset nord"
+                }
+                ThemeButton {
+                    label: "TOKYO NIGHT"
+                    command: "preset tokyo-night"
+                }
+                ThemeButton {
+                    label: "CATPPUCCIN MOCHA"
+                    command: "preset catppuccin-mocha"
+                }
+                ThemeButton {
+                    label: "EVERFOREST DARK"
+                    command: "preset everforest-dark"
                 }
             }
 

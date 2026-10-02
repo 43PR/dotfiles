@@ -2,71 +2,59 @@
 
 set -uo pipefail
 
-# 43PR/dotfiles updater
+# 43PR/dotfiles updater (symlink model)
 #
-# Fast-path sync for iterating on the dotfiles after the initial install.sh
-# run. It:
-#   1. Installs any packages from packages.txt that are not installed yet
-#   2. Compares every file in the repo's .config (and .zshrc) with what is
-#      installed, and prints exactly which files are NEW or UPDATED
-#   3. Backs up only the files it is about to overwrite
-#   4. Copies only the files that actually changed
-#   5. Regenerates the theme
-#
-# Does NOT touch: default shell, PipeWire services, Papirus folders, or
-# wallpapers (one-time install.sh concerns). It never deletes files, so
-# anything you added to ~/.config yourself is left alone.
+# Dotfiles are symlinked from the repo into ~/.config, so editing either
+# path edits the same file — there is nothing to sync for existing files.
+#   1. Install any new packages.txt entries
+#   2. Link any files newly added to the repo since the last run
+#   3. Regenerate the theme
 #
 # Usage:
-#   ./update.sh                   install new packages, sync, regenerate theme
-#   ./update.sh --dry-run         show what would change, write nothing
-#   ./update.sh --diff            also print a diff for every updated file
-#   ./update.sh --skip-packages   skip package installation
-#   ./update.sh --skip-theme      do not run 'theme.py apply'
-#   ./update.sh --restart-shell   also restart Quickshell (qs)
-#   ./update.sh --help            show this help
-#
-# Backups live in ~/.config-backups/update-<timestamp>/ and only contain the
-# files that were overwritten. The newest 5 update backups are kept.
+#   ./update.sh
+#   ./update.sh --dry-run
+#   ./update.sh --skip-packages
+#   ./update.sh --skip-theme
+#   ./update.sh --restart-shell
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_DIR="$HOME/.config"
 SRC="$REPO_DIR/.config"
+CONFIG_DIR="$HOME/.config"
 PACKAGE_FILE="$REPO_DIR/packages.txt"
-BACKUP_ROOT="$HOME/.config-backups"
-TIMESTAMP="$(date '+%Y-%m-%d_%H-%M-%S')"
-BACKUP_DIR="$BACKUP_ROOT/update-$TIMESTAMP"
-KEEP_BACKUPS=5
+
+GENERATED_FILES=(
+    "kitty/matugen.conf"
+    "waybar/colors.css"
+    "hypr/hyprlock-colors.conf"
+    "gtk-3.0/colors.css"
+    "gtk-4.0/colors.css"
+    "rofi/colors.rasi"
+    "quickshell/state/powermenu-state.json"
+    "quickshell/state/settings-state.json"
+)
 
 DRY_RUN=0
-SHOW_DIFF=0
-RESTART_SHELL=0
 SKIP_PACKAGES=0
 SKIP_THEME=0
+RESTART_SHELL=0
+
+for arg in "$@"; do
+    case "$arg" in
+        --dry-run)       DRY_RUN=1 ;;
+        --skip-packages) SKIP_PACKAGES=1 ;;
+        --skip-theme)    SKIP_THEME=1 ;;
+        --restart-shell) RESTART_SHELL=1 ;;
+        *)
+            printf '\033[1;31m[ERROR]\033[0m Unknown option: %s\n' "$arg" >&2
+            exit 1
+            ;;
+    esac
+done
 
 info()    { printf '\n\033[1;34m[INFO]\033[0m %s\n' "$1"; }
 success() { printf '\n\033[1;32m[DONE]\033[0m %s\n' "$1"; }
 warning() { printf '\n\033[1;33m[WARN]\033[0m %s\n' "$1"; }
 error()   { printf '\n\033[1;31m[ERROR]\033[0m %s\n' "$1" >&2; }
-
-usage() {
-    sed -n '3,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
-}
-
-for arg in "$@"; do
-    case "$arg" in
-        --dry-run)        DRY_RUN=1 ;;
-        --diff)           SHOW_DIFF=1 ;;
-        --restart-shell)  RESTART_SHELL=1 ;;
-        --skip-packages)  SKIP_PACKAGES=1 ;;
-        --skip-theme)     SKIP_THEME=1 ;;
-        -h|--help)        usage; exit 0 ;;
-        *)
-            error "Unknown option: $arg (try --help)"
-            exit 1
-            ;;
-    esac
-done
 
 if [[ "${EUID}" -eq 0 ]]; then
     error "Do not run this script as root."
@@ -77,6 +65,14 @@ if [[ ! -d "$SRC" ]]; then
     error "No .config directory found at $SRC"
     exit 1
 fi
+
+is_generated() {
+    local rel="$1" g
+    for g in "${GENERATED_FILES[@]}"; do
+        [[ "$rel" == "$g" ]] && return 0
+    done
+    return 1
+}
 
 # --------------------------------------------------
 # Packages
@@ -94,20 +90,15 @@ elif [[ ! -f "$PACKAGE_FILE" ]]; then
 else
     mapfile -t PACKAGES < <(grep -vE '^[[:space:]]*(#|$)' "$PACKAGE_FILE")
 
-    if [[ "${#PACKAGES[@]}" -eq 0 ]]; then
-        warning "packages.txt does not contain any packages."
-    elif [[ "$DRY_RUN" -eq 1 ]]; then
-        # Fast check only: which packages are not installed yet?
-        MISSING=()
-        for pkg in "${PACKAGES[@]}"; do
-            pacman -Qi "$pkg" >/dev/null 2>&1 || MISSING+=("$pkg")
-        done
+    MISSING=()
+    for pkg in "${PACKAGES[@]}"; do
+        pacman -Qi "$pkg" >/dev/null 2>&1 || MISSING+=("$pkg")
+    done
 
-        if [[ "${#MISSING[@]}" -eq 0 ]]; then
-            info "Packages: everything in packages.txt is already installed."
-        else
-            info "Packages that would be installed (${#MISSING[@]}): ${MISSING[*]}"
-        fi
+    if [[ "${#MISSING[@]}" -eq 0 ]]; then
+        info "Packages: everything in packages.txt is already installed."
+    elif [[ "$DRY_RUN" -eq 1 ]]; then
+        info "Would install (${#MISSING[@]}): ${MISSING[*]}"
     elif ! command -v sudo >/dev/null 2>&1; then
         warning "sudo not found; skipping package installation."
     else
@@ -121,12 +112,9 @@ else
         OFFICIAL_PACKAGES=()
         AUR_PACKAGES=()
 
-        info "Checking packages.txt against installed packages..."
-
-        for pkg in "${PACKAGES[@]}"; do
-            if pacman -Qi "$pkg" >/dev/null 2>&1; then
-                continue
-            elif pacman -Si "$pkg" >/dev/null 2>&1; then
+        info "Resolving new packages..."
+        for pkg in "${MISSING[@]}"; do
+            if pacman -Si "$pkg" >/dev/null 2>&1; then
                 OFFICIAL_PACKAGES+=("$pkg")
             elif [[ -n "$AUR_HELPER" ]] && "$AUR_HELPER" -Si "$pkg" >/dev/null 2>&1; then
                 AUR_PACKAGES+=("$pkg")
@@ -134,10 +122,6 @@ else
                 UNKNOWN_PACKAGES+=("$pkg")
             fi
         done
-
-        if [[ "${#OFFICIAL_PACKAGES[@]}" -eq 0 && "${#AUR_PACKAGES[@]}" -eq 0 ]]; then
-            success "All packages already installed."
-        fi
 
         if [[ "${#OFFICIAL_PACKAGES[@]}" -gt 0 ]]; then
             info "Installing new official-repo packages: ${OFFICIAL_PACKAGES[*]}"
@@ -170,185 +154,65 @@ else
 fi
 
 # --------------------------------------------------
-# Compare repo vs installed (nothing is written here)
+# Link anything new
 # --------------------------------------------------
 
-CH_KIND=()    # add | update
-CH_SRC=()     # file in the repo
-CH_DEST=()    # where it gets installed
-CH_NAME=()    # name shown to the user
-CH_BACKUP=()  # path inside the backup dir
-UNCHANGED=0
+NEW_LINKS=0
+SKIPPED_REAL_FILES=0
 
-consider() {
-    local src="$1" dest="$2" name="$3" backup="$4" kind
+while IFS= read -r -d '' src; do
+    rel="${src#"$SRC"/}"
 
-    if [[ ! -e "$dest" && ! -L "$dest" ]]; then
-        kind="add"
-    elif cmp -s "$src" "$dest"; then
-        UNCHANGED=$((UNCHANGED + 1))
-        return
-    else
-        kind="update"
+    is_generated "$rel" && continue
+
+    dest="$CONFIG_DIR/$rel"
+    [[ -L "$dest" ]] && continue   # already linked, nothing to do
+
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+        if [[ -e "$dest" ]]; then
+            info "Would skip (real file exists, not overwriting): $rel"
+        else
+            info "Would link: $rel"
+        fi
+        NEW_LINKS=$((NEW_LINKS + 1))
+        continue
     fi
 
-    CH_KIND+=("$kind")
-    CH_SRC+=("$src")
-    CH_DEST+=("$dest")
-    CH_NAME+=("$name")
-    CH_BACKUP+=("$backup")
-}
-
-while IFS= read -r -d '' file; do
-    rel="${file#"$SRC"/}"
-
-    # .zshrc is installed to ~/.zshrc (handled below), not ~/.config/.zshrc
-    [[ "$rel" == ".zshrc" ]] && continue
-
-    consider "$file" "$CONFIG_DIR/$rel" "$rel" "config/$rel"
-done < <(find "$SRC" \( -type f -o -type l \) -not -path '*/.git/*' -print0 | sort -z)
-
-if [[ -f "$SRC/.zshrc" ]]; then
-    consider "$SRC/.zshrc" "$HOME/.zshrc" "~/.zshrc" "home/.zshrc"
-fi
-
-ADDED_COUNT=0
-UPDATED_COUNT=0
-declare -A TOUCHED=()
-
-for i in "${!CH_KIND[@]}"; do
-    if [[ "${CH_KIND[$i]}" == "add" ]]; then
-        ADDED_COUNT=$((ADDED_COUNT + 1))
-    else
-        UPDATED_COUNT=$((UPDATED_COUNT + 1))
+    if [[ -e "$dest" ]]; then
+        warning "A real file exists at $rel — leaving it, not overwriting. Remove it manually to let the symlink take over, or re-run install.sh to migrate it safely (it backs up before replacing)."
+        SKIPPED_REAL_FILES=$((SKIPPED_REAL_FILES + 1))
+        continue
     fi
 
-    top="${CH_NAME[$i]#\~/}"
-    top="${top%%/*}"
-    TOUCHED["$top"]=$(( ${TOUCHED["$top"]:-0} + 1 ))
-done
+    mkdir -p "$(dirname "$dest")"
+    ln -s "$src" "$dest"
+    NEW_LINKS=$((NEW_LINKS + 1))
+done < <(find "$SRC" -type f -not -path '*/.git/*' -print0)
 
-TOTAL_CHANGES=$((ADDED_COUNT + UPDATED_COUNT))
-
-info "Comparing $SRC with your installed config..."
-
-if [[ "$TOTAL_CHANGES" -eq 0 ]]; then
-    success "Everything is already up to date ($UNCHANGED files identical)."
-else
-    if [[ "$ADDED_COUNT" -gt 0 ]]; then
-        printf '\n\033[1;32mNew files (%d):\033[0m\n' "$ADDED_COUNT"
-        for i in "${!CH_KIND[@]}"; do
-            [[ "${CH_KIND[$i]}" == "add" ]] && printf '  \033[32m+\033[0m %s\n' "${CH_NAME[$i]}"
-        done
-    fi
-
-    if [[ "$UPDATED_COUNT" -gt 0 ]]; then
-        printf '\n\033[1;33mUpdated files (%d), these will be backed up first:\033[0m\n' "$UPDATED_COUNT"
-        for i in "${!CH_KIND[@]}"; do
-            [[ "${CH_KIND[$i]}" == "update" ]] && printf '  \033[33m~\033[0m %s\n' "${CH_NAME[$i]}"
-        done
-    fi
-
-    printf '\n\033[1mFolders affected:\033[0m\n'
-    for top in $(printf '%s\n' "${!TOUCHED[@]}" | sort); do
-        printf '  %-24s %d file(s)\n' "$top" "${TOUCHED[$top]}"
+# Generated files: ensure they exist (copy once), never link.
+if [[ "$DRY_RUN" -eq 0 ]]; then
+    for g in "${GENERATED_FILES[@]}"; do
+        [[ -f "$SRC/$g" ]] || continue
+        dest="$CONFIG_DIR/$g"
+        if [[ ! -e "$dest" ]]; then
+            mkdir -p "$(dirname "$dest")"
+            cp "$SRC/$g" "$dest"
+        fi
     done
-    printf '\nUnchanged: %d file(s)\n' "$UNCHANGED"
-
-    if [[ "$SHOW_DIFF" -eq 1 && "$UPDATED_COUNT" -gt 0 ]]; then
-        printf '\n\033[1mDiffs (installed -> repo):\033[0m\n'
-        for i in "${!CH_KIND[@]}"; do
-            [[ "${CH_KIND[$i]}" == "update" ]] || continue
-            printf '\n\033[1;36m--- %s ---\033[0m\n' "${CH_NAME[$i]}"
-            diff -u --label "installed: ${CH_NAME[$i]}" --label "repo: ${CH_NAME[$i]}" \
-                "${CH_DEST[$i]}" "${CH_SRC[$i]}" || true
-        done
-    fi
 fi
+
+if [[ "$NEW_LINKS" -eq 0 ]]; then
+    success "No new files to link."
+elif [[ "$DRY_RUN" -eq 0 ]]; then
+    success "Linked $NEW_LINKS new file(s)."
+fi
+
+[[ "$SKIPPED_REAL_FILES" -gt 0 ]] && warning "$SKIPPED_REAL_FILES file(s) skipped — see warnings above."
 
 if [[ "$DRY_RUN" -eq 1 ]]; then
     printf '\n'
     info "Dry run: nothing was written. Re-run without --dry-run to apply."
-    [[ "$UPDATED_COUNT" -gt 0 && "$SHOW_DIFF" -eq 0 ]] && info "Add --diff to see exactly what changes inside each updated file."
     exit 0
-fi
-
-# --------------------------------------------------
-# Back up the files that are about to be overwritten
-# --------------------------------------------------
-
-if [[ "$UPDATED_COUNT" -gt 0 ]]; then
-    info "Backing up $UPDATED_COUNT file(s) that will be overwritten..."
-
-    BACKUP_FAILED=0
-
-    mkdir -p "$BACKUP_DIR"
-    {
-        printf 'Update backup created %s\n' "$TIMESTAMP"
-        printf 'Repo: %s\n\n' "$REPO_DIR"
-        printf 'UPDATED (original versions saved in this folder):\n'
-    } > "$BACKUP_DIR/CHANGES.txt"
-
-    for i in "${!CH_KIND[@]}"; do
-        [[ "${CH_KIND[$i]}" == "update" ]] || continue
-        bpath="$BACKUP_DIR/${CH_BACKUP[$i]}"
-        mkdir -p "$(dirname "$bpath")"
-        if cp -a "${CH_DEST[$i]}" "$bpath"; then
-            printf '  %s\n' "${CH_NAME[$i]}" >> "$BACKUP_DIR/CHANGES.txt"
-        else
-            BACKUP_FAILED=1
-            error "Could not back up ${CH_NAME[$i]}"
-        fi
-    done
-
-    printf '\nNEW (did not exist before):\n' >> "$BACKUP_DIR/CHANGES.txt"
-    for i in "${!CH_KIND[@]}"; do
-        [[ "${CH_KIND[$i]}" == "add" ]] && printf '  %s\n' "${CH_NAME[$i]}" >> "$BACKUP_DIR/CHANGES.txt"
-    done
-
-    if [[ "$BACKUP_FAILED" -eq 1 ]]; then
-        error "Backup incomplete, aborting before anything was overwritten."
-        exit 1
-    fi
-
-    success "Backup saved to: $BACKUP_DIR"
-fi
-
-# --------------------------------------------------
-# Apply only the changed files
-# --------------------------------------------------
-
-if [[ "$TOTAL_CHANGES" -gt 0 ]]; then
-    info "Installing $TOTAL_CHANGES changed file(s)..."
-
-    COPY_FAILED=0
-    for i in "${!CH_KIND[@]}"; do
-        dest="${CH_DEST[$i]}"
-        mkdir -p "$(dirname "$dest")"
-
-        if cp -a "${CH_SRC[$i]}" "$dest"; then
-            case "$dest" in
-                *.sh|*.py) chmod +x "$dest" ;;
-            esac
-        else
-            COPY_FAILED=$((COPY_FAILED + 1))
-            error "Failed to install ${CH_NAME[$i]}"
-        fi
-    done
-
-    if [[ "$COPY_FAILED" -gt 0 ]]; then
-        warning "$COPY_FAILED file(s) failed to install; see errors above."
-    else
-        success "Config files synced ($ADDED_COUNT new, $UPDATED_COUNT updated)."
-    fi
-fi
-
-# Keep only the newest $KEEP_BACKUPS update backups
-if [[ -d "$BACKUP_ROOT" ]]; then
-    mapfile -t OLD_BACKUPS < <(ls -1dt "$BACKUP_ROOT"/update-* 2>/dev/null | tail -n +$((KEEP_BACKUPS + 1)))
-    for old in "${OLD_BACKUPS[@]}"; do
-        [[ -n "$old" ]] && rm -rf -- "$old"
-    done
 fi
 
 # --------------------------------------------------
@@ -363,7 +227,6 @@ elif command -v python3 >/dev/null 2>&1; then
         success "Theme regenerated and consumers reloaded (Kitty, Waybar)."
     else
         error "Theme regeneration failed, check the error above."
-        error "Configs on disk may be a mix of old and new; run 'theme apply' again once fixed."
         exit 1
     fi
 else
@@ -376,7 +239,7 @@ fi
 
 printf '\n'
 warning "GTK apps (Thunar) cache colors per-process. If Thunar looks stale: thunar -q && thunar"
-warning "Rofi and wlogout re-read their CSS on next launch, no action needed."
+warning "Rofi re-read CSS on next launch, no action needed."
 warning "Hyprlock re-reads its config on next lock, no action needed."
 
 if [[ "$RESTART_SHELL" -eq 1 ]]; then
@@ -387,8 +250,7 @@ if [[ "$RESTART_SHELL" -eq 1 ]]; then
     disown
     success "Quickshell restarted."
 else
-    warning "Quickshell (qs) was NOT restarted. Only needed if a .qml file changed;"
-    warning "  re-run with --restart-shell if so."
+    warning "Quickshell (qs) was NOT restarted. Only needed if a .qml file changed; re-run with --restart-shell if so."
 fi
 
 if [[ "${#UNKNOWN_PACKAGES[@]}" -gt 0 ]]; then
@@ -396,16 +258,5 @@ if [[ "${#UNKNOWN_PACKAGES[@]}" -gt 0 ]]; then
     warning "Unresolved packages (install manually): ${UNKNOWN_PACKAGES[*]}"
 fi
 
-# --------------------------------------------------
-# Summary
-# --------------------------------------------------
-
 printf '\n'
-success "Update complete: $ADDED_COUNT new, $UPDATED_COUNT updated, $UNCHANGED unchanged."
-
-if [[ "$UPDATED_COUNT" -gt 0 ]]; then
-    printf '\nYour previous versions of the updated files are in:\n  %s\n' "$BACKUP_DIR"
-    printf '\nTo undo this update:\n'
-    printf '  cp -a "%s/config/." ~/.config/\n' "$BACKUP_DIR"
-    [[ -f "$BACKUP_DIR/home/.zshrc" ]] && printf '  cp -a "%s/home/.zshrc" ~/.zshrc\n' "$BACKUP_DIR"
-fi
+success "Update complete."

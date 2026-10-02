@@ -15,9 +15,6 @@ reload = ["pkill", "-SIGUSR2", "waybar"]
 [hyprlock]
 input  = "~/.config/43pr/templates/hyprlock-colors.conf"
 output = "~/.config/hypr/hyprlock-colors.conf"
-[wlogout]
-input  = "~/.config/43pr/templates/wlogout-colors.css"
-output = "~/.config/wlogout/colors.css"
 [gtk3]
 input  = "~/.config/43pr/templates/gtk-colors.css"
 output = "~/.config/gtk-3.0/colors.css"

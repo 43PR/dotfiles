@@ -37,31 +37,78 @@ PanelWindow {
     property real cardCenterX: (root.width - cardWidth) / 2
     property real cardX: cardCenterX
 
-    function snapTop() {
-        cardHeight = cardHeightSnapped
-        cardY = cardMargin
+    // ---- persisted snap position ----
+    property string snapPosition: "center"   // center | top | bottom | left | right
+    readonly property string statePath: Quickshell.env("HOME") + "/.config/quickshell/state/settings-state.json"
+
+    function saveState() {
+        stateFile.setText(JSON.stringify({ snap: root.snapPosition }))
     }
-    function snapBottom() {
-        cardHeight = cardHeightSnapped
-        cardY = root.height - cardHeight - cardMargin
+
+    // Moves the card to a snap position without saving
+    function applySnap(pos) {
+        switch (pos) {
+        case "top":
+            cardHeight = cardHeightSnapped
+            cardY = cardMargin
+            break
+        case "bottom":
+            cardHeight = cardHeightSnapped
+            cardY = root.height - cardHeight - cardMargin
+            break
+        case "left":
+            cardWidth = cardWidthSnapped
+            cardHeight = cardHeightSideSnapped
+            cardX = cardMargin
+            cardY = (root.height - cardHeight) / 2
+            break
+        case "right":
+            cardWidth = cardWidthSnapped
+            cardHeight = cardHeightSideSnapped
+            cardX = root.width - cardWidth - cardMargin
+            cardY = (root.height - cardHeight) / 2
+            break
+        default:
+            cardHeight = cardHeightCenter
+            cardWidth = cardWidthCenter
+            cardY = (root.height - cardHeight) / 2
+            cardX = (root.width - cardWidth) / 2
+        }
     }
-    function snapLeft() {
-        cardWidth = cardWidthSnapped
-        cardHeight = cardHeightSideSnapped
-        cardX = cardMargin
-        cardY = (root.height - cardHeight) / 2
+
+    function snapTo(pos) {
+        root.snapPosition = pos
+        root.applySnap(pos)
+        root.saveState()
     }
-    function snapRight() {
-        cardWidth = cardWidthSnapped
-        cardHeight = cardHeightSideSnapped
-        cardX = root.width - cardWidth - cardMargin
-        cardY = (root.height - cardHeight) / 2
-    }
-    function snapCenter() {
-        cardHeight = cardHeightCenter
-        cardWidth = cardWidthCenter
-        cardY = (root.height - cardHeight) / 2
-        cardX = (root.width - cardWidth) / 2
+
+    function snapTop()    { snapTo("top") }
+    function snapBottom() { snapTo("bottom") }
+    function snapLeft()   { snapTo("left") }
+    function snapRight()  { snapTo("right") }
+    function snapCenter() { snapTo("center") }
+
+    // Re-apply the saved snap when the screen size is known or changes
+    onWidthChanged:  if (width > 0 && height > 0) applySnap(snapPosition)
+    onHeightChanged: if (width > 0 && height > 0) applySnap(snapPosition)
+
+    FileView {
+        id: stateFile
+        path: root.statePath
+        printErrors: false   // no warning on first run when the file doesn't exist yet
+
+        onLoaded: {
+            try {
+                var s = JSON.parse(stateFile.text())
+                if (["center", "top", "bottom", "left", "right"].indexOf(s.snap) >= 0) {
+                    root.snapPosition = s.snap
+                    if (root.width > 0 && root.height > 0)
+                        root.applySnap(s.snap)
+                }
+            } catch (e) {
+                console.warn("settings: could not read saved state:", e)
+            }
+        }
     }
 
     IpcHandler {
