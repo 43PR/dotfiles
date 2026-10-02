@@ -21,16 +21,11 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
-    // Only whichever view is currently visible captures input
     mask: Region {
         item: root.showing
             ? (root.showMedia ? mediaPanel : flyout)
             : null
     }
-
-    // -------------------------
-    // PipeWire
-    // -------------------------
 
     PwObjectTracker {
         id: audioTracker
@@ -51,16 +46,9 @@ PanelWindow {
         return sink.audio.muted
     }
 
-    // -------------------------
-    // OSD state
-    // -------------------------
-
-    property bool showing: false      // OSD visible at all
-    property bool showMedia: false    // false = volume view, true = media view
-
-    // True while we wait for playerctl to tell us if something is playing
+    property bool showing: false
+    property bool showMedia: false
     property bool pendingShow: false
-
     property bool hovered: flyoutArea.containsMouse || panelArea.containsMouse
 
     function showOsd() {
@@ -68,21 +56,28 @@ PanelWindow {
         hideTimer.restart()
     }
 
-    // Called on every volume / mute change.
-    // If the OSD is already open, just keep it open (the view stays as-is).
-    // Otherwise check the player first, then pick media or volume view.
     function triggerOsd() {
         if (showing) {
             hideTimer.restart()
             return
         }
+
         pendingShow = true
+        updateMedia()
+    }
+
+    function triggerMediaOsd() {
+        pendingShow = false
+        showMedia = true
+        showing = true
+        hideTimer.restart()
         updateMedia()
     }
 
     function finishPendingShow() {
         if (!pendingShow)
             return
+
         pendingShow = false
         showMedia = playing
         showOsd()
@@ -91,16 +86,15 @@ PanelWindow {
     Timer {
         id: hideTimer
 
-        // Give the media view a bit more time
         interval: root.showMedia ? 3000 : 1200
         repeat: false
 
         onTriggered: {
-            // Stay open while the pointer is over the OSD
             if (root.hovered) {
                 hideTimer.restart()
                 return
             }
+
             root.showing = false
         }
     }
@@ -117,11 +111,6 @@ PanelWindow {
             bars = []
     }
 
-    // -------------------------
-    // Detect volume changes
-    // (show media OSD if playing, otherwise the volume OSD)
-    // -------------------------
-
     Connections {
         target: root.sink?.audio ?? null
 
@@ -133,10 +122,6 @@ PanelWindow {
             root.triggerOsd()
         }
     }
-
-    // -------------------------
-    // MEDIA STATE
-    // -------------------------
 
     property string title: ""
     property string artist: ""
@@ -194,7 +179,52 @@ PanelWindow {
             mediaProcess.running = true
     }
 
-    // Only poll while the media view is visible
+    Process {
+        id: playerEventProcess
+
+        command: [
+            "playerctl",
+            "--follow",
+            "metadata",
+            "--format",
+            "{{status}}|{{title}}|{{artist}}"
+        ]
+
+        running: true
+
+        stdout: SplitParser {
+            onRead: data => {
+                var output = data.trim()
+
+                if (!output)
+                    return
+
+                var parts = output.split("|")
+
+                if (parts.length < 3)
+                    return
+
+                var newStatus = parts[0]
+                var newTitle = parts[1]
+                var newArtist = parts[2]
+
+                var trackChanged =
+                    newTitle !== root.title ||
+                    newArtist !== root.artist
+
+                root.status = newStatus
+                root.title = newTitle
+                root.artist = newArtist
+
+                if (trackChanged && newTitle !== "") {
+                    root.triggerMediaOsd()
+                }
+
+                root.updateMedia()
+            }
+        }
+    }
+
     Timer {
         interval: 500
         repeat: true
@@ -218,17 +248,12 @@ PanelWindow {
         }
     }
 
-    // -------------------------
-    // CAVA VISUALIZER
-    // -------------------------
-
     readonly property int barCount: 24
-    property var bars: []   // values 0..100
+    property var bars: []
 
     Process {
         id: cavaProcess
 
-        // Only runs while the media view is visible
         running: root.showing && root.showMedia
 
         command: [
@@ -246,16 +271,14 @@ PanelWindow {
             onRead: data => {
                 var parts = data.split(";")
                 var out = []
+
                 for (var i = 0; i < root.barCount; i++)
                     out.push(parseInt(parts[i]) || 0)
+
                 root.bars = out
             }
         }
     }
-
-    // -------------------------
-    // VOLUME OSD
-    // -------------------------
 
     Rectangle {
         id: flyout
@@ -286,7 +309,6 @@ PanelWindow {
             }
         }
 
-        // Hover keeps the OSD open
         MouseArea {
             id: flyoutArea
 
@@ -336,10 +358,8 @@ PanelWindow {
         Rectangle {
             anchors.left: icon.right
             anchors.leftMargin: 15
-
             anchors.right: parent.right
             anchors.rightMargin: 68
-
             anchors.verticalCenter: parent.verticalCenter
 
             height: 5
@@ -363,10 +383,6 @@ PanelWindow {
             }
         }
     }
-
-    // -------------------------
-    // MEDIA PANEL
-    // -------------------------
 
     Rectangle {
         id: mediaPanel
@@ -397,8 +413,6 @@ PanelWindow {
             }
         }
 
-        // Hover keeps the OSD open.
-        // Declared first so the control buttons below sit on top of it.
         MouseArea {
             id: panelArea
 
@@ -407,7 +421,6 @@ PanelWindow {
             enabled: mediaPanel.open
         }
 
-        // Title / Artist
         Row {
             anchors {
                 top: parent.top
@@ -450,10 +463,6 @@ PanelWindow {
             }
         }
 
-        // Visualizer + progress bar combined.
-        // Bars react to the audio; bars before the playback position are
-        // fully bright, the rest are dimmed. In silence they flatten to
-        // small dots, so it still reads as a progress bar.
         Item {
             id: visualizer
 
@@ -485,13 +494,18 @@ PanelWindow {
                     x: index * (visualizer.barWidth + visualizer.barSpacing)
                     width: visualizer.barWidth
                     radius: width / 2
+
                     color: Theme.text
 
                     opacity: ((index + 0.5) / root.barCount) <= visualizer.progress
                         ? 0.9
                         : 0.3
 
-                    height: Math.max(3, ((root.bars[index] ?? 0) / 100) * visualizer.height)
+                    height: Math.max(
+                        3,
+                        ((root.bars[index] ?? 0) / 100) * visualizer.height
+                    )
+
                     y: visualizer.height - height
 
                     Behavior on height {
@@ -505,7 +519,6 @@ PanelWindow {
             }
         }
 
-        // Controls
         Row {
             anchors {
                 horizontalCenter: parent.horizontalCenter
@@ -523,6 +536,7 @@ PanelWindow {
 
                 MouseArea {
                     anchors.fill: parent
+
                     onClicked: {
                         Quickshell.execDetached(["playerctl", "previous"])
                         hideTimer.restart()
@@ -538,6 +552,7 @@ PanelWindow {
 
                 MouseArea {
                     anchors.fill: parent
+
                     onClicked: {
                         Quickshell.execDetached(["playerctl", "play-pause"])
                         hideTimer.restart()
@@ -553,6 +568,7 @@ PanelWindow {
 
                 MouseArea {
                     anchors.fill: parent
+
                     onClicked: {
                         Quickshell.execDetached(["playerctl", "next"])
                         hideTimer.restart()

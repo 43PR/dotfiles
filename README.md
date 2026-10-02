@@ -2,7 +2,7 @@
 
 ## Hyprland Setup by 43pr メ
 
-Simple setup focused on practical keybinds, productivity, and easy to customize. Feel free to use as inspiration or as a starting point for building your own setup.
+A clean and simple Hyprland setup focused on practical workflows, productivity, and easy to customize.
 
 ![Hyprland](https://img.shields.io/badge/Hyprland-0.56.2-8b9aaf?style=for-the-badge&labelColor=101418)
 ![GitHub last commit](https://img.shields.io/github/last-commit/43PR/dotfiles?style=for-the-badge&labelColor=101418&color=8b9aaf)
@@ -11,34 +11,29 @@ Simple setup focused on practical keybinds, productivity, and easy to customize.
 [![YouTube](https://img.shields.io/badge/youtube-subscribe-b05a63?style=for-the-badge&logo=youtube&logoColor=ffffff&labelColor=101418)](https://www.youtube.com/@43PR2)
 [![Ko-Fi donate](https://img.shields.io/badge/donate-kofi?style=for-the-badge&logo=ko-fi&logoColor=ffffff&label=ko-fi&labelColor=101418&color=9a6570)](https://ko-fi.com/43pr)
 
-### **[Features](#features)  -  [Keybinds](#most-used-keybinds)  -  [Installation](#installation)**
+### **[Features](#features)  -  [Keybinds](#most-used-keybinds)  -  [Installation](#installation) -  [Updating](#updating)**
 
 </div>
 
-https://github.com/user-attachments/assets/f56103b4-534c-4148-89ec-201d75acf7aa
+**v1.1.0**
 
-<img width="1920" height="1080" alt="1790717154" src="https://github.com/user-attachments/assets/53a7a2ff-4050-450b-8218-b3e42ac2e0f2" />
-
-<img width="1920" height="1080" alt="9" src="https://github.com/user-attachments/assets/0a1fc782-8111-4efd-bc8c-684b3556ebd1" />
+https://github.com/user-attachments/assets/d28c7791-3f7a-42ee-85d3-8bb91c9796c6
 
 Wallpapers: https://wallhaven.cc/user/43pr
 
 ## Features
 
 - **Waybar** — Volume control, mute, and media playback controls.
-- **Quickshell Settings** — System, network, bluetooth, display, audio, storage, and more.
+- **Settings Menu** — System, network, bluetooth, display, audio, storage, and more.
 - **Dynamic Colors** — Wallpaper-based color generation with **Matugen**.
-- **Wallpaper Selector** — Custom wallpaper picker powered by **Awww + Quickshell**.
-- **App Launcher** — **Rofi** for application search, clipboard history, and opacity control.
-- **Zsh + Starship** — Customizable shell with autocompletion, history, and a polished prompt.
-- **Spotify + Spicetify** — Custom theme based on **Darkthemer**, with personal modifications.
-- **Monochrome Theme** — Custom monochrome styling across the desktop.
-- **Custom Scripts** — A collection of scripts for workflow and system management.
+- **Preset Themes** — Default Monochrome, Nord, Tokyo Night, etc. (you can create your own too)
+- **Wallpaper Selector** — Custom wallpaper picker **(Awww + Quickshell)**.
+- **App Launcher** — **Rofi** Application search, clipboard history, and opacity control.
+- **Zsh + Starship** — Customizable shell with autosuggestions, history, and a polished prompt.
+- **Customizable Power Menu** —  Custom power menu. 
 - **Hyprlock** — Custom lock screen.
-- **Wlogout** — Custom logout/power menu.
-- **Terminal** — Kitty.
-- **File Manager** — Thunar.
-- **Text Editor** — Xed.
+- **Custom Scripts** — Scripts for workflow and system management.
+- **Spotify + Spicetify** — Custom theme based on **text - darkthemer**, (modified).
 
 > All programs: [packages.txt](packages.txt)
 
@@ -48,7 +43,9 @@ Just made some tweaks to it. Give it some love: [hyprquickpaper](https://github.
 
 ## Most used keybinds
 
-> **You can modify the keybinds using HyprMod**
+> **You can modify keybinds using HyprMod**
+
+> **Move and resize windows with Super + left/right mouse drag.**
 
 | Keybind                 | Action                    |
 | -----------             | ------------------------- |
@@ -58,71 +55,93 @@ Just made some tweaks to it. Give it some love: [hyprquickpaper](https://github.
 | `Super + Shift + 1, 2..`| Move window to workspace  |
 | `Super + D`             | Application launcher      |
 | `Super + E`             | File manager              |
+| `Super + F`             | Toggle fullscreen         |
+| `Super + Space`         | Toggle floating window    |
 | `Super + B`             | Browser                   |
 | `Super + W`             | Wallpaper selector        |
 | `Super + I`             | Settings menu             |
 | `Super + O`             | Switch opacity            |
 | `Super + V`             | Clipboard history         |
-| `Super + F`             | Toggle fullscreen         |
-| `Super + Space`         | Toggle floating window    |
 | `Super + Shift + W`     | Toggle waybar             |
 | `Super + Tab`           | Lock screen               |
 | `Super + Grave`         | Logout menu               |
+| `Super + Mouse wheel`   | Zoom in/out               |
 | `Delete`                | Screenshot fullscreen     |
 | `SHIFT + Delete`        | Screenshot area select    |
-| `Super + Mouse wheel`   | Zoom in/out               |
+| `Super + L`             | Toggle dark/light mode    |
 
-> To close wlogout, wallpaper picker, setting menu just click outside or Esc key. Toggle (same keybind to open/close) for app launcher and waybar
+> To close most quickshell apps just click outside or Esc key.
 
 > All keybinds: [.config/hypr/keybinds.lua](.config/hypr/keybinds.lua)
+
+> Quickshell SettingsCornerTrigger.qml to controls hover actions
 
 ---
 ## Installation 
 
 **READ ALL**
 
-Should work for Arch, Manjaro, EndeavourOS, CachyOS, etc. Let me know if there's any issues
+Should work for Arch, Manjaro, EndeavourOS, CachyOS, etc. 
 
-This is mainly intended for a clean installation. If you already have a desktop configuration I recommend to implement manually.
+This is mainly intended for a clean installation (existing configuration files that are being replaced will be backed up automatically).
 
-Existing configuration files that are being replaced will be backed up automatically.
-
-**First install git then use the next command and continue the installation until it's finished:**
+**First install git then use the next command and continue the installation until it's finished**
 
 ```bash
-
 sudo pacman -S git   
 ```
-```bash
 
+```bash
 git clone https://github.com/43PR/dotfiles.git
 cd dotfiles
 chmod +x install.sh
 ./install.sh
 ```
 
-Open GTX Settings and change Color scheme to Prefer dark - Apply.
-
 After the installation finishes log out and back in.
 
-> [!note]
-> 
-> Waybar custom-gpu is specific to my PC so you can remove it or implement.
+> [!important]
+> **Do not move or delete the dotfiles repository after installation.**
 >
-> If you’re having any issues with the wallpaper picker, you can clear the cache from the Storage page in Settings.
+> This setup uses **symbolic links (symlinks)** that point to files inside the cloned repository. If you move or delete the repository, those symlinks will break.
+>
+> If you relocate the repository, simply run:
+>
+> ```bash
+> ./install.sh
+> ```
+>
+> The installer will automatically update the existing symlinks to point to the new location.
 
 ---
 ## Updating
 
-To pull the latest changes and update your configuration, run the updater from the dotfiles folder:
+Pull the latest changes, then run the updater from inside the repository:
 
 ```bash
-cd dotfiles
-chmod +x update.sh
+git pull
 ./update.sh
 ```
 
-Existing configuration files that are replaced will be backed up automatically.
+Other options: `--dry-run` (preview changes), `--skip-packages`, `--skip-theme`.
 
-After the update finishes, log out and back in so all changes are applied.
+Dotfiles are symlinked so, `git pull` updates your live configs directly.
+
+You can check the reminders printed at the end of the run.
+
+> [!tip]
+> If any Quickshell (`.qml`) files changed in the pull, run:
+>
+> ```bash
+> ./update.sh --restart-shell
+> ```
+>
+> to restart Quickshell automatically.
+
+> [!note]
+> 
+> Custom-gpu parts are specific to my hardware.
+>
+> For issues with the wallpaper picker, you can clear the cache from the Storage page in Settings.
+
 

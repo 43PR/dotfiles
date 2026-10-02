@@ -15,7 +15,7 @@ hl.bind(mainMod .. " + Q", hl.dsp.window.close())
 
 hl.bind(mainMod .. " + Tab", hl.dsp.exec_cmd("hyprlock")) -- Lock screen
 
-hl.bind(mainMod .. " + GRAVE", hl.dsp.exec_cmd(home .. "/.config/hypr/scripts/wlogout.sh")) -- Power menu
+hl.bind(mainMod .. " + GRAVE", hl.dsp.exec_cmd("qs ipc call powermenu toggle")) -- Power menu
 
 hl.bind(mainMod .. " + I", hl.dsp.exec_cmd("qs ipc call settings toggle")) -- Settings
 

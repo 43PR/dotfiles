@@ -96,6 +96,6 @@
     "custom/power": {
         "format": "⏻",
         "tooltip": false,
-        "on-click": "$HOME/.config/hypr/scripts/wlogout.sh"
+        "on-click": "qs ipc call powermenu toggle"
     }
 }

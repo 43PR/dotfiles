@@ -210,7 +210,7 @@ Item {
                 ScrollBar.vertical: ScrollBar {
                     id: scrollBar
                     background: Rectangle {
-                        color: Theme.alpha(Theme.border, 0.3)
+                        color: Theme.alpha(Theme.border, 0)
                         radius: width / 2
                     }
                     contentItem: Rectangle {

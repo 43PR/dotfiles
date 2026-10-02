@@ -14,19 +14,34 @@ set -uo pipefail
 #   3. Splits packages.txt into "official repo" vs "AUR-only" and
 #      installs each with the right tool, so a single AUR-only or
 #      unresolvable name never aborts the whole install
-#   4. Backs up existing ~/.config
-#   5. Installs this repository's configuration
+#   4. Symlinks this repository's configuration into ~/.config, so the
+#      repo is the only copy of each file — editing either path edits
+#      the same file, and update.sh never needs to sync or diff anything
+#   5. Generates the initial theme
 #
 # Supported package managers:
 #   - pacman       (official repos: Arch, Manjaro, EndeavourOS, CachyOS, etc.)
 #   - paru / yay   (AUR helpers, optional but recommended)
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SRC="$REPO_DIR/.config"
 CONFIG_DIR="$HOME/.config"
 BACKUP_ROOT="$HOME/.config-backups"
 TIMESTAMP="$(date '+%Y-%m-%d_%H-%M-%S')"
 BACKUP_DIR="$BACKUP_ROOT/$TIMESTAMP"
 
+# Files written by theme.py at runtime. These are copied once (so they
+# exist before the first boot), 
+GENERATED_FILES=(
+    "kitty/matugen.conf"
+    "waybar/colors.css"
+    "hypr/hyprlock-colors.conf"
+    "gtk-3.0/colors.css"
+    "gtk-4.0/colors.css"
+    "rofi/colors.rasi"
+    "quickshell/state/powermenu-state.json"
+    "quickshell/state/settings-state.json"
+)
 # --------------------------------------------------
 # Colors / output
 # --------------------------------------------------
@@ -79,6 +94,11 @@ fi
 
 if ! command -v pacman >/dev/null 2>&1; then
     error "pacman was not found. This installer requires an Arch-based system."
+    exit 1
+fi
+
+if [[ ! -d "$SRC" ]]; then
+    error "No .config directory found at $SRC"
     exit 1
 fi
 
@@ -201,50 +221,90 @@ else
 fi
 
 # --------------------------------------------------
-# Backup existing configuration
+# Link dotfiles (symlinked — the repo is the only copy)
 # --------------------------------------------------
 
-if [[ -d "$CONFIG_DIR" ]]; then
-    info "Backing up existing ~/.config..."
+info "Linking dotfiles..."
 
-    mkdir -p "$BACKUP_DIR"
+mkdir -p "$CONFIG_DIR"
 
-    # Only back up directories/files that this repository
-    # is going to replace.
-    for item in "$REPO_DIR/.config/"*; do
-        [[ -e "$item" ]] || continue
-
-        name="$(basename "$item")"
-
-        if [[ -e "$CONFIG_DIR/$name" ]]; then
-            cp -a "$CONFIG_DIR/$name" "$BACKUP_DIR/"
-        fi
+is_generated() {
+    local rel="$1" g
+    for g in "${GENERATED_FILES[@]}"; do
+        [[ "$rel" == "$g" ]] && return 0
     done
+    return 1
+}
 
-    success "Existing configuration backed up to:"
+LINK_FAILED=0
+LINKED_COUNT=0
+BACKED_UP_COUNT=0
+
+while IFS= read -r -d '' src; do
+    rel="${src#"$SRC"/}"
+
+    is_generated "$rel" && continue
+
+    dest="$CONFIG_DIR/$rel"
+    mkdir -p "$(dirname "$dest")"
+
+    if [[ -L "$dest" ]]; then
+        # Already a symlink (e.g. re-running install.sh) — repoint it in
+        # case the repo was moved or cloned to a new path.
+        ln -sfn "$src" "$dest"
+    elif [[ -e "$dest" ]]; then
+        # A real file/dir is in the way: back it up, then replace with a link.
+        mkdir -p "$BACKUP_DIR/config/$(dirname "$rel")"
+        mv "$dest" "$BACKUP_DIR/config/$rel"
+        BACKED_UP_COUNT=$((BACKED_UP_COUNT + 1))
+        ln -s "$src" "$dest"
+    else
+        ln -s "$src" "$dest"
+    fi
+
+    if [[ -L "$dest" && "$(readlink -f "$dest")" == "$(readlink -f "$src")" ]]; then
+        LINKED_COUNT=$((LINKED_COUNT + 1))
+    else
+        LINK_FAILED=1
+        error "Failed to link $rel"
+    fi
+done < <(find "$SRC" \( -type f -o -type l \) -not -path '*/.git/*' -print0)
+
+# ~/.zshrc is installed from .config/.zshrc but lives outside ~/.config
+if [[ -f "$SRC/.zshrc" ]]; then
+    if [[ -e "$HOME/.zshrc" && ! -L "$HOME/.zshrc" ]]; then
+        mkdir -p "$BACKUP_DIR/home"
+        mv "$HOME/.zshrc" "$BACKUP_DIR/home/.zshrc"
+        BACKED_UP_COUNT=$((BACKED_UP_COUNT + 1))
+    fi
+    ln -sfn "$SRC/.zshrc" "$HOME/.zshrc"
+    success "Linked ~/.zshrc."
+fi
+
+# Generated files: copy once so configs that `include`/`source`/`@import`
+# them don't fail to parse before the first `theme apply` runs.
+for g in "${GENERATED_FILES[@]}"; do
+    [[ -f "$SRC/$g" ]] || continue
+    dest="$CONFIG_DIR/$g"
+    if [[ ! -e "$dest" || -L "$dest" ]]; then
+        # Fresh install, or a stale symlink from an older version of this
+        # script — replace with a real, independent copy.
+        [[ -L "$dest" ]] && rm -f "$dest"
+        mkdir -p "$(dirname "$dest")"
+        cp "$SRC/$g" "$dest"
+    fi
+done
+
+if [[ "$LINK_FAILED" -eq 1 ]]; then
+    error "One or more files failed to link. See errors above."
+else
+    success "Dotfiles linked ($LINKED_COUNT file(s))."
+fi
+
+if [[ "$BACKED_UP_COUNT" -gt 0 ]]; then
+    info "Replaced $BACKED_UP_COUNT existing file(s) with symlinks; originals saved to:"
     printf '  %s\n' "$BACKUP_DIR"
-else
-    mkdir -p "$CONFIG_DIR"
 fi
-
-# --------------------------------------------------
-# Install dotfiles
-# --------------------------------------------------
-
-info "Installing dotfiles..."
-
-# Install ~/.config files
-cp -a "$REPO_DIR/.config/." "$CONFIG_DIR/"
-
-# Install ~/.zshrc
-if [[ -f "$REPO_DIR/.config/.zshrc" ]]; then
-    cp "$REPO_DIR/.config/.zshrc" "$HOME/.zshrc"
-    success "Installed .zshrc."
-else
-    warning ".zshrc not found; skipping."
-fi
-
-success "Dotfiles installed."
 
 # --------------------------------------------------
 # Papirus folder color
@@ -267,24 +327,15 @@ else
 fi
 
 # --------------------------------------------------
-# Wallpapers
+# User directories
 # --------------------------------------------------
 
 info "Creating user directories..."
 
-if command -v xdg-user-dirs-update >/dev/null 2>&1; then
-    xdg-user-dirs-update
-fi
-
+mkdir -p "$HOME/Pictures"
 mkdir -p "$HOME/Pictures/Wallpapers"
 
-if [[ -d "$REPO_DIR/Wallpapers" ]]; then
-    info "Installing wallpapers..."
-    cp -a "$REPO_DIR/Wallpapers/." "$HOME/Pictures/Wallpapers/"
-    success "Wallpapers installed."
-else
-    warning "No Wallpapers directory in the repo; created an empty ~/Pictures/Wallpapers."
-fi
+success "Pictures and Wallpapers directories created."
 
 # --------------------------------------------------
 # Enable user audio services
@@ -305,10 +356,15 @@ fi
 # --------------------------------------------------
 # Permissions
 # --------------------------------------------------
+#
+# Scripts are now symlinks into the repo, so chmod must target the repo's
+# real files — a symlink's own permission bits are irrelevant on Linux,
+# what matters is the target's. `find -type f` on ~/.config would no
+# longer even match these paths, since a symlink is type l, not type f.
 
 info "Setting executable permissions on shell scripts..."
 
-find "$CONFIG_DIR" -type f \( -name "*.sh" -o -name "*.py" \) -exec chmod +x {} \;
+find "$SRC" -type f \( -name "*.sh" -o -name "*.py" \) -exec chmod +x {} \;
 
 success "Shell script permissions configured."
 
@@ -325,42 +381,6 @@ else
 fi
 
 # --------------------------------------------------
-# Dark color scheme (GTK / libadwaita / portals)
-# --------------------------------------------------
-
-info "Setting dark color scheme preference..."
-
-gset() {
-    if [[ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]]; then
-        gsettings set "$1" "$2" "$3"
-    else
-        dbus-run-session -- gsettings set "$1" "$2" "$3"
-    fi
-}
-
-if command -v gsettings >/dev/null 2>&1; then
-    gset org.gnome.desktop.interface color-scheme 'prefer-dark' \
-        && success "color-scheme set to prefer-dark." \
-        || warning "gsettings failed (is dconf installed?)."
-    gset org.gnome.desktop.interface gtk-theme 'adw-gtk3-dark' || true
-    gset org.gnome.desktop.interface icon-theme 'Papirus-Dark' || true
-else
-    warning "gsettings not found; install glib2 and dconf."
-fi
-
-# Fallback that works without a session bus
-for v in 3 4; do
-    f="$CONFIG_DIR/gtk-$v.0/settings.ini"
-    mkdir -p "$(dirname "$f")"
-    [[ -f "$f" ]] || printf '[Settings]\n' > "$f"
-    if grep -q '^gtk-application-prefer-dark-theme' "$f"; then
-        sed -i 's/^gtk-application-prefer-dark-theme.*/gtk-application-prefer-dark-theme=1/' "$f"
-    else
-        printf 'gtk-application-prefer-dark-theme=1\n' >> "$f"
-    fi
-done
-
-# --------------------------------------------------
 # Finish
 # --------------------------------------------------
 
@@ -372,9 +392,9 @@ printf '\n'
 
 printf 'Distribution:  %s\n' "${PRETTY_NAME:-unknown}"
 printf 'AUR helper:    %s\n' "${AUR_HELPER:-none}"
-printf 'Configuration: %s\n' "$CONFIG_DIR"
+printf 'Configuration: %s (symlinked to %s)\n' "$CONFIG_DIR" "$SRC"
 
-if [[ -d "$BACKUP_DIR" ]]; then
+if [[ "$BACKED_UP_COUNT" -gt 0 ]]; then
     printf 'Backup:        %s\n' "$BACKUP_DIR"
 fi
 

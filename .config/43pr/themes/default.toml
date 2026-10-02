@@ -62,13 +62,6 @@ lock_password = "#ffffff"
 lock_time   = "#ffffff"
 lock_layout = "#ffffff"
 
-wl_window_bg  = "#0c0c0c"
-wl_button_bg  = "#0c0c0c"
-wl_text       = "#ffffff"
-wl_hover_bg   = "#ffffff"
-wl_active_bg  = "#ffffff"
-wl_focus_ring = "#ffffff"
-
 gtk_bg = "#000000"
 gtk_fg = "#ffffff"
 

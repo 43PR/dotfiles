@@ -439,7 +439,7 @@ Item {
 
                     Image {
                         anchors.centerIn: parent
-                        source: page.homeDir ? "file://" + page.homeDir + "/.config/quickshell/pfp3.png" : ""
+                        source: page.homeDir ? "file://" + page.homeDir + "/.config/quickshell/imgs/pfp3.png" : ""
                         width: 140
                         height: 140
                         fillMode: Image.PreserveAspectFit

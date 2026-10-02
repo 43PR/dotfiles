@@ -8,7 +8,7 @@ QtObject {
     id: root
 
     readonly property int radius: 10
-    readonly property real tiltStrength: 7 // 0 to disable
+    readonly property real tiltStrength: 8
     readonly property string fontFamily: "JetBrains Mono"
     property string iconFont: "JetBrainsMono Nerd Font"
     readonly property int animFast: 120
@@ -22,7 +22,6 @@ QtObject {
     property color danger: palette.danger || '#ff003c'
     property color accent: palette.accent || '#ffffff'
     property color accent2: palette.accent2 || '#ffffff'
-    
     property color border: palette.border || '#151515'
     property color bgPanel: palette.bgPanel || '#050505'
     property color bgCard: palette.bgCard || '#0d0d0d'
