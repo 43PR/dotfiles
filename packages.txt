@@ -13,7 +13,6 @@ hyprland
 hyprlock
 hyprpolkitagent
 quickshell
-waybar
 rofi
 polkit
 qt6-wayland
@@ -121,7 +120,6 @@ gammastep
 # Desktop Notifications
 # --------------------------------------------------
 
-dunst
 libnotify
 
 # --------------------------------------------------

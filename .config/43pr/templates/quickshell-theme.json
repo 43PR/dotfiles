@@ -1,6 +1,6 @@
 {
   "bg": "#{{qs_bg|strip}}",
-  "bgAlpha": 0.7,
+  "bgAlpha": 0.8,
   "text": "#{{qs_text|strip}}",
   "textDim": "#{{qs_text_dim|strip}}",
   "danger": "#{{qs_danger|strip}}",

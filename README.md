@@ -5,7 +5,6 @@
 A clean and simple Hyprland setup focused on practical workflows, productivity, and easy to customize.
 
 ![Hyprland](https://img.shields.io/badge/Hyprland-0.56.2-8b9aaf?style=for-the-badge&labelColor=101418)
-![GitHub last commit](https://img.shields.io/github/last-commit/43PR/dotfiles?style=for-the-badge&labelColor=101418&color=8b9aaf)
 ![GitHub repo size](https://img.shields.io/github/repo-size/43PR/dotfiles?style=for-the-badge&labelColor=101418&color=8b9aaf)
 [![Discord](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Finvites%2FHQwU9SzHj%3Fwith_counts%3Dtrue&query=%24.approximate_member_count&style=for-the-badge&logo=discord&logoColor=ffffff&label=discord&labelColor=101418&color=7289a8)](https://discord.gg/HQwU9SzHj)
 [![YouTube](https://img.shields.io/badge/youtube-subscribe-b05a63?style=for-the-badge&logo=youtube&logoColor=ffffff&labelColor=101418)](https://www.youtube.com/@43PR2)
@@ -15,25 +14,25 @@ A clean and simple Hyprland setup focused on practical workflows, productivity, 
 
 </div>
 
-**v1.1.0**
+**v1.2.0**
 
-https://github.com/user-attachments/assets/d28c7791-3f7a-42ee-85d3-8bb91c9796c6
+<img width="1920" height="1080" alt="v1 2 0" src="https://github.com/user-attachments/assets/3b4857bc-285a-473a-924c-be89dab714b9" />
 
 Wallpapers: https://wallhaven.cc/user/43pr
 
 ## Features
 
-- **Waybar** — Volume control, mute, and media playback controls.
-- **Settings Menu** — System, network, bluetooth, display, audio, storage, and more.
-- **Dynamic Colors** — Wallpaper-based color generation with **Matugen**.
-- **Preset Themes** — Default Monochrome, Nord, Tokyo Night, etc. (you can create your own too)
-- **Wallpaper Selector** — Custom wallpaper picker **(Awww + Quickshell)**.
+- **Top bar** - Volume control, mute, and media playback controls, calendar.
+- **Settings Menu** — System, network, bluetooth, display, audio, storage, themes, and more.
+- **Wallpaper picker & Dynamic Colors** — Custom wallpaper selector with automatic wallpaper-based color generation.
+- **Preset Themes** — Default Monochrome, Nord, Tokyo Night, etc, and easily create your own. 
 - **App Launcher** — **Rofi** Application search, clipboard history, and opacity control.
-- **Zsh + Starship** — Customizable shell with autosuggestions, history, and a polished prompt.
+- **Zsh + Starship** — Customizable shell with autosuggestions and history.
 - **Customizable Power Menu** —  Custom power menu. 
+- **Notes / To do** —  Custom to-do app. 
 - **Hyprlock** — Custom lock screen.
-- **Custom Scripts** — Scripts for workflow and system management.
 - **Spotify + Spicetify** — Custom theme based on **text - darkthemer**, (modified).
+- **Custom Scripts** — Scripts for workflow and system management.
 
 > All programs: [packages.txt](packages.txt)
 
@@ -45,36 +44,34 @@ Just made some tweaks to it. Give it some love: [hyprquickpaper](https://github.
 
 > **You can modify keybinds using HyprMod**
 
-> **Move and resize windows with Super + left/right mouse drag.**
-
 | Keybind                 | Action                    |
 | -----------             | ------------------------- |
 | `Super + T`             | Terminal                  |
 | `Super + Q`             | Close active window       |
+| `Super + D`             | Application launcher      |
+| `Super + Space`         | Toggle floating window    |
+| `Super + F`             | Toggle fullscreen         |
 | `Super + 1, 2, 3..`     | Change workspaces         |
 | `Super + Shift + 1, 2..`| Move window to workspace  |
-| `Super + D`             | Application launcher      |
 | `Super + E`             | File manager              |
-| `Super + F`             | Toggle fullscreen         |
-| `Super + Space`         | Toggle floating window    |
 | `Super + B`             | Browser                   |
 | `Super + W`             | Wallpaper selector        |
 | `Super + I`             | Settings menu             |
+| `Super + Tab`           | Lock screen               |
+| `Super + Grave`         | Logout menu               |
 | `Super + O`             | Switch opacity            |
 | `Super + V`             | Clipboard history         |
 | `Super + Shift + W`     | Toggle waybar             |
-| `Super + Tab`           | Lock screen               |
-| `Super + Grave`         | Logout menu               |
 | `Super + Mouse wheel`   | Zoom in/out               |
+| `Super + C`             | To do / Notes             |
+| `Super + N`             | Notifications             |
 | `Delete`                | Screenshot fullscreen     |
 | `SHIFT + Delete`        | Screenshot area select    |
-| `Super + L`             | Toggle dark/light mode    |
 
+> [!note]
+> **Move and resize windows with Super + left/right mouse drag.**
 > To close most quickshell apps just click outside or Esc key.
-
 > All keybinds: [.config/hypr/keybinds.lua](.config/hypr/keybinds.lua)
-
-> Quickshell SettingsCornerTrigger.qml to controls hover actions
 
 ---
 ## Installation 

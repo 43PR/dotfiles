@@ -176,64 +176,6 @@ Item {
                     path: "~/.config/hypr/hyprlock.conf"
                 }
             }
-
-            Text {
-                text: "WAYBAR"
-                color: Theme.text
-                font.family: Theme.fontFamily
-                font.pixelSize: 16
-                font.letterSpacing: 3
-            }
-
-            Rectangle {
-                width: parent.width
-                height: 1
-                color: Theme.border
-            }
-
-            Column {
-                width: parent.width
-                spacing: page.sectionSpacing
-
-                ConfigButton {
-                    label: "CONFIG"
-                    path: "~/.config/waybar/config.jsonc"
-                }
-
-                ConfigButton {
-                    label: "STYLE"
-                    path: "~/.config/waybar/style.css"
-                }
-            }
-
-            Text {
-                text: "WLOGOUT"
-                color: Theme.text
-                font.family: Theme.fontFamily
-                font.pixelSize: 16
-                font.letterSpacing: 3
-            }
-
-            Rectangle {
-                width: parent.width
-                height: 1
-                color: Theme.border
-            }
-
-            Column {
-                width: parent.width
-                spacing: page.sectionSpacing
-
-                ConfigButton {
-                    label: "STYLE"
-                    path: "~/.config/wlogout/style.css"
-                }
-
-                ConfigButton {
-                    label: "LAYOUT"
-                    path: "~/.config/wlogout/layout"
-                }
-            }
             Text {
                 text: "ROFI"
                 color: Theme.text

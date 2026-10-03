@@ -240,14 +240,14 @@ Item {
             radius: Theme.radius
             color: page.powered
                 ? Theme.alpha(Theme.accent, 0.1)
-                : Theme.alpha("#A0A0A0", 0.15)
+                : Theme.alpha(Theme.textDim, 0.15)
             border.width: 1
-            border.color: page.powered ? Theme.accent : "#A0A0A0"
+            border.color: page.powered ? Theme.accent : Theme.textDim
 
             Text {
                 anchors.centerIn: parent
                 text: page.powered ? "BLUETOOTH ON" : "BLUETOOTH OFF"
-                color: page.powered ? Theme.accent : "#A0A0A0"
+                color: page.powered ? Theme.accent : Theme.textDim
                 font.family: Theme.fontFamily
                 font.pixelSize: 10
                 font.bold: true
@@ -366,9 +366,6 @@ Item {
 
                 Repeater {
                     id: repeater
-                    // Only bind to the device list while the adapter is powered on;
-                    // otherwise the model is null so no device cards render,
-                    // even for devices that remain paired/known while BT is off.
                     model: (page.adapter && page.powered) ? page.adapter.devices : null
 
                     delegate: Rectangle {
@@ -389,7 +386,7 @@ Item {
 
                         color: isConnected
                             ? Theme.alpha(Theme.accent, 0.10)
-                            : Theme.alpha(Theme.text, 0.025)
+                            : "transparent"
 
                         border.width: 1
                         border.color: isConnected
