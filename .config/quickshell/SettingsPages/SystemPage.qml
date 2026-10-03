@@ -446,7 +446,7 @@ Item {
                         smooth: true
                         mipmap: true
                         asynchronous: true
-                        opacity: 0.7
+                        opacity: Theme.imageOpacity
                     }
                 }
 

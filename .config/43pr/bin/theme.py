@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# .config/43pr/bin/theme.py
 """43PR theme controller: presets + Matugen -> one semantic palette -> app files."""
 import argparse, colorsys, fcntl, json, os, re, shutil, subprocess, sys, tempfile, tomllib
 from contextlib import contextmanager
@@ -245,6 +246,11 @@ def cmd_wallpaper(a):
         die(f"not readable: {p}")
     with lock():
         st = load_state()
+        if not st.get("colorgen", True):
+            st["wallpaper"] = str(p)          # remember it for when it's turned back on
+            save_state(st)
+            print("theme: color generation is off; wallpaper recorded only")
+            return
         pinned = False
         try:
             pinned = st.get("mode") == "preset" and \
@@ -313,6 +319,20 @@ def cmd_mode(a):
         print(f"theme: mode set to {a.value} (no wallpaper active; will apply on next 'wallpaper' or 'auto')")
 
 
+def cmd_colorgen(a):
+    """Enable/disable wallpaper-driven color generation."""
+    if a.value not in ("on", "off"):
+        die("colorgen must be 'on' or 'off'")
+    with lock():
+        st = load_state()
+        st["colorgen"] = (a.value == "on")
+        save_state(st)
+    if a.value == "on" and load_state().get("wallpaper"):
+        cmd_auto(a)    # regenerate from the last wallpaper right away
+    else:
+        print(f"theme: color generation {a.value}")
+
+
 def cmd_list(a):
     st = load_state()
     for p in sorted(THEMES.glob("*.toml")):
@@ -346,10 +366,12 @@ def cmd_status(a):
     print("palette:", PALETTE, "(exists)" if PALETTE.exists() else "(missing)")
     print("matugen:", shutil.which("matugen") or "NOT INSTALLED")
 
+
 def cmd_toggle(a):
     st = load_state()
     current = st.get("mode_appearance", "dark")
     cmd_mode(argparse.Namespace(value="light" if current == "dark" else "dark"))
+
 
 def main():
     ap = argparse.ArgumentParser(prog="theme.py")
@@ -360,6 +382,7 @@ def main():
     s = sp.add_parser("auto"); s.set_defaults(f=cmd_auto)
     s = sp.add_parser("apply"); s.set_defaults(f=cmd_apply)
     s = sp.add_parser("mode"); s.add_argument("value"); s.set_defaults(f=cmd_mode)
+    s = sp.add_parser("colorgen"); s.add_argument("value"); s.set_defaults(f=cmd_colorgen)
     s = sp.add_parser("list"); s.set_defaults(f=cmd_list)
     s = sp.add_parser("new"); s.add_argument("name")
     s.add_argument("source", nargs="?", default="default"); s.set_defaults(f=cmd_new)

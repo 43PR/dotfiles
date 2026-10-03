@@ -8,15 +8,17 @@ QtObject {
     id: root
 
     readonly property int radius: 10
-    readonly property real tiltStrength: 8
+    readonly property real tiltStrength: 7
     readonly property string fontFamily: "JetBrains Mono"
     property string iconFont: "JetBrainsMono Nerd Font"
     readonly property int animFast: 120
     readonly property int animMed: 220
     readonly property int animSlow: 380
 
+    property real bgAlpha: 1.0   
     property color _bgBase: palette.bg || '#000000'
-    property color bg: alpha(_bgBase, palette.bgAlpha !== undefined ? palette.bgAlpha : 0.7)
+    property color bg: alpha(_bgBase, bgAlpha)
+    property real imageOpacity: palette.imageOpacity !== undefined ? Math.max(0, Math.min(1, Number(palette.imageOpacity))) : 0.8
     property color text: palette.text || '#ffffff'
     property color textDim: palette.textDim || '#c2c2c2'
     property color danger: palette.danger || '#ff003c'

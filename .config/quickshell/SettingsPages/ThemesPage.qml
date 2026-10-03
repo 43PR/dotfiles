@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import Quickshell.Io
 import Quickshell
 import "../"
 
@@ -26,6 +27,105 @@ Item {
             "-c",
             "python3 \"$HOME/.config/43pr/bin/theme.py\" " + themeCommand
         ])
+    }
+
+    property bool colorGen: true
+
+    FileView {
+        id: stateView
+        path: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state"))
+              + "/43pr/state.json"
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: page.colorGen = stateAdapter.colorgen
+        adapter: JsonAdapter {
+            id: stateAdapter
+            property bool colorgen: true
+        }
+    }
+
+    // fallback re-read in case the atomic file replace drops the watcher
+    Timer {
+        id: reloadTimer
+        interval: 700
+        onTriggered: stateView.reload()
+    }
+
+    function setColorGen(on) {
+        page.colorGen = on                      // update UI immediately
+        runTheme("colorgen " + (on ? "on" : "off"))
+        reloadTimer.restart()
+    }
+
+    component ToggleButton: Rectangle {
+        required property string label
+        required property bool checked
+        signal toggled()
+
+        width: parent.width
+        height: 42
+        radius: Theme.radius
+        color: "#00000000"
+        border.width: 1
+        border.color: checked ? Theme.accent : Theme.border
+
+        Text {
+            anchors.left: parent.left
+            anchors.leftMargin: 14
+            anchors.verticalCenter: parent.verticalCenter
+            text: label
+            color: Theme.textDim
+            font.family: Theme.fontFamily
+            font.pixelSize: 13
+            font.bold: true
+            font.letterSpacing: 2
+        }
+
+        Row {
+            anchors.right: parent.right
+            anchors.rightMargin: 14
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 10
+
+            Text {
+                text: checked ? "ON" : "OFF"
+                color: checked ? Theme.accent : Theme.textDim
+                font.family: Theme.fontFamily
+                font.pixelSize: 12
+                font.bold: true
+                font.letterSpacing: 1
+                anchors.verticalCenter: parent.verticalCenter
+            }
+
+            // switch pill
+            Rectangle {
+                width: 34
+                height: 18
+                radius: height / 2
+                anchors.verticalCenter: parent.verticalCenter
+                color: checked ? Theme.alpha(Theme.accent, 0.35) : "#00000000"
+                border.width: 1
+                border.color: checked ? Theme.accent : Theme.border
+
+                Rectangle {
+                    width: 12
+                    height: 12
+                    radius: 6
+                    anchors.verticalCenter: parent.verticalCenter
+                    x: checked ? parent.width - width - 3 : 3
+                    color: checked ? Theme.accent : Theme.textDim
+                    Behavior on x { NumberAnimation { duration: 120 } }
+                }
+            }
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            hoverEnabled: true
+            onEntered: parent.color = Theme.alpha(Theme.accent, 0.08)
+            onExited: parent.color = "#00000000"
+            onClicked: parent.toggled()
+        }
     }
 
     component ConfigButton: Rectangle {
@@ -211,9 +311,13 @@ Item {
             Column {
                 width: parent.width
                 spacing: page.sectionSpacing
-
+                ToggleButton {
+                    label: "COLOR GENERATION"
+                    checked: page.colorGen
+                    onToggled: page.setColorGen(!page.colorGen)
+                    }
                 ThemeButton {
-                    label: "DEFAULT THEME"
+                    label: "DEFAULT"
                     command: "default"
                 }
                 ThemeButton {
@@ -251,12 +355,6 @@ Item {
             Column {
                 width: parent.width
                 spacing: page.sectionSpacing
-
-                ConfigButton {
-                    label: "OPACITY"
-                    path: "~/.config/43pr/templates/quickshell-theme.json"
-                }
-
                 ConfigButton {
                     label: "THEME"
                     path: "~/.config/quickshell/Theme.qml"
