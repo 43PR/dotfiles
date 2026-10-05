@@ -66,7 +66,6 @@
 ; (gtk_accel_path "<Actions>/XedSpellPluginActions/InlineSpellChecker" "")
 ; (gtk_accel_path "<Actions>/XedWindowActions/DocumentsPreviousDocument" "<Primary><Alt>Page_Up")
 ; (gtk_accel_path "<Actions>/XedWindowActions/EditToggleCommentBlock" "<Primary><Shift>question")
-; (gtk_accel_path "<Actions>/DocumentsListActions/Tab_2" "<Alt>3")
 ; (gtk_accel_path "<Actions>/XedWindowAlwaysSensitiveActions/XAppFavoritesMenu" "")
 ; (gtk_accel_path "<Actions>/XedWindowAlwaysSensitiveActions/Edit" "")
 ; (gtk_accel_path "<Actions>/XedTextSizePluginActions/SmallerTextAction" "<Primary>minus")

@@ -22,14 +22,14 @@ Wallpapers: https://wallhaven.cc/user/43pr
 
 ## Features
 
-- **Top bar** - Volume control, mute, and media playback controls, calendar.
+- **Top bar** - Customizing options, vertical bar, styles, calendar, controls for volume and media playback.
 - **Settings Menu** — System, network, bluetooth, display, audio, storage, themes, and more.
 - **Wallpaper picker & Dynamic Colors** — Custom wallpaper selector with automatic wallpaper-based color generation.
 - **Preset Themes** — Default Monochrome, Nord, Tokyo Night, etc, and easily create your own. 
 - **App Launcher** — **Rofi** Application search, clipboard history, and opacity control.
 - **Zsh + Starship** — Customizable shell with autosuggestions and history.
 - **Customizable Power Menu** —  Custom power menu. 
-- **Notes / To do** —  Custom to-do app. 
+- **Notes / To do** —  Custom quick Notes/To-do. 
 - **Hyprlock** — Custom lock screen.
 - **Spotify + Spicetify** — Custom theme based on **text - darkthemer**, (modified).
 - **Custom Scripts** — Scripts for workflow and system management.
@@ -55,15 +55,15 @@ Just made some tweaks to it. Give it some love: [hyprquickpaper](https://github.
 | `Super + Shift + 1, 2..`| Move window to workspace  |
 | `Super + E`             | File manager              |
 | `Super + B`             | Browser                   |
-| `Super + W`             | Wallpaper selector        |
+| `Super + V`             | Clipboard history         |
 | `Super + I`             | Settings menu             |
+| `Super + W`             | Wallpaper selector        |
+| `Super + O`             | Switch opacity            |
 | `Super + Tab`           | Lock screen               |
 | `Super + Grave`         | Logout menu               |
-| `Super + O`             | Switch opacity            |
-| `Super + V`             | Clipboard history         |
-| `Super + Shift + W`     | Toggle waybar             |
+| `Super + Shift + W`     | Toggle bar                |
 | `Super + Mouse wheel`   | Zoom in/out               |
-| `Super + C`             | To do / Notes             |
+| `Super + C`             | Notes/To-do               |
 | `Super + N`             | Notifications             |
 | `Delete`                | Screenshot fullscreen     |
 | `SHIFT + Delete`        | Screenshot area select    |
