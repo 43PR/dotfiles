@@ -240,14 +240,14 @@ Item {
             radius: Theme.radius
             color: page.powered
                 ? Theme.alpha(Theme.accent, 0.1)
-                : Theme.alpha(Theme.textDim, 0.15)
+                : Theme.alpha(Theme.textFaint, 0.15)
             border.width: 1
-            border.color: page.powered ? Theme.accent : Theme.textDim
+            border.color: page.powered ? Theme.accent : Theme.textFaint
 
             Text {
                 anchors.centerIn: parent
                 text: page.powered ? "BLUETOOTH ON" : "BLUETOOTH OFF"
-                color: page.powered ? Theme.accent : Theme.textDim
+                color: page.powered ? Theme.accent : Theme.textFaint
                 font.family: Theme.fontFamily
                 font.pixelSize: 10
                 font.bold: true

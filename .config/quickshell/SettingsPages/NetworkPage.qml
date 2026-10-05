@@ -143,8 +143,6 @@ Item {
         triggeredOnStart: true
         onTriggered: if (!pEthernet.running) pEthernet.running = true
     }
-
-    // ── Wi-Fi radio ──────────────────────────────────────────────
     Process {
         id: pRadioGet
         command: ["nmcli", "radio", "wifi"]
@@ -154,10 +152,8 @@ Item {
             onStreamFinished: page.wifiEnabled = text.trim() === "enabled"
         }
     }
-
     Process {
         id: pRadioSet
-
         stdout: StdioCollector {
             onStreamFinished: {
                 pRadioGet.running = true
@@ -171,8 +167,6 @@ Item {
         pRadioSet.command = ["nmcli", "radio", "wifi", on ? "on" : "off"]
         pRadioSet.running = true
     }
-
-    // ── Wi-Fi network list ───────────────────────────────────────
     Process {
         id: pList
         command: ["nmcli", "-t", "-f", "IN-USE,SSID,SIGNAL,SECURITY", "device", "wifi", "list"]
@@ -233,13 +227,11 @@ Item {
 
     Process {
         id: pConnect
-
         function refresh() {
             page.pendingSsid = ""
             pEthernet.running = true
             if (page.wifiEnabled) pList.running = true
         }
-
         stdout: StdioCollector { onStreamFinished: pConnect.refresh() }
         stderr: StdioCollector { onStreamFinished: pConnect.refresh() }
     }
@@ -270,16 +262,11 @@ Item {
         anchors.leftMargin: page.marginLeft; anchors.rightMargin: page.marginRight
         anchors.topMargin: page.marginTop; anchors.bottomMargin: page.marginBottom
         spacing: 14
-
-        // ── Header ───────────────────────────────────────────────
         Text {
             text: "NETWORK"; color: Theme.text
             font.family: page.monoFont; font.pixelSize: 19; font.letterSpacing: 3
         }
-
         Rectangle { width: parent.width; height: 1; color: Theme.border }
-
-        // ── Wi-Fi toggle + speed stats ──────────────────────────
         Column {
             id: statsRow
             width: parent.width
@@ -292,14 +279,14 @@ Item {
                 radius: Theme.radius
                 color: page.wifiEnabled
                     ? Theme.alpha(Theme.accent, 0.1)
-                    : Theme.alpha("#A0A0A0", 0.15)
+                    : Theme.alpha(Theme.textFaint, 0.15)
                 border.width: 1
-                border.color: page.wifiEnabled ? Theme.accent : "#A0A0A0"
+                border.color: page.wifiEnabled ? Theme.accent : Theme.textFaint
 
                 Text {
                     anchors.centerIn: parent
                     text: page.wifiEnabled ? "WI-FI ON" : "WI-FI OFF"
-                    color: page.wifiEnabled ? Theme.accent : "#A0A0A0"
+                    color: page.wifiEnabled ? Theme.accent : Theme.textFaint
                     font.family: page.monoFont
                     font.pixelSize: 10
                     font.bold: true

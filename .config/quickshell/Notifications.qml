@@ -5,141 +5,201 @@ import Quickshell.Services.Notifications
 import Quickshell.Services.UPower
 import QtQuick
 
-// Notification daemon:
-//  - popups in the top-right corner
-//  - persistent history panel (toggle: qs ipc call notifications toggle)
-//  - history saved to ~/.cache/43pr/notifications.json
-//  - battery low / critical alerts
 PanelWindow {
     id: root
 
-    // ---- tweakables ----
-    property int topGap: 50          // distance from the top (clear your bar)
-    property int sideGap: 16         // distance from the right edge
-    property int cardWidth: 300
+    property int topGap: 50
+    property int sideGap: 16
+    property int baseWidth: 300
     property int maxHistory: 100
 
+    property bool dnd: false
     property bool panelOpen: false
+    property bool stateReady: false
+    property bool historyReady: false
+    property int menuSize: 100
+    readonly property real ui: menuSize / 100
+    readonly property int cardWidth: Math.round(baseWidth * ui)
 
-    anchors {
-        top: true
-        bottom: true
-        right: true
-    }
-
+    anchors { top: true; bottom: true; right: true; left: true }
     implicitWidth: cardWidth + sideGap + 24
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "notifications"
-    WlrLayershell.keyboardFocus: root.panelOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: panelOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
-    // Only the visible thing catches input; the rest of the edge clicks through.
-    mask: Region {
-        item: root.panelOpen ? panel : stack
+    mask: Region { item: root.panelOpen ? backdrop : stack }
+
+    component Lbl: Text {
+        property real ui: 1
+        property real sz: 10
+        font.pixelSize: Math.round(sz * ui)
+        color: Theme.text
+        elide: Text.ElideRight
     }
 
-    // ------------------------------------------------------------------
-    // Helpers
-    // ------------------------------------------------------------------
-    function imgSrc(p) {
-        if (!p)
-            return "";
-        return p.startsWith("/") ? "file://" + p : p;
+    component Thumb: Rectangle {
+        property real ui: 1
+        property real size: 40
+        property string src: ""
+        width: Math.round(size * ui)
+        height: width
+        radius: Math.round(8 * ui)
+        clip: true
+        Image {
+            id: im
+            anchors.fill: parent
+            fillMode: Image.PreserveAspectCrop
+            asynchronous: true
+            source: parent.src
+        }
+        Text {
+            anchors.centerIn: parent
+            visible: im.status !== Image.Ready
+            text: "󰂚"
+            font.family: Theme.iconFont
+            font.pixelSize: Math.round(parent.size * 0.45 * parent.ui)
+            color: Theme.text
+        }
     }
 
+    component IconBtn: Rectangle {
+        id: b
+        property real ui: 1
+        property string icon: ""
+        property string tip: ""
+        property color tint: Theme.text
+        property real rest: 0.08
+        property real hot: 0.2
+        property bool tipReady: false
+        signal clicked()
+        width: Math.round(24 * ui)
+        height: width
+        radius: Math.round(8 * ui)
+        color: Theme.alpha(tint, area.containsMouse ? hot : rest)
+
+        Text {
+            anchors.centerIn: parent
+            text: b.icon
+            font.family: Theme.iconFont
+            font.pixelSize: Math.round(13 * b.ui)
+            color: b.tint
+        }
+        MouseArea {
+            id: area
+            anchors.fill: parent
+            hoverEnabled: true
+            onClicked: b.clicked()
+            onContainsMouseChanged: {
+                b.tipReady = false;
+                if (containsMouse) tipTimer.restart();
+                else tipTimer.stop();
+            }
+        }
+        Timer { id: tipTimer; interval: 400; onTriggered: b.tipReady = true }
+
+        Rectangle {
+            visible: b.tipReady && b.tip !== ""
+            anchors.top: parent.bottom
+            anchors.topMargin: 6
+            anchors.right: parent.right
+            width: tipText.implicitWidth + Math.round(14 * b.ui)
+            height: tipText.implicitHeight + Math.round(8 * b.ui)
+            radius: Math.round(7 * b.ui)
+            color: Theme.bg
+            border.width: 1
+            border.color: Theme.alpha(Theme.text, 0.15)
+            Lbl { id: tipText; anchors.centerIn: parent; ui: b.ui; sz: 9; text: b.tip }
+        }
+    }
+
+    component SizeBtn: Text {
+        signal clicked()
+        height: 16
+        verticalAlignment: Text.AlignVCenter
+        horizontalAlignment: Text.AlignHCenter
+        color: Theme.text
+        MouseArea { anchors.fill: parent; onClicked: parent.clicked() }
+    }
+
+    function px(n) { return Math.round(n * ui); }
+    function imgSrc(p) { return !p ? "" : (p.startsWith("/") ? "file://" + p : p); }
+    function thumbSrc(image, icon) {
+        if (image && image !== "") return imgSrc(image);
+        if (icon && icon !== "") return Quickshell.iconPath(icon, true);
+        return "";
+    }
     function fmtTime(ms) {
         const d = new Date(ms);
-        const now = new Date();
-        return d.toDateString() === now.toDateString()
+        return d.toDateString() === new Date().toDateString()
             ? Qt.formatDateTime(d, "HH:mm")
             : Qt.formatDateTime(d, "dd MMM HH:mm");
     }
+    function copyText(s, b) { Quickshell.execDetached(["wl-copy", b !== "" ? s + "\n" + b : s]); }
+    function removeHistory(i) { history.remove(i); saveTimer.restart(); }
+    function clearHistory() { history.clear(); saveTimer.restart(); }
+    function setSize(v) { menuSize = Math.max(60, Math.min(200, v)); stateTimer.restart(); }
+    function toggleDnd() { dnd = !dnd; stateTimer.restart(); }
 
-    function removeHistory(i) {
-        history.remove(i);
-        saveTimer.restart();
-    }
-
-    function clearHistory() {
-        history.clear();
-        saveTimer.restart();
-    }
-
-    // ------------------------------------------------------------------
-    // IPC:  qs ipc call notifications toggle | open | close | clear
-    // ------------------------------------------------------------------
     IpcHandler {
         target: "notifications"
-
-        function toggle(): void {
-            root.panelOpen = !root.panelOpen;
-        }
-        function open(): void {
-            root.panelOpen = true;
-        }
-        function close(): void {
-            root.panelOpen = false;
-        }
-        function clear(): void {
-            root.clearHistory();
-        }
+        function toggle(): void { root.panelOpen = !root.panelOpen; }
+        function open(): void { root.panelOpen = true; }
+        function close(): void { root.panelOpen = false; }
+        function clear(): void { root.clearHistory(); }
+        function dnd(): void { root.toggleDnd(); }
     }
 
-    // ------------------------------------------------------------------
-    // History (persisted)
-    // ------------------------------------------------------------------
-    ListModel {
-        id: history
+    FileView {
+        id: stateFile
+        path: Quickshell.env("HOME") + "/.config/quickshell/state/notifications-state.json"
+        printErrors: false
+        onLoaded: {
+            try {
+                const s = JSON.parse(text());
+                if (typeof s.dnd === "boolean") root.dnd = s.dnd;
+                if (typeof s.menuSize === "number") root.menuSize = Math.max(60, Math.min(200, Math.round(s.menuSize)));
+            } catch (e) { console.warn("Notifications: bad state file: " + e); }
+            root.stateReady = true;
+        }
+        onLoadFailed: root.stateReady = true
+    }
+    Timer {
+        id: stateTimer
+        interval: 300
+        onTriggered: if (root.stateReady) stateFile.setText(JSON.stringify({ dnd: root.dnd, menuSize: root.menuSize }))
     }
 
-    property bool historyReady: false
+    ListModel { id: history }
 
     FileView {
         id: store
         path: Quickshell.env("HOME") + "/.cache/43pr/notifications.json"
         printErrors: false
-
         onLoaded: {
             try {
                 const arr = JSON.parse(text());
-                // Append (not replace): anything that arrived before the
-                // file finished loading is newer and stays on top.
-                for (let i = 0; i < arr.length; i++)
-                    history.append(arr[i]);
-            } catch (e) {
-                console.warn("Notifications: bad history file: " + e);
-            }
+                for (let i = 0; i < arr.length; i++) history.append(arr[i]);
+            } catch (e) { console.warn("Notifications: bad history file: " + e); }
             root.historyReady = true;
         }
         onLoadFailed: root.historyReady = true
     }
-
     Timer {
         id: saveTimer
         interval: 400
         onTriggered: {
-            if (!root.historyReady)
-                return;
+            if (!root.historyReady) return;
             const out = [];
             for (let i = 0; i < history.count; i++) {
                 const e = history.get(i);
-                out.push({
-                    summary: e.summary,
-                    body: e.body,
-                    appName: e.appName,
-                    appIcon: e.appIcon,
-                    image: e.image,
-                    time: e.time
-                });
+                out.push({ summary: e.summary, body: e.body, appName: e.appName, appIcon: e.appIcon, image: e.image, time: e.time });
             }
             store.setText(JSON.stringify(out));
         }
     }
 
-    // ------------------------------------------------------------------
-    // Notification server
-    // ------------------------------------------------------------------
     NotificationServer {
         id: server
         keepOnReload: true
@@ -148,15 +208,10 @@ PanelWindow {
         imageSupported: true
 
         onNotification: n => {
-            n.tracked = true;
+            n.tracked = !(root.dnd && n.urgency !== NotificationUrgency.Critical);
+            if (n.transient) return;
 
-            if (n.transient)
-                return;
-
-            // image:// providers only live as long as the notification,
-            // so only real file paths are kept in history.
             const img = (n.image && !String(n.image).startsWith("image://")) ? String(n.image) : "";
-
             history.insert(0, {
                 summary: n.summary || "",
                 body: n.body || "",
@@ -165,119 +220,79 @@ PanelWindow {
                 image: img,
                 time: Date.now()
             });
-            if (history.count > root.maxHistory)
-                history.remove(root.maxHistory, history.count - root.maxHistory);
+            if (history.count > root.maxHistory) history.remove(root.maxHistory, history.count - root.maxHistory);
             saveTimer.restart();
         }
     }
 
-    // ------------------------------------------------------------------
-    // Battery alerts
-    // ------------------------------------------------------------------
-    property real lastBatteryPercentage: -1
-    property bool battery20Triggered: false
-    property bool battery15Triggered: false
+    property real lastBat: -1
+    property bool bat20: false
+    property bool bat15: false
+
+    function notifyBat(urgency, icon, title, pct) {
+        Quickshell.execDetached(["notify-send", "-a", "Battery", "-u", urgency, "-i", icon, title, "Battery is at " + Math.round(pct) + "%"]);
+    }
 
     function checkBattery() {
-        if (!UPower.displayDevice.ready)
-            return;
+        if (!UPower.displayDevice.ready) return;
+        const p = UPower.displayDevice.percentage;
 
-        var percentage = UPower.displayDevice.percentage;
-        var discharging = UPower.onBattery;
-
-        if (!discharging) {
-            battery20Triggered = false;
-            battery15Triggered = false;
-            lastBatteryPercentage = percentage;
+        if (!UPower.onBattery) {
+            bat20 = false;
+            bat15 = false;
+            lastBat = p;
             return;
         }
+        if (lastBat < 0) { lastBat = p; return; }
 
-        if (lastBatteryPercentage < 0) {
-            lastBatteryPercentage = percentage;
-            return;
-        }
+        if (p > 20) bat20 = false;
+        if (p > 15) bat15 = false;
 
-        if (percentage > 20)
-            battery20Triggered = false;
-        if (percentage > 15)
-            battery15Triggered = false;
-
-        if (!battery20Triggered && lastBatteryPercentage > 20 && percentage <= 20) {
-            battery20Triggered = true;
-            Quickshell.execDetached([
-                "notify-send", "-a", "Battery", "-u", "normal",
-                "-i", "battery-caution",
-                "Battery Low",
-                "Battery is at " + Math.round(percentage) + "%"
-            ]);
-        }
-
-        if (!battery15Triggered && lastBatteryPercentage > 15 && percentage <= 15) {
-            battery15Triggered = true;
-            Quickshell.execDetached([
-                "notify-send", "-a", "Battery", "-u", "critical",
-                "-i", "battery-empty",
-                "Battery Critical",
-                "Battery is at " + Math.round(percentage) + "%"
-            ]);
-        }
-
-        lastBatteryPercentage = percentage;
+        if (!bat20 && lastBat > 20 && p <= 20) { bat20 = true; notifyBat("normal", "battery-caution", "Battery Low", p); }
+        if (!bat15 && lastBat > 15 && p <= 15) { bat15 = true; notifyBat("critical", "battery-empty", "Battery Critical", p); }
+        lastBat = p;
     }
 
-    Component.onCompleted: checkBattery()
-
+    Component.onCompleted: {
+        Quickshell.execDetached(["mkdir", "-p", Quickshell.env("HOME") + "/.config/quickshell/state"]);
+        checkBattery();
+    }
     Connections {
         target: UPower.displayDevice
-        function onPercentageChanged() {
-            root.checkBattery();
-        }
-        function onStateChanged() {
-            root.checkBattery();
-        }
+        function onPercentageChanged() { root.checkBattery(); }
+        function onStateChanged() { root.checkBattery(); }
     }
-
     Connections {
         target: UPower
-        function onOnBatteryChanged() {
-            root.checkBattery();
+        function onOnBatteryChanged() { root.checkBattery(); }
+    }
+    Timer { interval: 30000; running: true; repeat: true; onTriggered: root.checkBattery() }
+
+    Item { anchors.fill: parent; focus: root.panelOpen; Keys.onEscapePressed: root.panelOpen = false }
+
+    Item {
+        id: backdrop
+        anchors.fill: parent
+        visible: root.panelOpen
+        MouseArea {
+            anchors.fill: parent
+            enabled: root.panelOpen
+            onClicked: root.panelOpen = false
         }
     }
 
-    Timer {
-        interval: 30000
-        running: true
-        repeat: true
-        onTriggered: root.checkBattery()
-    }
-
-    // Esc closes the panel
-    Item {
-        anchors.fill: parent
-        focus: root.panelOpen
-        Keys.onEscapePressed: root.panelOpen = false
-    }
-
-    // ------------------------------------------------------------------
-    // Popups (top-right)
-    // ------------------------------------------------------------------
     Column {
         id: stack
         visible: !root.panelOpen
-        anchors.top: parent.top
-        anchors.topMargin: root.topGap
-        anchors.right: parent.right
-        anchors.rightMargin: root.sideGap
-        spacing: 8
+        anchors { top: parent.top; topMargin: root.topGap; right: parent.right; rightMargin: root.sideGap }
+        spacing: root.px(8)
 
         Repeater {
             model: server.trackedNotifications
 
             delegate: Item {
                 id: wrapper
-
                 required property var modelData
-
                 property bool shown: false
                 property bool leaving: false
                 property bool wasExpired: false
@@ -287,33 +302,22 @@ PanelWindow {
                 height: card.height
 
                 function close(expired) {
-                    if (leaving)
-                        return;
+                    if (leaving) return;
                     wasExpired = expired;
                     leaving = true;
                     shown = false;
                     gone.start();
                 }
-
                 Component.onCompleted: shown = true
 
-                // Let the slide-out finish before destroying.
                 Timer {
                     id: gone
                     interval: 220
-                    onTriggered: {
-                        if (wrapper.wasExpired)
-                            wrapper.modelData.expire();
-                        else
-                            wrapper.modelData.dismiss();
-                    }
+                    onTriggered: wrapper.wasExpired ? wrapper.modelData.expire() : wrapper.modelData.dismiss()
                 }
 
-                // Auto-expire (paused on hover, never for critical).
                 Timer {
-                    interval: wrapper.modelData.expireTimeout > 0
-                        ? wrapper.modelData.expireTimeout * 1000
-                        : 6000
+                    interval: wrapper.modelData.expireTimeout > 0 ? wrapper.modelData.expireTimeout * 1000 : 6000
                     running: !wrapper.critical && !hover.containsMouse && !wrapper.leaving
                     onTriggered: wrapper.close(true)
                 }
@@ -321,139 +325,78 @@ PanelWindow {
                 Rectangle {
                     id: card
                     width: parent.width
-                    height: Math.max(64, content.implicitHeight + 20)
-                    radius: 16
+                    height: Math.max(root.px(64), content.implicitHeight + root.px(20))
+                    radius: root.px(16)
                     color: Theme.bg
                     border.width: wrapper.critical ? 1 : 0
                     border.color: Theme.danger
-
                     x: wrapper.shown ? 0 : root.cardWidth + 40
                     opacity: wrapper.shown ? 1 : 0
 
-                    Behavior on x {
-                        NumberAnimation {
-                            duration: 220
-                            easing.type: Easing.OutCubic
-                        }
-                    }
-                    Behavior on opacity {
-                        NumberAnimation {
-                            duration: 180
-                        }
-                    }
+                    Behavior on x { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+                    Behavior on opacity { NumberAnimation { duration: 180 } }
 
-                    // Click = dismiss
                     MouseArea {
                         id: hover
                         anchors.fill: parent
                         hoverEnabled: true
                         acceptedButtons: Qt.LeftButton | Qt.RightButton
-                        onClicked: wrapper.close(false)
+                        onClicked: mouse => {
+                            if (mouse.button === Qt.RightButton) root.copyText(wrapper.modelData.summary, wrapper.modelData.body);
+                            wrapper.close(false);
+                        }
                     }
 
                     Row {
                         id: content
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
-                        anchors.margins: 10
-                        spacing: 10
+                        anchors { left: parent.left; right: parent.right; verticalCenter: parent.verticalCenter; margins: root.px(10) }
+                        spacing: root.px(10)
 
-                        Rectangle {
+                        Thumb {
                             id: thumb
-                            width: 40
-                            height: 40
-                            radius: 8
+                            ui: root.ui
                             color: Theme.bg
-                            clip: true
+                            src: root.thumbSrc(wrapper.modelData.image, wrapper.modelData.appIcon)
                             anchors.verticalCenter: parent.verticalCenter
-
-                            Image {
-                                id: img
-                                anchors.fill: parent
-                                fillMode: Image.PreserveAspectCrop
-                                asynchronous: true
-                                source: {
-                                    if (wrapper.modelData.image !== "")
-                                        return root.imgSrc(wrapper.modelData.image);
-                                    if (wrapper.modelData.appIcon !== "")
-                                        return Quickshell.iconPath(wrapper.modelData.appIcon, true);
-                                    return "";
-                                }
-                            }
-                            Text {
-                                anchors.centerIn: parent
-                                visible: img.status !== Image.Ready
-                                text: "󰂚"
-                                font.family: Theme.iconFont
-                                font.pixelSize: 18
-                                color: Theme.text
-                            }
                         }
 
                         Column {
                             anchors.verticalCenter: parent.verticalCenter
-                            spacing: 3
+                            spacing: root.px(3)
                             width: parent.width - thumb.width - parent.spacing
 
-                            Text {
-                                text: wrapper.modelData.summary
-                                font.pixelSize: 12
-                                font.bold: true
-                                color: Theme.text
-                                elide: Text.ElideRight
+                            Lbl { ui: root.ui; sz: 12; font.bold: true; width: parent.width; text: wrapper.modelData.summary }
+                            Lbl {
+                                ui: root.ui
                                 width: parent.width
-                            }
-                            Text {
                                 visible: text !== ""
                                 text: wrapper.modelData.body
-                                font.pixelSize: 10
                                 color: Theme.textDim
                                 textFormat: Text.PlainText
                                 wrapMode: Text.WordWrap
                                 maximumLineCount: 3
-                                elide: Text.ElideRight
-                                width: parent.width
                             }
-                            Text {
-                                text: wrapper.modelData.appName
-                                font.pixelSize: 9
-                                color: Theme.textDim
-                                opacity: 0.7
-                                elide: Text.ElideRight
-                                width: parent.width
-                            }
+                            Lbl { ui: root.ui; sz: 9; width: parent.width; text: wrapper.modelData.appName; color: Theme.textDim; opacity: 0.7 }
 
-                            // Action buttons (if the app provided any)
                             Row {
                                 visible: wrapper.modelData.actions.length > 0
-                                spacing: 6
+                                spacing: root.px(6)
 
                                 Repeater {
                                     model: wrapper.modelData.actions
-
                                     delegate: Rectangle {
                                         required property var modelData
-                                        height: 20
-                                        width: label.implicitWidth + 14
-                                        radius: 7
+                                        height: root.px(20)
+                                        width: label.implicitWidth + root.px(14)
+                                        radius: root.px(7)
                                         color: Theme.alpha(Theme.text, btn.containsMouse ? 0.22 : 0.1)
 
-                                        Text {
-                                            id: label
-                                            anchors.centerIn: parent
-                                            text: parent.modelData.text
-                                            font.pixelSize: 9
-                                            color: Theme.text
-                                        }
+                                        Lbl { id: label; anchors.centerIn: parent; ui: root.ui; sz: 9; text: parent.modelData.text }
                                         MouseArea {
                                             id: btn
                                             anchors.fill: parent
                                             hoverEnabled: true
-                                            onClicked: {
-                                                parent.modelData.invoke();
-                                                wrapper.close(false);
-                                            }
+                                            onClicked: { parent.modelData.invoke(); wrapper.close(false); }
                                         }
                                     }
                                 }
@@ -465,136 +408,88 @@ PanelWindow {
         }
     }
 
-    // ------------------------------------------------------------------
-    // History panel (top-right, slides in)
-    // ------------------------------------------------------------------
     Rectangle {
         id: panel
         width: root.cardWidth
-        height: panelCol.height + 28
-        radius: 20
+        height: panelCol.height + root.px(28)
+        radius: root.px(20)
         color: Theme.bg
-
-        anchors.top: parent.top
-        anchors.topMargin: root.topGap
-        anchors.right: parent.right
-        anchors.rightMargin: root.panelOpen ? root.sideGap : -(root.cardWidth + 40)
-
+        anchors { top: parent.top; topMargin: root.topGap; right: parent.right; rightMargin: root.panelOpen ? root.sideGap : -(root.cardWidth + 40) }
         opacity: root.panelOpen ? 1 : 0
         visible: opacity > 0
 
-        Behavior on anchors.rightMargin {
-            NumberAnimation {
-                duration: 220
-                easing.type: Easing.OutCubic
-            }
-        }
-        Behavior on opacity {
-            NumberAnimation {
-                duration: 180
-            }
-        }
+        Behavior on anchors.rightMargin { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+        Behavior on opacity { NumberAnimation { duration: 180 } }
+
+        MouseArea { anchors.fill: parent }
 
         Column {
             id: panelCol
-            anchors.top: parent.top
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.margins: 14
-            spacing: 10
+            anchors { top: parent.top; left: parent.left; right: parent.right; margins: root.px(14) }
+            spacing: root.px(10)
 
-            // Header
             Item {
                 width: parent.width
-                height: 24
+                height: root.px(24)
+                z: 10
 
-                Text {
-                    anchors.left: parent.left
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "Notifications" + (history.count > 0 ? "  " + history.count : "")
-                    font.pixelSize: 13
+                Lbl {
+                    anchors { left: parent.left; verticalCenter: parent.verticalCenter }
+                    ui: root.ui
+                    sz: 13
                     font.bold: true
-                    color: Theme.text
+                    text: "Notifications" + (history.count > 0 ? "  " + history.count : "")
                 }
 
                 Row {
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: 4
+                    anchors { right: parent.right; verticalCenter: parent.verticalCenter }
+                    spacing: root.px(4)
 
-                    // Clear all
-                    Rectangle {
-                        width: 24
-                        height: 24
-                        radius: 8
+                    IconBtn {
+                        ui: root.ui
+                        icon: root.dnd ? "󰂛" : "󰂚"
+                        tip: "Do Not Disturb: " + (root.dnd ? "ON" : "OFF")
+                        rest: root.dnd ? 0.3 : 0.08
+                        onClicked: root.toggleDnd()
+                    }
+                    IconBtn {
+                        ui: root.ui
+                        icon: "󰆴"
+                        tip: "Clear all"
+                        tint: Theme.danger
+                        rest: 0.1
+                        hot: 0.25
                         visible: history.count > 0
-                        color: Theme.alpha(Theme.danger, clearArea.containsMouse ? 0.25 : 0.1)
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: "󰆴"
-                            font.family: Theme.iconFont
-                            font.pixelSize: 13
-                            color: Theme.danger
-                        }
-                        MouseArea {
-                            id: clearArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            onClicked: root.clearHistory()
-                        }
+                        onClicked: root.clearHistory()
                     }
-
-                    // Close panel
-                    Rectangle {
-                        width: 24
-                        height: 24
-                        radius: 8
-                        color: Theme.alpha(Theme.text, closeArea.containsMouse ? 0.2 : 0.08)
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: "󰅖"
-                            font.family: Theme.iconFont
-                            font.pixelSize: 13
-                            color: Theme.text
-                        }
-                        MouseArea {
-                            id: closeArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            onClicked: root.panelOpen = false
-                        }
-                    }
+                    IconBtn { ui: root.ui; icon: "󰅖"; tip: "Close"; onClicked: root.panelOpen = false }
                 }
             }
 
-            // Empty state
-            Text {
+            Lbl {
                 visible: history.count === 0
+                ui: root.ui
+                sz: 11
                 width: parent.width
-                height: 40
+                height: root.px(40)
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
                 text: "No notifications"
-                font.pixelSize: 11
                 color: Theme.textDim
             }
 
-            // History list
             ListView {
                 id: list
                 visible: history.count > 0
                 width: parent.width
-                height: Math.min(contentHeight, root.height - root.topGap - 120)
+                height: Math.min(contentHeight, root.height - root.topGap - root.px(120))
                 clip: true
-                spacing: 8
+                spacing: root.px(8)
                 model: history
                 boundsBehavior: Flickable.StopAtBounds
 
                 delegate: Rectangle {
                     id: entry
-
                     required property int index
                     required property string summary
                     required property string body
@@ -603,104 +498,91 @@ PanelWindow {
                     required property string image
                     required property real time
 
+                    property bool copied: false
+
                     width: list.width
-                    height: Math.max(56, textCol.implicitHeight + 20)
-                    radius: 12
-                    color: Theme.alpha(Theme.text, 0.06)
+                    height: Math.max(root.px(56), textCol.implicitHeight + root.px(20))
+                    radius: root.px(12)
+                    color: Theme.alpha(Theme.text, entry.copied ? 0.2 : 0.06)
 
-                    Rectangle {
+                    Timer { id: copiedTimer; interval: 600; onTriggered: entry.copied = false }
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: {
+                            root.copyText(entry.summary, entry.body);
+                            entry.copied = true;
+                            copiedTimer.restart();
+                        }
+                    }
+
+                    Thumb {
                         id: eThumb
-                        width: 32
-                        height: 32
-                        radius: 8
-                        anchors.left: parent.left
-                        anchors.leftMargin: 10
-                        anchors.verticalCenter: parent.verticalCenter
+                        ui: root.ui
+                        size: 32
                         color: Theme.alpha(Theme.text, 0.1)
-                        clip: true
-
-                        Image {
-                            id: eImg
-                            anchors.fill: parent
-                            fillMode: Image.PreserveAspectCrop
-                            asynchronous: true
-                            source: entry.image !== ""
-                                ? root.imgSrc(entry.image)
-                                : (entry.appIcon !== "" ? Quickshell.iconPath(entry.appIcon, true) : "")
-                        }
-                        Text {
-                            anchors.centerIn: parent
-                            visible: eImg.status !== Image.Ready
-                            text: "󰂚"
-                            font.family: Theme.iconFont
-                            font.pixelSize: 15
-                            color: Theme.text
-                        }
+                        src: root.thumbSrc(entry.image, entry.appIcon)
+                        anchors { left: parent.left; leftMargin: root.px(10); verticalCenter: parent.verticalCenter }
                     }
 
                     Column {
                         id: textCol
-                        anchors.left: eThumb.right
-                        anchors.leftMargin: 10
-                        anchors.right: delBtn.left
-                        anchors.rightMargin: 8
-                        anchors.verticalCenter: parent.verticalCenter
-                        spacing: 2
+                        anchors { left: eThumb.right; leftMargin: root.px(10); right: delBtn.left; rightMargin: root.px(8); verticalCenter: parent.verticalCenter }
+                        spacing: root.px(2)
 
-                        Text {
-                            text: entry.summary
-                            font.pixelSize: 11
-                            font.bold: true
-                            color: Theme.text
-                            elide: Text.ElideRight
+                        Lbl { ui: root.ui; sz: 11; font.bold: true; width: parent.width; text: entry.summary }
+                        Lbl {
+                            ui: root.ui
                             width: parent.width
-                        }
-                        Text {
                             visible: text !== ""
                             text: entry.body
-                            font.pixelSize: 10
                             color: Theme.textDim
                             textFormat: Text.PlainText
                             wrapMode: Text.WordWrap
                             maximumLineCount: 3
-                            elide: Text.ElideRight
-                            width: parent.width
                         }
-                        Text {
-                            text: (entry.appName !== "" ? entry.appName + " · " : "") + root.fmtTime(entry.time)
-                            font.pixelSize: 9
+                        Lbl {
+                            ui: root.ui
+                            sz: 9
+                            width: parent.width
                             color: Theme.textDim
                             opacity: 0.7
-                            elide: Text.ElideRight
-                            width: parent.width
+                            text: (entry.appName !== "" ? entry.appName + " · " : "") + root.fmtTime(entry.time)
                         }
                     }
 
-                    // Delete this entry
                     Item {
                         id: delBtn
-                        width: 24
-                        height: 24
-                        anchors.right: parent.right
-                        anchors.rightMargin: 8
-                        anchors.verticalCenter: parent.verticalCenter
+                        width: root.px(24)
+                        height: width
+                        anchors { right: parent.right; rightMargin: root.px(8); verticalCenter: parent.verticalCenter }
 
                         Text {
                             anchors.centerIn: parent
                             text: "󰅖"
                             font.family: Theme.iconFont
-                            font.pixelSize: 13
+                            font.pixelSize: root.px(13)
                             color: delArea.containsMouse ? Theme.danger : Theme.textDim
                         }
-                        MouseArea {
-                            id: delArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            onClicked: root.removeHistory(entry.index)
-                        }
+                        MouseArea { id: delArea; anchors.fill: parent; hoverEnabled: true; onClicked: root.removeHistory(entry.index) }
                     }
                 }
             }
         }
+    }
+
+    Row {
+        id: sizeRow
+        anchors { top: panel.bottom; topMargin: 6; left: panel.left }
+        spacing: 2
+        width: root.panelOpen ? implicitWidth : 0
+        height: root.panelOpen ? implicitHeight : 0
+        visible: root.panelOpen
+        opacity: sizeHover.hovered ? 0.9 : 0.18
+
+        Behavior on opacity { NumberAnimation { duration: 150 } }
+        HoverHandler { id: sizeHover }
+
+        SizeBtn { text: "−"; width: 16; font.pixelSize: 12; onClicked: root.setSize(root.menuSize - 10) }
+        SizeBtn { text: "+"; width: 16; font.pixelSize: 12; onClicked: root.setSize(root.menuSize + 10) }
     }
 }

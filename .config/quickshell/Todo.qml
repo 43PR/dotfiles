@@ -11,13 +11,23 @@ PanelWindow {
 
     property int topGap: 4
     property int sideGap: 16
-    property int cardWidth: 440
-    property int rowHeight: 48
+    property int baseWidth: 440
+    property int baseRow: 48
     property int maxItems: 200
 
     property bool showing: false
     property bool ready: false
+    property bool dragging: false
     property int remaining: 0
+    property int menuSize: 100
+    property real offsetX: 0
+    property real offsetY: 0
+
+    readonly property int defaultSize: 100
+    readonly property real ui: menuSize / 100
+    readonly property int cardWidth: Math.round(baseWidth * ui)
+    readonly property int rowHeight: Math.round(baseRow * ui)
+    readonly property bool movedFromDefault: offsetX !== 0 || offsetY !== 0 || menuSize !== defaultSize
 
     readonly property string statePath: Quickshell.env("HOME") + "/.config/quickshell/state/todo-state.json"
 
@@ -30,7 +40,37 @@ PanelWindow {
 
     mask: Region { item: root.showing ? menuRoot : null }
 
+    onMenuSizeChanged: if (root.showing) root.setPosition(root.offsetX, root.offsetY)
+
     ListModel { id: todos }
+
+    function px(n) { return Math.round(n * ui) }
+
+    function setSize(v) {
+        root.menuSize = Math.max(60, Math.min(200, v))
+        saveTimer.restart()
+    }
+
+    function setPosition(x, y) {
+        if (root.width <= 0 || root.height <= 0) {
+            root.offsetX = x
+            root.offsetY = y
+            return
+        }
+        var maxX = root.sideGap
+        var minX = Math.min(maxX, root.cardWidth + 2 * root.sideGap - root.width)
+        var minY = 0
+        var maxY = Math.max(minY, root.height - panel.height - 2 * root.topGap)
+        root.offsetX = Math.max(minX, Math.min(maxX, x))
+        root.offsetY = Math.max(minY, Math.min(maxY, y))
+    }
+
+    function resetPosition() {
+        root.offsetX = 0
+        root.offsetY = 0
+        root.menuSize = root.defaultSize
+        saveTimer.restart()
+    }
 
     function recount() {
         var n = 0
@@ -46,7 +86,12 @@ PanelWindow {
             var e = todos.get(i)
             out.push({ title: e.title, done: e.done })
         }
-        store.setText(JSON.stringify(out))
+        store.setText(JSON.stringify({
+            menuSize: root.menuSize,
+            offsetX: root.offsetX,
+            offsetY: root.offsetY,
+            items: out
+        }))
     }
 
     function changed() {
@@ -57,7 +102,7 @@ PanelWindow {
     function addTodo(t) {
         t = t.trim()
         if (t === "" || todos.count >= root.maxItems) return
-        todos.insert(0, { title: t, done: false })   // newest on top
+        todos.insert(0, { title: t, done: false })
         root.changed()
     }
 
@@ -96,7 +141,14 @@ PanelWindow {
 
         onLoaded: {
             try {
-                var arr = JSON.parse(store.text())
+                var data = JSON.parse(store.text())
+                var arr = Array.isArray(data) ? data : (data.items || [])
+                if (!Array.isArray(data)) {
+                    if (typeof data.menuSize === "number")
+                        root.menuSize = Math.max(60, Math.min(200, Math.round(data.menuSize)))
+                    if (typeof data.offsetX === "number") root.offsetX = data.offsetX
+                    if (typeof data.offsetY === "number") root.offsetY = data.offsetY
+                }
                 for (var i = 0; i < arr.length; i++) {
                     if (typeof arr[i].title === "string")
                         todos.append({ title: arr[i].title, done: arr[i].done === true })
@@ -109,19 +161,24 @@ PanelWindow {
         }
         onLoadFailed: root.ready = true
     }
+
     function openMenu() {
         var mon = Hyprland.focusedMonitor
         if (mon) {
             var scr = Quickshell.screens.find(function (s) { return s.name === mon.name })
             if (scr) root.screen = scr
         }
+        dragging = false
         showing = true
         Qt.callLater(function () {
-            if (root.showing) input.forceActiveFocus()
+            if (root.showing) {
+                input.forceActiveFocus()
+                root.setPosition(root.offsetX, root.offsetY)
+            }
         })
     }
 
-    function closeMenu() { showing = false }
+    function closeMenu() { showing = false; dragging = false }
     function toggleMenu() { showing ? closeMenu() : openMenu() }
 
     IpcHandler {
@@ -130,16 +187,19 @@ PanelWindow {
         function show(): void { root.openMenu() }
         function hide(): void { root.closeMenu() }
     }
-    // Small square button (same look as the power menu footer buttons)
+
     component FooterButton: Rectangle {
         id: fb
+        property real ui: 1
         property string label: ""
         property int fontSize: 11
         property color textColor: Theme.textDim
         readonly property bool hovered: fbArea.containsMouse
         signal clicked()
 
-        width: 24; height: 24; radius: 8
+        width: Math.round(24 * ui)
+        height: width
+        radius: Math.round(8 * ui)
         color: Theme.bg
         Behavior on color { ColorAnimation { duration: 120 } }
         Behavior on opacity { NumberAnimation { duration: 120 } }
@@ -147,7 +207,7 @@ PanelWindow {
         Text {
             anchors.centerIn: parent
             text: fb.label
-            font.pixelSize: fb.fontSize
+            font.pixelSize: Math.round(fb.fontSize * fb.ui)
             font.bold: true
             color: fb.hovered ? Theme.text : fb.textColor
         }
@@ -159,6 +219,16 @@ PanelWindow {
             onClicked: fb.clicked()
         }
     }
+
+    component SizeBtn: Text {
+        signal clicked()
+        height: 16
+        verticalAlignment: Text.AlignVCenter
+        horizontalAlignment: Text.AlignHCenter
+        color: Theme.text
+        MouseArea { anchors.fill: parent; onClicked: parent.clicked() }
+    }
+
     Item {
         id: menuRoot
         anchors.fill: parent
@@ -166,7 +236,6 @@ PanelWindow {
 
         Keys.onEscapePressed: root.closeMenu()
 
-        // Backdrop: click outside closes
         MouseArea {
             anchors.fill: parent
             onClicked: root.closeMenu()
@@ -175,26 +244,32 @@ PanelWindow {
         Rectangle {
             id: panel
             width: root.cardWidth
-            height: panelCol.height + 28
-            radius: 20
+            height: panelCol.height + root.px(28)
+            radius: root.px(20)
             color: "transparent"
 
             anchors.top: parent.top
-            anchors.topMargin: root.topGap
+            anchors.topMargin: root.topGap + root.offsetY
             anchors.right: parent.right
-            anchors.rightMargin: root.showing ? root.sideGap : -(root.cardWidth + 40)
+            anchors.rightMargin: root.sideGap - root.offsetX
 
             opacity: root.showing ? 1 : 0
             visible: opacity > 0
 
             Behavior on anchors.rightMargin {
+                enabled: !root.dragging && root.showing
+                NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+            }
+            Behavior on anchors.topMargin {
+                enabled: !root.dragging && root.showing
                 NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
             }
             Behavior on opacity {
-                NumberAnimation { duration: 180 }
+                NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
             }
 
-            // Swallow clicks on the card (so gaps don't close it)
+            onHeightChanged: if (root.showing) root.setPosition(root.offsetX, root.offsetY)
+
             MouseArea { anchors.fill: parent }
 
             Column {
@@ -202,18 +277,71 @@ PanelWindow {
                 anchors.top: parent.top
                 anchors.left: parent.left
                 anchors.right: parent.right
-                anchors.margins: 14
-                spacing: 10
+                anchors.margins: root.px(14)
+                spacing: root.px(10)
 
-                // Top spacer (same as the power menu header)
                 Item {
+                    id: header
                     width: parent.width
-                    height: 24
+                    height: root.px(24)
+
+                    Rectangle {
+                        anchors.centerIn: parent
+                        width: root.px(36)
+                        height: root.px(4)
+                        radius: root.px(2)
+                        color: Theme.bg
+                        opacity: (dragArea.containsMouse || root.dragging) ? 1 : 0.1
+                        Behavior on opacity { NumberAnimation { duration: 150 } }
+                    }
+
+                    MouseArea {
+                        id: dragArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        acceptedButtons: Qt.LeftButton
+                        cursorShape: root.dragging ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+
+                        property real pressX: 0
+                        property real pressY: 0
+                        property real startX: 0
+                        property real startY: 0
+
+                        onPressed: function (mouse) {
+                            var p = dragArea.mapToItem(menuRoot, mouse.x, mouse.y)
+                            pressX = p.x
+                            pressY = p.y
+                            startX = root.offsetX
+                            startY = root.offsetY
+                            root.dragging = true
+                        }
+
+                        onPositionChanged: function (mouse) {
+                            if (!root.dragging) return
+                            var p = dragArea.mapToItem(menuRoot, mouse.x, mouse.y)
+                            root.setPosition(startX + (p.x - pressX), startY + (p.y - pressY))
+                        }
+
+                        onReleased: {
+                            if (!root.dragging) return
+                            root.dragging = false
+                            saveTimer.restart()
+                        }
+
+                        onCanceled: {
+                            if (!root.dragging) return
+                            root.dragging = false
+                            saveTimer.restart()
+                        }
+
+                        onDoubleClicked: root.resetPosition()
+                    }
                 }
+
                 Rectangle {
                     width: parent.width
-                    height: Math.max(root.rowHeight, input.contentHeight + 24)
-                    radius: 12
+                    height: Math.max(root.rowHeight, input.contentHeight + root.px(24))
+                    radius: root.px(12)
                     color: Theme.bg
                     border.width: input.activeFocus ? 1 : 0
                     border.color: Theme.accent
@@ -221,17 +349,19 @@ PanelWindow {
 
                     Rectangle {
                         id: addThumb
-                        width: 32; height: 32; radius: 8
+                        width: root.px(32)
+                        height: width
+                        radius: root.px(8)
                         anchors.left: parent.left
-                        anchors.leftMargin: 10
+                        anchors.leftMargin: root.px(10)
                         anchors.top: parent.top
-                        anchors.topMargin: 8
+                        anchors.topMargin: root.px(8)
                         color: Theme.bg
 
                         Text {
                             anchors.centerIn: parent
                             text: "+"
-                            font.pixelSize: 16
+                            font.pixelSize: root.px(16)
                             font.bold: true
                             color: Theme.text
                         }
@@ -251,12 +381,12 @@ PanelWindow {
                     TextEdit {
                         id: input
                         anchors.left: addThumb.right
-                        anchors.leftMargin: 10
+                        anchors.leftMargin: root.px(10)
                         anchors.right: parent.right
-                        anchors.rightMargin: 12
+                        anchors.rightMargin: root.px(12)
                         anchors.top: parent.top
-                        anchors.topMargin: 12
-                        font.pixelSize: 12
+                        anchors.topMargin: root.px(12)
+                        font.pixelSize: root.px(12)
                         color: Theme.text
                         selectionColor: Theme.accent
                         selectedTextColor: Theme.bg
@@ -281,8 +411,8 @@ PanelWindow {
 
                         Text {
                             visible: input.text === "" && !input.inputMethodComposing
-                            text: "Add a task…  (Shift+Enter = new line)"
-                            font.pixelSize: 12
+                            text: "Add a note/task…  (Shift+Enter = new line)"
+                            font.pixelSize: root.px(12)
                             color: Theme.textDim
                             opacity: 0.7
                         }
@@ -292,20 +422,21 @@ PanelWindow {
                 Text {
                     visible: todos.count === 0
                     width: parent.width
-                    height: 40
+                    height: root.px(40)
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                     text: "Nothing to do"
-                    font.pixelSize: 11
+                    font.pixelSize: root.px(11)
                     color: Theme.textDim
                 }
+
                 ListView {
                     id: list
                     visible: todos.count > 0
                     width: parent.width
-                    height: Math.min(contentHeight, root.height - root.topGap - 240)
+                    height: Math.max(0, Math.min(contentHeight, root.height - root.topGap - root.offsetY - root.px(240)))
                     clip: true
-                    spacing: 8
+                    spacing: root.px(8)
                     model: todos
                     boundsBehavior: Flickable.StopAtBounds
 
@@ -316,14 +447,13 @@ PanelWindow {
                         required property bool done
 
                         width: list.width
-                        height: Math.max(root.rowHeight, edit.contentHeight + 24)
-                        radius: 12
+                        height: Math.max(root.rowHeight, edit.contentHeight + root.px(24))
+                        radius: root.px(12)
                         color: Theme.bg
                         border.width: edit.activeFocus ? 1 : 0
                         border.color: Theme.accent
                         Behavior on color { ColorAnimation { duration: 120 } }
 
-                        // Hover tracking only (doesn't steal clicks from the text)
                         MouseArea {
                             id: hoverArea
                             anchors.fill: parent
@@ -331,14 +461,15 @@ PanelWindow {
                             acceptedButtons: Qt.NoButton
                         }
 
-                        // Checkbox
                         Rectangle {
                             id: check
-                            width: 24; height: 24; radius: 8
+                            width: root.px(24)
+                            height: width
+                            radius: root.px(8)
                             anchors.left: parent.left
-                            anchors.leftMargin: 14
+                            anchors.leftMargin: root.px(14)
                             anchors.top: parent.top
-                            anchors.topMargin: 12
+                            anchors.topMargin: root.px(12)
                             color: entry.done ? Theme.accent : "transparent"
                             border.width: 1
                             border.color: entry.done ? Theme.accent : Theme.alpha(Theme.text, 0.3)
@@ -348,7 +479,7 @@ PanelWindow {
                                 anchors.centerIn: parent
                                 visible: entry.done
                                 text: "✓"
-                                font.pixelSize: 13
+                                font.pixelSize: root.px(13)
                                 font.bold: true
                                 color: Theme.bg
                             }
@@ -358,15 +489,16 @@ PanelWindow {
                                 onClicked: root.toggleTodo(entry.index)
                             }
                         }
+
                         TextEdit {
                             id: edit
                             anchors.left: check.right
-                            anchors.leftMargin: 12
+                            anchors.leftMargin: root.px(12)
                             anchors.right: delBtn.left
-                            anchors.rightMargin: 8
+                            anchors.rightMargin: root.px(8)
                             anchors.top: parent.top
-                            anchors.topMargin: 12
-                            font.pixelSize: 12
+                            anchors.topMargin: root.px(12)
+                            font.pixelSize: root.px(12)
                             font.strikeout: entry.done
                             color: entry.done ? Theme.textDim : Theme.text
                             opacity: entry.done ? 0.7 : 1
@@ -389,7 +521,7 @@ PanelWindow {
                                     if (e.modifiers & Qt.ShiftModifier) {
                                         edit.insert(edit.cursorPosition, "\n")
                                     } else {
-                                        input.forceActiveFocus()   // finish editing
+                                        input.forceActiveFocus()
                                     }
                                 } else if (e.key === Qt.Key_Escape) {
                                     e.accepted = true
@@ -398,19 +530,19 @@ PanelWindow {
                             }
                         }
 
-                        // Delete
                         Item {
                             id: delBtn
-                            width: 24; height: 24
+                            width: root.px(24)
+                            height: width
                             anchors.right: parent.right
-                            anchors.rightMargin: 10
+                            anchors.rightMargin: root.px(10)
                             anchors.top: parent.top
-                            anchors.topMargin: 12
+                            anchors.topMargin: root.px(12)
 
                             Text {
                                 anchors.centerIn: parent
                                 text: "✕"
-                                font.pixelSize: 12
+                                font.pixelSize: root.px(12)
                                 color: delArea.containsMouse ? Theme.danger : Theme.textDim
                                 opacity: (hoverArea.containsMouse || delArea.containsMouse) ? 1 : 0.4
                                 Behavior on opacity { NumberAnimation { duration: 120 } }
@@ -425,28 +557,46 @@ PanelWindow {
                         }
                     }
                 }
+
                 Item {
                     width: parent.width
-                    height: 24
+                    height: root.px(24)
 
-                    Text {
+                    Row {
+                        id: sizeRow
                         anchors.left: parent.left
                         anchors.leftMargin: 2
                         anchors.verticalCenter: parent.verticalCenter
-                        text: root.remaining + " left"
-                        font.pixelSize: 10
-                        font.bold: true
-                        color: Theme.textDim
-                        opacity: 0.8
+                        spacing: 4
+                        opacity: sizeHover.hovered ? 0.9 : 0.35
+
+                        Behavior on opacity { NumberAnimation { duration: 150 } }
+                        HoverHandler { id: sizeHover }
+
+                        SizeBtn { text: "−"; width: 16; font.pixelSize: 12; onClicked: root.setSize(root.menuSize - 10) }
+                        SizeBtn { text: "+"; width: 16; font.pixelSize: 12; onClicked: root.setSize(root.menuSize + 10) }
                     }
 
-                    FooterButton {
+                    Row {
                         anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
-                        label: "✓"
-                        fontSize: 12
-                        opacity: (todos.count - root.remaining) > 0 ? 1 : 0.4
-                        onClicked: root.clearDone()
+                        spacing: root.px(6)
+
+                        FooterButton {
+                            ui: root.ui
+                            label: "↺"
+                            fontSize: 13
+                            opacity: root.movedFromDefault ? 1 : 0.4
+                            onClicked: root.resetPosition()
+                        }
+
+                        FooterButton {
+                            ui: root.ui
+                            label: "✓"
+                            fontSize: 12
+                            opacity: (todos.count - root.remaining) > 0 ? 1 : 0.4
+                            onClicked: root.clearDone()
+                        }
                     }
                 }
             }

@@ -354,6 +354,24 @@ else
 fi
 
 # --------------------------------------------------
+# Enable system services
+# --------------------------------------------------
+
+if command -v systemctl >/dev/null 2>&1; then
+    if pacman -Qi power-profiles-daemon >/dev/null 2>&1; then
+        info "Enabling power-profiles-daemon..."
+
+        if sudo systemctl enable --now power-profiles-daemon.service; then
+            success "power-profiles-daemon enabled."
+        else
+            warning "Failed to enable power-profiles-daemon."
+        fi
+    else
+        warning "power-profiles-daemon is not installed; the Power page will not work."
+    fi
+fi
+
+# --------------------------------------------------
 # Permissions
 # --------------------------------------------------
 #

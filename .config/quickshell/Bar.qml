@@ -1,4 +1,3 @@
-// Bar.qml — top bar (one per screen). Uses Theme.qml and Marquee.qml singletons.
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -9,45 +8,39 @@ import Quickshell.Services.UPower
 Scope {
     id: root
 
-    // Nerd Font glyphs sit slightly high in their line box; nudge down (px).
-    // Raise to 2 if icons still look high, set to 0 to disable.
+    readonly property int sizeCpuRam: 12
+    readonly property int sizeClock: 12
+    readonly property int sizeMarquee: 11
+    readonly property int sizeNetIcon: 14
+    readonly property int sizeVolIcon: 18
+    readonly property int sizeVolText: 12
+    readonly property int sizeBatIcon: 13
+    readonly property int sizeBatText: 12
+    readonly property int sizePowerIcon: 13
+    readonly property real hoverScale: 1.2
+    readonly property int sizeIconGap: 12
     readonly property int iconYOffset: 1
 
-    // ---------- Battery (laptops only) ----------
-    // null on desktops (no laptop battery known to UPower) -> module hides itself.
-    // Prefer a device flagged as a laptop battery; fall back to UPower's combined
-    // "display device" when it reports a present battery.
+    readonly property int sizeCalTime: 30
+    readonly property int sizeCalDate: 12
+    readonly property int sizeCalMonth: 13
+    readonly property int sizeCalArrow: 16
+    readonly property int sizeCalWeekday: 11
+    readonly property int sizeCalDay: 12
+
     readonly property var battery: UPower.devices.values.find(d => d.isLaptopBattery)
         ?? (UPower.displayDevice && UPower.displayDevice.isPresent
             && UPower.displayDevice.type === UPowerDeviceType.Battery
             ? UPower.displayDevice : null)
-
-    // TEMPORARY DEBUG: prints what UPower sees 3s after start. Delete when done.
-    Timer {
-        interval: 3000; running: true; repeat: false
-        onTriggered: {
-            const ds = UPower.devices.values;
-            console.log("[UPower] devices:", ds.length);
-            for (const d of ds)
-                console.log("[UPower]  dev", d.nativePath, "type", d.type,
-                            "laptopBattery", d.isLaptopBattery, "present", d.isPresent,
-                            "pct", d.percentage, "state", d.state);
-            const dd = UPower.displayDevice;
-            console.log("[UPower] display: present", dd ? dd.isPresent : null,
-                        "type", dd ? dd.type : null, "pct", dd ? dd.percentage : null);
-            console.log("[UPower] chosen battery:", root.battery);
-        }
-    }
     readonly property int batPct: battery ? Math.round(battery.percentage * 100) : 0
     readonly property bool batCharging: battery !== null
         && (battery.state === UPowerDeviceState.Charging
-            || battery.state === UPowerDeviceState.PendingCharge)
+            || battery.state === UPowerDeviceState.PendingCharge
+            || battery.state === UPowerDeviceState.FullyCharged)
     readonly property bool batLow: battery !== null && !batCharging && batPct <= 15
-    // nf-fa battery empty / quarter / half / three-quarters / full
     readonly property var batIcons: ["\uf244", "\uf243", "\uf242", "\uf241", "\uf240"]
     readonly property string batIcon: batIcons[batPct >= 90 ? 4 : batPct >= 65 ? 3 : batPct >= 40 ? 2 : batPct >= 15 ? 1 : 0]
 
-    // ---------- Show / hide (qs ipc call bar toggle|show|hide) ----------
     property bool barVisible: true
     IpcHandler {
         target: "bar"
@@ -56,15 +49,12 @@ Scope {
         function hide(): void { root.barVisible = false; }
     }
 
-    // ---------- Shared state ----------
     property int cpuUsage: 0
     property int memPercent: 0
-    property string netState: "disconnected" // wifi | ethernet | disconnected
-
+    property string netState: "disconnected"
     property real _prevTotal: 0
     property real _prevIdle: 0
 
-    // ---------- Data sources ----------
     FileView {
         id: statFile
         path: "/proc/stat"
@@ -87,9 +77,7 @@ Scope {
         onLoaded: {
             const t = text();
             const kb = k => Number(t.match(new RegExp(k + ":\\s+(\\d+)"))[1]);
-            const total = kb("MemTotal");
-            const avail = kb("MemAvailable");
-            root.memPercent = Math.round(100 * (total - avail) / total);
+            root.memPercent = Math.round(100 * (kb("MemTotal") - kb("MemAvailable")) / kb("MemTotal"));
         }
     }
 
@@ -103,37 +91,40 @@ Scope {
                     if (l === "ethernet:connected") { s = "ethernet"; break; }
                     if (l === "wifi:connected") s = "wifi";
                 }
-                root.netState = s;
+                if (s !== root.netState) root.netState = s;
             }
         }
     }
 
     Timer {
-        interval: 1000; running: true; repeat: true; triggeredOnStart: true
-        onTriggered: {
-            statFile.reload();
-            memFile.reload();
-        }
+        interval: 2000; running: root.barVisible; repeat: true; triggeredOnStart: true
+        onTriggered: { statFile.reload(); memFile.reload(); }
     }
 
     Timer {
-        interval: 5000; running: true; repeat: true; triggeredOnStart: true
+        interval: 10000; running: root.barVisible; repeat: true; triggeredOnStart: true
         onTriggered: if (!netProc.running) netProc.running = true
     }
 
     PwObjectTracker { objects: [Pipewire.defaultAudioSink] }
 
-    // Fire-and-forget command runner
     Process { id: runner }
     function run(cmd) {
         runner.command = ["sh", "-c", cmd];
         runner.running = true;
     }
 
-    // ---------- Reusable module ----------
+    component Panel: Rectangle {
+        height: 20
+        radius: Theme.radius
+        color: Theme.bg
+    }
+
     component Mod: Item {
         id: mod
         property string text: ""
+        property string glyph: ""
+        property real glyphSize: 16
         property real baseSize: 11
         property color color: Theme.text
         property bool bold: false
@@ -142,20 +133,37 @@ Scope {
         signal clicked(var mouse)
         signal scrolled(real delta)
 
-        implicitWidth: label.implicitWidth + 20
+        implicitWidth: content.implicitWidth + 20
         implicitHeight: 18
 
-        Text {
-            id: label
+        Row {
+            id: content
             anchors.centerIn: parent
             anchors.verticalCenterOffset: mod.yOffset
-            verticalAlignment: Text.AlignVCenter
-            text: mod.text
-            color: mod.color
-            font.family: Theme.iconFont
-            font.bold: mod.bold
-            font.pixelSize: (mod.hoverGrow && ma.containsMouse) ? 15 : mod.baseSize
-            Behavior on font.pixelSize { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
+            spacing: root.sizeIconGap
+
+            Text {
+                visible: mod.glyph !== ""
+                anchors.verticalCenter: parent.verticalCenter
+                text: mod.glyph
+                color: mod.color
+                font.family: Theme.iconFont
+                font.pixelSize: mod.glyphSize
+                renderType: Text.NativeRendering
+            }
+
+            Text {
+                visible: mod.text !== ""
+                anchors.verticalCenter: parent.verticalCenter
+                text: mod.text
+                color: mod.color
+                font.family: Theme.iconFont
+                font.bold: mod.bold
+                font.pixelSize: mod.baseSize
+                renderType: Text.NativeRendering
+                scale: mod.hoverGrow && ma.containsMouse ? root.hoverScale : 1
+                Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
+            }
         }
 
         MouseArea {
@@ -168,7 +176,6 @@ Scope {
         }
     }
 
-    // ---------- Bar (one per screen) ----------
     Variants {
         model: Quickshell.screens
 
@@ -182,25 +189,19 @@ Scope {
             color: "transparent"
             visible: root.barVisible
 
-            // ===== LEFT =====
-            Rectangle {
+            Panel {
                 anchors { left: parent.left; top: parent.top; leftMargin: 6; topMargin: 4 }
-                height: 20
                 width: leftRow.implicitWidth + 4
-                radius: Theme.radius
-                color: Theme.bg
 
                 Row {
                     id: leftRow
                     anchors.verticalCenter: parent.verticalCenter
                     anchors.left: parent.left
                     anchors.leftMargin: 2
-                    spacing: 0
 
-                    Mod { text: "CPU " + root.cpuUsage + "%" }
-                    Mod { text: "RAM " + root.memPercent + "%" }
+                    Mod { baseSize: root.sizeCpuRam; text: "CPU " + root.cpuUsage + "%" }
+                    Mod { baseSize: root.sizeCpuRam; text: "RAM " + root.memPercent + "%" }
 
-                    // Workspaces
                     Row {
                         anchors.verticalCenter: parent.verticalCenter
                         leftPadding: 4
@@ -222,7 +223,6 @@ Scope {
                                      : Qt.alpha(Theme.textFaint, 0.5)
 
                                 Behavior on width { NumberAnimation { duration: Theme.animMed; easing.type: Easing.OutQuad } }
-                                Behavior on color { ColorAnimation { duration: Theme.animMed } }
 
                                 MouseArea {
                                     id: dotMa
@@ -233,7 +233,6 @@ Scope {
                             }
                         }
 
-                        // Scroll to switch workspace
                         WheelHandler {
                             acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
                             onWheel: e => root.run(e.angleDelta.y > 0
@@ -244,14 +243,13 @@ Scope {
                 }
             }
 
-            // ===== CENTER =====
-            Rectangle {
+            Panel {
                 id: clockPanel
                 anchors { horizontalCenter: parent.horizontalCenter; top: parent.top; topMargin: 4 }
-                height: 20
                 width: clockMod.implicitWidth + 4
-                radius: Theme.radius
-                color: Theme.bg
+
+                property bool calOpen: false
+                property int monthOffset: 0
 
                 SystemClock { id: clk; precision: SystemClock.Minutes }
 
@@ -259,220 +257,193 @@ Scope {
                     id: clockMod
                     anchors.centerIn: parent
                     bold: true
+                    baseSize: root.sizeClock
                     text: Qt.formatDateTime(clk.date, "HH:mm")
+                    onClicked: mouse => {
+                        if (mouse.button !== Qt.LeftButton) return;
+                        clockPanel.monthOffset = 0;
+                        clockPanel.calOpen = !clockPanel.calOpen;
+                    }
                 }
 
-                // ---- Popup open/close: stays open while the pointer is on the
-                // clock OR on the popup (so the month arrows are clickable) ----
-                HoverHandler { id: clockHover }
+                LazyLoader {
+                    active: clockPanel.calOpen
 
-                property bool calOpen: false
-                readonly property bool hoverAny: clockHover.hovered || calHover.hovered
-                onHoverAnyChanged: {
-                    if (hoverAny) { closeTimer.stop(); calOpen = true; }
-                    else closeTimer.restart();
-                }
-                Timer {
-                    id: closeTimer
-                    interval: 200
-                    onTriggered: { clockPanel.calOpen = false; calBox.monthOffset = 0; }
-                }
+                    PopupWindow {
+                        anchor.window: bar
+                        anchor.rect.x: clockPanel.x + (clockPanel.width - implicitWidth) / 2
+                        anchor.rect.y: clockPanel.y + clockPanel.height + 4
+                        implicitWidth: calBox.gridW + 2 * calBox.pad
+                        implicitHeight: calCol.implicitHeight + 2 * calBox.pad
+                        color: "transparent"
+                        visible: true
 
-                // ---- Calendar popup ----
-                PopupWindow {
-                    id: calendar
-                    anchor.window: bar
-                    anchor.rect.x: clockPanel.x + (clockPanel.width - calendar.implicitWidth) / 2
-                    anchor.rect.y: clockPanel.y + clockPanel.height + 4
-                    implicitWidth: calBox.gridW + 2 * calBox.pad
-                    implicitHeight: calCol.implicitHeight + 2 * calBox.pad
-                    color: "transparent"
-                    visible: clockPanel.calOpen
+                        Rectangle {
+                            id: calBox
+                            anchors.fill: parent
+                            radius: 4
+                            color: Theme.bg
 
-                    Rectangle {
-                        id: calBox
-                        anchors.fill: parent
-                        radius: 4                 // rectangular; raise for softer corners
-                        color: Theme.bg
+                            readonly property int firstDay: 1
+                            readonly property int cellW: 36
+                            readonly property int cellH: 30
+                            readonly property int pad: 16
+                            readonly property int gridW: cellW * 7
 
-                        HoverHandler { id: calHover }
+                            readonly property date now: clk.date
+                            readonly property date view: new Date(now.getFullYear(), now.getMonth() + clockPanel.monthOffset, 1)
 
-                        // ---- config ----
-                        readonly property int firstDay: 1     // 0 = Sunday-first, 1 = Monday-first
-                        readonly property int cellW: 36
-                        readonly property int cellH: 30
-                        readonly property int pad: 16
-                        readonly property int gridW: cellW * 7
+                            readonly property var cells: {
+                                const first = (view.getDay() - firstDay + 7) % 7;
+                                const y = view.getFullYear(), m = view.getMonth();
+                                const ty = now.getFullYear(), tm = now.getMonth(), td = now.getDate();
+                                const out = [];
+                                for (let i = 0; i < 42; i++) {
+                                    const d = new Date(y, m, i - first + 1);
+                                    out.push({
+                                        n: d.getDate(),
+                                        inMonth: d.getMonth() === m,
+                                        today: d.getFullYear() === ty && d.getMonth() === tm && d.getDate() === td
+                                    });
+                                }
+                                return out;
+                            }
 
-                        // ---- state ----
-                        property int monthOffset: 0           // months away from the current one
-                        readonly property date now: clk.date
-                        readonly property date view: new Date(now.getFullYear(), now.getMonth() + monthOffset, 1)
-                        readonly property int offset: (view.getDay() - firstDay + 7) % 7
+                            WheelHandler {
+                                onWheel: e => clockPanel.monthOffset += (e.angleDelta.y > 0 ? -1 : 1)
+                            }
 
-                        // scroll over the popup to change month
-                        WheelHandler {
-                            onWheel: e => calBox.monthOffset += (e.angleDelta.y > 0 ? -1 : 1)
-                        }
-
-                        Column {
-                            id: calCol
-                            anchors.centerIn: parent
-                            spacing: 12
-
-                            // ---- Time + date header ----
-                            Item {
-                                width: calBox.gridW
-                                height: headCol.implicitHeight
+                            Column {
+                                id: calCol
+                                anchors.centerIn: parent
+                                spacing: 12
 
                                 Column {
-                                    id: headCol
                                     spacing: 2
                                     Text {
                                         text: Qt.formatTime(calBox.now, "HH:mm")
                                         color: Theme.text
                                         font.family: Theme.iconFont
-                                        font.pixelSize: 30
+                                        font.pixelSize: root.sizeCalTime
                                         font.bold: true
                                     }
                                     Text {
                                         text: Qt.formatDate(calBox.now, "dddd, d MMMM yyyy")
                                         color: Theme.textDim
                                         font.family: Theme.iconFont
-                                        font.pixelSize: 12
-                                    }
-                                }
-                            }
-
-                            // ---- Divider ----
-                            Rectangle {
-                                width: calBox.gridW
-                                height: 1
-                                color: Qt.alpha(Theme.text, 0.12)
-                            }
-
-                            // ---- Month navigation ----
-                            Item {
-                                width: calBox.gridW
-                                height: 26
-
-                                Item {
-                                    id: prevBtn
-                                    width: 28; height: parent.height
-                                    anchors.left: parent.left
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: "\uDB80\uDD41"   // nf-md chevron_left
-                                        color: prevMa.containsMouse ? Theme.accent : Theme.text
-                                        font.family: Theme.iconFont
-                                        font.pixelSize: 16
-                                    }
-                                    MouseArea {
-                                        id: prevMa
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        onClicked: calBox.monthOffset -= 1
+                                        font.pixelSize: root.sizeCalDate
                                     }
                                 }
 
-                                // Month title; click to jump back to today
-                                Item {
-                                    anchors.centerIn: parent
-                                    width: monthTitle.implicitWidth + 16
-                                    height: parent.height
-                                    Text {
-                                        id: monthTitle
-                                        anchors.centerIn: parent
-                                        text: Qt.formatDate(calBox.view, "MMMM yyyy")
-                                        color: titleMa.containsMouse ? Theme.accent : Theme.text
-                                        font.family: Theme.iconFont
-                                        font.pixelSize: 13
-                                        font.bold: true
-                                    }
-                                    MouseArea {
-                                        id: titleMa
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        onClicked: calBox.monthOffset = 0
-                                    }
+                                Rectangle {
+                                    width: calBox.gridW
+                                    height: 1
+                                    color: Qt.alpha(Theme.text, 0.12)
                                 }
 
                                 Item {
-                                    id: nextBtn
-                                    width: 28; height: parent.height
-                                    anchors.right: parent.right
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: "\uDB80\uDD42"   // nf-md chevron_right
-                                        color: nextMa.containsMouse ? Theme.accent : Theme.text
-                                        font.family: Theme.iconFont
-                                        font.pixelSize: 16
-                                    }
-                                    MouseArea {
-                                        id: nextMa
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        onClicked: calBox.monthOffset += 1
-                                    }
-                                }
-                            }
+                                    width: calBox.gridW
+                                    height: 26
 
-                            // ---- Weekday headers ----
-                            Row {
-                                Repeater {
-                                    model: 7
-                                    delegate: Text {
-                                        required property int index
-                                        width: calBox.cellW
-                                        horizontalAlignment: Text.AlignHCenter
-                                        text: Qt.locale().dayName((index + calBox.firstDay) % 7, Locale.ShortFormat)
-                                        color: Theme.textDim
-                                        font.family: Theme.iconFont
-                                        font.pixelSize: 11
-                                    }
-                                }
-                            }
-
-                            // ---- Days (always 6 rows: height never jumps) ----
-                            Grid {
-                                columns: 7
-                                Repeater {
-                                    model: 42
-                                    delegate: Item {
-                                        id: dayCell
-                                        required property int index
-                                        readonly property date d: new Date(calBox.view.getFullYear(),
-                                            calBox.view.getMonth(), index - calBox.offset + 1)
-                                        readonly property bool inMonth: d.getMonth() === calBox.view.getMonth()
-                                        readonly property bool today:
-                                            d.getFullYear() === calBox.now.getFullYear()
-                                            && d.getMonth() === calBox.now.getMonth()
-                                            && d.getDate() === calBox.now.getDate()
-                                        width: calBox.cellW
-                                        height: calBox.cellH
-
-                                        Rectangle {
-                                            anchors.fill: parent
-                                            anchors.margins: 2
-                                            radius: Theme.radius
-                                            color: dayCell.today ? Qt.alpha(Theme.accent, 0.45)
-                                                 : dayMa.containsMouse ? Qt.alpha(Theme.text, 0.08)
-                                                 : "transparent"
-                                            border.width: dayCell.today ? 1 : 0
-                                            border.color: Theme.accent
-                                        }
+                                    Item {
+                                        width: 28; height: parent.height
+                                        anchors.left: parent.left
                                         Text {
                                             anchors.centerIn: parent
-                                            text: dayCell.d.getDate()
-                                            color: dayCell.inMonth ? Theme.text : Theme.textFaint
+                                            text: "\uDB80\uDD41"
+                                            color: prevMa.containsMouse ? Theme.accent : Theme.text
                                             font.family: Theme.iconFont
-                                            font.pixelSize: 12
-                                            font.bold: dayCell.today
+                                            font.pixelSize: root.sizeCalArrow
                                         }
                                         MouseArea {
-                                            id: dayMa
+                                            id: prevMa
                                             anchors.fill: parent
                                             hoverEnabled: true
+                                            onClicked: clockPanel.monthOffset -= 1
+                                        }
+                                    }
+
+                                    Item {
+                                        anchors.centerIn: parent
+                                        width: monthTitle.implicitWidth + 16
+                                        height: parent.height
+                                        Text {
+                                            id: monthTitle
+                                            anchors.centerIn: parent
+                                            text: Qt.formatDate(calBox.view, "MMMM yyyy")
+                                            color: titleMa.containsMouse ? Theme.accent : Theme.text
+                                            font.family: Theme.iconFont
+                                            font.pixelSize: root.sizeCalMonth
+                                            font.bold: true
+                                        }
+                                        MouseArea {
+                                            id: titleMa
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            onClicked: clockPanel.monthOffset = 0
+                                        }
+                                    }
+
+                                    Item {
+                                        width: 28; height: parent.height
+                                        anchors.right: parent.right
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: "\uDB80\uDD42"
+                                            color: nextMa.containsMouse ? Theme.accent : Theme.text
+                                            font.family: Theme.iconFont
+                                            font.pixelSize: root.sizeCalArrow
+                                        }
+                                        MouseArea {
+                                            id: nextMa
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            onClicked: clockPanel.monthOffset += 1
+                                        }
+                                    }
+                                }
+
+                                Row {
+                                    Repeater {
+                                        model: 7
+                                        delegate: Text {
+                                            required property int index
+                                            width: calBox.cellW
+                                            horizontalAlignment: Text.AlignHCenter
+                                            text: Qt.locale().dayName((index + calBox.firstDay) % 7, Locale.ShortFormat)
+                                            color: Theme.textDim
+                                            font.family: Theme.iconFont
+                                            font.pixelSize: root.sizeCalWeekday
+                                        }
+                                    }
+                                }
+
+                                Grid {
+                                    columns: 7
+                                    Repeater {
+                                        model: calBox.cells
+                                        delegate: Item {
+                                            required property var modelData
+                                            width: calBox.cellW
+                                            height: calBox.cellH
+
+                                            Rectangle {
+                                                visible: parent.modelData.today
+                                                anchors.fill: parent
+                                                anchors.margins: 2
+                                                radius: Theme.radius
+                                                color: Qt.alpha(Theme.accent, 0.45)
+                                                border.width: 1
+                                                border.color: Theme.accent
+                                            }
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: parent.modelData.n
+                                                color: parent.modelData.inMonth ? Theme.text : Theme.textFaint
+                                                font.family: Theme.iconFont
+                                                font.pixelSize: root.sizeCalDay
+                                                font.bold: parent.modelData.today
+                                            }
                                         }
                                     }
                                 }
@@ -482,22 +453,16 @@ Scope {
                 }
             }
 
-            // ===== RIGHT =====
-            Rectangle {
+            Panel {
                 anchors { right: parent.right; top: parent.top; rightMargin: 6; topMargin: 4 }
-                height: 20
                 width: rightRow.implicitWidth + 4
-                radius: Theme.radius
-                color: Theme.bg
 
                 Row {
                     id: rightRow
                     anchors.verticalCenter: parent.verticalCenter
                     anchors.right: parent.right
                     anchors.rightMargin: 2
-                    spacing: 0
 
-                    // MPRIS marquee (state + ticker live in Marquee.qml)
                     Item {
                         visible: Marquee.player !== null && Marquee.title !== ""
                         width: visible ? Math.min(Marquee.textW, Marquee.maxW) + 20 : 0
@@ -520,20 +485,19 @@ Scope {
                                     text: Marquee.text
                                     color: Theme.text
                                     font.family: Theme.iconFont
-                                    font.pixelSize: 11
+                                    font.pixelSize: root.sizeMarquee
                                     renderType: Text.NativeRendering
                                     width: Marquee.animating ? Marquee.textW
                                                              : Math.min(Marquee.textW, Marquee.maxW)
                                     elide: Marquee.animating ? Text.ElideNone : Text.ElideRight
                                 }
 
-                                // Second copy only while scrolling (seamless wrap)
                                 Text {
                                     visible: Marquee.animating
                                     text: Marquee.text
                                     color: Theme.text
                                     font.family: Theme.iconFont
-                                    font.pixelSize: 11
+                                    font.pixelSize: root.sizeMarquee
                                     renderType: Text.NativeRendering
                                 }
                             }
@@ -552,20 +516,17 @@ Scope {
                         }
                     }
 
-                    // Volume
                     Mod {
                         readonly property var sink: Pipewire.defaultAudioSink
                         readonly property real vol: sink && sink.audio ? sink.audio.volume : 0
                         readonly property bool muted: sink && sink.audio ? sink.audio.muted : false
-                        baseSize: 12
-                        // nf-md volume_off / low / medium / high
-                        readonly property string icon: muted || vol <= 0 ? "\uDB81\uDF5F"
-                            : vol > 0.66 ? "\uDB81\uDD7E"
-                            : vol > 0.33 ? "\uDB81\uDD80" : "\uDB81\uDD7F"
-                        text: muted ? icon + "  Muted" : icon + "  " + Math.round(vol * 100) + "%"
+                        baseSize: root.sizeVolText
+                        glyphSize: root.sizeVolIcon
+                        glyph: muted || vol <= 0 ? "\uDB81\uDF5F"
+                             : vol > 0.66 ? "\uDB81\uDD7E"
+                             : vol > 0.33 ? "\uDB81\uDD80" : "\uDB81\uDD7F"
+                        text: muted ? "Muted" : Math.round(vol * 100) + "%"
                         color: muted ? Theme.danger : Theme.text
-
-                        // Wheel while hovering: 2% per notch, capped at 100%
                         onScrolled: delta => {
                             if (!sink || !sink.audio) return;
                             const v = sink.audio.volume + (delta / 120) * 0.02;
@@ -579,26 +540,25 @@ Scope {
                         }
                     }
 
-                    // Network (nf-md wifi / ethernet / wifi_off)
                     Mod {
-                        baseSize: 13
+                        visible: root.battery !== null
+                        baseSize: root.sizeBatText
+                        glyphSize: root.sizeBatIcon
+                        glyph: (root.batCharging ? "\uf0e7 " : "") + root.batIcon
+                        text: root.batPct + "%"
+                        color: root.batLow ? Theme.danger : Theme.text
+                    }
+
+                    Mod {
+                        baseSize: root.sizeNetIcon
                         yOffset: root.iconYOffset
                         text: root.netState === "wifi" ? "\uDB81\uDDA9"
                             : root.netState === "ethernet" ? "\uDB80\uDE00" : "\uDB81\uDDAA"
                         onClicked: root.run("qs ipc call settings network")
                     }
 
-                    // Battery (hidden unless a laptop battery exists)
                     Mod {
-                        visible: root.battery !== null
-                        baseSize: 12
-                        text: (root.batCharging ? "\uf0e7 " : "") + root.batIcon + "  " + root.batPct + "%"
-                        color: root.batLow ? Theme.danger : Theme.text
-                    }
-
-                    // Power
-                    Mod {
-                        baseSize: 15
+                        baseSize: root.sizePowerIcon
                         hoverGrow: false
                         yOffset: root.iconYOffset
                         text: "\u23FB"

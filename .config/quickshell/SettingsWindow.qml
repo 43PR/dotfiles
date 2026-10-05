@@ -172,6 +172,7 @@ PanelWindow {
         { name: "Network", icon: "\uf1eb", page: "NetworkPage" },
         { name: "Bluetooth", icon: "󰂯", page: "BluetoothPage" },
         { name: "Storage", icon: "󰋊", page: "StoragePage" },
+        { name: "Power", icon: "󰐥", page: "PowerPage" },        
         { name: "Configs", icon: "󰧮",  page: "ConfigsPage" },
         { name: "Themes", icon: "󰉼",  page: "ThemesPage" }
     ]
