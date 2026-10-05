@@ -1,5 +1,4 @@
 pragma ComponentBehavior: Bound
-
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -16,7 +15,6 @@ PanelWindow {
     property bool showing: false
     property bool settingsOpen: false
     property bool dragging: false
-    property bool resizing: false
     property int currentIndex: 0
     property var hiddenNames: []
     property real offsetX: 0
@@ -24,9 +22,9 @@ PanelWindow {
     property bool horizontal: false
 
     readonly property int minSize: 70
-    readonly property int maxSize: 150
+    readonly property int maxSize: 160
     readonly property int defaultSize: 100
-    property int menuSize: defaultSize        // percent
+    property int menuSize: defaultSize
 
     readonly property bool movedFromDefault: offsetX !== 0 || offsetY !== 0 || horizontal || menuSize !== defaultSize
 
@@ -42,10 +40,8 @@ PanelWindow {
 
     mask: Region { item: root.showing ? menuRoot : null }
 
-    // Keep the card on screen whenever the size changes
     onMenuSizeChanged: if (root.showing) root.setPosition(root.offsetX, root.offsetY)
 
-    // Small square button used in the footers (same look as notification header buttons)
     component FooterButton: Rectangle {
         id: fb
         property string label: ""
@@ -73,6 +69,30 @@ PanelWindow {
             hoverEnabled: true
             onClicked: fb.clicked()
         }
+    }
+
+    component SizeBtn: Text {
+        signal clicked()
+        height: 16
+        verticalAlignment: Text.AlignVCenter
+        horizontalAlignment: Text.AlignHCenter
+        color: Theme.text
+        MouseArea { anchors.fill: parent; onClicked: parent.clicked() }
+    }
+
+    component SizeControl: Row {
+        id: sc
+        property int value: 100
+        signal step(int delta)
+        signal reset()
+
+        spacing: 4
+        opacity: scHover.hovered ? 0.9 : 0.35
+        Behavior on opacity { NumberAnimation { duration: 150 } }
+        HoverHandler { id: scHover }
+
+        SizeBtn { text: "−"; width: 16; font.pixelSize: 12; onClicked: sc.step(-10) }
+        SizeBtn { text: "+"; width: 16; font.pixelSize: 12; onClicked: sc.step(10) }
     }
 
     readonly property var actions: [
@@ -104,17 +124,16 @@ PanelWindow {
         currentIndex = 0
         settingsOpen = false
         dragging = false
-        resizing = false
         showing = true
         Qt.callLater(function () {
             if (root.showing) {
                 menuRoot.forceActiveFocus()
-                root.setPosition(root.offsetX, root.offsetY)   // keep saved position on-screen
+                root.setPosition(root.offsetX, root.offsetY)
             }
         })
     }
 
-    function closeMenu() { showing = false; settingsOpen = false; dragging = false; resizing = false }
+    function closeMenu() { showing = false; settingsOpen = false; dragging = false }
     function toggleMenu() { showing ? closeMenu() : openMenu() }
 
     function saveState() {
@@ -140,7 +159,6 @@ PanelWindow {
         root.saveState()
     }
 
-    // Back to default position AND default size
     function resetPosition() {
         root.offsetX = 0
         root.offsetY = 0
@@ -153,9 +171,16 @@ PanelWindow {
         root.menuSize = Math.max(root.minSize, Math.min(root.maxSize, Math.round(v)))
     }
 
-    // Sets the offset, clamped so the whole (scaled) card stays on screen.
-    //   offsetX > 0 moves right, offsetX < 0 moves left
-    //   offsetY > 0 moves down
+    function stepSize(d) {
+        root.setMenuSize(root.menuSize + d)
+        root.saveState()
+    }
+
+    function resetSize() {
+        root.menuSize = root.defaultSize
+        root.saveState()
+    }
+
     function setPosition(x, y) {
         if (root.width <= 0 || root.height <= 0) {
             root.offsetX = x
@@ -264,7 +289,6 @@ PanelWindow {
             }
         }
 
-        // Backdrop: outside click leaves settings first, then closes
         MouseArea {
             anchors.fill: parent
             onClicked: root.settingsOpen ? root.settingsOpen = false : root.closeMenu()
@@ -277,85 +301,36 @@ PanelWindow {
             radius: 20
             color: "transparent"
 
-            // Scale from the top-right corner so the card stays pinned to its anchor
             transformOrigin: Item.TopRight
             scale: root.menuSize / 100
 
             anchors.top: parent.top
             anchors.topMargin: root.topGap + root.offsetY
             anchors.right: parent.right
-            anchors.rightMargin: root.showing ? root.sideGap - root.offsetX : -(root.cardWidth + 40)
+            anchors.rightMargin: root.sideGap - root.offsetX
 
             opacity: root.showing ? 1 : 0
             visible: opacity > 0
 
-            // Animations are disabled while dragging / resizing, otherwise the card lags
-            // behind the cursor. They still run for the slide-in and for reset.
             Behavior on anchors.rightMargin {
-                enabled: !root.dragging && !root.resizing
+                enabled: !root.dragging && root.showing
                 NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
             }
             Behavior on anchors.topMargin {
-                enabled: !root.dragging && !root.resizing
+                enabled: !root.dragging && root.showing
                 NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
             }
             Behavior on scale {
-                enabled: !root.resizing
+                enabled: root.showing
                 NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
             }
             Behavior on opacity {
-                NumberAnimation { duration: 180 }
+                NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
             }
 
-            // Switching between list and settings changes the height: keep it on screen
             onHeightChanged: if (root.showing) root.setPosition(root.offsetX, root.offsetY)
 
-            // Always swallows clicks on the card (so gaps don't close the menu).
-            // Drags only in settings mode.
-            MouseArea {
-                id: dragArea
-                anchors.fill: parent
-                hoverEnabled: true
-                acceptedButtons: Qt.LeftButton
-                cursorShape: !root.settingsOpen ? Qt.ArrowCursor
-                           : root.dragging ? Qt.ClosedHandCursor
-                           : Qt.OpenHandCursor
-
-                property real pressX: 0
-                property real pressY: 0
-                property real startX: 0
-                property real startY: 0
-
-                onPressed: function (mouse) {
-                    if (!root.settingsOpen) return
-                    // Use menuRoot coordinates: the card itself moves while dragging,
-                    // so local mouse.x/y would give jittery deltas.
-                    var p = dragArea.mapToItem(menuRoot, mouse.x, mouse.y)
-                    pressX = p.x
-                    pressY = p.y
-                    startX = root.offsetX
-                    startY = root.offsetY
-                    root.dragging = true
-                }
-
-                onPositionChanged: function (mouse) {
-                    if (!root.dragging) return
-                    var p = dragArea.mapToItem(menuRoot, mouse.x, mouse.y)
-                    root.setPosition(startX + (p.x - pressX), startY + (p.y - pressY))
-                }
-
-                onReleased: {
-                    if (!root.dragging) return
-                    root.dragging = false
-                    root.saveState()
-                }
-
-                onCanceled: {
-                    if (!root.dragging) return
-                    root.dragging = false
-                    root.saveState()
-                }
-            }
+            MouseArea { anchors.fill: parent }
 
             Column {
                 id: panelCol
@@ -365,8 +340,8 @@ PanelWindow {
                 anchors.margins: 14
                 spacing: 10
 
-                // Header: grip shown in settings mode (drag from here or anywhere on the card)
                 Item {
+                    id: header
                     width: parent.width
                     height: 24
 
@@ -374,13 +349,53 @@ PanelWindow {
                         anchors.centerIn: parent
                         width: 36; height: 4; radius: 2
                         color: Theme.bg
-                        opacity: root.settingsOpen ? 1 : 0
+                        opacity: (dragArea.containsMouse || root.dragging) ? 1 : 0.1
                         Behavior on opacity { NumberAnimation { duration: 150 } }
-                        Behavior on color { ColorAnimation { duration: 120 } }
+                    }
+
+                    MouseArea {
+                        id: dragArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        acceptedButtons: Qt.LeftButton
+                        cursorShape: root.dragging ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+
+                        property real pressX: 0
+                        property real pressY: 0
+                        property real startX: 0
+                        property real startY: 0
+
+                        onPressed: function (mouse) {
+                            var p = dragArea.mapToItem(menuRoot, mouse.x, mouse.y)
+                            pressX = p.x
+                            pressY = p.y
+                            startX = root.offsetX
+                            startY = root.offsetY
+                            root.dragging = true
+                        }
+
+                        onPositionChanged: function (mouse) {
+                            if (!root.dragging) return
+                            var p = dragArea.mapToItem(menuRoot, mouse.x, mouse.y)
+                            root.setPosition(startX + (p.x - pressX), startY + (p.y - pressY))
+                        }
+
+                        onReleased: {
+                            if (!root.dragging) return
+                            root.dragging = false
+                            root.saveState()
+                        }
+
+                        onCanceled: {
+                            if (!root.dragging) return
+                            root.dragging = false
+                            root.saveState()
+                        }
+
+                        onDoubleClicked: root.resetPosition()
                     }
                 }
 
-                // ---------------- Action list ----------------
                 Column {
                     visible: !root.settingsOpen
                     width: parent.width
@@ -457,10 +472,18 @@ PanelWindow {
                         }
                     }
 
-                    // Footer: customize
                     Item {
                         width: parent.width
                         height: 24
+
+                        SizeControl {
+                            anchors.left: parent.left
+                            anchors.leftMargin: 2
+                            anchors.verticalCenter: parent.verticalCenter
+                            value: root.menuSize
+                            onStep: function (d) { root.stepSize(d) }
+                            onReset: root.resetSize()
+                        }
 
                         FooterButton {
                             anchors.right: parent.right
@@ -477,7 +500,6 @@ PanelWindow {
                     }
                 }
 
-                // ---------------- Settings ----------------
                 Column {
                     visible: root.settingsOpen
                     width: parent.width
@@ -555,138 +577,37 @@ PanelWindow {
                         }
                     }
 
-                    // Size bar
                     Item {
-                        id: sizeRow
                         width: parent.width
                         height: 24
 
-                        Text {
-                            id: sizeLabel
+                        SizeControl {
                             anchors.left: parent.left
                             anchors.leftMargin: 2
                             anchors.verticalCenter: parent.verticalCenter
-                            text: "Size"
-                            font.pixelSize: 10
-                            font.bold: true
-                            color: Theme.textDim
+                            value: root.menuSize
+                            onStep: function (d) { root.stepSize(d) }
+                            onReset: root.resetSize()
                         }
 
-                        Text {
-                            id: sizeValue
-                            anchors.right: parent.right
-                            anchors.rightMargin: 2
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: 30
-                            horizontalAlignment: Text.AlignRight
-                            text: root.menuSize + "%"
-                            font.pixelSize: 10
-                            color: Theme.textDim
-                        }
-
-                        Item {
-                            id: sizeBox
-                            anchors.left: sizeLabel.right
-                            anchors.leftMargin: 10
-                            anchors.right: sizeValue.left
-                            anchors.rightMargin: 10
-                            anchors.verticalCenter: parent.verticalCenter
-                            height: 24
-
-                            readonly property real ratio: (root.menuSize - root.minSize) / (root.maxSize - root.minSize)
-
-                            Rectangle {
-                                id: sizeTrack
-                                anchors.left: parent.left
-                                anchors.right: parent.right
-                                anchors.verticalCenter: parent.verticalCenter
-                                height: 4
-                                radius: 2
-                                color: Theme.alpha(Theme.text, 0.15)
-
-                                Rectangle {
-                                    width: sizeHandle.x + sizeHandle.width / 2
-                                    height: parent.height
-                                    radius: parent.radius
-                                    color: Theme.accent
-                                }
-
-                                Rectangle {
-                                    id: sizeHandle
-                                    width: 12; height: 12; radius: 6
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    x: sizeBox.ratio * (sizeTrack.width - width)
-                                    color: Theme.text
-                                    scale: sizeArea.pressed ? 1.2 : 1
-                                    Behavior on scale { NumberAnimation { duration: 100 } }
-                                }
-                            }
-
-                            // The card scales while you drag, so the track moves under the cursor.
-                            // To avoid feedback, the drag is relative and measured in menuRoot
-                            // coordinates using the track width frozen at press time.
-                            MouseArea {
-                                id: sizeArea
-                                anchors.fill: parent
-                                preventStealing: true
-                                cursorShape: Qt.PointingHandCursor
-
-                                property real pressX: 0
-                                property real startSize: 0
-                                property real sceneW: 1
-
-                                onPressed: function (m) {
-                                    root.resizing = true
-                                    var p = sizeArea.mapToItem(menuRoot, m.x, m.y)
-                                    // click on the track = jump there first
-                                    var r = Math.max(0, Math.min(1, (m.x - 6) / Math.max(1, sizeTrack.width - 12)))
-                                    root.setMenuSize(root.minSize + r * (root.maxSize - root.minSize))
-                                    pressX = p.x
-                                    startSize = root.menuSize
-                                    sceneW = Math.max(1, (sizeTrack.width - 12) * panel.scale)
-                                }
-
-                                onPositionChanged: function (m) {
-                                    if (!pressed) return
-                                    var p = sizeArea.mapToItem(menuRoot, m.x, m.y)
-                                    var d = (p.x - pressX) / sceneW * (root.maxSize - root.minSize)
-                                    root.setMenuSize(startSize + d)
-                                }
-
-                                onReleased: {
-                                    root.resizing = false
-                                    root.saveState()
-                                }
-
-                                onCanceled: {
-                                    root.resizing = false
-                                    root.saveState()
-                                }
-                            }
-                        }
-                    }
-
-                    // Footer: reset (left) + back (right) on one row
-                    Item {
-                        width: parent.width
-                        height: 24
-
-                        FooterButton {
-                            anchors.left: parent.left
-                            anchors.verticalCenter: parent.verticalCenter
-                            label: "↺"
-                            fontSize: 13
-                            opacity: root.movedFromDefault ? 1 : 0.4
-                            onClicked: root.resetPosition()
-                        }
-
-                        FooterButton {
+                        Row {
                             anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
-                            label: "C"
-                            onClicked: {
-                                root.settingsOpen = false
-                                root.dragging = false
+                            spacing: 6
+
+                            FooterButton {
+                                label: "↺"
+                                fontSize: 13
+                                opacity: root.movedFromDefault ? 1 : 0.4
+                                onClicked: root.resetPosition()
+                            }
+
+                            FooterButton {
+                                label: "C"
+                                onClicked: {
+                                    root.settingsOpen = false
+                                    root.dragging = false
+                                }
                             }
                         }
                     }

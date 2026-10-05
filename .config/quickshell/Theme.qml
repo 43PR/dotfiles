@@ -15,7 +15,7 @@ QtObject {
     readonly property int animMed: 220
     readonly property int animSlow: 380
 
-    property real bgAlpha: 1.0   
+    property real bgAlpha: 0.8   
     property color _bgBase: palette.bg || '#000000'
     property color bg: alpha(_bgBase, bgAlpha)
     property real imageOpacity: palette.imageOpacity !== undefined ? Math.max(0, Math.min(1, Number(palette.imageOpacity))) : 0.8

@@ -9,6 +9,7 @@
 ; (gtk_accel_path "<Actions>/XedWindowAlwaysSensitiveActions/ViewFullscreen" "F11")
 ; (gtk_accel_path "<Actions>/XedWindowActions/FileSaveAll" "<Primary><Shift>l")
 ; (gtk_accel_path "<Actions>/XedTextSizePluginActions/NormalSizeAction" "<Primary>0")
+; (gtk_accel_path "<Actions>/DocumentsListActions/Tab_1" "<Alt>2")
 ; (gtk_accel_path "<Actions>/XedWindowPanesActions/ViewBottomPane" "<Primary>F9")
 ; (gtk_accel_path "<Actions>/XedWindowActions/DocumentsMoveToNewWindow" "")
 ; (gtk_accel_path "<Actions>/XedWindowAlwaysSensitiveActions/HelpAbout" "")

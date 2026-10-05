@@ -115,6 +115,7 @@ nvtop
 dmidecode
 brightnessctl
 gammastep
+power-profiles-daemon
 
 # --------------------------------------------------
 # Desktop Notifications
@@ -137,6 +138,7 @@ cmatrix
 ttf-jetbrains-mono-nerd
 ttf-iosevka-nerd
 ttf-roboto-mono
+ttf-font-awesome
 
 # --------------------------------------------------
 # Scripting / Package / Application Utilities
