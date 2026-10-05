@@ -97,6 +97,7 @@ dconf
 gsettings-desktop-schemas
 adw-gtk-theme
 papirus-icon-theme
+gnome-themes-extra
 papirus-folders
 nwg-look
 

@@ -21,8 +21,14 @@ PanelWindow {
     function show()   { showing = true }
     function hide()   { showing = false }
     function toggle() { showing = !showing }
+    function nextPage() { selectedIndex = (selectedIndex + 1) % navItems.length }
+    function prevPage() { selectedIndex = (selectedIndex - 1 + navItems.length) % navItems.length }
+
+    onShowingChanged: if (!showing) dragging = false
 
     property real cardMargin: 40
+    property real dragMargin: 8
+    property bool dragging: false
 
     property real cardHeightCenter: Math.min(640, root.height - cardMargin * 2)
     property real cardHeightSnapped: cardHeightCenter * 0.6
@@ -37,23 +43,44 @@ PanelWindow {
     property real cardCenterX: (root.width - cardWidth) / 2
     property real cardX: cardCenterX
 
-    // ---- persisted snap position ----
-    property string snapPosition: "center"   // center | top | bottom | left | right
+    property string snapPosition: "center"
+    property real freeX: 0
+    property real freeY: 0
+    property real freeW: 0
+    property real freeH: 0
+
     readonly property string statePath: Quickshell.env("HOME") + "/.config/quickshell/state/settings-state.json"
 
     function saveState() {
-        stateFile.setText(JSON.stringify({ snap: root.snapPosition }))
+        stateFile.setText(JSON.stringify({
+            snap: root.snapPosition,
+            x: root.freeX,
+            y: root.freeY,
+            w: root.freeW,
+            h: root.freeH
+        }))
     }
 
-    // Moves the card to a snap position without saving
+    function clampX(v) {
+        return Math.max(dragMargin, Math.min(root.width - cardWidth - dragMargin, v))
+    }
+
+    function clampY(v) {
+        return Math.max(dragMargin, Math.min(root.height - cardHeight - dragMargin, v))
+    }
+
     function applySnap(pos) {
         switch (pos) {
         case "top":
+            cardWidth = cardWidthCenter
             cardHeight = cardHeightSnapped
+            cardX = (root.width - cardWidth) / 2
             cardY = cardMargin
             break
         case "bottom":
+            cardWidth = cardWidthCenter
             cardHeight = cardHeightSnapped
+            cardX = (root.width - cardWidth) / 2
             cardY = root.height - cardHeight - cardMargin
             break
         case "left":
@@ -67,6 +94,12 @@ PanelWindow {
             cardHeight = cardHeightSideSnapped
             cardX = root.width - cardWidth - cardMargin
             cardY = (root.height - cardHeight) / 2
+            break
+        case "free":
+            cardWidth = Math.min(freeW > 0 ? freeW : cardWidthCenter, root.width - 2 * dragMargin)
+            cardHeight = Math.min(freeH > 0 ? freeH : cardHeightCenter, root.height - 2 * dragMargin)
+            cardX = clampX(freeX)
+            cardY = clampY(freeY)
             break
         default:
             cardHeight = cardHeightCenter
@@ -88,19 +121,32 @@ PanelWindow {
     function snapRight()  { snapTo("right") }
     function snapCenter() { snapTo("center") }
 
-    // Re-apply the saved snap when the screen size is known or changes
+    function finishDrag() {
+        root.dragging = false
+        root.snapPosition = "free"
+        root.freeX = root.cardX
+        root.freeY = root.cardY
+        root.freeW = root.cardWidth
+        root.freeH = root.cardHeight
+        root.saveState()
+    }
+
     onWidthChanged:  if (width > 0 && height > 0) applySnap(snapPosition)
     onHeightChanged: if (width > 0 && height > 0) applySnap(snapPosition)
 
     FileView {
         id: stateFile
         path: root.statePath
-        printErrors: false   // no warning on first run when the file doesn't exist yet
+        printErrors: false
 
         onLoaded: {
             try {
                 var s = JSON.parse(stateFile.text())
-                if (["center", "top", "bottom", "left", "right"].indexOf(s.snap) >= 0) {
+                if (["center", "top", "bottom", "left", "right", "free"].indexOf(s.snap) >= 0) {
+                    if (typeof s.x === "number") root.freeX = s.x
+                    if (typeof s.y === "number") root.freeY = s.y
+                    if (typeof s.w === "number") root.freeW = s.w
+                    if (typeof s.h === "number") root.freeH = s.h
                     root.snapPosition = s.snap
                     if (root.width > 0 && root.height > 0)
                         root.applySnap(s.snap)
@@ -158,6 +204,16 @@ PanelWindow {
 
         focus: root.showing
         Keys.onEscapePressed: root.hide()
+        Keys.onPressed: function (event) {
+            if (event.key === Qt.Key_Backtab ||
+            (event.key === Qt.Key_Tab && (event.modifiers & Qt.ShiftModifier))) {
+                root.prevPage()
+                event.accepted = true
+            } else if (event.key === Qt.Key_Tab) {
+                root.nextPage()
+                event.accepted = true
+            }
+        }
 
         MouseArea {
             anchors.fill: parent
@@ -172,7 +228,7 @@ PanelWindow {
         { name: "Network", icon: "\uf1eb", page: "NetworkPage" },
         { name: "Bluetooth", icon: "󰂯", page: "BluetoothPage" },
         { name: "Storage", icon: "󰋊", page: "StoragePage" },
-        { name: "Power", icon: "󰐥", page: "PowerPage" },        
+        { name: "Power", icon: "󰐥", page: "PowerPage" },
         { name: "Configs", icon: "󰧮",  page: "ConfigsPage" },
         { name: "Themes", icon: "󰉼",  page: "ThemesPage" }
     ]
@@ -188,6 +244,7 @@ PanelWindow {
         open: root.showing
 
         Behavior on x {
+            enabled: !root.dragging
             NumberAnimation {
                 duration: Theme.animMed
                 easing.type: Easing.OutCubic
@@ -195,6 +252,7 @@ PanelWindow {
         }
 
         Behavior on y {
+            enabled: !root.dragging
             NumberAnimation {
                 duration: Theme.animMed
                 easing.type: Easing.OutCubic
@@ -271,11 +329,14 @@ PanelWindow {
             Item {
                 id: positionHandle
                 width: 140
-                height: 13
+                height: 9
                 anchors {
                     top: parent.top
                     horizontalCenter: parent.horizontalCenter
                 }
+                Behavior on opacity { NumberAnimation { duration: 150 } }
+
+                HoverHandler { id: handleHover }
 
                 Shape {
                     anchors.fill: parent
@@ -285,7 +346,7 @@ PanelWindow {
                         id: tabPath
                         property real w: positionHandle.width
                         property real h: positionHandle.height
-                        property real r: 10
+                        property real r: 6
                         property real fx: 30
                         property real fy: 0
 
@@ -323,6 +384,52 @@ PanelWindow {
                     }
                 }
 
+                MouseArea {
+                    id: dragArea
+                    anchors.fill: parent
+                    anchors.bottomMargin: -6
+                    acceptedButtons: Qt.LeftButton
+                    cursorShape: root.dragging ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+
+                    property real pressX: 0
+                    property real pressY: 0
+                    property real startX: 0
+                    property real startY: 0
+                    property bool moved: false
+
+                    onPressed: function (mouse) {
+                        var p = dragArea.mapToItem(backdrop, mouse.x, mouse.y)
+                        pressX = p.x
+                        pressY = p.y
+                        startX = root.cardX
+                        startY = root.cardY
+                        moved = false
+                        root.dragging = true
+                    }
+
+                    onPositionChanged: function (mouse) {
+                        if (!root.dragging) return
+                        var p = dragArea.mapToItem(backdrop, mouse.x, mouse.y)
+                        moved = true
+                        root.cardX = root.clampX(startX + (p.x - pressX))
+                        root.cardY = root.clampY(startY + (p.y - pressY))
+                    }
+
+                    onReleased: {
+                        if (!root.dragging) return
+                        if (moved) root.finishDrag()
+                        else root.dragging = false
+                    }
+
+                    onCanceled: {
+                        if (!root.dragging) return
+                        if (moved) root.finishDrag()
+                        else root.dragging = false
+                    }
+
+                    onDoubleClicked: root.snapCenter()
+                }
+
                 Row {
                     anchors.centerIn: parent
                     anchors.verticalCenterOffset: -1
@@ -331,7 +438,7 @@ PanelWindow {
                     Text {
                         text: "◀"
                         font.family: Theme.fontFamily
-                        font.pixelSize: 7
+                        font.pixelSize: 6
                         color: Theme.textDim
                         anchors.verticalCenter: parent.verticalCenter
                         MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: root.snapLeft() }
@@ -339,7 +446,7 @@ PanelWindow {
                     Text {
                         text: "▲"
                         font.family: Theme.fontFamily
-                        font.pixelSize: 10
+                        font.pixelSize: 8
                         color: Theme.textDim
                         anchors.verticalCenter: parent.verticalCenter
                         MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: root.snapTop() }
@@ -347,7 +454,7 @@ PanelWindow {
                     Text {
                         text: "●"
                         font.family: Theme.fontFamily
-                        font.pixelSize: 10
+                        font.pixelSize: 8
                         color: Theme.textDim
                         anchors.verticalCenter: parent.verticalCenter
                         MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: root.snapCenter() }
@@ -355,7 +462,7 @@ PanelWindow {
                     Text {
                         text: "▼"
                         font.family: Theme.fontFamily
-                        font.pixelSize: 10
+                        font.pixelSize: 8
                         color: Theme.textDim
                         anchors.verticalCenter: parent.verticalCenter
                         MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: root.snapBottom() }
@@ -363,7 +470,7 @@ PanelWindow {
                     Text {
                         text: "▶"
                         font.family: Theme.fontFamily
-                        font.pixelSize: 7
+                        font.pixelSize: 6
                         color: Theme.textDim
                         anchors.verticalCenter: parent.verticalCenter
                         MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: root.snapRight() }

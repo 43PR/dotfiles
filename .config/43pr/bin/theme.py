@@ -17,6 +17,15 @@ MATUGEN_OUT = CACHE / "matugen" / "semantic.json"
 PALETTE = CACHE / "palette.json"
 STATE = STATE_DIR / "state.json"
 
+# GTK theme names used when syncing light/dark.
+#   "auto" -> "Adwaita-dark" for dark if that theme is installed (Arch: the
+#             gnome-themes-extra package), otherwise plain "Adwaita" (dark is then
+#             a variant set via gtk-application-prefer-dark-theme in settings.ini).
+#   None   -> leave gtk-theme untouched.
+# Or put your own theme names here.
+GTK_THEME_DARK = "auto"
+GTK_THEME_LIGHT = "Adwaita"
+
 HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
 NAME = re.compile(r"^[A-Za-z0-9._-]+$")
 TOKEN = re.compile(r"\{\{\s*([A-Za-z0-9_]+)((?:\s*\|\s*[a-z0-9]+(?:=[0-9a-fA-Fx.]+)?)*)\s*\}\}")
@@ -65,6 +74,88 @@ def save_state(st):
 
 def current_mode():
     return os.environ.get("MATUGEN_MODE") or load_state().get("mode_appearance", "dark")
+
+
+# ---------- GTK / portal sync ----------
+
+def set_ini_key(path, key, value):
+    """Set key=value under [Settings] in a GTK settings.ini, creating it if needed."""
+    text = path.read_text() if path.is_file() else "[Settings]\n"
+    line = f"{key}={value}"
+    if re.search(rf"(?m)^{re.escape(key)}=.*$", text):
+        text = re.sub(rf"(?m)^{re.escape(key)}=.*$", line, text)
+    elif re.search(r"(?m)^\[Settings\]\s*$", text):
+        text = re.sub(r"(?m)^\[Settings\]\s*$", f"[Settings]\n{line}", text, count=1)
+    else:
+        text = text.rstrip("\n") + f"\n[Settings]\n{line}\n"
+    atomic_write(path, text)
+
+
+def sync_gtk_ini(dark):
+    """GTK3 ignores color-scheme; it follows prefer-dark-theme from settings.ini."""
+    for d in ("gtk-3.0", "gtk-4.0"):
+        try:
+            set_ini_key(CFG / d / "settings.ini",
+                        "gtk-application-prefer-dark-theme", int(dark))
+        except Exception as e:
+            warn(f"could not update {d}/settings.ini: {e}")
+
+
+def gtk_theme_installed(name):
+    """True if a GTK3 theme called `name` exists in the standard theme dirs."""
+    data = Path(os.environ.get("XDG_DATA_HOME", HOME / ".local/share"))
+    dirs = [Path("/usr/share/themes"), Path("/usr/local/share/themes"),
+            HOME / ".themes", data / "themes"]
+    return any((d / name / "gtk-3.0").is_dir() for d in dirs)
+
+
+def resolve_gtk_theme(dark):
+    name = GTK_THEME_DARK if dark else GTK_THEME_LIGHT
+    if name == "auto":
+        return "Adwaita-dark" if dark and gtk_theme_installed("Adwaita-dark") else "Adwaita"
+    return name
+
+
+def set_gtk_color_scheme(value):
+    """Sync GTK/libadwaita/portal color-scheme with our appearance mode.
+    Never raises; failures only produce warnings."""
+    sync_gtk_ini(value == "dark")
+    if not shutil.which("gsettings"):
+        warn("gsettings not found; skipping GTK color-scheme sync")
+        return
+    dark = value == "dark"
+    settings = [("color-scheme", "prefer-dark" if dark else "prefer-light")]
+    gtk_theme = resolve_gtk_theme(dark)
+    if gtk_theme:
+        settings.append(("gtk-theme", gtk_theme))
+    for key, val in settings:
+        try:
+            r = subprocess.run(
+                ["gsettings", "set", "org.gnome.desktop.interface", key, val],
+                stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=5)
+            if r.returncode != 0:
+                warn(f"gsettings {key} failed: {r.stderr.strip()}")
+        except Exception as e:
+            warn(f"gsettings {key} failed: {e}")
+
+
+def palette_appearance(pal, hint=None):
+    """'light' or 'dark' for a palette. A preset may set appearance = "light"|"dark";
+    otherwise it's inferred from the background color's luminance."""
+    if hint in ("dark", "light"):
+        return hint
+    h = (pal.get("gtk_bg") or pal.get("bg") or "#000000").lstrip("#")[:6]
+    r, g, b = (int(h[i:i + 2], 16) / 255 for i in (0, 2, 4))
+    lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
+    return "light" if lum > 0.5 else "dark"
+
+
+def sync_appearance(st, pal, hint=None):
+    """Record the effective appearance in state and sync GTK to it."""
+    mode = palette_appearance(pal, hint)
+    st["mode_appearance"] = mode
+    set_gtk_color_scheme(mode)
+    return mode
 
 
 # ---------- palettes ----------
@@ -219,7 +310,8 @@ def apply_palette(pal):
     for h in hooks:                                # 3. reload consumers last
         try:
             r = subprocess.run(h, stdin=subprocess.DEVNULL, capture_output=True, timeout=10)
-            if r.returncode != 0:
+            benign = bool(h) and Path(h[0]).name == "pkill" and r.returncode == 1  # no process matched
+            if r.returncode != 0 and not benign:
                 warn(f"reload {h} exited {r.returncode}")
         except Exception as e:
             warn(f"reload {h} failed: {e}")
@@ -253,15 +345,17 @@ def cmd_wallpaper(a):
             return
         pinned = False
         try:
-            pinned = st.get("mode") == "preset" and \
-                load_toml(preset_path(st["preset"])).get("override", False)
+            pdata = load_toml(preset_path(st["preset"])) if st.get("mode") == "preset" else {}
+            pinned = bool(pdata.get("override", False))
             if pinned:
-                pal = preset_palette(st["preset"])
+                pal = merged(pdata.get("colors", {}))
                 print(f"theme: preset '{st['preset']}' is pinned; keeping it")
             else:
                 pal = from_wallpaper(p)
                 st["mode"] = "wallpaper"
             apply_palette(pal)
+            if pinned:
+                sync_appearance(st, pal, pdata.get("appearance"))
         except Exception as e:
             ensure_fallback()
             die(f"theme unchanged: {e}")
@@ -273,12 +367,15 @@ def cmd_wallpaper(a):
 def cmd_preset(a):
     with lock():
         try:
-            apply_palette(preset_palette(a.name))
+            data = load_toml(preset_path(a.name))
+            pal = merged(data.get("colors", {}))
+            apply_palette(pal)
         except Exception as e:
             ensure_fallback()
             die(f"theme unchanged: {e}")
         st = load_state()
         st.update(mode="preset", preset="default" if a.name == "43pr-default" else a.name)
+        sync_appearance(st, pal, data.get("appearance"))   # light/dark GTK follows the preset
         save_state(st)
     print(f"theme: preset '{a.name}' applied")
 
@@ -301,6 +398,7 @@ def cmd_apply(a):
         try:
             pal = json.loads(PALETTE.read_text()) if PALETTE.exists() else preset_palette("default")
             apply_palette(merged(pal))
+            set_gtk_color_scheme(load_state().get("mode_appearance", "dark"))   # first run / install
         except Exception as e:
             die(f"apply failed: {e}")
     print("theme: re-rendered")
@@ -312,6 +410,7 @@ def cmd_mode(a):
     st = load_state()
     st["mode_appearance"] = a.value
     save_state(st)
+    set_gtk_color_scheme(a.value)             # sync GTK/libadwaita/portal color-scheme
     wp = st.get("wallpaper")
     if st.get("mode") == "wallpaper" and wp:
         cmd_wallpaper(argparse.Namespace(path=wp))

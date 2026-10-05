@@ -7,10 +7,11 @@ import Quickshell.Hyprland
 
 PanelWindow {
     id: root
-
-    property int topGap: 4
-    property int sideGap: 16
-    property int cardWidth: 300
+    property int topGap: 12
+    property int sideGap: 24
+    property int edgeGap: 0
+    property int pad: 6
+    property int cardWidth: 284
 
     property bool showing: false
     property bool settingsOpen: false
@@ -25,6 +26,9 @@ PanelWindow {
     readonly property int maxSize: 160
     readonly property int defaultSize: 100
     property int menuSize: defaultSize
+    property string icon: ""
+
+    Component.onCompleted: BluetoothState.init()
 
     readonly property bool movedFromDefault: offsetX !== 0 || offsetY !== 0 || horizontal || menuSize !== defaultSize
 
@@ -50,7 +54,7 @@ PanelWindow {
         readonly property bool hovered: fbArea.containsMouse
         signal clicked()
 
-        width: 24; height: 24; radius: 8
+        width: 16; height: 16; radius: 6
         color: Theme.bg
         Behavior on color { ColorAnimation { duration: 120 } }
         Behavior on opacity { NumberAnimation { duration: 120 } }
@@ -73,7 +77,7 @@ PanelWindow {
 
     component SizeBtn: Text {
         signal clicked()
-        height: 16
+        height: 14
         verticalAlignment: Text.AlignVCenter
         horizontalAlignment: Text.AlignHCenter
         color: Theme.text
@@ -188,10 +192,10 @@ PanelWindow {
             return
         }
         var s = root.menuSize / 100
-        var maxX = root.sideGap
-        var minX = Math.min(maxX, root.cardWidth * s + 2 * root.sideGap - root.width)
-        var minY = 0
-        var maxY = Math.max(minY, root.height - panel.height * s - 2 * root.topGap)
+        var maxX = root.sideGap - root.edgeGap
+        var minX = Math.min(maxX, root.cardWidth * s + root.sideGap + root.edgeGap - root.width)
+        var minY = root.edgeGap - root.topGap
+        var maxY = Math.max(minY, root.height - panel.height * s - root.edgeGap - root.topGap)
         root.offsetX = Math.max(minX, Math.min(maxX, x))
         root.offsetY = Math.max(minY, Math.min(maxY, y))
     }
@@ -233,10 +237,8 @@ PanelWindow {
         id: menuRoot
         anchors.fill: parent
         focus: true
-
         Keys.onPressed: function (event) {
             if (!root.showing) return
-
             if (root.settingsOpen) {
                 if (event.key === Qt.Key_Escape
                         || event.key === Qt.Key_Return
@@ -248,38 +250,38 @@ PanelWindow {
                 event.accepted = true
                 return
             }
-
             if (event.key === Qt.Key_Escape) {
                 root.closeMenu()
                 event.accepted = true
                 return
             }
-
-            if (event.key === Qt.Key_Down || event.key === Qt.Key_Right) {
+            if (event.key === Qt.Key_Down
+                    || event.key === Qt.Key_Right
+                    || event.key === Qt.Key_Tab) {
                 root.currentIndex = (root.currentIndex + 1) % root.visibleActions.length
                 event.accepted = true
                 return
             }
-
-            if (event.key === Qt.Key_Up || event.key === Qt.Key_Left) {
+            if (event.key === Qt.Key_Up
+                    || event.key === Qt.Key_Left
+                    || event.key === Qt.Key_Backtab) {
                 root.currentIndex = (root.currentIndex - 1 + root.visibleActions.length) % root.visibleActions.length
                 event.accepted = true
                 return
             }
-
-            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            if (event.key === Qt.Key_Return
+                    || event.key === Qt.Key_Enter
+                    || event.key === Qt.Key_Space) {
                 root.runAction(root.visibleActions[root.currentIndex])
                 event.accepted = true
                 return
             }
-
             if (event.text.toLowerCase() === "c") {
                 root.settingsOpen = true
                 root.dragging = false
                 event.accepted = true
                 return
             }
-
             for (var i = 0; i < root.visibleActions.length; i++) {
                 if (event.text.toLowerCase() === root.visibleActions[i].key) {
                     root.runAction(root.visibleActions[i])
@@ -288,27 +290,22 @@ PanelWindow {
                 }
             }
         }
-
         MouseArea {
             anchors.fill: parent
             onClicked: root.settingsOpen ? root.settingsOpen = false : root.closeMenu()
         }
-
         Rectangle {
             id: panel
             width: root.cardWidth
-            height: panelCol.height + 28
+            height: panelCol.height + 2 * root.pad
             radius: 20
             color: "transparent"
-
             transformOrigin: Item.TopRight
             scale: root.menuSize / 100
-
             anchors.top: parent.top
             anchors.topMargin: root.topGap + root.offsetY
             anchors.right: parent.right
             anchors.rightMargin: root.sideGap - root.offsetX
-
             opacity: root.showing ? 1 : 0
             visible: opacity > 0
 
@@ -327,24 +324,20 @@ PanelWindow {
             Behavior on opacity {
                 NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
             }
-
             onHeightChanged: if (root.showing) root.setPosition(root.offsetX, root.offsetY)
-
             MouseArea { anchors.fill: parent }
-
             Column {
                 id: panelCol
                 anchors.top: parent.top
                 anchors.left: parent.left
                 anchors.right: parent.right
-                anchors.margins: 14
-                spacing: 10
+                anchors.margins: root.pad
+                spacing: 6
 
                 Item {
                     id: header
                     width: parent.width
-                    height: 24
-
+                    height: 12
                     Rectangle {
                         anchors.centerIn: parent
                         width: 36; height: 4; radius: 2
@@ -359,12 +352,10 @@ PanelWindow {
                         hoverEnabled: true
                         acceptedButtons: Qt.LeftButton
                         cursorShape: root.dragging ? Qt.ClosedHandCursor : Qt.OpenHandCursor
-
                         property real pressX: 0
                         property real pressY: 0
                         property real startX: 0
                         property real startY: 0
-
                         onPressed: function (mouse) {
                             var p = dragArea.mapToItem(menuRoot, mouse.x, mouse.y)
                             pressX = p.x
@@ -373,25 +364,21 @@ PanelWindow {
                             startY = root.offsetY
                             root.dragging = true
                         }
-
                         onPositionChanged: function (mouse) {
                             if (!root.dragging) return
                             var p = dragArea.mapToItem(menuRoot, mouse.x, mouse.y)
                             root.setPosition(startX + (p.x - pressX), startY + (p.y - pressY))
                         }
-
                         onReleased: {
                             if (!root.dragging) return
                             root.dragging = false
                             root.saveState()
                         }
-
                         onCanceled: {
                             if (!root.dragging) return
                             root.dragging = false
                             root.saveState()
                         }
-
                         onDoubleClicked: root.resetPosition()
                     }
                 }
@@ -400,10 +387,8 @@ PanelWindow {
                     visible: !root.settingsOpen
                     width: parent.width
                     spacing: 8
-
                     Repeater {
                         model: root.visibleActions
-
                         delegate: Rectangle {
                             id: entry
                             required property var modelData
@@ -414,8 +399,8 @@ PanelWindow {
                             height: 56
                             radius: 12
                             color: entryArea.pressed || entryArea.containsMouse || entry.focused
-                            ? Theme._bgBase
-                            : Theme.alpha(Theme._bgBase, 0.8)
+                            ? Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, Math.min(1, Theme.bg.a + 0.12))
+                            : Theme.bg
                             border.width: entry.focused ? 1 : 0
                             border.color: Theme.accent
                             Behavior on color { ColorAnimation { duration: 120 } }
@@ -427,7 +412,6 @@ PanelWindow {
                                 anchors.leftMargin: 10
                                 anchors.verticalCenter: parent.verticalCenter
                                 color: Theme.alpha(Theme.text, 0.1)
-
                                 Image {
                                     anchors.centerIn: parent
                                     width: 20; height: 20
@@ -474,7 +458,7 @@ PanelWindow {
 
                     Item {
                         width: parent.width
-                        height: 24
+                        height: 16
 
                         SizeControl {
                             anchors.left: parent.left
@@ -488,8 +472,8 @@ PanelWindow {
                         FooterButton {
                             anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
-                            label: "C"
-                            fontSize: 4
+                            label: "󰒓"
+                            fontSize: 12
                             textColor: Theme.textDim
                             opacity: hovered ? 1 : 0.1
                             onClicked: {
@@ -579,7 +563,7 @@ PanelWindow {
 
                     Item {
                         width: parent.width
-                        height: 24
+                        height: 16
 
                         SizeControl {
                             anchors.left: parent.left
@@ -597,13 +581,14 @@ PanelWindow {
 
                             FooterButton {
                                 label: "↺"
-                                fontSize: 13
+                                fontSize: 11
                                 opacity: root.movedFromDefault ? 1 : 0.4
                                 onClicked: root.resetPosition()
                             }
 
                             FooterButton {
-                                label: "C"
+                                label: "󰒓"
+                                fontSize: 12
                                 onClicked: {
                                     root.settingsOpen = false
                                     root.dragging = false

@@ -196,26 +196,6 @@ Item {
                     path: "~/.config/rofi/config.rasi"
                 }
             }
-            Text {
-                text: "BINDS"
-                color: Theme.text
-                font.family: Theme.fontFamily
-                font.pixelSize: 16
-                font.letterSpacing: 3
-            }
-            Rectangle {
-                width: parent.width
-                height: 1
-                color: Theme.border
-            }
-            Column {
-                width: parent.width
-                spacing: page.sectionSpacing
-                ConfigButton {
-                    label: "MOUSE HOVER TRIGGERS"
-                    path: "~/.config/quickshell/SettingsCornerTrigger.qml"
-                }
-            }
         }
     }
 }

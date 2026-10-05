@@ -8,6 +8,8 @@ case "$choice" in
     "80%")  opacity=0.8; alpha=CC ;;
     "70%")  opacity=0.7; alpha=B3 ;;
     "60%")  opacity=0.6; alpha=99 ;;
+    "50%")  opacity=0.5; alpha=80 ;;
+    "40%")  opacity=0.4; alpha=66 ;;
     *) exit 0 ;;
 esac
 
@@ -18,5 +20,5 @@ sed -i -E "s/(bg:[[:space:]]*#[0-9A-Fa-f]{6})([0-9A-Fa-f]{2})?;/\1$alpha;/" ~/.c
 hyprctl reload
 
 pkill qs
-sleep 0.5
+sleep 0.2
 qs &

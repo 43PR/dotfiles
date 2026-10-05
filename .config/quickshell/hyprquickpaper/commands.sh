@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Central wallpaper hook, called by hyprquickpaper with the chosen image path.
+# Replace "random" with: fade, wipe, grow, outer, wave, center, any, random
 
 img="$1"
 [[ -f "$img" ]] || { echo "commands.sh: not a file: $img" >&2; exit 1; }

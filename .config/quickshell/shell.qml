@@ -8,5 +8,5 @@ ShellRoot {
     PowerMenu {}
     Bar {}
     Todo {}
-    SettingsCornerTrigger {}
+    Wheel {}
 }

@@ -40,7 +40,7 @@ configuration {
 window {
     location: center;
     width: 420px;
-    height: 420px;
+    height: 290px;
     background-color: @bg;
     border: 1px;
     border-color: @border-color;

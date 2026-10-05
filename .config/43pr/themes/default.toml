@@ -1,4 +1,5 @@
 name = "43pr-default"
+appearance = "dark"
 description = "The original 43PR look, extracted from the repo"
 override = false   # true = wallpaper changes will NOT replace this preset
 

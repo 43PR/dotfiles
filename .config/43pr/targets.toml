@@ -8,10 +8,6 @@ reload = ["pkill", "-USR1", "-x", "kitty"]
 [rofi]
 input  = "~/.config/43pr/templates/rofi-colors.rasi"
 output = "~/.config/rofi/colors.rasi"
-[waybar]
-input  = "~/.config/43pr/templates/waybar-colors.css"
-output = "~/.config/waybar/colors.css"
-reload = ["pkill", "-SIGUSR2", "waybar"]
 [hyprlock]
 input  = "~/.config/43pr/templates/hyprlock-colors.conf"
 output = "~/.config/hypr/hyprlock-colors.conf"

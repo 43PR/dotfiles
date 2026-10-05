@@ -1,4 +1,5 @@
 name = "everforest-dark"
+appearance = "dark"
 description = "Everforest Dark theme"
 override = false   # true = wallpaper changes will NOT replace this preset
 

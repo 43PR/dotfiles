@@ -8,6 +8,7 @@ Item {
     id: page
 
     property var monitors: []
+    property var savedState: ({})
     property real marginLeft: 0
     property real marginRight: 55
     property real marginTop: 0
@@ -17,6 +18,7 @@ Item {
     property bool nightlightEnabled: false
     property real sliderMarginRight: 10
     property real labelWidth: 96
+    readonly property string stateDir: Quickshell.env("HOME") + "/.config/quickshell/state"
 
     Process {
         id: brightnessGet
@@ -96,6 +98,86 @@ Item {
         onExited: exitCode => {
             page.nightlightEnabled = exitCode === 0
         }
+    }
+
+    Process {
+        id: stateDirProcess
+        command: ["mkdir", "-p", page.stateDir]
+    }
+
+    FileView {
+        id: displayFile
+        path: page.stateDir + "/display.json"
+        blockLoading: true
+    }
+
+    FileView {
+        id: displayLua
+        path: page.stateDir + "/display.lua"
+    }
+
+    function loadState() {
+        try {
+            const saved = JSON.parse(displayFile.text())
+            if (saved && typeof saved.monitors === "object" && saved.monitors !== null) {
+                savedState = saved.monitors
+            }
+        } catch (error) {}
+    }
+
+    function luaFileText() {
+        const lines = []
+        const names = Object.keys(savedState)
+        for (let i = 0; i < names.length; i++) {
+            const entry = savedState[names[i]]
+            if (!entry || typeof entry.mode !== "string") continue
+            lines.push(monitorLua({ name: names[i] }, {
+                mode: entry.mode,
+                position: typeof entry.position === "string" ? entry.position : "auto",
+                scale: typeof entry.scale === "number" ? entry.scale : 1
+            }))
+        }
+        return lines.join("\n") + "\n"
+    }
+
+    Timer {
+        id: stateSaveTimer
+        interval: 300
+        onTriggered: {
+            try {
+                displayFile.setText(JSON.stringify({ monitors: page.savedState }, null, 2))
+                displayLua.setText(page.luaFileText())
+            } catch (error) {}
+        }
+    }
+
+    function monitorPosition(mon) {
+        return page.monitors.length <= 1 ? "auto" : mon.x + "x" + mon.y
+    }
+
+    function rememberMonitor(mon, fields) {
+        if (!mon || !mon.name) return
+        const next = Object.assign({}, savedState)
+        next[mon.name] = Object.assign({}, next[mon.name] || {}, fields)
+        savedState = next
+        stateSaveTimer.restart()
+    }
+
+    Process {
+        id: pReset
+        onExited: exitCode => {
+            refreshTimer.restart()
+        }
+    }
+
+    function resetToConfig() {
+        stateSaveTimer.stop()
+        savedState = ({})
+        pReset.command = [
+            "sh", "-c",
+            "rm -f '" + page.stateDir + "/display.json' '" + page.stateDir + "/display.lua'; hyprctl reload"
+        ]
+        pReset.running = true
     }
 
     function monitorMode(mon) { return mon.width + "x" + mon.height + "@" + mon.refreshRate.toFixed(2) }
@@ -197,6 +279,8 @@ Item {
             page.monitors = updated
         }
 
+        rememberMonitor(mon, { mode: monitorMode(mon), scale: applied, position: monitorPosition(mon) })
+
         pApply.pendingMon = mon
         pApply.command = [
             "hyprctl", "eval",
@@ -218,14 +302,90 @@ Item {
         }
     }
 
+    function resolutionList(mon) {
+        if (!mon || !mon.availableModes) return []
+        const seen = {}
+        const items = []
+        for (let i = 0; i < mon.availableModes.length; i++) {
+            const match = String(mon.availableModes[i]).match(/^(\d+)x(\d+)@/)
+            if (!match) continue
+            const key = match[1] + "x" + match[2]
+            if (seen[key]) continue
+            seen[key] = true
+            items.push({ key: key, width: parseInt(match[1]), height: parseInt(match[2]) })
+        }
+        items.sort((a, b) => (b.width * b.height - a.width * a.height) || (b.width - a.width))
+        return items.map(item => item.key)
+    }
+
+    function bestMode(mon, resolution) {
+        if (!mon || !mon.availableModes) return null
+        const prefix = resolution + "@"
+        let bestRate = null
+        let bestDistance = Infinity
+        for (let i = 0; i < mon.availableModes.length; i++) {
+            const mode = String(mon.availableModes[i])
+            if (mode.indexOf(prefix) !== 0) continue
+            const rate = parseFloat(mode.substring(prefix.length))
+            if (isNaN(rate)) continue
+            const distance = Math.abs(rate - mon.refreshRate)
+            if (distance < bestDistance || (distance === bestDistance && rate > bestRate)) {
+                bestRate = rate
+                bestDistance = distance
+            }
+        }
+        return bestRate === null ? null : prefix + bestRate.toFixed(2)
+    }
+
     function setResolution(mon, resolution) {
         if (!mon || !mon.name || !resolution) {
             return
         }
+        const scale = mon.scale !== undefined ? mon.scale : 1
+        rememberMonitor(mon, { mode: resolution, scale: scale, position: monitorPosition(mon) })
         const lua = monitorLua(mon, {
             mode: resolution,
             position: mon.x + "x" + mon.y,
-            scale: mon.scale !== undefined ? mon.scale : 1
+            scale: scale
+        })
+        try {
+            pResolution.command = ["hyprctl", "eval", lua]
+            pResolution.running = true
+        } catch (error) {}
+    }
+
+    function refreshRates(mon) {
+        if (!mon || !mon.availableModes) return []
+        const prefix = mon.width + "x" + mon.height + "@"
+        const seen = {}
+        const rates = []
+        for (let i = 0; i < mon.availableModes.length; i++) {
+            const mode = String(mon.availableModes[i])
+            if (mode.indexOf(prefix) !== 0) continue
+            const match = mode.match(/@([\d.]+)/)
+            if (!match) continue
+            const rate = parseFloat(match[1])
+            if (isNaN(rate)) continue
+            const key = rate.toFixed(2)
+            if (seen[key]) continue
+            seen[key] = true
+            rates.push(rate)
+        }
+        rates.sort((a, b) => b - a)
+        return rates
+    }
+
+    function setRefreshRate(mon, rate) {
+        if (!mon || !mon.name || rate === undefined) {
+            return
+        }
+        const mode = mon.width + "x" + mon.height + "@" + rate.toFixed(2)
+        const scale = mon.scale !== undefined ? mon.scale : 1
+        rememberMonitor(mon, { mode: mode, scale: scale, position: monitorPosition(mon) })
+        const lua = monitorLua(mon, {
+            mode: mode,
+            position: mon.x + "x" + mon.y,
+            scale: scale
         })
         try {
             pResolution.command = ["hyprctl", "eval", lua]
@@ -416,48 +576,141 @@ Item {
                     font.family: Theme.fontFamily; font.pixelSize: 15; font.bold: true; font.letterSpacing: 2
                 }
 
-                Row {
-                    width: parent.width; spacing: 10
-                    topPadding: 6
-                    bottomPadding: 6
-                    Repeater {
-                        model: [
-                            "1920x1080",
-                            "2560x1440",
-                            "3840x2160",
-                            "1280x720"
-                        ]
+                Repeater {
+                    model: page.monitors
 
-                        delegate: Rectangle {
-                            required property string modelData
-                            width: (parent.width - parent.spacing * 3) / 4; height: 42; radius: Theme.radius
-                            color: "#00000000"; border.width: 1; border.color: Theme.border
+                    delegate: Column {
+                        id: resBlock
+                        required property var modelData
+                        property var resolutions: page.resolutionList(modelData)
+                        width: parent.width; spacing: 8
 
-                            Text {
-                                anchors.centerIn: parent; text: modelData; color: Theme.text
-                                font.family: Theme.fontFamily; font.pixelSize: 12; font.bold: true; font.letterSpacing: 1
-                            }
+                        Text {
+                            text: modelData.name; color: Theme.textDim
+                            font.family: Theme.fontFamily; font.pixelSize: 11
+                        }
 
-                            MouseArea {
-                                anchors.fill: parent; hoverEnabled: true
-                                onEntered: { parent.color = Theme.alpha(Theme.accent, 0.08); parent.border.color = Theme.accent }
-                                onExited: { parent.color = "#00000000"; parent.border.color = Theme.border }
-                                onClicked: {
-                                    if (page.monitors.length === 0) {
-                                        page.refresh()
-                                        return
+                        Flow {
+                            width: parent.width; spacing: 10
+
+                            Repeater {
+                                model: resBlock.resolutions
+
+                                delegate: Rectangle {
+                                    id: resButton
+                                    required property string modelData
+                                    property bool current: modelData === resBlock.modelData.width + "x" + resBlock.modelData.height
+                                    width: 112; height: 38; radius: Theme.radius
+                                    color: current ? Theme.alpha(Theme.accent, 0.10) : (resMouse.containsMouse ? Theme.alpha(Theme.accent, 0.08) : "#00000000")
+                                    border.width: 1
+                                    border.color: current || resMouse.containsMouse ? Theme.accent : Theme.border
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: resButton.modelData
+                                        color: Theme.text
+                                        font.family: Theme.fontFamily; font.pixelSize: 12; font.bold: true; font.letterSpacing: 1
                                     }
-                                    page.setResolution(page.monitors[0], modelData + "@60")
+
+                                    MouseArea {
+                                        id: resMouse
+                                        anchors.fill: parent; hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            const mode = page.bestMode(resBlock.modelData, resButton.modelData)
+                                            if (mode) page.setResolution(resBlock.modelData, mode)
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
+
+            Column {
+                width: parent.width; spacing: 10
+                topPadding: 6
+                bottomPadding: 6
+
+                Text {
+                    text: "REFRESH RATE"; color: Theme.text
+                    font.family: Theme.fontFamily; font.pixelSize: 15; font.bold: true; font.letterSpacing: 2
+                }
+
+                Repeater {
+                    model: page.monitors
+
+                    delegate: Column {
+                        id: rateBlock
+                        required property var modelData
+                        property var rates: page.refreshRates(modelData)
+                        width: parent.width; spacing: 8
+
+                        Text {
+                            text: modelData.name; color: Theme.textDim
+                            font.family: Theme.fontFamily; font.pixelSize: 11
+                        }
+
+                        Flow {
+                            width: parent.width; spacing: 10
+
+                            Repeater {
+                                model: rateBlock.rates
+
+                                delegate: Rectangle {
+                                    id: rateButton
+                                    required property var modelData
+                                    property bool current: Math.abs(modelData - rateBlock.modelData.refreshRate) < 0.05
+                                    width: 96; height: 38; radius: Theme.radius
+                                    color: current ? Theme.alpha(Theme.accent, 0.10) : (rateMouse.containsMouse ? Theme.alpha(Theme.accent, 0.08) : "#00000000")
+                                    border.width: 1
+                                    border.color: current || rateMouse.containsMouse ? Theme.accent : Theme.border
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: rateButton.modelData.toFixed(2) + " Hz"
+                                        color: Theme.text
+                                        font.family: Theme.fontFamily; font.pixelSize: 12; font.bold: true
+                                    }
+
+                                    MouseArea {
+                                        id: rateMouse
+                                        anchors.fill: parent; hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: page.setRefreshRate(rateBlock.modelData, rateButton.modelData)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Rectangle {
+                width: parent.width; height: 42; radius: Theme.radius
+                color: resetMouse.containsMouse ? Theme.alpha(Theme.accent, 0.08) : "#00000000"
+                border.width: 1
+                border.color: resetMouse.containsMouse ? Theme.accent : Theme.border
+
+                Text {
+                    anchors.centerIn: parent; text: "RESET TO CONFIG"; color: Theme.text
+                    font.family: Theme.fontFamily; font.pixelSize: 12; font.bold: true; font.letterSpacing: 1
+                }
+
+                MouseArea {
+                    id: resetMouse
+                    anchors.fill: parent; hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: page.resetToConfig()
+                }
+            }
         }
     }
 
     Component.onCompleted: {
+        stateDirProcess.running = true
+        loadState()
         brightnessGet.running = true
         loadNightlight()
         nightlightCheck.running = true

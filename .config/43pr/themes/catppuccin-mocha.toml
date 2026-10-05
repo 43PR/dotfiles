@@ -1,4 +1,5 @@
 name = "catppuccin-mocha"
+appearance = "dark"
 description = "Catppuccin Mocha theme"
 override = false   # true = wallpaper changes will NOT replace this preset
 

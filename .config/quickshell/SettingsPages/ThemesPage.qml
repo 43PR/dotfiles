@@ -27,9 +27,14 @@ Item {
             "-c",
             "python3 \"$HOME/.config/43pr/bin/theme.py\" " + themeCommand
         ])
+
+        // Re-read state.json shortly after, so the buttons reflect the new
+        // colorgen / appearance (presets can change the appearance too).
+        reloadTimer.restart()
     }
 
     property bool colorGen: true
+    property bool darkMode: true
 
     FileView {
         id: stateView
@@ -37,14 +42,17 @@ Item {
               + "/43pr/state.json"
         watchChanges: true
         onFileChanged: reload()
-        onLoaded: page.colorGen = stateAdapter.colorgen
+        onLoaded: {
+            page.colorGen = stateAdapter.colorgen
+            page.darkMode = stateAdapter.mode_appearance !== "light"
+        }
         adapter: JsonAdapter {
             id: stateAdapter
             property bool colorgen: true
+            property string mode_appearance: "dark"
         }
     }
 
-    // fallback re-read in case the atomic file replace drops the watcher
     Timer {
         id: reloadTimer
         interval: 700
@@ -52,14 +60,19 @@ Item {
     }
 
     function setColorGen(on) {
-        page.colorGen = on                      // update UI immediately
+        page.colorGen = on
         runTheme("colorgen " + (on ? "on" : "off"))
-        reloadTimer.restart()
+    }
+
+    function toggleMode() {
+        page.darkMode = !page.darkMode      // optimistic; state.json reload corrects it
+        runTheme("toggle")
     }
 
     component ToggleButton: Rectangle {
         required property string label
         required property bool checked
+        property string valueText: checked ? "ON" : "OFF"
         signal toggled()
 
         width: parent.width
@@ -70,60 +83,36 @@ Item {
         border.color: checked ? Theme.accent : Theme.border
 
         Text {
-            anchors.left: parent.left
-            anchors.leftMargin: 14
-            anchors.verticalCenter: parent.verticalCenter
-            text: label
-            color: Theme.textDim
+            anchors.fill: parent
+            anchors.leftMargin: 6
+            anchors.rightMargin: 6
+            text: label + ": " + valueText
+            color: checked ? Theme.accent : Theme.textDim
             font.family: Theme.fontFamily
-            font.pixelSize: 13
+            font.pixelSize: 11
             font.bold: true
-            font.letterSpacing: 2
-        }
-
-        Row {
-            anchors.right: parent.right
-            anchors.rightMargin: 14
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: 10
-
-            Text {
-                text: checked ? "ON" : "OFF"
-                color: checked ? Theme.accent : Theme.textDim
-                font.family: Theme.fontFamily
-                font.pixelSize: 12
-                font.bold: true
-                font.letterSpacing: 1
-                anchors.verticalCenter: parent.verticalCenter
-            }
-
-            // switch pill
-            Rectangle {
-                width: 34
-                height: 18
-                radius: height / 2
-                anchors.verticalCenter: parent.verticalCenter
-                color: checked ? Theme.alpha(Theme.accent, 0.35) : "#00000000"
-                border.width: 1
-                border.color: checked ? Theme.accent : Theme.border
-
-                Rectangle {
-                    width: 12
-                    height: 12
-                    radius: 6
-                    anchors.verticalCenter: parent.verticalCenter
-                    x: checked ? parent.width - width - 3 : 3
-                    color: checked ? Theme.accent : Theme.textDim
-                    Behavior on x { NumberAnimation { duration: 120 } }
-                }
-            }
+            font.letterSpacing: 1
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+            wrapMode: Text.WordWrap
+            maximumLineCount: 2
+            elide: Text.ElideRight
         }
 
         MouseArea {
             anchors.fill: parent
             hoverEnabled: true
-            onEntered: parent.color = Theme.alpha(Theme.accent, 0.08)
-            onExited: parent.color = "#00000000"
+
+            onEntered: {
+                parent.color = Theme.alpha(Theme.accent, 0.08)
+                parent.border.color = Theme.accent
+            }
+
+            onExited: {
+                parent.color = "#00000000"
+                parent.border.color = parent.checked ? Theme.accent : Theme.border
+            }
+
             onClicked: parent.toggled()
         }
     }
@@ -198,7 +187,7 @@ Item {
         required property string label
         required property string command
 
-        width: parent.width
+        width: (parent.width - (parent.columns - 1) * parent.spacing) / parent.columns
         height: 42
         radius: Theme.radius
         color: "#00000000"
@@ -206,40 +195,20 @@ Item {
         border.color: Theme.border
 
         Text {
-            anchors.left: parent.left
-            anchors.leftMargin: 14
-            anchors.verticalCenter: parent.verticalCenter
+            anchors.fill: parent
+            anchors.leftMargin: 6
+            anchors.rightMargin: 6
             text: label
             color: Theme.textDim
             font.family: Theme.fontFamily
-            font.pixelSize: 13
+            font.pixelSize: 11
             font.bold: true
-            font.letterSpacing: 2
-        }
-
-        Row {
-            anchors.right: parent.right
-            anchors.rightMargin: 14
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: 8
-
-            Text {
-                text: "\uf0c8"
-                color: Theme.textDim
-                font.family: Theme.iconFont
-                font.pixelSize: 13
-                anchors.verticalCenter: parent.verticalCenter
-            }
-
-            Text {
-                text: command.toUpperCase()
-                color: Theme.textDim
-                font.family: Theme.fontFamily
-                font.pixelSize: 12
-                font.bold: true
-                font.letterSpacing: 1
-                anchors.verticalCenter: parent.verticalCenter
-            }
+            font.letterSpacing: 1
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+            wrapMode: Text.WordWrap
+            maximumLineCount: 2
+            elide: Text.ElideRight
         }
 
         MouseArea {
@@ -311,50 +280,107 @@ Item {
             Column {
                 width: parent.width
                 spacing: page.sectionSpacing
-                ToggleButton {
-                    label: "COLOR GENERATION"
-                    checked: page.colorGen
-                    onToggled: page.setColorGen(!page.colorGen)
+
+                Row {
+                    width: parent.width
+                    spacing: page.sectionSpacing
+
+                    ToggleButton {
+                        width: (parent.width - parent.spacing) / 2
+                        label: "COLOR GENERATION"
+                        checked: page.colorGen
+                        onToggled: page.setColorGen(!page.colorGen)
                     }
-                ThemeButton {
-                    label: "DEFAULT"
-                    command: "default"
-                }
-                ThemeButton {
-                    label: "NORD"
-                    command: "preset nord"
-                }
-                ThemeButton {
-                    label: "TOKYO NIGHT"
-                    command: "preset tokyo-night"
-                }
-                ThemeButton {
-                    label: "CATPPUCCIN MOCHA"
-                    command: "preset catppuccin-mocha"
-                }
-                ThemeButton {
-                    label: "EVERFOREST DARK"
-                    command: "preset everforest-dark"
-                }
-            }
 
-            Text {
-                text: "SETTINGS MENU"
-                color: Theme.text
-                font.family: Theme.fontFamily
-                font.pixelSize: 16
-                font.letterSpacing: 3
-            }
+                    ToggleButton {
+                        width: (parent.width - parent.spacing) / 2
+                        label: "MODE"
+                        checked: true
+                        valueText: page.darkMode ? "DARK" : "LIGHT"
+                        onToggled: page.toggleMode()
+                    }
+                }
 
-            Rectangle {
-                width: parent.width
-                height: 1
-                color: Theme.border
+                Grid {
+                    width: parent.width
+                    columns: 3
+                    spacing: page.sectionSpacing
+
+                    ThemeButton {
+                        label: "DEFAULT"
+                        command: "default"
+                    }
+                    ThemeButton {
+                        label: "WHITE"
+                        command: "preset white"
+                    }
+                    ThemeButton {
+                        label: "METAL"
+                        command: "preset metal"
+                    }
+                    ThemeButton {
+                        label: "LIGHT GRAY"
+                        command: "preset light-gray"
+                    }
+                    ThemeButton {
+                        label: "BEIGE"
+                        command: "preset beige"
+                    }
+                    ThemeButton {
+                        label: "SILVER"
+                        command: "preset silver"
+                    }
+                    ThemeButton {
+                        label: "GOLD"
+                        command: "preset gold"
+                    }
+                    ThemeButton {
+                        label: "NORD"
+                        command: "preset nord"
+                    }
+                    ThemeButton {
+                        label: "TOKYO NIGHT"
+                        command: "preset tokyo-night"
+                    }
+                    ThemeButton {
+                        label: "CATPPUCCIN MOCHA"
+                        command: "preset catppuccin-mocha"
+                    }
+                    ThemeButton {
+                        label: "EVERFOREST DARK"
+                        command: "preset everforest-dark"
+                    }
+                    ThemeButton {
+                        label: "DRACULA"
+                        command: "preset dracula"
+                    }
+                    ThemeButton {
+                        label: "ONE DARK"
+                        command: "preset one-dark"
+                    }
+                    ThemeButton {
+                        label: "KANAGAWA"
+                        command: "preset kanagawa"
+                    }
+                    ThemeButton {
+                        label: "ROSE PINE"
+                        command: "preset rose-pine"
+                    }
+                    ThemeButton {
+                        label: "RED"
+                        command: "preset red"
+                    }
+                    ThemeButton {
+                        label: "MATRIX"
+                        command: "preset matrix"
+                    }
+                }
             }
 
             Column {
                 width: parent.width
                 spacing: page.sectionSpacing
+
                 ConfigButton {
                     label: "THEME"
                     path: "~/.config/quickshell/Theme.qml"

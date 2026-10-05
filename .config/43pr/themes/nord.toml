@@ -1,4 +1,5 @@
 name = "nord"
+appearance = "dark"
 description = "Nord theme"
 override = false   # true = wallpaper changes will NOT replace this preset
 

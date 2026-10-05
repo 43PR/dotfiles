@@ -24,13 +24,13 @@ PACKAGE_FILE="$REPO_DIR/packages.txt"
 
 GENERATED_FILES=(
     "kitty/matugen.conf"
-    "waybar/colors.css"
     "hypr/hyprlock-colors.conf"
     "gtk-3.0/colors.css"
     "gtk-4.0/colors.css"
+    "gtk-3.0/settings.ini"
+    "gtk-4.0/settings.ini"
     "rofi/colors.rasi"
-    "quickshell/state/powermenu-state.json"
-    "quickshell/state/settings-state.json"
+    "quickshell/Theme.qml"
 )
 
 DRY_RUN=0

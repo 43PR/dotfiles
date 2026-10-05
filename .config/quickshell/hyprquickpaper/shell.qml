@@ -7,7 +7,9 @@ import Quickshell.Wayland
 
 PanelWindow {
     id: main
-
+    readonly property real ui: Screen.height / 1080
+    readonly property real refWidth: 1920
+    readonly property real refHeight: 500
     property int speed: 5000
     property int animDuration: 1000
     property real zoomScale: 0.8
@@ -88,14 +90,14 @@ PanelWindow {
     Column {
         id: emptyState
         anchors.centerIn: parent
-        spacing: 10
+        spacing: 10 * main.ui
         z: 2
         visible: main.showEmpty
 
         Text {
             text: "No wallpapers found"
             color: "#ffffff"
-            font.pixelSize: 22
+            font.pixelSize: 22 * main.ui
             font.bold: true
             anchors.horizontalCenter: parent.horizontalCenter
         }
@@ -103,7 +105,7 @@ PanelWindow {
         Text {
             text: "Add images to:"
             color: "#aaaaaa"
-            font.pixelSize: 13
+            font.pixelSize: 13 * main.ui
             anchors.horizontalCenter: parent.horizontalCenter
         }
 
@@ -111,7 +113,7 @@ PanelWindow {
             id: pathText
             text: main.wallpaperPath
             color: "#dddddd"
-            font.pixelSize: 14
+            font.pixelSize: 14 * main.ui
             readOnly: true
             selectByMouse: true
             anchors.horizontalCenter: parent.horizontalCenter
@@ -122,7 +124,7 @@ PanelWindow {
     ListView {
         id: list
         width: parent.width
-        height: 500
+        height: tileHeight
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.verticalCenter: parent.verticalCenter
         z: 1
@@ -131,13 +133,18 @@ PanelWindow {
         orientation: ListView.Horizontal
         spacing: 0
         clip: true
-        cacheBuffer: 400
+        cacheBuffer: 400 * main.ui
         boundsBehavior: Flickable.StopAtBounds
 
         property int selectedIndex: main.startPosition
-        readonly property real tileWidth: width / configs.number_of_pictures - 10
+
+        readonly property real tileHeight: main.refHeight * main.ui
+        readonly property real tileWidth: (main.refWidth / Math.max(1, configs.number_of_pictures) - 10) * main.ui
+
         readonly property real viewportCenterX: width / 2
-        readonly property real step: tileWidth + main.baseSpacing
+        readonly property real falloffRadius: (main.refWidth / 2) * main.ui
+
+        readonly property real step: tileWidth + main.baseSpacing * main.ui
         readonly property real sideMargin: Math.max(0, viewportCenterX - tileWidth / 2)
         property bool ready: false
         property bool userMoved: false
@@ -168,6 +175,7 @@ PanelWindow {
 
         onCountChanged: centerOnStart()
         onWidthChanged: centerOnStart()
+        onTileWidthChanged: centerOnStart()
 
         Connections {
             target: configs
@@ -182,16 +190,16 @@ PanelWindow {
         delegate: Item {
             id: delegateItem
             width: list.tileWidth
-            height: 500
+            height: list.tileHeight
 
             property bool active: index === list.selectedIndex
             readonly property real baseWidth: list.tileWidth
             readonly property real baseCenterX: x - list.contentX + baseWidth / 2
             readonly property real distance: Math.abs(baseCenterX - list.viewportCenterX)
-            readonly property real fraction: Math.min(1, distance / list.viewportCenterX)
+            readonly property real fraction: Math.min(1, distance / list.falloffRadius)
             readonly property real compression: { const t = fraction; return t * t * t * t }
             readonly property real edgeOffset: {
-                const amount = main.edgeSpacing * compression
+                const amount = main.edgeSpacing * main.ui * compression
                 return baseCenterX < list.viewportCenterX ? amount : -amount
             }
             readonly property real scaleFactor: {
@@ -208,8 +216,8 @@ PanelWindow {
 
                 Image {
                     id: shadowImage
-                    x: main.shadowX
-                    y: main.shadowY
+                    x: main.shadowX * main.ui
+                    y: main.shadowY * main.ui
                     width: parent.width
                     height: parent.height
                     source: img.source
@@ -231,7 +239,7 @@ PanelWindow {
                     text: ""
                     color: configs.border_color
                     anchors.centerIn: parent
-                    font.pixelSize: 16
+                    font.pixelSize: 16 * main.ui
                     transform: Shear { xFactor: main.skewFactor }
                 }
 
@@ -265,7 +273,7 @@ PanelWindow {
                     anchors.fill: parent
                     visible: delegateItem.active
                     color: "transparent"
-                    border.width: 2
+                    border.width: Math.max(1, Math.round(2 * main.ui))
                     border.color: configs.border_color
                     transform: Shear { xFactor: main.skewFactor }
                 }
