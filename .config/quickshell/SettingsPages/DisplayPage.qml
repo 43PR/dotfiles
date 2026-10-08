@@ -19,6 +19,7 @@ Item {
     property real sliderMarginRight: 10
     property real labelWidth: 96
     readonly property string stateDir: Quickshell.env("HOME") + "/.config/quickshell/state"
+    readonly property var activeMonitors: monitors.filter(m => !m.disabled)
 
     Process {
         id: brightnessGet
@@ -130,7 +131,12 @@ Item {
         const names = Object.keys(savedState)
         for (let i = 0; i < names.length; i++) {
             const entry = savedState[names[i]]
-            if (!entry || typeof entry.mode !== "string") continue
+            if (!entry) continue
+            if (entry.disabled === true) {
+                lines.push(monitorLua({ name: names[i] }, { disabled: true }))
+                continue
+            }
+            if (typeof entry.mode !== "string") continue
             lines.push(monitorLua({ name: names[i] }, {
                 mode: entry.mode,
                 position: typeof entry.position === "string" ? entry.position : "auto",
@@ -152,7 +158,7 @@ Item {
     }
 
     function monitorPosition(mon) {
-        return page.monitors.length <= 1 ? "auto" : mon.x + "x" + mon.y
+        return page.activeMonitors.length <= 1 ? "auto" : mon.x + "x" + mon.y
     }
 
     function rememberMonitor(mon, fields) {
@@ -194,9 +200,66 @@ Item {
         return "hl.monitor({" + values.join(",") + "})"
     }
 
+    function isMain(mon) {
+        return !mon.disabled && page.activeMonitors.length > 0 && mon.x === 0 && mon.y === 0
+    }
+
+    Process {
+        id: pShell
+        onExited: exitCode => {
+            refreshTimer.restart()
+        }
+    }
+
+    function layoutCommands(ordered) {
+        const cmds = []
+        let x = 0
+        for (let i = 0; i < ordered.length; i++) {
+            const m = ordered[i]
+            const mode = monitorMode(m)
+            const pos = x + "x0"
+            rememberMonitor(m, { mode: mode, scale: m.scale, position: pos, disabled: false })
+            cmds.push("hyprctl eval '" + monitorLua(m, { mode: mode, position: pos, scale: m.scale }) + "'")
+            x += Math.round(m.width / m.scale)
+        }
+        if (ordered.length > 0) cmds.push("hyprctl dispatch focusmonitor '" + ordered[0].name + "'")
+        return cmds
+    }
+
+    function setMainMonitor(main) {
+        if (!main || !main.name || main.disabled) return
+        const others = page.activeMonitors.filter(m => m.name !== main.name).sort((a, b) => a.x - b.x)
+        const cmds = layoutCommands([main].concat(others))
+        pShell.command = ["sh", "-c", cmds.join("; ")]
+        pShell.running = true
+    }
+
+    function setMonitorEnabled(mon, enabled) {
+        if (!mon || !mon.name) return
+        let cmds = []
+        if (enabled) {
+            const entry = savedState[mon.name] || {}
+            const mode = typeof entry.mode === "string" ? entry.mode : "preferred"
+            const scale = typeof entry.scale === "number" ? entry.scale : 1
+            rememberMonitor(mon, { mode: mode, scale: scale, position: "auto", disabled: false })
+            cmds.push("hyprctl eval '" + monitorLua(mon, { mode: mode, position: "auto", scale: scale }) + "'")
+        } else {
+            if (page.activeMonitors.length <= 1) return
+            const wasMain = isMain(mon)
+            rememberMonitor(mon, { mode: monitorMode(mon), scale: mon.scale, disabled: true })
+            cmds.push("hyprctl eval '" + monitorLua(mon, { disabled: true }) + "'")
+            if (wasMain) {
+                const rest = page.activeMonitors.filter(m => m.name !== mon.name).sort((a, b) => a.x - b.x)
+                cmds = cmds.concat(layoutCommands(rest))
+            }
+        }
+        pShell.command = ["sh", "-c", cmds.join("; ")]
+        pShell.running = true
+    }
+
     Process {
         id: pList
-        command: ["hyprctl", "monitors", "-j"]
+        command: ["hyprctl", "monitors", "all", "-j"]
         running: true
         stdout: StdioCollector {
             onStreamFinished: {
@@ -315,7 +378,7 @@ Item {
             items.push({ key: key, width: parseInt(match[1]), height: parseInt(match[2]) })
         }
         items.sort((a, b) => (b.width * b.height - a.width * a.height) || (b.width - a.width))
-        return items.map(item => item.key)
+        return items.slice(0, 6).map(item => item.key)
     }
 
     function bestMode(mon, resolution) {
@@ -503,122 +566,216 @@ Item {
             }
 
             Column {
-                width: parent.width; spacing: 16
+                width: parent.width; spacing: 8
 
                 Repeater {
                     model: page.monitors
 
                     delegate: Rectangle {
+                        id: card
                         required property var modelData
-                        width: parent.width; height: 100; radius: Theme.radius
+                        property bool off: modelData.disabled === true
+                        property bool main: page.isMain(modelData)
+                        width: parent.width
+                        height: cardColumn.implicitHeight + 20
+                        radius: Theme.radius
                         color: "#00000000"; border.width: 1
-                        border.color: modelData.focused ? "#454545" : Theme.border
+                        border.color: modelData.focused && !off ? "#454545" : Theme.border
 
                         Column {
-                            anchors.fill: parent
-                            anchors.margins: 14
-                            spacing: 8
-                            Row {
-                                spacing: 10
+                            id: cardColumn
+                            anchors.left: parent.left; anchors.right: parent.right
+                            anchors.top: parent.top
+                            anchors.margins: 10
+                            spacing: 6
 
-                                Text {
-                                    text: modelData.name; color: Theme.text
-                                    font.family: Theme.fontFamily; font.pixelSize: 14; font.bold: true
+                            Item {
+                                width: parent.width; height: 24
+
+                                Row {
+                                    anchors.left: parent.left
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    spacing: 8
+
+                                    Text {
+                                        text: card.modelData.name
+                                        color: card.off ? Theme.textDim : Theme.text
+                                        font.family: Theme.fontFamily; font.pixelSize: 14; font.bold: true
+                                    }
+
+                                    Text {
+                                        visible: !card.off
+                                        text: card.modelData.width + "x" + card.modelData.height + " @ " + Math.round(card.modelData.refreshRate) + "Hz"
+                                        color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: 12
+                                    }
                                 }
 
-                                Text {
-                                    text: modelData.width + "x" + modelData.height + " @ " + Math.round(modelData.refreshRate) + "Hz"
-                                    color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: 12
-                                }
+                                Row {
+                                    anchors.right: parent.right
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    spacing: 6
 
-                                Text {
-                                    visible: modelData.focused; text: "ACTIVE"; color: Theme.accent2
-                                    font.family: Theme.fontFamily; font.pixelSize: 10
+                                    Rectangle {
+                                        visible: !card.off && page.activeMonitors.length > 1
+                                        width: 84; height: 24; radius: Theme.radius
+                                        color: card.main ? Theme.alpha(Theme.accent, 0.10) : (mainMouse.containsMouse ? Theme.alpha(Theme.accent, 0.08) : "#00000000")
+                                        border.width: 1
+                                        border.color: card.main || mainMouse.containsMouse ? Theme.accent : Theme.border
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: card.main ? "MAIN" : "SET MAIN"
+                                            color: card.main ? Theme.accent : Theme.text
+                                            font.family: Theme.fontFamily; font.pixelSize: 11; font.bold: true; font.letterSpacing: 1
+                                        }
+
+                                        MouseArea {
+                                            id: mainMouse
+                                            anchors.fill: parent; hoverEnabled: true
+                                            enabled: !card.main
+                                            cursorShape: card.main ? Qt.ArrowCursor : Qt.PointingHandCursor
+                                            onClicked: page.setMainMonitor(card.modelData)
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        visible: card.off || page.activeMonitors.length > 1
+                                        width: 72; height: 24; radius: Theme.radius
+                                        color: toggleMouse.containsMouse ? Theme.alpha(Theme.accent, 0.08) : "#00000000"
+                                        border.width: 1
+                                        border.color: toggleMouse.containsMouse ? Theme.accent : Theme.border
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: card.off ? "ENABLE" : "DISABLE"
+                                            color: Theme.text
+                                            font.family: Theme.fontFamily; font.pixelSize: 11; font.bold: true; font.letterSpacing: 1
+                                        }
+
+                                        MouseArea {
+                                            id: toggleMouse
+                                            anchors.fill: parent; hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: page.setMonitorEnabled(card.modelData, card.off)
+                                        }
+                                    }
                                 }
                             }
 
-                            Item {
-                                width: parent.width
-                                height: scaleLabel.implicitHeight
+                            Row {
+                                visible: !card.off
+                                width: parent.width; spacing: 8
+
                                 Text {
                                     id: scaleLabel
-                                    anchors.left: parent.left
-                                    text: "SCALE"
-                                    color: Theme.textDim
+                                    width: 36; anchors.verticalCenter: parent.verticalCenter
+                                    text: "SCALE"; color: Theme.textDim
                                     font.family: Theme.fontFamily; font.pixelSize: 11
                                 }
+
+                                Slider {
+                                    width: parent.width - 36 - 44 - 16
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    icon: "\uf00e"
+                                    value: Math.max(0, Math.min(1, (card.modelData.scale - 0.7) / 0.6))
+                                    onCommitted: value => page.setScale(card.modelData, 0.7 + value * 0.6)
+                                }
+
                                 Text {
-                                    anchors.right: parent.right
-                                    text: modelData.scale.toFixed(2) + "x"
+                                    width: 44; anchors.verticalCenter: parent.verticalCenter
+                                    horizontalAlignment: Text.AlignRight
+                                    text: card.modelData.scale.toFixed(2) + "x"
                                     color: Theme.text
                                     font.family: Theme.fontFamily; font.pixelSize: 11
                                 }
                             }
 
-                            Slider {
-                                width: parent.width
-                                icon: "\uf00e"
-                                value: Math.max(0, Math.min(1, (modelData.scale - 0.7) / 0.6))
-                                onCommitted: value => page.setScale(modelData, 0.7 + value * 0.6)
-                            }
-                        }
-                    }
-                }
-            }
+                            Row {
+                                visible: !card.off
+                                width: parent.width; spacing: 8
 
-            Column {
-                width: parent.width; spacing: 10
-                topPadding: 6
-                bottomPadding: 6
+                                Text {
+                                    width: 36; height: 28
+                                    verticalAlignment: Text.AlignVCenter
+                                    text: "RES"; color: Theme.textDim
+                                    font.family: Theme.fontFamily; font.pixelSize: 11
+                                }
 
-                Text {
-                    text: "RESOLUTION"; color: Theme.text
-                    font.family: Theme.fontFamily; font.pixelSize: 15; font.bold: true; font.letterSpacing: 2
-                }
+                                Flow {
+                                    width: parent.width - 36 - 8; spacing: 6
 
-                Repeater {
-                    model: page.monitors
+                                    Repeater {
+                                        model: card.off ? [] : page.resolutionList(card.modelData)
 
-                    delegate: Column {
-                        id: resBlock
-                        required property var modelData
-                        property var resolutions: page.resolutionList(modelData)
-                        width: parent.width; spacing: 8
+                                        delegate: Rectangle {
+                                            id: resButton
+                                            required property string modelData
+                                            property bool current: modelData === card.modelData.width + "x" + card.modelData.height
+                                            width: 92; height: 28; radius: Theme.radius
+                                            color: current ? Theme.alpha(Theme.accent, 0.10) : (resMouse.containsMouse ? Theme.alpha(Theme.accent, 0.08) : "#00000000")
+                                            border.width: 1
+                                            border.color: current || resMouse.containsMouse ? Theme.accent : Theme.border
 
-                        Text {
-                            text: modelData.name; color: Theme.textDim
-                            font.family: Theme.fontFamily; font.pixelSize: 11
-                        }
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: resButton.modelData
+                                                color: Theme.text
+                                                font.family: Theme.fontFamily; font.pixelSize: 11; font.bold: true
+                                            }
 
-                        Flow {
-                            width: parent.width; spacing: 10
-
-                            Repeater {
-                                model: resBlock.resolutions
-
-                                delegate: Rectangle {
-                                    id: resButton
-                                    required property string modelData
-                                    property bool current: modelData === resBlock.modelData.width + "x" + resBlock.modelData.height
-                                    width: 112; height: 38; radius: Theme.radius
-                                    color: current ? Theme.alpha(Theme.accent, 0.10) : (resMouse.containsMouse ? Theme.alpha(Theme.accent, 0.08) : "#00000000")
-                                    border.width: 1
-                                    border.color: current || resMouse.containsMouse ? Theme.accent : Theme.border
-
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: resButton.modelData
-                                        color: Theme.text
-                                        font.family: Theme.fontFamily; font.pixelSize: 12; font.bold: true; font.letterSpacing: 1
+                                            MouseArea {
+                                                id: resMouse
+                                                anchors.fill: parent; hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: {
+                                                    const mode = page.bestMode(card.modelData, resButton.modelData)
+                                                    if (mode) page.setResolution(card.modelData, mode)
+                                                }
+                                            }
+                                        }
                                     }
+                                }
+                            }
 
-                                    MouseArea {
-                                        id: resMouse
-                                        anchors.fill: parent; hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: {
-                                            const mode = page.bestMode(resBlock.modelData, resButton.modelData)
-                                            if (mode) page.setResolution(resBlock.modelData, mode)
+                            Row {
+                                visible: !card.off
+                                width: parent.width; spacing: 8
+
+                                Text {
+                                    width: 36; height: 28
+                                    verticalAlignment: Text.AlignVCenter
+                                    text: "HZ"; color: Theme.textDim
+                                    font.family: Theme.fontFamily; font.pixelSize: 11
+                                }
+
+                                Flow {
+                                    width: parent.width - 36 - 8; spacing: 6
+
+                                    Repeater {
+                                        model: card.off ? [] : page.refreshRates(card.modelData)
+
+                                        delegate: Rectangle {
+                                            id: rateButton
+                                            required property var modelData
+                                            property bool current: Math.abs(modelData - card.modelData.refreshRate) < 0.05
+                                            width: 76; height: 28; radius: Theme.radius
+                                            color: current ? Theme.alpha(Theme.accent, 0.10) : (rateMouse.containsMouse ? Theme.alpha(Theme.accent, 0.08) : "#00000000")
+                                            border.width: 1
+                                            border.color: current || rateMouse.containsMouse ? Theme.accent : Theme.border
+
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: rateButton.modelData.toFixed(2)
+                                                color: Theme.text
+                                                font.family: Theme.fontFamily; font.pixelSize: 11; font.bold: true
+                                            }
+
+                                            MouseArea {
+                                                id: rateMouse
+                                                anchors.fill: parent; hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: page.setRefreshRate(card.modelData, rateButton.modelData)
+                                            }
                                         }
                                     }
                                 }
@@ -628,67 +785,8 @@ Item {
                 }
             }
 
-            Column {
-                width: parent.width; spacing: 10
-                topPadding: 6
-                bottomPadding: 6
-
-                Text {
-                    text: "REFRESH RATE"; color: Theme.text
-                    font.family: Theme.fontFamily; font.pixelSize: 15; font.bold: true; font.letterSpacing: 2
-                }
-
-                Repeater {
-                    model: page.monitors
-
-                    delegate: Column {
-                        id: rateBlock
-                        required property var modelData
-                        property var rates: page.refreshRates(modelData)
-                        width: parent.width; spacing: 8
-
-                        Text {
-                            text: modelData.name; color: Theme.textDim
-                            font.family: Theme.fontFamily; font.pixelSize: 11
-                        }
-
-                        Flow {
-                            width: parent.width; spacing: 10
-
-                            Repeater {
-                                model: rateBlock.rates
-
-                                delegate: Rectangle {
-                                    id: rateButton
-                                    required property var modelData
-                                    property bool current: Math.abs(modelData - rateBlock.modelData.refreshRate) < 0.05
-                                    width: 96; height: 38; radius: Theme.radius
-                                    color: current ? Theme.alpha(Theme.accent, 0.10) : (rateMouse.containsMouse ? Theme.alpha(Theme.accent, 0.08) : "#00000000")
-                                    border.width: 1
-                                    border.color: current || rateMouse.containsMouse ? Theme.accent : Theme.border
-
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: rateButton.modelData.toFixed(2) + " Hz"
-                                        color: Theme.text
-                                        font.family: Theme.fontFamily; font.pixelSize: 12; font.bold: true
-                                    }
-
-                                    MouseArea {
-                                        id: rateMouse
-                                        anchors.fill: parent; hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: page.setRefreshRate(rateBlock.modelData, rateButton.modelData)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
             Rectangle {
-                width: parent.width; height: 42; radius: Theme.radius
+                width: parent.width; height: 34; radius: Theme.radius
                 color: resetMouse.containsMouse ? Theme.alpha(Theme.accent, 0.08) : "#00000000"
                 border.width: 1
                 border.color: resetMouse.containsMouse ? Theme.accent : Theme.border
