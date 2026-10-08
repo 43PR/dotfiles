@@ -319,6 +319,10 @@ Item {
                         command: "preset metal"
                     }
                     ThemeButton {
+                        label: "SLATE"
+                        command: "preset slate"
+                    }
+                    ThemeButton {
                         label: "LIGHT GRAY"
                         command: "preset light-gray"
                     }

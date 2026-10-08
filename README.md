@@ -10,15 +10,13 @@ A clean and simple Hyprland setup focused on practical keybinds, productivity, a
 [![YouTube](https://img.shields.io/badge/youtube-subscribe-b05a63?style=for-the-badge&logo=youtube&logoColor=ffffff&labelColor=101418)](https://www.youtube.com/@43PR2)
 [![Ko-Fi donate](https://img.shields.io/badge/donate-kofi?style=for-the-badge&logo=ko-fi&logoColor=ffffff&label=ko-fi&labelColor=101418&color=9a6570)](https://ko-fi.com/43pr)
 
-### **[Features](#features)  -  [Keybinds](#most-used-keybinds)  -  [Installation](#installation) -  [Updating](#updating)**
+### **[Features](#features)  -  [Keybinds](#keybinds)  -  [Installation](#installation) -  [Updating](#updating)**
 
 </div>
 
-**v1.2.0**
-
 <img width="1920" height="1080" alt="v1 2 0" src="https://github.com/user-attachments/assets/3b4857bc-285a-473a-924c-be89dab714b9" />
 
-<img width="1920" height="1080" alt="1791338767" src="https://github.com/user-attachments/assets/d2b9999a-9939-410d-9980-11e97b448d78" />
+<img width="1920" height="1080" alt="2" src="https://github.com/user-attachments/assets/49dd4dd2-7d4b-450b-8907-73280cfc8b6c" />
 
 Wallpapers: https://wallhaven.cc/user/43pr
 
@@ -42,7 +40,7 @@ Wallpapers: https://wallhaven.cc/user/43pr
 
 Just made some tweaks to it. Give it some love: [hyprquickpaper](https://github.com/iamsurjog/hyprquickpaper)
 
-## Most used keybinds
+## Keybinds
 
 > **You can modify keybinds using HyprMod**
 
@@ -75,8 +73,6 @@ Just made some tweaks to it. Give it some love: [hyprquickpaper](https://github.
 >
 > **Move and resize windows with Super + left/right mouse drag.**
 >
-> To close most quickshell apps just click outside or Esc key.
->
 > All keybinds: [.config/hypr/keybinds.lua](.config/hypr/keybinds.lua)
 
 ---
@@ -84,7 +80,7 @@ Just made some tweaks to it. Give it some love: [hyprquickpaper](https://github.
 
 **READ ALL**
 
-Should work for Arch, Manjaro, EndeavourOS, CachyOS, etc. 
+Works for Arch, CachyOS, EndeavourOS, Manjaro, etc. 
 
 This is mainly intended for a clean installation (existing configuration files that are being replaced will be backed up automatically).
 
@@ -103,7 +99,7 @@ chmod +x install.sh
 
 After the installation finishes log out and back in.
 
-Dowload and move wallpapers to Pictures/Wallpapers
+It will show an empty desktop, dowload and move wallpapers to Pictures/Wallpapers, then you can use the wallpaper picker with: Super + W.
 
 > [!important]
 > **Do not move or delete the dotfiles repository after installation.**
@@ -121,9 +117,10 @@ Dowload and move wallpapers to Pictures/Wallpapers
 ---
 ## Updating
 
-Pull the latest changes, then run the updater from inside the repository:
+If you didn't move the repository/dotfiles folder then run:
 
 ```bash
+cd dotfiles
 git pull
 ./update.sh
 ```
@@ -148,5 +145,6 @@ You can check the reminders printed at the end of the run.
 > Custom-gpu parts are specific to my hardware.
 >
 > For issues with the wallpaper picker, you can clear the cache from the Storage page in Settings.
+
 
 

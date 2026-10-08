@@ -11,7 +11,25 @@ PanelWindow {
     property int sideGap: 24
     property int edgeGap: 0
     property int pad: 6
-    property int cardWidth: 284
+
+    // how much of the panel must stay on screen when dragged past borders
+    readonly property int keepVisible: 40
+
+    // layout controls (persisted)
+    readonly property int minWidth: 200
+    readonly property int maxWidth: 500
+    readonly property int defaultWidth: 284
+    property int cardWidth: defaultWidth
+
+    readonly property int minItemHeight: 40
+    readonly property int maxItemHeight: 100
+    readonly property int defaultItemHeight: 56
+    property int itemHeight: defaultItemHeight
+
+    readonly property int minSpacing: 0
+    readonly property int maxSpacing: 24
+    readonly property int defaultSpacing: 8
+    property int itemSpacing: defaultSpacing
 
     property bool showing: false
     property bool settingsOpen: false
@@ -27,10 +45,16 @@ PanelWindow {
     readonly property int defaultSize: 100
     property int menuSize: defaultSize
     property string icon: ""
+    readonly property int iconRes: 128
+    readonly property bool lightMode: Theme._bgBase.hslLightness > 0.5
 
     Component.onCompleted: BluetoothState.init()
 
-    readonly property bool movedFromDefault: offsetX !== 0 || offsetY !== 0 || horizontal || menuSize !== defaultSize
+    readonly property bool movedFromDefault: offsetX !== 0 || offsetY !== 0 || horizontal
+        || menuSize !== defaultSize
+        || cardWidth !== defaultWidth
+        || itemHeight !== defaultItemHeight
+        || itemSpacing !== defaultSpacing
 
     readonly property string iconDir: "file://" + Quickshell.env("HOME") + "/.config/quickshell/imgs/"
     readonly property string statePath: Quickshell.env("HOME") + "/.config/quickshell/state/powermenu-state.json"
@@ -45,6 +69,7 @@ PanelWindow {
     mask: Region { item: root.showing ? menuRoot : null }
 
     onMenuSizeChanged: if (root.showing) root.setPosition(root.offsetX, root.offsetY)
+    onCardWidthChanged: if (root.showing) root.setPosition(root.offsetX, root.offsetY)
 
     component FooterButton: Rectangle {
         id: fb
@@ -99,6 +124,47 @@ PanelWindow {
         SizeBtn { text: "+"; width: 16; font.pixelSize: 12; onClicked: sc.step(10) }
     }
 
+    // label on the left, value + [−][+] on the right
+    component StepRow: Item {
+        id: sr
+        property string label: ""
+        property string valueText: ""
+        signal step(int dir)
+
+        height: 20
+        opacity: srHover.hovered ? 0.95 : 0.6
+        Behavior on opacity { NumberAnimation { duration: 150 } }
+        HoverHandler { id: srHover }
+
+        Text {
+            anchors.left: parent.left
+            anchors.leftMargin: 4
+            anchors.verticalCenter: parent.verticalCenter
+            text: sr.label
+            font.pixelSize: 10
+            font.bold: true
+            color: Theme.textDim
+        }
+
+        Row {
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 4
+
+            Text {
+                width: 34
+                height: 20
+                text: sr.valueText
+                horizontalAlignment: Text.AlignRight
+                verticalAlignment: Text.AlignVCenter
+                font.pixelSize: 10
+                color: Theme.text
+            }
+            SizeBtn { text: "−"; width: 16; height: 20; font.pixelSize: 12; onClicked: sr.step(-1) }
+            SizeBtn { text: "+"; width: 16; height: 20; font.pixelSize: 12; onClicked: sr.step(1) }
+        }
+    }
+
     readonly property var actions: [
         { name: "shutdown",  label: "Shut down", icon: "shutdown.png",  key: "s", cmd: ["systemctl", "poweroff"] },
         { name: "reboot",    label: "Reboot",    icon: "reboot.png",    key: "r", cmd: ["systemctl", "reboot"] },
@@ -110,6 +176,15 @@ PanelWindow {
     readonly property var visibleActions: actions.filter(function (a) {
         return root.hiddenNames.indexOf(a.name) < 0
     })
+
+    function iconFile(name) {
+        if (!root.lightMode) return name
+        return name.replace(/\.png$/, "2.png")
+    }
+
+    function clamp(v, lo, hi) {
+        return Math.max(lo, Math.min(hi, Math.round(v)))
+    }
 
     function runAction(a) {
         if (a.dispatch)
@@ -146,7 +221,10 @@ PanelWindow {
             offsetX: root.offsetX,
             offsetY: root.offsetY,
             horizontal: root.horizontal,
-            menuSize: root.menuSize
+            menuSize: root.menuSize,
+            cardWidth: root.cardWidth,
+            itemHeight: root.itemHeight,
+            itemSpacing: root.itemSpacing
         }))
     }
 
@@ -168,11 +246,14 @@ PanelWindow {
         root.offsetY = 0
         root.horizontal = false
         root.menuSize = root.defaultSize
+        root.cardWidth = root.defaultWidth
+        root.itemHeight = root.defaultItemHeight
+        root.itemSpacing = root.defaultSpacing
         root.saveState()
     }
 
     function setMenuSize(v) {
-        root.menuSize = Math.max(root.minSize, Math.min(root.maxSize, Math.round(v)))
+        root.menuSize = root.clamp(v, root.minSize, root.maxSize)
     }
 
     function stepSize(d) {
@@ -185,6 +266,24 @@ PanelWindow {
         root.saveState()
     }
 
+    function stepWidth(dir) {
+        root.cardWidth = root.clamp(root.cardWidth + dir * 10, root.minWidth, root.maxWidth)
+        root.saveState()
+    }
+
+    function stepHeight(dir) {
+        root.itemHeight = root.clamp(root.itemHeight + dir * 4, root.minItemHeight, root.maxItemHeight)
+        root.saveState()
+    }
+
+    function stepSpacing(dir) {
+        root.itemSpacing = root.clamp(root.itemSpacing + dir * 2, root.minSpacing, root.maxSpacing)
+        root.saveState()
+    }
+
+    // Allows the panel to go past the screen borders (left, right, bottom),
+    // keeping at least `keepVisible` px on screen. Top is kept on screen so the
+    // drag handle always stays reachable.
     function setPosition(x, y) {
         if (root.width <= 0 || root.height <= 0) {
             root.offsetX = x
@@ -192,10 +291,11 @@ PanelWindow {
             return
         }
         var s = root.menuSize / 100
-        var maxX = root.sideGap - root.edgeGap
-        var minX = Math.min(maxX, root.cardWidth * s + root.sideGap + root.edgeGap - root.width)
+        var kv = root.keepVisible
+        var minX = kv - root.width + root.sideGap
+        var maxX = root.sideGap + root.cardWidth * s - kv
         var minY = root.edgeGap - root.topGap
-        var maxY = Math.max(minY, root.height - panel.height * s - root.edgeGap - root.topGap)
+        var maxY = Math.max(minY, root.height - kv - root.topGap)
         root.offsetX = Math.max(minX, Math.min(maxX, x))
         root.offsetY = Math.max(minY, Math.min(maxY, y))
     }
@@ -226,7 +326,13 @@ PanelWindow {
                 if (typeof s.offsetY === "number") root.offsetY = s.offsetY
                 if (typeof s.horizontal === "boolean") root.horizontal = s.horizontal
                 if (typeof s.menuSize === "number")
-                    root.menuSize = Math.max(root.minSize, Math.min(root.maxSize, Math.round(s.menuSize)))
+                    root.menuSize = root.clamp(s.menuSize, root.minSize, root.maxSize)
+                if (typeof s.cardWidth === "number")
+                    root.cardWidth = root.clamp(s.cardWidth, root.minWidth, root.maxWidth)
+                if (typeof s.itemHeight === "number")
+                    root.itemHeight = root.clamp(s.itemHeight, root.minItemHeight, root.maxItemHeight)
+                if (typeof s.itemSpacing === "number")
+                    root.itemSpacing = root.clamp(s.itemSpacing, root.minSpacing, root.maxSpacing)
             } catch (e) {
                 console.warn("powermenu: could not read saved state:", e)
             }
@@ -386,7 +492,7 @@ PanelWindow {
                 Column {
                     visible: !root.settingsOpen
                     width: parent.width
-                    spacing: 8
+                    spacing: root.itemSpacing
                     Repeater {
                         model: root.visibleActions
                         delegate: Rectangle {
@@ -396,7 +502,7 @@ PanelWindow {
                             readonly property bool focused: index === root.currentIndex
 
                             width: parent.width
-                            height: 56
+                            height: root.itemHeight
                             radius: 12
                             color: entryArea.pressed || entryArea.containsMouse || entry.focused
                             ? Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, Math.min(1, Theme.bg.a + 0.12))
@@ -411,12 +517,16 @@ PanelWindow {
                                 anchors.left: parent.left
                                 anchors.leftMargin: 10
                                 anchors.verticalCenter: parent.verticalCenter
-                                color: Theme.alpha(Theme.text, 0.1)
+                                color: "transparent"
                                 Image {
                                     anchors.centerIn: parent
                                     width: 20; height: 20
+                                    sourceSize: Qt.size(root.iconRes, root.iconRes)
                                     fillMode: Image.PreserveAspectFit
-                                    source: root.iconDir + entry.modelData.icon
+                                    smooth: true
+                                    mipmap: true
+                                    asynchronous: true
+                                    source: root.iconDir + root.iconFile(entry.modelData.icon)
                                 }
                             }
 
@@ -487,7 +597,7 @@ PanelWindow {
                 Column {
                     visible: root.settingsOpen
                     width: parent.width
-                    spacing: 8
+                    spacing: root.itemSpacing
 
                     Repeater {
                         model: root.actions
@@ -498,7 +608,7 @@ PanelWindow {
                             readonly property bool on: root.hiddenNames.indexOf(modelData.name) < 0
 
                             width: parent.width
-                            height: 48
+                            height: Math.max(36, root.itemHeight - 8)
                             radius: 12
                             color: Theme.alpha(
                                 Theme._bgBase,
@@ -512,13 +622,17 @@ PanelWindow {
                                 anchors.left: parent.left
                                 anchors.leftMargin: 10
                                 anchors.verticalCenter: parent.verticalCenter
-                                color: Theme.alpha(Theme.text, 0.1)
+                                color: "transparent"
 
                                 Image {
                                     anchors.centerIn: parent
                                     width: 20; height: 20
+                                    sourceSize: Qt.size(root.iconRes, root.iconRes)
                                     fillMode: Image.PreserveAspectFit
-                                    source: root.iconDir + row.modelData.icon
+                                    smooth: true
+                                    mipmap: true
+                                    asynchronous: true
+                                    source: root.iconDir + root.iconFile(row.modelData.icon)
                                     opacity: row.on ? 1 : 0.4
                                 }
                             }
@@ -558,6 +672,31 @@ PanelWindow {
                                 hoverEnabled: true
                                 onClicked: root.toggleAction(row.modelData.name)
                             }
+                        }
+                    }
+
+                    // layout steppers
+                    Column {
+                        width: parent.width
+                        spacing: 2
+
+                        StepRow {
+                            width: parent.width
+                            label: "Width"
+                            valueText: root.cardWidth + "px"
+                            onStep: function (dir) { root.stepWidth(dir) }
+                        }
+                        StepRow {
+                            width: parent.width
+                            label: "Height"
+                            valueText: root.itemHeight + "px"
+                            onStep: function (dir) { root.stepHeight(dir) }
+                        }
+                        StepRow {
+                            width: parent.width
+                            label: "Spacing"
+                            valueText: root.itemSpacing + "px"
+                            onStep: function (dir) { root.stepSpacing(dir) }
                         }
                     }
 

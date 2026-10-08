@@ -18,7 +18,7 @@ Scope {
     // nf-md play / pause
     readonly property string text: (playing ? "\uDB81\uDC0A " : "\uDB80\uDFE4 ") + title
 
-    readonly property int maxW: 180       // visible width in px
+    readonly property int maxW: 150       // visible width in px
     readonly property int gap: 20         // gap between the two copies
     readonly property int step: 1         // px per tick (integer = crisp text)
     readonly property int interval: 33    // ms per tick (~30 fps); 50 = 20 fps

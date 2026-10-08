@@ -10,6 +10,7 @@ PanelWindow {
 
     property int topGap: 50
     property int sideGap: 16
+    property int edgeGap: 0
     property int baseWidth: 300
     property int maxHistory: 100
 
@@ -17,9 +18,13 @@ PanelWindow {
     property bool panelOpen: false
     property bool stateReady: false
     property bool historyReady: false
+    property bool dragging: false
+    property real offsetX: 0
+    property real offsetY: 0
     property int menuSize: 100
     readonly property real ui: menuSize / 100
     readonly property int cardWidth: Math.round(baseWidth * ui)
+    readonly property bool movedFromDefault: offsetX !== 0 || offsetY !== 0
 
     anchors { top: true; bottom: true; right: true; left: true }
     implicitWidth: cardWidth + sideGap + 24
@@ -30,6 +35,11 @@ PanelWindow {
     WlrLayershell.keyboardFocus: panelOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
     mask: Region { item: root.panelOpen ? backdrop : stack }
+
+    onPanelOpenChanged: {
+        if (panelOpen) root.setPosition(root.offsetX, root.offsetY);
+        else dragging = false;
+    }
 
     component Lbl: Text {
         property real ui: 1
@@ -139,8 +149,32 @@ PanelWindow {
     function copyText(s, b) { Quickshell.execDetached(["wl-copy", b !== "" ? s + "\n" + b : s]); }
     function removeHistory(i) { history.remove(i); saveTimer.restart(); }
     function clearHistory() { history.clear(); saveTimer.restart(); }
-    function setSize(v) { menuSize = Math.max(60, Math.min(200, v)); stateTimer.restart(); }
+    function setSize(v) {
+        menuSize = Math.max(60, Math.min(200, v));
+        if (panelOpen) setPosition(offsetX, offsetY);
+        stateTimer.restart();
+    }
     function toggleDnd() { dnd = !dnd; stateTimer.restart(); }
+
+    function setPosition(x, y) {
+        if (root.width <= 0 || root.height <= 0) {
+            root.offsetX = x;
+            root.offsetY = y;
+            return;
+        }
+        const maxX = root.sideGap - root.edgeGap;
+        const minX = Math.min(maxX, root.cardWidth + root.sideGap + root.edgeGap - root.width);
+        const minY = root.edgeGap + root.px(14) - root.topGap;
+        const maxY = Math.max(minY, root.height - panel.height - root.edgeGap - root.topGap);
+        root.offsetX = Math.max(minX, Math.min(maxX, x));
+        root.offsetY = Math.max(minY, Math.min(maxY, y));
+    }
+
+    function resetPosition() {
+        offsetX = 0;
+        offsetY = 0;
+        stateTimer.restart();
+    }
 
     IpcHandler {
         target: "notifications"
@@ -160,6 +194,8 @@ PanelWindow {
                 const s = JSON.parse(text());
                 if (typeof s.dnd === "boolean") root.dnd = s.dnd;
                 if (typeof s.menuSize === "number") root.menuSize = Math.max(60, Math.min(200, Math.round(s.menuSize)));
+                if (typeof s.offsetX === "number") root.offsetX = s.offsetX;
+                if (typeof s.offsetY === "number") root.offsetY = s.offsetY;
             } catch (e) { console.warn("Notifications: bad state file: " + e); }
             root.stateReady = true;
         }
@@ -168,7 +204,12 @@ PanelWindow {
     Timer {
         id: stateTimer
         interval: 300
-        onTriggered: if (root.stateReady) stateFile.setText(JSON.stringify({ dnd: root.dnd, menuSize: root.menuSize }))
+        onTriggered: if (root.stateReady) stateFile.setText(JSON.stringify({
+            dnd: root.dnd,
+            menuSize: root.menuSize,
+            offsetX: root.offsetX,
+            offsetY: root.offsetY
+        }))
     }
 
     ListModel { id: history }
@@ -284,7 +325,12 @@ PanelWindow {
     Column {
         id: stack
         visible: !root.panelOpen
-        anchors { top: parent.top; topMargin: root.topGap; right: parent.right; rightMargin: root.sideGap }
+        anchors {
+            top: parent.top
+            topMargin: root.topGap + root.offsetY
+            right: parent.right
+            rightMargin: root.sideGap - root.offsetX
+        }
         spacing: root.px(8)
 
         Repeater {
@@ -330,11 +376,9 @@ PanelWindow {
                     color: Theme.bg
                     border.width: wrapper.critical ? 1 : 0
                     border.color: Theme.danger
-                    x: wrapper.shown ? 0 : root.cardWidth + 40
                     opacity: wrapper.shown ? 1 : 0
 
-                    Behavior on x { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
-                    Behavior on opacity { NumberAnimation { duration: 180 } }
+                    Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.InOutQuad } }
 
                     MouseArea {
                         id: hover
@@ -408,18 +452,85 @@ PanelWindow {
         }
     }
 
+    Item {
+        id: dragHandle
+        visible: panel.visible
+        opacity: panel.opacity
+        height: root.px(14)
+        anchors { bottom: panel.top; left: panel.left; right: panel.right }
+
+        Rectangle {
+            anchors.centerIn: parent
+            width: root.px(36)
+            height: root.px(4)
+            radius: height / 2
+            color: Theme.text
+            opacity: (dragArea.containsMouse || root.dragging) ? 0.35 : 0.1
+            Behavior on opacity { NumberAnimation { duration: 150 } }
+        }
+
+        MouseArea {
+            id: dragArea
+            anchors.fill: parent
+            enabled: root.panelOpen
+            hoverEnabled: true
+            acceptedButtons: Qt.LeftButton
+            cursorShape: root.dragging ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+
+            property real pressX: 0
+            property real pressY: 0
+            property real startX: 0
+            property real startY: 0
+
+            onPressed: function (mouse) {
+                const p = dragArea.mapToItem(backdrop, mouse.x, mouse.y);
+                pressX = p.x;
+                pressY = p.y;
+                startX = root.offsetX;
+                startY = root.offsetY;
+                root.dragging = true;
+            }
+
+            onPositionChanged: function (mouse) {
+                if (!root.dragging) return;
+                const p = dragArea.mapToItem(backdrop, mouse.x, mouse.y);
+                root.setPosition(startX + (p.x - pressX), startY + (p.y - pressY));
+            }
+
+            onReleased: {
+                if (!root.dragging) return;
+                root.dragging = false;
+                stateTimer.restart();
+            }
+
+            onCanceled: {
+                if (!root.dragging) return;
+                root.dragging = false;
+                stateTimer.restart();
+            }
+
+            onDoubleClicked: root.resetPosition()
+        }
+    }
+
     Rectangle {
         id: panel
         width: root.cardWidth
         height: panelCol.height + root.px(28)
         radius: root.px(20)
         color: Theme.bg
-        anchors { top: parent.top; topMargin: root.topGap; right: parent.right; rightMargin: root.panelOpen ? root.sideGap : -(root.cardWidth + 40) }
+        anchors {
+            top: parent.top
+            topMargin: root.topGap + root.offsetY
+            right: parent.right
+            rightMargin: root.sideGap - root.offsetX
+        }
         opacity: root.panelOpen ? 1 : 0
         visible: opacity > 0
 
-        Behavior on anchors.rightMargin { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
-        Behavior on opacity { NumberAnimation { duration: 180 } }
+        Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.InOutQuad } }
+
+        onHeightChanged: if (root.panelOpen) root.setPosition(root.offsetX, root.offsetY)
 
         MouseArea { anchors.fill: parent }
 
@@ -584,5 +695,12 @@ PanelWindow {
 
         SizeBtn { text: "−"; width: 16; font.pixelSize: 12; onClicked: root.setSize(root.menuSize - 10) }
         SizeBtn { text: "+"; width: 16; font.pixelSize: 12; onClicked: root.setSize(root.menuSize + 10) }
+        SizeBtn {
+            text: "↺"
+            width: 16
+            font.pixelSize: 12
+            visible: root.movedFromDefault
+            onClicked: root.resetPosition()
+        }
     }
 }

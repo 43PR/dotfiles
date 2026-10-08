@@ -1,4 +1,4 @@
-name = "43pr-silver"
+name = "silver"
 appearance = "light"
 description = "Cool brushed-silver light theme"
 override = false
@@ -45,13 +45,6 @@ term12 = "#2a6fd0"
 term13 = "#9a40bc"
 term14 = "#1590a0"
 term15 = "#252a31"
-
-wb_panel_bg    = "#bcc1c9"
-wb_text        = "#14171c"
-wb_critical    = "#c8283a"
-wb_ws_idle     = "#5f6773"
-wb_ws_active   = "#14171c"
-wb_ws_urgent   = "#c8102e"
 
 lock_outline  = "#2b3340"
 lock_check    = "#2b3340"

@@ -45,6 +45,7 @@ networkmanager
 network-manager-applet
 bluez
 bluez-utils
+blueman                  # blueman-manager
 
 # --------------------------------------------------
 # Audio
@@ -54,6 +55,8 @@ pipewire
 pipewire-audio
 pipewire-pulse
 wireplumber
+pavucontrol
+playerctl
 
 # --------------------------------------------------
 # Clipboard
@@ -117,6 +120,7 @@ dmidecode
 brightnessctl
 gammastep
 power-profiles-daemon
+lm_sensors
 
 # --------------------------------------------------
 # Desktop Notifications
@@ -139,7 +143,7 @@ cmatrix
 ttf-jetbrains-mono-nerd
 ttf-iosevka-nerd
 ttf-roboto-mono
-ttf-font-awesome
+otf-font-awesome
 
 # --------------------------------------------------
 # Scripting / Package / Application Utilities

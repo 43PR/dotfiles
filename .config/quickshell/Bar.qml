@@ -20,8 +20,8 @@ Scope {
 
         adapter: JsonAdapter {
             id: cfg
-            property string position: "top"       // top | right | bottom | left
-            property string style: "floating"     // floating | joined | strip
+            property string position: "top"
+            property string style: "floating"
             property int thickness: 20
             property int margin: 4
             property real scale: 1.0
@@ -33,6 +33,12 @@ Scope {
             property bool showVolume: true
             property bool showBattery: true
             property bool showNet: true
+            property bool showNotif: true
+            property bool showWall: true
+            property bool showSettings: true
+            property string startMods: "stats,ws"
+            property string centerMods: "clock"
+            property string endMods: "media,volume,battery,net,notif,wall,settings,power"
         }
     }
 
@@ -47,9 +53,12 @@ Scope {
         cfg.scale = 1.0; cfg.bgOpacity = 0.7; cfg.border = false;
         cfg.showStats = false; cfg.showWs = true; cfg.showMedia = true;
         cfg.showVolume = true; cfg.showBattery = true; cfg.showNet = true;
+        cfg.showNotif = true; cfg.showWall = true; cfg.showSettings = true;
+        cfg.startMods = "stats,ws";
+        cfg.centerMods = "clock";
+        cfg.endMods = "media,volume,battery,net,notif,wall,settings,power";
     }
 
-    // ───────────────────────── Derived layout values ─────────────────────────
     readonly property bool vertical: cfg.position === "left" || cfg.position === "right"
     readonly property bool joined: cfg.style !== "floating"
     readonly property int panelThick: vertical ? cfg.thickness + 12 : cfg.thickness
@@ -64,7 +73,8 @@ Scope {
     readonly property int sizeCpuRam: s(12)
     readonly property int sizeClock: s(12)
     readonly property int sizeMarquee: s(11)
-    readonly property int sizeNetIcon: s(14)
+    readonly property int sizeMediaVertical: s(26)
+    readonly property int sizeNetIcon: s(16)
     readonly property int sizeVolIcon: s(16)
     readonly property int sizeVolText: s(13)
     readonly property int sizeBatIcon: s(13)
@@ -80,7 +90,6 @@ Scope {
     readonly property int sizeCalWeekday: s(11)
     readonly property int sizeCalDay: s(12)
 
-    // ───────────────────────── Battery ─────────────────────────
     readonly property var battery: UPower.devices.values.find(d => d.isLaptopBattery)
         ?? (UPower.displayDevice && UPower.displayDevice.isPresent
             && UPower.displayDevice.type === UPowerDeviceType.Battery
@@ -94,7 +103,97 @@ Scope {
     readonly property var batIcons: ["\uf244", "\uf243", "\uf242", "\uf241", "\uf240"]
     readonly property string batIcon: batIcons[batPct >= 90 ? 4 : batPct >= 65 ? 3 : batPct >= 40 ? 2 : batPct >= 15 ? 1 : 0]
 
-    // ───────────────────────── State + IPC ─────────────────────────
+    readonly property var moduleIds: ["stats", "ws", "media", "volume", "battery", "net", "notif", "wall", "settings", "power"]
+    readonly property var moduleDefs: [
+        { id: "stats", l: "CPU / RAM (x)", k: "showStats" },
+        { id: "ws", l: "Workspaces", k: "showWs" },
+        { id: "media", l: "Media", k: "showMedia" },
+        { id: "volume", l: "Volume", k: "showVolume" },
+        { id: "battery", l: "Battery", k: "showBattery" },
+        { id: "net", l: "Network", k: "showNet" },
+        { id: "notif", l: "Notifications", k: "showNotif" },
+        { id: "wall", l: "Wallpapers", k: "showWall" },
+        { id: "settings", l: "Settings", k: "showSettings" },
+        { id: "power", l: "Power", k: "" }
+    ]
+
+    readonly property var startList: cfg.startMods === "" ? []
+        : cfg.startMods.split(",").filter(x => moduleIds.indexOf(x) >= 0)
+
+    readonly property var centerList: {
+        const a = cfg.centerMods === "" ? []
+            : cfg.centerMods.split(",").filter(x => x === "clock" || moduleIds.indexOf(x) >= 0);
+        return a.indexOf("clock") >= 0 ? a : ["clock"].concat(a);
+    }
+
+    readonly property var endList: {
+        const a = cfg.endMods === "" ? []
+            : cfg.endMods.split(",").filter(x => moduleIds.indexOf(x) >= 0);
+        const miss = moduleIds.filter(x => startList.indexOf(x) < 0 && centerList.indexOf(x) < 0 && a.indexOf(x) < 0);
+        return a.concat(miss);
+    }
+
+    function sectionOf(id) {
+        if (startList.indexOf(id) >= 0) return "start";
+        if (centerList.indexOf(id) >= 0) return "center";
+        return "end";
+    }
+
+    function moveTo(id, sec) {
+        const st = startList.filter(x => x !== id);
+        const ce = centerList.filter(x => x !== id);
+        const en = endList.filter(x => x !== id);
+        (sec === "start" ? st : sec === "center" ? ce : en).push(id);
+        cfg.startMods = st.join(",");
+        cfg.centerMods = ce.join(",");
+        cfg.endMods = en.join(",");
+    }
+
+    function shiftBy(id, d) {
+        const sec = sectionOf(id);
+        const a = (sec === "start" ? startList : sec === "center" ? centerList : endList).slice();
+        const i = a.indexOf(id);
+        const j = i + d;
+        if (i < 0 || j < 0 || j >= a.length) return;
+        const t = a[i];
+        a[i] = a[j];
+        a[j] = t;
+        if (sec === "start") cfg.startMods = a.join(",");
+        else if (sec === "center") cfg.centerMods = a.join(",");
+        else cfg.endMods = a.join(",");
+    }
+
+    function modVisible(id) {
+        switch (id) {
+        case "stats": return cfg.showStats && !vertical;
+        case "ws": return cfg.showWs;
+        case "media": return cfg.showMedia && Marquee.player !== null && Marquee.title !== "";
+        case "volume": return cfg.showVolume;
+        case "battery": return cfg.showBattery && battery !== null;
+        case "net": return cfg.showNet;
+        case "notif": return cfg.showNotif;
+        case "wall": return cfg.showWall;
+        case "settings": return cfg.showSettings;
+        default: return true;
+        }
+    }
+
+    function compFor(id) {
+        switch (id) {
+        case "stats": return statsC;
+        case "ws": return wsC;
+        case "media": return mediaC;
+        case "volume": return volumeC;
+        case "battery": return batteryC;
+        case "net": return netC;
+        case "notif": return notifC;
+        case "wall": return wallC;
+        case "settings": return settingsC;
+        case "power": return powerC;
+        default: return null;
+        }
+    }
+
     property bool barVisible: true
     property bool settingsOpen: false
 
@@ -123,6 +222,13 @@ Scope {
             if (["floating", "joined", "strip"].indexOf(st) >= 0) cfg.style = st;
         }
         function customize(): void { root.settingsOpen = !root.settingsOpen; }
+        function moveModule(id: string, section: string): void {
+            if (root.moduleIds.indexOf(id) >= 0 && ["start", "center", "end"].indexOf(section) >= 0)
+                root.moveTo(id, section);
+        }
+        function shiftModule(id: string, delta: int): void {
+            if (root.moduleIds.indexOf(id) >= 0) root.shiftBy(id, delta);
+        }
     }
 
     property int cpuUsage: 0
@@ -190,9 +296,6 @@ Scope {
         runner.running = true;
     }
 
-    // ───────────────────────── Reusable components ─────────────────────────
-
-    // Flows left→right on horizontal bars, top→bottom on vertical ones.
     component Lane: GridLayout {
         property int gap: 0
         flow: root.vertical ? GridLayout.TopToBottom : GridLayout.LeftToRight
@@ -202,6 +305,7 @@ Scope {
 
     component Panel: Rectangle {
         property Item lane
+        visible: lane ? (root.vertical ? lane.implicitHeight : lane.implicitWidth) > 0 : false
         width: root.vertical ? root.panelThick : (lane ? lane.implicitWidth + 4 : 0)
         height: root.vertical ? (lane ? lane.implicitHeight + 4 : 0) : root.panelThick
         radius: root.barRadius
@@ -213,9 +317,9 @@ Scope {
     component Mod: Item {
         id: mod
         property string text: ""
-        property string vtext: text          // text shown on vertical bars
+        property string vtext: text
         property string glyph: ""
-        property string vglyph: glyph        // glyph used on vertical bars
+        property string vglyph: glyph
         property real glyphSize: 16
         property real baseSize: 11
         property color color: Theme.text
@@ -228,7 +332,6 @@ Scope {
         readonly property string shownGlyph: root.vertical ? vglyph : glyph
 
         Layout.alignment: Qt.AlignCenter
-        // vertical: every module is exactly as wide as the bar, content is centered inside
         implicitWidth: root.vertical ? root.panelThick : content.implicitWidth + 20
         implicitHeight: root.vertical ? Math.max(20, content.implicitHeight + 8)
                                       : Math.max(root.panelThick - 2, content.implicitHeight)
@@ -275,7 +378,15 @@ Scope {
         }
     }
 
-    // ── settings-popup widgets ──
+    component Slot: Loader {
+        id: slot
+        required property string modelData
+        property Component clockComp: null
+        visible: root.modVisible(modelData)
+        Layout.alignment: Qt.AlignCenter
+        sourceComponent: modelData === "clock" ? clockComp : root.compFor(modelData)
+    }
+
     component Lbl: Text {
         color: Theme.text
         font.family: Theme.iconFont
@@ -314,6 +425,29 @@ Scope {
                     onClicked: seg.picked(opt.modelData)
                 }
             }
+        }
+    }
+
+    component Btn: Rectangle {
+        id: btn
+        property string label: ""
+        signal clicked()
+        implicitWidth: 22
+        implicitHeight: 22
+        radius: Theme.radius
+        color: btnMa.containsMouse ? Qt.alpha(Theme.accent, 0.35) : Qt.alpha(Theme.text, 0.07)
+        Text {
+            anchors.centerIn: parent
+            text: btn.label
+            color: Theme.text
+            font.family: Theme.iconFont
+            font.pixelSize: 10
+        }
+        MouseArea {
+            id: btnMa
+            anchors.fill: parent
+            hoverEnabled: true
+            onClicked: btn.clicked()
         }
     }
 
@@ -367,13 +501,247 @@ Scope {
         }
     }
 
-    // ───────────────────────── Settings popup ─────────────────────────
+    Component {
+        id: statsC
+        Lane {
+            Mod {
+                baseSize: root.sizeCpuRam
+                glyphSize: root.sizeCpuRam + 4
+                vglyph: "\uDB81\uDE1A"
+                text: "CPU " + root.cpuUsage + "%"
+                vtext: ""
+                color: root.vertical && root.cpuUsage >= 85 ? Theme.danger : Theme.text
+            }
+            Mod {
+                baseSize: root.sizeCpuRam
+                glyphSize: root.sizeCpuRam + 4
+                vglyph: "\uDB80\uDF5B"
+                text: "RAM " + root.memPercent + "%"
+                vtext: ""
+                color: root.vertical && root.memPercent >= 85 ? Theme.danger : Theme.text
+            }
+        }
+    }
+
+    Component {
+        id: wsC
+        Item {
+            implicitWidth: root.vertical ? root.panelThick : wsLane.implicitWidth + 12
+            implicitHeight: wsLane.implicitHeight + (root.vertical ? 12 : 0)
+
+            Lane {
+                id: wsLane
+                anchors.centerIn: parent
+                gap: 8
+
+                Repeater {
+                    model: Hyprland.workspaces
+                    delegate: Rectangle {
+                        id: dot
+                        required property var modelData
+                        visible: modelData.id > 0
+                        Layout.alignment: Qt.AlignCenter
+                        implicitWidth: root.vertical ? 10 : (modelData.focused ? 32 : 10)
+                        implicitHeight: root.vertical ? (modelData.focused ? 24 : 10) : 10
+                        radius: 5
+                        color: modelData.urgent ? Theme.danger
+                             : modelData.focused ? Qt.alpha(Theme.accent, 0.2)
+                             : dotMa.containsMouse ? Theme.accent2
+                             : Qt.alpha(Theme.textFaint, 0.5)
+
+                        Behavior on implicitWidth { NumberAnimation { duration: Theme.animMed; easing.type: Easing.OutQuad } }
+                        Behavior on implicitHeight { NumberAnimation { duration: Theme.animMed; easing.type: Easing.OutQuad } }
+
+                        MouseArea {
+                            id: dotMa
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            onClicked: dot.modelData.activate()
+                        }
+                    }
+                }
+            }
+
+            WheelHandler {
+                acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                onWheel: e => root.run(e.angleDelta.y > 0
+                    ? "hyprctl dispatch 'hl.dsp.focus({workspace=\"e+1\"})'"
+                    : "hyprctl dispatch 'hl.dsp.focus({workspace=\"e-1\"})'")
+            }
+        }
+    }
+
+    Component {
+        id: mediaC
+        Item {
+            implicitWidth: root.vertical ? vMedia.implicitWidth : Math.min(Marquee.textW, Marquee.maxW) + 20
+            implicitHeight: root.vertical ? vMedia.implicitHeight : 18
+
+            Item {
+                visible: !root.vertical
+                anchors.fill: parent
+
+                Item {
+                    anchors.fill: parent
+                    anchors.leftMargin: 10
+                    anchors.rightMargin: 10
+                    clip: true
+
+                    Row {
+                        x: Marquee.animating ? Marquee.x : 0
+                        spacing: Marquee.gap
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.verticalCenterOffset: root.iconYOffset
+
+                        Text {
+                            text: Marquee.text
+                            color: Theme.text
+                            font.family: Theme.iconFont
+                            font.pixelSize: root.sizeMarquee
+                            renderType: Text.NativeRendering
+                            width: Marquee.animating ? Marquee.textW
+                                                     : Math.min(Marquee.textW, Marquee.maxW)
+                            elide: Marquee.animating ? Text.ElideNone : Text.ElideRight
+                        }
+
+                        Text {
+                            visible: Marquee.animating
+                            text: Marquee.text
+                            color: Theme.text
+                            font.family: Theme.iconFont
+                            font.pixelSize: root.sizeMarquee
+                            renderType: Text.NativeRendering
+                        }
+                    }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+                    onClicked: mouse => {
+                        const p = Marquee.player;
+                        if (!p) return;
+                        if (mouse.button === Qt.LeftButton) p.togglePlaying();
+                        else if (mouse.button === Qt.RightButton) p.next();
+                        else p.previous();
+                    }
+                }
+            }
+
+            Mod {
+                id: vMedia
+                visible: root.vertical
+                anchors.centerIn: parent
+                text: "\u266B"
+                baseSize: root.sizeMediaVertical
+                onClicked: mouse => {
+                    const p = Marquee.player;
+                    if (!p) return;
+                    if (mouse.button === Qt.LeftButton) p.togglePlaying();
+                    else if (mouse.button === Qt.RightButton) p.next();
+                    else p.previous();
+                }
+            }
+        }
+    }
+
+    Component {
+        id: volumeC
+        Mod {
+            readonly property var sink: Pipewire.defaultAudioSink
+            readonly property real vol: sink && sink.audio ? sink.audio.volume : 0
+            readonly property bool muted: sink && sink.audio ? sink.audio.muted : false
+            baseSize: root.sizeVolText
+            glyphSize: root.sizeVolIcon
+            glyph: muted || vol <= 0 ? "\uDB81\uDF5F" : "\uDB81\uDD7E"
+            //text: muted ? "Muted" : Math.round(vol * 100) + "%"
+            vtext: ""
+            color: muted ? Theme.danger : Theme.text
+            onScrolled: delta => {
+                if (!sink || !sink.audio) return;
+                const v = sink.audio.volume + (delta / 120) * 0.02;
+                sink.audio.volume = Math.max(0, Math.min(1.0, v));
+            }
+            onClicked: mouse => {
+                if (mouse.button === Qt.RightButton)
+                    root.run("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle");
+                else
+                    root.run("qs ipc call settings sound");
+            }
+        }
+    }
+
+    Component {
+        id: batteryC
+        Mod {
+            baseSize: root.sizeBatText
+            glyphSize: root.sizeBatIcon
+            glyph: (root.batCharging ? "\uf0e7 " : "") + root.batIcon
+            vglyph: root.batIcon
+            text: root.batPct + "%"
+            vtext: root.batPct + ""
+            color: root.batLow ? Theme.danger
+                 : root.vertical && root.batCharging ? Theme.accent : Theme.text
+        }
+    }
+
+    Component {
+        id: netC
+        Mod {
+            baseSize: root.sizeNetIcon
+            yOffset: root.iconYOffset
+            text: root.netState === "wifi" ? "\uDB81\uDDA9"
+                : root.netState === "ethernet" ? "\uDB80\uDE00" : "\uDB81\uDDAA"
+            onClicked: root.run("qs ipc call settings network")
+        }
+    }
+
+    Component {
+        id: notifC
+        Mod {
+            baseSize: root.sizeNetIcon
+            yOffset: root.iconYOffset
+            text: "\uDB80\uDC9A"
+            onClicked: root.run("qs ipc call notifications toggle")
+        }
+    }
+
+    Component {
+        id: wallC
+        Mod {
+            baseSize: root.sizeNetIcon
+            yOffset: root.iconYOffset
+            text: "\uDB80\uDEE9"
+            onClicked: root.run("qs -n -p ~/.config/quickshell/hyprquickpaper")
+        }
+    }
+
+    Component {
+        id: settingsC
+        Mod {
+            baseSize: root.sizeNetIcon
+            yOffset: root.iconYOffset
+            text: "\uDB81\uDC93"
+            onClicked: root.run("qs ipc call settings toggle")
+        }
+    }
+
+    Component {
+        id: powerC
+        Mod {
+            baseSize: root.sizePowerIcon
+            yOffset: root.iconYOffset
+            text: "\u23FB"
+            onClicked: root.run("qs ipc call powermenu toggle")
+        }
+    }
+
     LazyLoader {
         active: root.settingsOpen
 
         PanelWindow {
             id: sw
-            implicitWidth: 380
+            implicitWidth: 440
             implicitHeight: col.implicitHeight + 32
             color: "transparent"
             exclusionMode: ExclusionMode.Ignore
@@ -476,34 +844,73 @@ Scope {
                         color: Qt.alpha(Theme.text, 0.12)
                     }
 
-                    Repeater {
-                        model: [
-                            { k: "showStats", l: "CPU / RAM (horizontal)" },
-                            { k: "showWs", l: "Workspaces" },
-                            { k: "showMedia", l: "Media" },
-                            { k: "showVolume", l: "Volume" },
-                            { k: "showBattery", l: "Battery" },
-                            { k: "showNet", l: "Network" }
-                        ]
-                        delegate: RowLayout {
-                            id: trow
-                            required property var modelData
-                            Layout.fillWidth: true
-                            Lbl { text: trow.modelData.l; Layout.fillWidth: true }
-                            Toggle {
-                                checked: cfg[trow.modelData.k]
-                                onToggled: v => cfg[trow.modelData.k] = v
+                    Lbl {
+                        text: "Modules"
+                        font.bold: true
+                    }
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 4
+
+                        Repeater {
+                            model: root.moduleDefs
+                            delegate: RowLayout {
+                                id: mrow
+                                required property var modelData
+                                Layout.fillWidth: true
+                                spacing: 8
+
+                                Item {
+                                    Layout.preferredWidth: 34
+                                    Layout.preferredHeight: 18
+                                    Toggle {
+                                        anchors.fill: parent
+                                        visible: mrow.modelData.k !== ""
+                                        checked: mrow.modelData.k !== "" && cfg[mrow.modelData.k]
+                                        onToggled: v => cfg[mrow.modelData.k] = v
+                                    }
+                                }
+
+                                Lbl { text: mrow.modelData.l; Layout.fillWidth: true }
+
+                                Seg {
+                                    options: ["start", "center", "end"]
+                                    current: root.sectionOf(mrow.modelData.id)
+                                    onPicked: v => root.moveTo(mrow.modelData.id, v)
+                                }
+
+                                Btn {
+                                    label: root.vertical ? "\u25B2" : "\u25C0"
+                                    onClicked: root.shiftBy(mrow.modelData.id, -1)
+                                }
+
+                                Btn {
+                                    label: root.vertical ? "\u25BC" : "\u25B6"
+                                    onClicked: root.shiftBy(mrow.modelData.id, 1)
+                                }
                             }
                         }
                     }
 
-                    Item {
+                    Rectangle {
                         Layout.fillWidth: true
-                        implicitHeight: 24
-                        Mod {
-                            anchors.right: parent.right
+                        implicitHeight: 32
+                        radius: Theme.radius
+                        color: resetMa.containsMouse ? Qt.alpha(Theme.accent, 0.2) : Qt.alpha(Theme.text, 0)
+
+                        Text {
+                            anchors.centerIn: parent
                             text: "Reset to defaults"
-                            baseSize: 11
+                            color: Theme.text
+                            font.family: Theme.iconFont
+                            font.pixelSize: 11
+                        }
+
+                        MouseArea {
+                            id: resetMa
+                            anchors.fill: parent
+                            hoverEnabled: true
                             onClicked: root.resetSettings()
                         }
                     }
@@ -512,7 +919,6 @@ Scope {
         }
     }
 
-    // ───────────────────────── The bar ─────────────────────────
     Variants {
         model: root.barLive ? Quickshell.screens : []
 
@@ -542,7 +948,6 @@ Scope {
                     rightMargin: cfg.position === "right" ? root.effEdge : (root.vertical ? 0 : root.effGap)
                 }
 
-                // continuous background for "joined" / "strip"
                 Rectangle {
                     visible: root.joined
                     anchors.fill: parent
@@ -552,7 +957,6 @@ Scope {
                     border.color: root.borderColor
                 }
 
-                // ── start section ──
                 Panel {
                     lane: startLane
                     anchors.left: frame.left
@@ -562,75 +966,13 @@ Scope {
                         id: startLane
                         anchors.centerIn: parent
 
-                        Mod {
-                            visible: cfg.showStats && !root.vertical
-                            baseSize: root.sizeCpuRam
-                            glyphSize: root.sizeCpuRam + 4
-                            vglyph: "\uDB81\uDE1A"
-                            text: "CPU " + root.cpuUsage + "%"
-                            vtext: ""
-                            color: root.vertical && root.cpuUsage >= 85 ? Theme.danger : Theme.text
-                        }
-                        Mod {
-                            visible: cfg.showStats && !root.vertical
-                            baseSize: root.sizeCpuRam
-                            glyphSize: root.sizeCpuRam + 4
-                            vglyph: "\uDB80\uDF5B"
-                            text: "RAM " + root.memPercent + "%"
-                            vtext: ""
-                            color: root.vertical && root.memPercent >= 85 ? Theme.danger : Theme.text
-                        }
-
-                        Item {
-                            visible: cfg.showWs
-                            Layout.alignment: Qt.AlignCenter
-                            implicitWidth: root.vertical ? root.panelThick : wsLane.implicitWidth + 12
-                            implicitHeight: wsLane.implicitHeight + (root.vertical ? 12 : 0)
-
-                            Lane {
-                                id: wsLane
-                                anchors.centerIn: parent
-                                gap: 8
-
-                                Repeater {
-                                    model: Hyprland.workspaces
-                                    delegate: Rectangle {
-                                        id: dot
-                                        required property var modelData
-                                        visible: modelData.id > 0
-                                        Layout.alignment: Qt.AlignCenter
-                                        implicitWidth: root.vertical ? 10 : (modelData.focused ? 32 : 10)
-                                        implicitHeight: root.vertical ? (modelData.focused ? 24 : 10) : 10
-                                        radius: 5
-                                        color: modelData.urgent ? Theme.danger
-                                             : modelData.focused ? Qt.alpha(Theme.accent, 0.2)
-                                             : dotMa.containsMouse ? Theme.accent2
-                                             : Qt.alpha(Theme.textFaint, 0.5)
-
-                                        Behavior on implicitWidth { NumberAnimation { duration: Theme.animMed; easing.type: Easing.OutQuad } }
-                                        Behavior on implicitHeight { NumberAnimation { duration: Theme.animMed; easing.type: Easing.OutQuad } }
-
-                                        MouseArea {
-                                            id: dotMa
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            onClicked: dot.modelData.activate()
-                                        }
-                                    }
-                                }
-                            }
-
-                            WheelHandler {
-                                acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-                                onWheel: e => root.run(e.angleDelta.y > 0
-                                    ? "hyprctl dispatch 'hl.dsp.focus({workspace=\"e+1\"})'"
-                                    : "hyprctl dispatch 'hl.dsp.focus({workspace=\"e-1\"})'")
-                            }
+                        Repeater {
+                            model: root.startList
+                            delegate: Slot {}
                         }
                     }
                 }
 
-                // ── center section (clock + calendar) ──
                 Panel {
                     id: clockPanel
                     lane: clockLane
@@ -644,10 +986,8 @@ Scope {
 
                     SystemClock { id: clk; precision: SystemClock.Minutes }
 
-                    Lane {
-                        id: clockLane
-                        anchors.centerIn: parent
-
+                    Component {
+                        id: clockC
                         Mod {
                             id: clockMod
                             bold: true
@@ -663,6 +1003,16 @@ Scope {
                                 clockPanel.monthOffset = 0;
                                 clockPanel.calOpen = !clockPanel.calOpen;
                             }
+                        }
+                    }
+
+                    Lane {
+                        id: clockLane
+                        anchors.centerIn: parent
+
+                        Repeater {
+                            model: root.centerList
+                            delegate: Slot { clockComp: clockC }
                         }
                     }
 
@@ -863,7 +1213,6 @@ Scope {
                     }
                 }
 
-                // ── end section ──
                 Panel {
                     lane: endLane
                     anchors.right: root.vertical ? undefined : frame.right
@@ -875,126 +1224,9 @@ Scope {
                         id: endLane
                         anchors.centerIn: parent
 
-                        // horizontal: scrolling title
-                        Item {
-                            visible: cfg.showMedia && !root.vertical && Marquee.player !== null && Marquee.title !== ""
-                            Layout.alignment: Qt.AlignCenter
-                            implicitWidth: Math.min(Marquee.textW, Marquee.maxW) + 20
-                            implicitHeight: 18
-
-                            Item {
-                                anchors.fill: parent
-                                anchors.leftMargin: 10
-                                anchors.rightMargin: 10
-                                clip: true
-
-                                Row {
-                                    x: Marquee.animating ? Marquee.x : 0
-                                    spacing: Marquee.gap
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    anchors.verticalCenterOffset: root.iconYOffset
-
-                                    Text {
-                                        text: Marquee.text
-                                        color: Theme.text
-                                        font.family: Theme.iconFont
-                                        font.pixelSize: root.sizeMarquee
-                                        renderType: Text.NativeRendering
-                                        width: Marquee.animating ? Marquee.textW
-                                                                 : Math.min(Marquee.textW, Marquee.maxW)
-                                        elide: Marquee.animating ? Text.ElideNone : Text.ElideRight
-                                    }
-
-                                    Text {
-                                        visible: Marquee.animating
-                                        text: Marquee.text
-                                        color: Theme.text
-                                        font.family: Theme.iconFont
-                                        font.pixelSize: root.sizeMarquee
-                                        renderType: Text.NativeRendering
-                                    }
-                                }
-                            }
-
-                            MouseArea {
-                                anchors.fill: parent
-                                acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
-                                onClicked: mouse => {
-                                    const p = Marquee.player;
-                                    if (!p) return;
-                                    if (mouse.button === Qt.LeftButton) p.togglePlaying();
-                                    else if (mouse.button === Qt.RightButton) p.next();
-                                    else p.previous();
-                                }
-                            }
-                        }
-
-                        // vertical: compact media button
-                        Mod {
-                            visible: cfg.showMedia && root.vertical && Marquee.player !== null && Marquee.title !== ""
-                            text: "\u266A"
-                            baseSize: root.sizeVolIcon - 2
-                            onClicked: mouse => {
-                                const p = Marquee.player;
-                                if (!p) return;
-                                if (mouse.button === Qt.LeftButton) p.togglePlaying();
-                                else if (mouse.button === Qt.RightButton) p.next();
-                                else p.previous();
-                            }
-                        }
-
-                        Mod {
-                            visible: cfg.showVolume
-                            readonly property var sink: Pipewire.defaultAudioSink
-                            readonly property real vol: sink && sink.audio ? sink.audio.volume : 0
-                            readonly property bool muted: sink && sink.audio ? sink.audio.muted : false
-                            baseSize: root.sizeVolText
-                            glyphSize: root.sizeVolIcon
-                            glyph: muted || vol <= 0 ? "\uDB81\uDF5F"
-                                 : vol > 0.66 ? "\uDB81\uDD7E"
-                                 : vol > 0.33 ? "\uDB81\uDD80" : "\uDB81\uDD7F"
-                            text: muted ? "Muted" : Math.round(vol * 100) + "%"
-                            vtext: ""
-                            color: muted ? Theme.danger : Theme.text
-                            onScrolled: delta => {
-                                if (!sink || !sink.audio) return;
-                                const v = sink.audio.volume + (delta / 120) * 0.02;
-                                sink.audio.volume = Math.max(0, Math.min(1.0, v));
-                            }
-                            onClicked: mouse => {
-                                if (mouse.button === Qt.RightButton)
-                                    root.run("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle");
-                                else
-                                    root.run("qs ipc call settings sound");
-                            }
-                        }
-
-                        Mod {
-                            visible: cfg.showBattery && root.battery !== null
-                            baseSize: root.sizeBatText
-                            glyphSize: root.sizeBatIcon
-                            glyph: (root.batCharging ? "\uf0e7 " : "") + root.batIcon
-                            vglyph: root.batIcon
-                            text: root.batPct + "%"
-                            vtext: root.batPct + ""
-                            color: root.batLow ? Theme.danger
-                                 : root.vertical && root.batCharging ? Theme.accent : Theme.text
-                        }
-
-                        Mod {
-                            visible: cfg.showNet
-                            baseSize: root.sizeNetIcon
-                            yOffset: root.iconYOffset
-                            text: root.netState === "wifi" ? "\uDB81\uDDA9"
-                                : root.netState === "ethernet" ? "\uDB80\uDE00" : "\uDB81\uDDAA"
-                            onClicked: root.run("qs ipc call settings network")
-                        }
-
-                        Mod {
-                            baseSize: root.sizePowerIcon
-                            yOffset: root.iconYOffset
-                            text: "\u23FB"
-                            onClicked: root.run("qs ipc call powermenu toggle")
+                        Repeater {
+                            model: root.endList
+                            delegate: Slot {}
                         }
                     }
                 }

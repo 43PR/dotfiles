@@ -46,13 +46,6 @@ term13 = "#b020b6"
 term14 = "#0a8f96"
 term15 = "#222222"
 
-wb_panel_bg    = "#d6d6d6"
-wb_text        = "#111111"
-wb_critical    = "#d62b2b"
-wb_ws_idle     = "#6a6a6a"
-wb_ws_active   = "#111111"
-wb_ws_urgent   = "#d62020"
-
 lock_outline  = "#111111"
 lock_check    = "#111111"
 lock_fail     = "#111111"
