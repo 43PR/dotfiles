@@ -14,9 +14,7 @@ A clean and simple Hyprland setup focused on practical keybinds, productivity, a
 
 </div>
 
-<img width="1920" height="1080" alt="v1 2 0" src="https://github.com/user-attachments/assets/3b4857bc-285a-473a-924c-be89dab714b9" />
-
-<img width="1920" height="1080" alt="2" src="https://github.com/user-attachments/assets/49dd4dd2-7d4b-450b-8907-73280cfc8b6c" />
+<img width="1920" height="1080" alt="1791658361" src="https://github.com/user-attachments/assets/3ce57df8-499e-4b26-9975-354c53665864" />
 
 Wallpapers: https://wallhaven.cc/user/43pr
 
@@ -98,6 +96,8 @@ chmod +x install.sh
 ```
 
 After the installation finishes log out and back in.
+
+Right-click the clock to open Bar Settings. 
 
 It will show an empty desktop, dowload and move wallpapers to Pictures/Wallpapers, then you can use the wallpaper picker with: Super + W.
 

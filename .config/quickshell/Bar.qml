@@ -66,6 +66,7 @@ Scope {
     readonly property int effGap: cfg.style === "strip" ? 0 : 6
     readonly property real barRadius: cfg.style === "strip" ? 0 : Theme.radius
     readonly property color bgColor: Qt.alpha(Theme.bg, cfg.bgOpacity)
+    readonly property color overlayBgColor: Qt.alpha(Theme.bg, cfg.bgOpacity)
     readonly property color borderColor: Qt.alpha(Theme.accent, 0.25)
 
     function s(n) { return Math.round(n * cfg.scale); }
@@ -751,7 +752,7 @@ Scope {
             Rectangle {
                 anchors.fill: parent
                 radius: 8
-                color: Theme.bg
+                color: root.overlayBgColor
                 border.width: 1
                 border.color: root.borderColor
 
@@ -1040,7 +1041,7 @@ Scope {
                                 id: calBox
                                 anchors.fill: parent
                                 radius: 4
-                                color: Theme.bg
+                                color: root.overlayBgColor
                                 border.width: cfg.border ? 1 : 0
                                 border.color: root.borderColor
 

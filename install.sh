@@ -327,15 +327,24 @@ else
 fi
 
 # --------------------------------------------------
-# User directories
+# User directories + default wallpaper
 # --------------------------------------------------
 
 info "Creating user directories..."
 
-mkdir -p "$HOME/Pictures"
-mkdir -p "$HOME/Pictures/Wallpapers"
+WALLPAPER_DIR="$HOME/Pictures/Wallpapers"
+DEFAULT_WALLPAPER_SRC="$REPO_DIR/wallhaven-k8jvm7.jpg"
+DEFAULT_WALLPAPER_DEST="$WALLPAPER_DIR/wallhaven-k8jvm7.jpg"
 
-success "Pictures and Wallpapers directories created."
+mkdir -p "$HOME/Pictures" "$WALLPAPER_DIR"
+
+# Copy (not symlink) so the picker can rename/delete it freely.
+# Never overwrite: if the user already has this file, leave it alone.
+if [[ -f "$DEFAULT_WALLPAPER_SRC" && ! -e "$DEFAULT_WALLPAPER_DEST" ]]; then
+    cp "$DEFAULT_WALLPAPER_SRC" "$DEFAULT_WALLPAPER_DEST"
+fi
+
+success "Pictures and Wallpapers directories ready."
 
 # --------------------------------------------------
 # Enable user audio services
@@ -385,6 +394,22 @@ info "Setting executable permissions on shell scripts..."
 find "$SRC" -type f \( -name "*.sh" -o -name "*.py" \) -exec chmod +x {} \;
 
 success "Shell script permissions configured."
+
+# --------------------------------------------------
+# Default wallpaper (only if the user has no wallpaper recorded yet)
+# --------------------------------------------------
+
+THEME_STATE="${XDG_STATE_HOME:-$HOME/.local/state}/43pr/state.json"
+
+if [[ -f "$DEFAULT_WALLPAPER_DEST" ]] && command -v python3 >/dev/null 2>&1; then
+    if [[ -f "$THEME_STATE" ]] && grep -q '"wallpaper":' "$THEME_STATE"; then
+        info "A wallpaper is already recorded; leaving it alone."
+    else
+        info "Setting default wallpaper and generating colors..."
+        python3 "$CONFIG_DIR/43pr/bin/theme.py" wallpaper "$DEFAULT_WALLPAPER_DEST" \
+            || warning "Could not apply the default wallpaper."
+    fi
+fi
 
 # --------------------------------------------------
 # Initial theme (generates the files the configs include)

@@ -187,7 +187,7 @@ while IFS= read -r -d '' src; do
     mkdir -p "$(dirname "$dest")"
     ln -s "$src" "$dest"
     NEW_LINKS=$((NEW_LINKS + 1))
-done < <(find "$SRC" -type f -not -path '*/.git/*' -print0)
+done < <(find "$SRC" \( -type f -o -type l \) -not -path '*/.git/*' -print0)
 
 # Generated files: ensure they exist (copy once), never link.
 if [[ "$DRY_RUN" -eq 0 ]]; then

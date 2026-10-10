@@ -12,13 +12,14 @@ browser    = "brave"
 ---- AUTOSTART ----
 
 hl.on("hyprland.start", function()
-    -- hl.exec_cmd("dunst") replaced with quickshell notifications
+    -- hl.exec_cmd("dunst") replaced with quickshell 
     hl.exec_cmd("nm-applet")
     hl.exec_cmd("wl-paste --type text --watch cliphist store")
     hl.exec_cmd("wl-paste --type image --watch cliphist store")
     hl.exec_cmd("/usr/lib/polkit-kde-authentication-agent-1")
 
     hl.exec_cmd("awww-daemon")
+    hl.exec_cmd("~/.config/hypr/scripts/wallpaper-restore.sh")
     hl.exec_cmd("sleep 2 && qs")
 end)
 
