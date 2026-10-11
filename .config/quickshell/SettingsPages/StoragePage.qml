@@ -372,17 +372,17 @@ Item {
                             {
                                 key: "pacman", label: "PACMAN CACHE", action: "CLEAN", title: "CLEAN PACMAN CACHE?",
                                 message: "paccache will remove old package versions while keeping the currently installed packages.",
-                                command: "sudo paccache -r"
+                                command: "pkexec paccache -r"
                             },
                             {
                                 key: "journal", label: "JOURNAL", action: "7 DAYS", title: "VACUUM JOURNAL?",
                                 message: "Keep only the last 7 days of system logs.",
-                                command: "sudo journalctl --vacuum-time=7d"
+                                command: "pkexec journalctl --vacuum-time=7d"
                             },
                             {
                                 key: "flatpak", label: "FLATPAK UNUSED", action: "CLEAN", title: "REMOVE UNUSED FLATPAKS?",
                                 message: "This removes unused Flatpak runtimes and packages.",
-                                command: "flatpak uninstall --unused"
+                                command: "flatpak uninstall --unused -y"
                             }
                         ]
 
