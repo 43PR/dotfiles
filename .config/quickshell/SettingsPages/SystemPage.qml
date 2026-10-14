@@ -1,64 +1,73 @@
 import QtQuick
+import QtQuick.Effects
+import Quickshell
 import Quickshell.Io
 import "../"
 
 Item {
     id: page
-    property string homeDir: ""
-    property string uptime: "..."
+
+    // ── Config ────────────────────────────────────────────────
+    readonly property string mono: "JetBrainsMono Nerd Font"
+    readonly property int hardwareLabelSize: 12
+    readonly property int hardwareTextSize: 12
+    readonly property int rightMargin: 46
+    readonly property int historyLength: 60
+
+    // ── Paths ─────────────────────────────────────────────────
+    readonly property string homeDir: Quickshell.env("HOME")
+    readonly property string imgDir: homeDir + "/.config/quickshell/imgs"
+    readonly property string defaultAvatar: imgDir + "/pfp3.png"
+    readonly property string customAvatar: imgDir + "/pfp_custom"
+
+    // ── State ─────────────────────────────────────────────────
     property string os: "..."
     property string wm: "Hyprland"
+    property string uptime: "..."
     property string cpu: "Loading..."
     property string gpu: "Loading..."
     property string memory: "Loading..."
     property string ramSpeed: "Loading..."
+    property string cpuTemp: "—"
+    property string gpuTemp: "—"
+    property string currentTime: ""
+
     property real cpuUsage: 0
     property real gpuUsage: 0
     property real memoryUsage: 0
-    property string cpuTemp: "—"
-    property string gpuTemp: "—"
     property var cpuHistory: []
     property var gpuHistory: []
     property var memoryHistory: []
     property var cpuPrev: null
-    property int hardwareLabelSize: 12
-    property int hardwareTextSize: 12
-    property string mono: "JetBrainsMono Nerd Font"
-    property int rightMargin: 46
-    property string currentTime: ""
+
+    // ── Helpers ───────────────────────────────────────────────
+    function poll(proc) {
+        if (!proc.running) proc.running = true
+    }
 
     function updateGraph(value, type) {
         value = parseFloat(value)
         if (isNaN(value)) return
         value = Math.max(0, Math.min(100, value))
         page[type + "Usage"] = value
-        var history = page[type + "History"].slice()
-        history.push(value)
-        if (history.length > 60) history.shift()
-        page[type + "History"] = history
+        page[type + "History"] = page[type + "History"].concat([value]).slice(-historyLength)
     }
 
-    function updateCpuFromStat(value) {
-        var p = value.trim().split(/\s+/)
+    function updateCpuFromStat(line) {
+        var p = line.trim().split(/\s+/)
         if (p.length < 5) return
-        var user = Number(p[1])
-        var nice = Number(p[2])
-        var system = Number(p[3])
-        var idle = Number(p[4])
-        var iowait = Number(p[5] || 0)
-        var irq = Number(p[6] || 0)
-        var softirq = Number(p[7] || 0)
-        var steal = Number(p[8] || 0)
-        var idleTime = idle + iowait
-        var total = user + nice + system + idle + iowait + irq + softirq + steal
+        // user nice system idle iowait irq softirq steal
+        var v = []
+        for (var i = 1; i <= 8; i++) v.push(Number(p[i] || 0))
+        var idle = v[3] + v[4]
+        var total = v.reduce(function(a, b) { return a + b }, 0)
 
-        if (cpuPrev !== null) {
+        if (cpuPrev) {
             var totalDelta = total - cpuPrev.total
-            var idleDelta = idleTime - cpuPrev.idle
             if (totalDelta > 0)
-                updateGraph(100 * (1 - idleDelta / totalDelta), "cpu")
+                updateGraph(100 * (1 - (idle - cpuPrev.idle) / totalDelta), "cpu")
         }
-        cpuPrev = { total: total, idle: idleTime }
+        cpuPrev = { total: total, idle: idle }
     }
 
     function formatMemory(kb) {
@@ -66,71 +75,95 @@ Item {
         return gb >= 1 ? gb.toFixed(1) + " GiB" : Math.round(kb / 1024) + " MiB"
     }
 
-    function updateMemoryFromStat(value) {
-        var total = 0
-        var available = 0
-        var lines = value.trim().split("\n")
-        for (var i = 0; i < lines.length; i++) {
-            var parts = lines[i].trim().split(/\s+/)
-            if (parts[0] === "MemTotal:")
-                total = Number(parts[1])
-            else if (parts[0] === "MemAvailable:")
-                available = Number(parts[1])
-        }
-        if (total <= 0) return
+    function updateMemoryFromStat(text) {
+        var total = Number((text.match(/^MemTotal:\s+(\d+)/m) || [])[1])
+        var available = Number((text.match(/^MemAvailable:\s+(\d+)/m) || [])[1])
+        if (!(total > 0)) return
         var used = total - available
-        updateGraph((used / total) * 100, "memory")
-        page.memory = formatMemory(used) + " / " + formatMemory(total)
+        updateGraph(used / total * 100, "memory")
+        memory = formatMemory(used) + " / " + formatMemory(total)
     }
 
-    function formatTemp(value) {
-        var temp = parseFloat(value.trim())
-        return isNaN(temp) ? "—" : Math.round(temp) + "°C"
+    function formatUptime(text) {
+        var s = Math.floor(parseFloat(text))
+        if (isNaN(s)) return "—"
+        var d = Math.floor(s / 86400)
+        var h = Math.floor(s % 86400 / 3600)
+        var m = Math.floor(s % 3600 / 60)
+        return (d ? d + "d " : "") + (h || d ? h + "h " : "") + m + "m"
     }
 
-    function sensorTempCmd(patterns) {
-        return "sensors 2>/dev/null | awk '/" + patterns.join("|") +
-            "/ {for(i=1;i<=NF;i++) if($i ~ /\\+?[0-9]+(\\.[0-9]+)?°C/) " +
-            "{gsub(/[+°C]/, \"\", $i); print $i; exit}}'"
+    // Finds the first `sensors` line starting with one of the keys
+    // (keys are tried in priority order) and returns "NN°C".
+    function tempFromSensors(lines, keys) {
+        for (var k = 0; k < keys.length; k++) {
+            for (var i = 0; i < lines.length; i++) {
+                var line = lines[i].trim()
+                if (line.indexOf(keys[k]) !== 0) continue
+                var m = line.match(/([+-]?\d+(?:\.\d+)?)\s*°C/)
+                if (m) return Math.round(parseFloat(m[1])) + "°C"
+            }
+        }
+        return "—"
     }
+
+    function parseRamSpeed(text) {
+        var m = text.match(/^\s*Configured Memory Speed:\s*(\d+)\s*(\S+)/m)
+            || text.match(/^\s*Speed:\s*(\d+)\s*(\S+)/m)
+        return m ? m[1] + " " + m[2] : "Unknown"
+    }
+
     function updateClock() {
-        page.currentTime = Qt.formatTime(new Date(), "HH:mm:ss")
+        currentTime = Qt.formatTime(new Date(), "HH:mm:ss")
     }
 
     function drawGraph(ctx, history) {
-        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height)
         var w = ctx.canvas.width
         var h = ctx.canvas.height
+        ctx.clearRect(0, 0, w, h)
         if (history.length < 2) return
+
         var step = w / (history.length - 1)
         ctx.beginPath()
-        ctx.moveTo(0, h)
-        for (var i = 0; i < history.length; i++)
-            ctx.lineTo(i * step, h - history[i] / 100 * h)
-        ctx.lineTo(w, h)
-        ctx.closePath()
-        ctx.fillStyle = Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.10)
-        ctx.fill()
-        ctx.beginPath()
-        for (var j = 0; j < history.length; j++) {
-            var x = j * step
-            var y = h - history[j] / 100 * h
-            if (j) ctx.lineTo(x, y)
+        for (var i = 0; i < history.length; i++) {
+            var x = i * step
+            var y = h - history[i] / 100 * h
+            if (i) ctx.lineTo(x, y)
             else ctx.moveTo(x, y)
         }
-
         ctx.strokeStyle = Theme.accent
         ctx.lineWidth = 2
         ctx.lineJoin = "round"
         ctx.lineCap = "round"
         ctx.stroke()
+
+        ctx.lineTo(w, h)
+        ctx.lineTo(0, h)
+        ctx.closePath()
+        ctx.fillStyle = Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.10)
+        ctx.fill()
     }
 
+    // ── Avatar handling ───────────────────────────────────────
+    function reloadAvatar() {
+        // blank first so Qt re-reads the file even if the path is unchanged
+        avatar.source = ""
+        Qt.callLater(function() { avatar.source = "file://" + customAvatar })
+    }
+
+    function pickAvatar() {
+        if (!pPicker.running) pPicker.running = true
+    }
+
+    function resetAvatar() {
+        pReset.running = true
+    }
+
+    // ── Components ────────────────────────────────────────────
     component InfoRow: Column {
         property string icon: ""
         property string label: ""
         property string value: ""
-
         spacing: 3
 
         Text {
@@ -140,7 +173,6 @@ Item {
             font.pixelSize: 10
             font.letterSpacing: 2
         }
-
         Text {
             text: value
             color: Theme.text
@@ -175,7 +207,6 @@ Item {
                 font.letterSpacing: 2
                 anchors.verticalCenter: parent.verticalCenter
             }
-
             Text {
                 text: block.valueText
                 color: Theme.text
@@ -184,7 +215,6 @@ Item {
                 elide: Text.ElideLeft
                 anchors.verticalCenter: parent.verticalCenter
             }
-
             Repeater {
                 model: block.badges
                 Text {
@@ -200,15 +230,14 @@ Item {
         Item {
             width: parent.width
             height: 60
+
             Rectangle {
                 anchors.fill: parent
                 color: "transparent"
                 border.color: Theme.border
             }
-
             Repeater {
                 model: [0.25, 0.5, 0.75]
-
                 Rectangle {
                     y: parent.height * modelData
                     width: parent.width
@@ -217,14 +246,12 @@ Item {
                     opacity: 0.35
                 }
             }
-
             Canvas {
                 id: graphCanvas
                 anchors.fill: parent
                 anchors.margins: 6
                 onPaint: page.drawGraph(getContext("2d"), block.history)
             }
-
             Text {
                 text: "100%"
                 anchors { top: parent.top; right: parent.right; margins: 5 }
@@ -233,7 +260,6 @@ Item {
                 font.family: page.mono
                 font.pixelSize: 8
             }
-
             Text {
                 text: "0%"
                 anchors { bottom: parent.bottom; right: parent.right; margins: 5 }
@@ -245,150 +271,137 @@ Item {
         }
     }
 
-    Process {
-        id: pHome
-        command: ["sh", "-c", "printf '%s' \"$HOME\""]
-        running: true
-        stdout: StdioCollector { onStreamFinished: page.homeDir = text.trim() }
+    // ── One-shot data sources ─────────────────────────────────
+    FileView {
+        path: "/etc/os-release"
+        onLoaded: {
+            var m = text().match(/^PRETTY_NAME="?([^"\n]*)"?/m)
+            page.os = m ? m[1] : "Linux"
+        }
+    }
+    FileView {
+        path: "/proc/cpuinfo"
+        onLoaded: {
+            var m = text().match(/^model name\s*:\s*(.+)$/m)
+            page.cpu = m ? m[1].trim() : "Unknown"
+        }
     }
     Process {
-        id: pUptime
-        command: ["uptime", "-p"]
+        command: ["sh", "-c",
+            "lspci 2>/dev/null | grep -Ei 'VGA|3D|Display' | sed -E 's/.*: //; s/ \\(rev.*\\)//' | head -1"]
         running: true
-        stdout: StdioCollector { onStreamFinished: page.uptime = text.trim() }
+        stdout: StdioCollector { onStreamFinished: page.gpu = text.trim() || "Unknown" }
     }
     Process {
-        id: pOs
-        command: ["sh", "-c", "grep PRETTY_NAME /etc/os-release | cut -d= -f2 | tr -d '\"'"]
+        // needs a NOPASSWD sudoers rule for dmidecode
+        command: ["sudo", "-n", "/usr/bin/dmidecode", "-t", "memory"]
         running: true
-        stdout: StdioCollector { onStreamFinished: page.os = text.trim() }
+        stdout: StdioCollector { onStreamFinished: page.ramSpeed = page.parseRamSpeed(text) }
+    }
+
+    // ── Polled data sources ───────────────────────────────────
+    FileView {
+        id: cpuStat
+        path: "/proc/stat"
+        onLoaded: page.updateCpuFromStat(text().split("\n")[0])
+    }
+    FileView {
+        id: memInfo
+        path: "/proc/meminfo"
+        onLoaded: page.updateMemoryFromStat(text())
+    }
+    FileView {
+        id: upInfo
+        path: "/proc/uptime"
+        onLoaded: page.uptime = page.formatUptime(text())
     }
     Process {
-        id: pCpu
-        command: ["sh", "-c", "awk -F: '/model name/ {gsub(/^ +/, \"\", $2); print $2; exit}' /proc/cpuinfo"]
-        running: true
-        stdout: StdioCollector { onStreamFinished: page.cpu = text.trim() }
-    }
-    Process {
-        id: pCpuUsage
-        command: ["sh", "-c", "head -1 /proc/stat"]
-        running: true
-        stdout: StdioCollector { onStreamFinished: page.updateCpuFromStat(text) }
-    }
-    Process {
-        id: pCpuTemp
-        command: ["sh", "-c", page.sensorTempCmd(["Package id 0:", "Tctl:", "Tdie:"])]
-        running: true
-        stdout: StdioCollector { onStreamFinished: page.cpuTemp = page.formatTemp(text) }
-    }
-    Process {
-        id: pGpu
-        command: [
-            "sh", "-c",
-            "lspci 2>/dev/null | grep -Ei 'VGA|3D|Display' | sed -E 's/.*: //; s/ \\(rev.*\\)//' | head -1"
-        ]
-        running: true
+        // single `sensors` call serves both CPU and GPU temps
+        id: pSensors
+        command: ["sensors"]
         stdout: StdioCollector {
-            onStreamFinished: page.gpu = text.trim() || "Unknown"
+            onStreamFinished: {
+                var lines = text.split("\n")
+                page.cpuTemp = page.tempFromSensors(lines, ["Package id 0:", "Tctl:", "Tdie:"])
+                page.gpuTemp = page.tempFromSensors(lines, ["GPU Temp:", "edge:", "junction:", "temp1:"])
+            }
         }
     }
     Process {
         id: pGpuUsage
         command: ["sh", "-c", "nvtop -s 2>/dev/null | jq -r '.[0].gpu_util' | tr -d '%'"]
-        running: true
         stdout: StdioCollector { onStreamFinished: page.updateGraph(text, "gpu") }
     }
-    Process {
-        id: pGpuTemp
-        command: ["sh", "-c", page.sensorTempCmd(["GPU Temp:", "edge:", "junction:", "temp1:"])]
-        running: true
-        stdout: StdioCollector { onStreamFinished: page.gpuTemp = page.formatTemp(text) }
-    }
-    Process {
-        id: pMemory
-        command: ["sh", "-c", "grep -E '^(MemTotal|MemAvailable):' /proc/meminfo"]
-        running: true
-        stdout: StdioCollector { onStreamFinished: page.updateMemoryFromStat(text) }
-    }
 
+    // ── Avatar processes ──────────────────────────────────────
     Process {
-        id: pRamSpeed
-        command: ["sudo", "-n", "/usr/bin/dmidecode", "-t", "memory"]
-        running: true
+        id: pPicker
+        command: ["sh", "-c",
+            "if command -v zenity >/dev/null; then " +
+            "  zenity --file-selection --title='Choose a picture' " +
+            "    --file-filter='Images | *.png *.jpg *.jpeg *.webp *.gif *.bmp *.svg' 2>/dev/null; " +
+            "elif command -v kdialog >/dev/null; then " +
+            "  kdialog --getopenfilename \"$HOME\" 'image/*' 2>/dev/null; " +
+            "elif command -v yad >/dev/null; then " +
+            "  yad --file --title='Choose a picture' 2>/dev/null; " +
+            "fi"]
         stdout: StdioCollector {
             onStreamFinished: {
-                var lines = text.split("\n")
-                var speed = ""
-
-                for (var i = 0; i < lines.length; i++) {
-                    var line = lines[i].trim()
-                    if (line.indexOf("Configured Memory Speed:") === 0) {
-                        var parts = line.split(/\s+/)
-                        if (parts.length >= 4 && /^[0-9]+$/.test(parts[3])) {
-                            speed = parts[3] + " " + parts[4]
-                            break
-                        }
-                    }
-                }
-
-                if (!speed) {
-                    for (var j = 0; j < lines.length; j++) {
-                        var line2 = lines[j].trim()
-                        if (line2.indexOf("Speed:") === 0) {
-                            var parts2 = line2.split(/\s+/)
-                            if (parts2.length >= 3 && /^[0-9]+$/.test(parts2[1])) {
-                                speed = parts2[1] + " " + parts2[2]
-                                break
-                            }
-                        }
-                    }
-                }
-
-                page.ramSpeed = speed || "Unknown"
+                var src = text.trim()
+                if (!src) return
+                pCopy.command = ["sh", "-c",
+                    "mkdir -p \"$(dirname \"$2\")\" && cp -f -- \"$1\" \"$2\"",
+                    "sh", src, page.customAvatar]
+                pCopy.running = true
             }
         }
     }
+    Process {
+        id: pCopy
+        onExited: page.reloadAvatar()
+    }
+    Process {
+        id: pReset
+        command: ["rm", "-f", "--", page.customAvatar]
+        onExited: page.reloadAvatar()
+    }
 
+    // ── Timers (paused while the page is hidden) ──────────────
     Timer {
         interval: 1000
-        running: true
+        running: page.visible
         repeat: true
+        triggeredOnStart: true
         onTriggered: {
             page.updateClock()
-            pCpuUsage.running = true
-            pCpuTemp.running = true
-            pGpuUsage.running = true
-            pGpuTemp.running = true
+            cpuStat.reload()
         }
     }
-
     Timer {
         interval: 2000
-        running: true
+        running: page.visible
         repeat: true
-        onTriggered: pMemory.running = true
+        triggeredOnStart: true
+        onTriggered: {
+            memInfo.reload()
+            page.poll(pSensors)
+            page.poll(pGpuUsage)
+        }
     }
-
     Timer {
-        interval: 5000
-        running: true
+        interval: 10000
+        running: page.visible
         repeat: true
-        onTriggered: pUptime.running = true
+        triggeredOnStart: true
+        onTriggered: upInfo.reload()
     }
 
-    Component.onCompleted: {
-        page.updateClock()
-        pRamSpeed.running = true
-        pCpuTemp.running = true
-        pGpuTemp.running = true
-    }
+    Component.onCompleted: reloadAvatar()
 
+    // ── UI ────────────────────────────────────────────────────
     Flickable {
         id: scrollArea
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
+        anchors.fill: parent
         clip: true
         contentWidth: width
         contentHeight: contentColumn.implicitHeight
@@ -396,13 +409,8 @@ Item {
 
         WheelHandler {
             onWheel: function(event) {
-                var delta = event.angleDelta.y
-                if (delta !== 0) {
-                    scrollArea.contentY = Math.max(
-                        0,
-                        Math.min(scrollArea.contentHeight - scrollArea.height, scrollArea.contentY - delta)
-                    )
-                }
+                var maxY = Math.max(0, scrollArea.contentHeight - scrollArea.height)
+                scrollArea.contentY = Math.max(0, Math.min(maxY, scrollArea.contentY - event.angleDelta.y))
                 event.accepted = true
             }
         }
@@ -434,19 +442,84 @@ Item {
                 spacing: 24
 
                 Item {
+                    id: avatarBox
                     width: 150
                     height: 150
 
-                    Image {
+                    AnimatedImage {
+                        id: avatar
+                        playing: page.visible                // pause animation while the page is hidden
                         anchors.centerIn: parent
-                        source: page.homeDir ? "file://" + page.homeDir + "/.config/quickshell/imgs/pfp3.png" : ""
                         width: 140
                         height: 140
-                        fillMode: Image.PreserveAspectFit
+                        sourceSize: Qt.size(280, 280)
+                        fillMode: Image.PreserveAspectCrop   // fills the circle, any aspect ratio
                         smooth: true
                         mipmap: true
                         asynchronous: true
+                        cache: false
+                        visible: false                        // drawn through the circular mask below
+
+                        // no custom picture (or unreadable) -> default one
+                        onStatusChanged: {
+                            var def = "file://" + page.defaultAvatar
+                            if (status === Image.Error && source.toString() !== def)
+                                source = def
+                        }
+                    }
+
+                    // circle mask
+                    Item {
+                        id: avatarMask
+                        anchors.fill: avatar
+                        layer.enabled: true
+                        visible: false
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: width / 2
+                        }
+                    }
+
+                    MultiEffect {
+                        anchors.fill: avatar
+                        source: avatar
+                        maskEnabled: true
+                        maskSource: avatarMask
                         opacity: Theme.bg.a
+                    }
+
+                    // Barely-visible change button: left click = pick, right click = reset
+                    Text {
+                        id: changeBtn
+                        anchors { right: parent.right; bottom: parent.bottom }
+                        text: "✎"
+                        color: Theme.textDim
+                        font.family: page.mono
+                        font.pixelSize: 12
+                        opacity: btnArea.containsMouse ? 0.9 : (hoverArea.containsMouse ? 0.35 : 0.12)
+                        Behavior on opacity { NumberAnimation { duration: 150 } }
+
+                        MouseArea {
+                            id: btnArea
+                            anchors.fill: parent
+                            anchors.margins: -6
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            acceptedButtons: Qt.LeftButton | Qt.RightButton
+                            onClicked: function(mouse) {
+                                if (mouse.button === Qt.RightButton) page.resetAvatar()
+                                else page.pickAvatar()
+                            }
+                        }
+                    }
+
+                    // lets the button fade in when hovering the picture
+                    MouseArea {
+                        id: hoverArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        acceptedButtons: Qt.NoButton
+                        z: -1
                     }
                 }
 
@@ -484,7 +557,6 @@ Item {
     }
 
     Text {
-        id: clock
         anchors.top: parent.top
         anchors.right: parent.right
         anchors.rightMargin: page.rightMargin

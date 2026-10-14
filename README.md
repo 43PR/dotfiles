@@ -1,8 +1,8 @@
 <div align="center">
 
-## Hyprland Setup by 43pr メ
+## 43PR — Hyprland
 
-A clean and simple Hyprland setup focused on practical keybinds, productivity, and easy to customize.
+Simple Hyprland setup focused on practical keybinds, productivity, and easy to customize.
 
 ![Hyprland](https://img.shields.io/badge/Hyprland-0.56.2-8b9aaf?style=for-the-badge&labelColor=101418)
 [![Discord](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Finvites%2FHQwU9SzHj%3Fwith_counts%3Dtrue&query=%24.approximate_member_count&style=for-the-badge&logo=discord&logoColor=ffffff&label=discord&labelColor=101418&color=7289a8)](https://discord.gg/HQwU9SzHj)
@@ -13,23 +13,23 @@ A clean and simple Hyprland setup focused on practical keybinds, productivity, a
 
 </div>
 
-<img width="1920" height="1080" alt="1791658361" src="https://github.com/user-attachments/assets/3ce57df8-499e-4b26-9975-354c53665864" />
+<img width="1920" height="1080" alt="1792044634" src="https://github.com/user-attachments/assets/3c468b4c-abb2-4484-963f-ad83f3134e19" />
 
 Wallpapers: https://wallhaven.cc/user/43pr
 
 ## Features
 
-- **Top bar** - Customizing options, vertical bar, styles, calendar, controls for volume and media playback.
-- **Settings Menu** — System, network, bluetooth, display, audio, storage, themes, and more.
+- **Fast & Lightweight Quickshell** — Optimized desktop components designed to be fast, and easy to customize.
+- **Top bar** - Customizable bar with settings menu, and quick shortcuts.
+- **Settings** — System, network, bluetooth, display, audio, storage, themes, and more.
 - **Wallpaper picker & Dynamic Colors** — Custom wallpaper selector with automatic wallpaper-based color generation.
-- **Preset Themes** — Default Monochrome, Nord, Tokyo Night, etc, and easily create your own. 
-- **App Launcher** — **Rofi** Application search, clipboard history, and opacity control.
+- **Preset Themes** — Monochrome, Nord, Tokyo Night and other popular ones, with support for creating your own.
+- **App Launcher** — **Rofi** App search, clipboard history, and opacity controls.
 - **Zsh + Starship** — Customizable shell with autosuggestions and history.
-- **Customizable Power Menu** —  Custom power menu. 
-- **Notes / To do** —  Custom quick Notes/To-do. 
+- **Notes & Reminders** —  Quick notes, tasks, and reminders.
+- **Power Menu** — Customizable power menu.
 - **Hyprlock** — Custom lock screen.
 - **Spotify + Spicetify** — Custom theme based on **text - darkthemer**, (modified).
-- **Custom Scripts** — Scripts for workflow and system management.
 
 > All programs: [packages.txt](packages.txt)
 
@@ -39,7 +39,7 @@ Just made some tweaks to it. Give it some love: [hyprquickpaper](https://github.
 
 ## Keybinds
 
-> **You can modify keybinds using HyprMod**
+> **Right-click clock to open bar settings, hover to see actions**
 
 | Keybind                 | Action                    |
 | -----------             | ------------------------- |
@@ -53,22 +53,25 @@ Just made some tweaks to it. Give it some love: [hyprquickpaper](https://github.
 | `Super + E`             | File manager              |
 | `Super + B`             | Browser                   |
 | `Super + V`             | Clipboard history         |
-| `Super + S`             | Second launcher           |
 | `Super + I`             | Settings menu             |
 | `Super + W`             | Wallpaper selector        |
 | `Super + O`             | Switch opacity            |
-| `Super + Tab`           | Lock screen               |
-| `Super + Grave`         | Logout menu               |
-| `Super + Shift + W`     | Toggle bar                |
+| `Super + C`             | Notes & Reminders         |
+| `Super + Shift + C`     | Color picker tool         |
 | `Super + Mouse wheel`   | Zoom in/out               |
-| `Super + C`             | Notes/To-do               |
+| `Super + Shift + W`     | Toggle bar                |
+| `Super + Grave`         | Logout menu               |
+| `Super + Tab`           | Lock screen               |
 | `Super + N`             | Notifications             |
+| `Super + S`             | Second launcher           |
 | `Delete`                | Screenshot fullscreen     |
 | `SHIFT + Delete`        | Screenshot area select    |
 
 > [!note]
 >
 > **Move and resize windows with Super + left/right mouse drag.**
+>
+> **You can modify keybinds using HyprMod**
 >
 > All keybinds: [.config/hypr/keybinds.lua](.config/hypr/keybinds.lua)
 
@@ -98,7 +101,7 @@ After the installation finishes log out and back in.
 
 Right-click the clock to open Bar Settings. 
 
-It will show an empty desktop, dowload and move wallpapers to Pictures/Wallpapers, then you can use the wallpaper picker with: Super + W.
+Dowload and move wallpapers to Pictures/Wallpapers. Wallpaper picker: Super + W.
 
 > [!important]
 > **Do not move or delete the dotfiles repository after installation.**

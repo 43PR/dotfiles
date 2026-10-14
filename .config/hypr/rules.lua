@@ -25,6 +25,14 @@ hl.window_rule({
 --})
 
 hl.window_rule({
+    name = "file-picker-float",
+    match = { class = "^(xdg-desktop-portal-gtk)$" },
+    float = true,
+    center = true,
+    size = "900 600",
+})
+
+hl.window_rule({
     match = { class = "kitty" },
     suppress_event = "maximize",
 })

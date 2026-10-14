@@ -47,48 +47,46 @@ Item {
     }
 
     // ── Network speed (all real interfaces, wifi + ethernet) ───────
-    Process {
-        id: pNet
-        command: ["cat", "/proc/net/dev"]
+    FileView {
+        id: netDev
+        path: "/proc/net/dev"
 
-        stdout: StdioCollector {
-            onStreamFinished: {
-                var lines = text.split("\n")
-                var rx = 0
-                var tx = 0
+        onLoaded: {
+            var lines = text().split("\n")
+            var rx = 0
+            var tx = 0
 
-                for (var i = 2; i < lines.length; ++i) {
-                    var line = lines[i].trim()
-                    if (!line) continue
+            for (var i = 2; i < lines.length; ++i) {
+                var line = lines[i].trim()
+                if (!line) continue
 
-                    var idx = line.indexOf(":")
-                    if (idx < 0) continue
+                var idx = line.indexOf(":")
+                if (idx < 0) continue
 
-                    var name = line.slice(0, idx).trim()
-                    if (name === "lo"
-                        || name.indexOf("veth") === 0
-                        || name.indexOf("docker") === 0
-                        || name.indexOf("br-") === 0
-                        || name.indexOf("virbr") === 0) continue
+                var name = line.slice(0, idx).trim()
+                if (name === "lo"
+                    || name.indexOf("veth") === 0
+                    || name.indexOf("docker") === 0
+                    || name.indexOf("br-") === 0
+                    || name.indexOf("virbr") === 0) continue
 
-                    var parts = line.slice(idx + 1).trim().split(/\s+/)
-                    rx += parseFloat(parts[0]) || 0
-                    tx += parseFloat(parts[8]) || 0
-                }
-
-                var now = Date.now()
-                if (page.lastTs > 0) {
-                    var dt = (now - page.lastTs) / 1000
-                    if (dt > 0) {
-                        page.downSpeed = Math.max(0, (rx - page.lastRx) / dt)
-                        page.upSpeed = Math.max(0, (tx - page.lastTx) / dt)
-                    }
-                }
-
-                page.lastRx = rx
-                page.lastTx = tx
-                page.lastTs = now
+                var parts = line.slice(idx + 1).trim().split(/\s+/)
+                rx += parseFloat(parts[0]) || 0
+                tx += parseFloat(parts[8]) || 0
             }
+
+            var now = Date.now()
+            if (page.lastTs > 0) {
+                var dt = (now - page.lastTs) / 1000
+                if (dt > 0) {
+                    page.downSpeed = Math.max(0, (rx - page.lastRx) / dt)
+                    page.upSpeed = Math.max(0, (tx - page.lastTx) / dt)
+                }
+            }
+
+            page.lastRx = rx
+            page.lastTx = tx
+            page.lastTs = now
         }
     }
 
@@ -97,7 +95,7 @@ Item {
         running: true
         repeat: true
         triggeredOnStart: true
-        onTriggered: if (!pNet.running) pNet.running = true
+        onTriggered: netDev.reload()
     }
 
     // ── Ethernet status (device / state / connection name) ─────────
@@ -307,8 +305,8 @@ Item {
 
                 Repeater {
                     model: [
-                        { icon: page.icDown, label: "DOWNLOAD", value: page.downSpeed, down: true },
-                        { icon: page.icUp,   label: "UPLOAD",   value: page.upSpeed,   down: false }
+                        { icon: page.icDown, label: "", value: page.downSpeed, down: true },
+                        { icon: page.icUp,   label: "",   value: page.upSpeed,   down: false }
                     ]
 
                     delegate: Rectangle {

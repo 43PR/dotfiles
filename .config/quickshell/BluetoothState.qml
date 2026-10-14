@@ -13,16 +13,20 @@ Singleton {
     readonly property string stateDir: Quickshell.env("HOME") + "/.config/quickshell/state"
     readonly property string statePath: stateDir + "/bluetooth-state.json"
     readonly property var sink: Pipewire.defaultAudioSink
+    readonly property bool btSink: !!(sink && sink.name && sink.name.indexOf("bluez") >= 0)
 
     property var removingDevices: ({})
     property int removalHideDurationMs: 10000
     property var rememberedDevices: []
     property var deviceVolumes: ({})
+    property var reconnectBackoff: ({})   // address -> { next: ms timestamp, delay: ms }
     property bool stateLoaded: false
     property bool reconnectPaused: false
     property string trackedSink: ""
     property real settleUntil: 0
     property int settleMs: 6000
+    onBtSinkChanged: if (!btSink) trackedSink = ""
+    
 
     function init() {}
 
@@ -72,7 +76,13 @@ Singleton {
     function saveState() {
         if (!root.stateLoaded)
             return
-        stateFile.setText(JSON.stringify({
+        saveTimer.restart()
+    }
+
+    Timer {
+        id: saveTimer
+        interval: 400
+        onTriggered: stateFile.setText(JSON.stringify({
             removing: root.removingDevices,
             devices: root.rememberedDevices,
             volumes: root.deviceVolumes
@@ -129,17 +139,27 @@ Singleton {
     function reconnectRemembered() {
         if (!root.stateLoaded || !root.adapter || !root.powered || root.reconnectPaused)
             return
+        var now = Date.now()
         var devs = root.deviceList()
         for (var i = 0; i < devs.length; i++) {
             var d = devs[i]
             if (!d.address || root.rememberedDevices.indexOf(d.address) < 0)
                 continue
+            if (d.state === BluetoothDeviceState.Connected) {
+                delete root.reconnectBackoff[d.address]
+                continue
+            }
             if (root.removingDevices[d.address])
                 continue
             if (d.pairing)
                 continue
             if (d.state !== BluetoothDeviceState.Disconnected)
                 continue
+            var b = root.reconnectBackoff[d.address]
+            if (b && now < b.next)
+                continue
+            var delay = b ? Math.min(b.delay * 2, 60000) : 10000
+            root.reconnectBackoff[d.address] = { next: now + delay, delay: delay }
             d.trusted = true
             d.connect()
         }
@@ -223,7 +243,7 @@ Singleton {
 
     Timer {
         interval: 250
-        running: root.stateLoaded
+        running: root.stateLoaded && root.btSink
         repeat: true
         onTriggered: root.volumeTick()
     }
@@ -249,6 +269,7 @@ Singleton {
     Connections {
         target: root.adapter
         function onEnabledChanged() {
+            root.reconnectBackoff = ({})
             if (root.adapter && root.adapter.enabled)
                 root.reconnectPaused = false
             root.reconnectRemembered()

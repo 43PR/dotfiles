@@ -21,6 +21,8 @@ hl.bind(mainMod .. " + I", hl.dsp.exec_cmd("qs ipc call settings toggle")) -- Se
 
 hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("qs -n -p ~/.config/quickshell/hyprquickpaper")) -- Wallpapers
 
+hl.bind(mainMod .. " + SHIFT + C", hl.dsp.exec_cmd("qs -n -p ~/.config/quickshell/colorpicker")) -- Color picker
+
 hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen({ mode = 0 })) -- Fullscreen
 
 hl.bind(mainMod .. " + O", hl.dsp.exec_cmd(home .. "/.config/hypr/scripts/opacity.sh")) -- Opacity

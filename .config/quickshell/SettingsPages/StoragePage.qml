@@ -154,7 +154,8 @@ Item {
     Rectangle {
         id: confirmPopup
         visible: false; anchors.centerIn: parent; z: 100
-        width: Math.min(parent.width - 30, 420); height: 190; radius: Theme.radius
+        width: Math.min(parent.width - 30, 420); 
+        height: 220; radius: Theme.radius
         color: Theme.bg; border.width: 1; border.color: Theme.accent
 
         Column {
@@ -351,37 +352,37 @@ Item {
                         model: [
                             {
                                 key: "trash", label: "TRASH", action: "EMPTY", title: "EMPTY TRASH?",
-                                message: "This permanently deletes everything in ~/.local/share/Trash.",
+                                message: "This permanently deletes everything in ~/.local/share/Trash.\n\nCommand: rm -rf -- \"$HOME/.local/share/Trash/files/\"* \"$HOME/.local/share/Trash/info/\"*",
                                 command: "rm -rf -- \"$HOME/.local/share/Trash/files/\"* \"$HOME/.local/share/Trash/info/\"*"
                             },
                             {
                                 key: "cliphist", label: "CLIPHIST", action: "WIPE", title: "WIPE CLIPBOARD HISTORY?",
-                                message: "This permanently clears your entire clipboard history (cliphist).",
-                                command: "cliphist wipe"
+                                message: "This keeps the 20 most recent clipboard entries and permanently deletes the rest.\n\nCommand: cliphist list | tail -n +21 | cliphist delete",
+                                command: "cliphist list | tail -n +21 | cliphist delete"
                             },
                             {
                                 key: "thumbs", label: "WALLPAPER PICKER", action: "CLEAR", title: "CLEAR THUMBNAIL CACHE?",
-                                message: "This permanently deletes everything in ~/.cache/quickshell/thumbs.",
+                                message: "This permanently deletes everything in ~/.cache/quickshell/thumbs.\n\nCommand: rm -rf -- \"$HOME/.cache/quickshell/thumbs/\"*",
                                 command: "rm -rf -- \"$HOME/.cache/quickshell/thumbs/\"*"
                             },
                             {
                                 key: "yay", label: "YAY CACHE", action: "CLEAN", title: "CLEAR YAY CACHE?",
-                                message: "CACHE_PLACEHOLDER",
+                                message: "This permanently deletes cached AUR build files and downloaded sources.\n\nCommand: rm -rf -- \"$HOME/.cache/yay/\"*",
                                 command: "rm -rf -- \"$HOME/.cache/yay/\"*"
                             },
                             {
                                 key: "pacman", label: "PACMAN CACHE", action: "CLEAN", title: "CLEAN PACMAN CACHE?",
-                                message: "paccache will remove old package versions while keeping the currently installed packages.",
+                                message: "This removes old cached package versions while keeping the 3 most recent versions by default.\n\nCommand: pkexec paccache -r",
                                 command: "pkexec paccache -r"
                             },
                             {
                                 key: "journal", label: "JOURNAL", action: "7 DAYS", title: "VACUUM JOURNAL?",
-                                message: "Keep only the last 7 days of system logs.",
+                                message: "This permanently deletes system journal logs older than 7 days.\n\nCommand: pkexec journalctl --vacuum-time=7d",
                                 command: "pkexec journalctl --vacuum-time=7d"
                             },
                             {
                                 key: "flatpak", label: "FLATPAK UNUSED", action: "CLEAN", title: "REMOVE UNUSED FLATPAKS?",
-                                message: "This removes unused Flatpak runtimes and packages.",
+                                message: "This removes unused Flatpak runtimes and packages.\n\nCommand: flatpak uninstall --unused -y",
                                 command: "flatpak uninstall --unused -y"
                             }
                         ]

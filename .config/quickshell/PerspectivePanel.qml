@@ -6,15 +6,27 @@ Item {
     default property alias content: contentContainer.data
     property bool open: false
     property real tiltStrength: Theme.tiltStrength
-
     property real parallaxX: 0
     property real parallaxY: 0
 
-    opacity: open ? 1 : 0
-    visible: opacity > 0.01
+    // ---- optional knobs; defaults keep the previous behaviour -------------
+    property int fadeDuration: Theme.animMed
+    property int popDuration: Theme.animSlow
+    property int tiltDuration: Theme.animSlow
+    property int popEasing: Easing.OutBack
+    property real closedScale: 0.88
+
+    property bool cacheContent: false
+    property bool prewarm: false
+
+    opacity: open ? 1 : (prewarm ? 0.004 : 0)
+    visible: opacity > 0.001
+
+    layer.enabled: root.cacheContent
+    layer.smooth: true
 
     Behavior on opacity {
-        NumberAnimation { duration: Theme.animMed; easing.type: Easing.OutCubic }
+        NumberAnimation { duration: root.fadeDuration; easing.type: Easing.OutCubic }
     }
 
     transform: [
@@ -25,7 +37,7 @@ Item {
             angle: root.open ? root.parallaxX : 20
 
             Behavior on angle {
-                NumberAnimation { duration: Theme.animSlow; easing.type: Easing.OutCubic }
+                NumberAnimation { duration: root.tiltDuration; easing.type: Easing.OutCubic }
             }
         },
         Rotation {
@@ -35,17 +47,17 @@ Item {
             angle: root.open ? root.parallaxY : -16
 
             Behavior on angle {
-                NumberAnimation { duration: Theme.animSlow; easing.type: Easing.OutCubic }
+                NumberAnimation { duration: root.tiltDuration; easing.type: Easing.OutCubic }
             }
         },
         Scale {
             origin.x: root.width / 2
             origin.y: root.height / 2
-            xScale: root.open ? 1 : 0.88
-            yScale: root.open ? 1 : 0.88
+            xScale: root.open ? 1 : root.closedScale
+            yScale: root.open ? 1 : root.closedScale
 
-            Behavior on xScale { NumberAnimation { duration: Theme.animSlow; easing.type: Easing.OutBack } }
-            Behavior on yScale { NumberAnimation { duration: Theme.animSlow; easing.type: Easing.OutBack } }
+            Behavior on xScale { NumberAnimation { duration: root.popDuration; easing.type: root.popEasing } }
+            Behavior on yScale { NumberAnimation { duration: root.popDuration; easing.type: root.popEasing } }
         }
     ]
 

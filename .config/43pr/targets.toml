@@ -20,3 +20,12 @@ output = "~/.config/gtk-4.0/colors.css"
 [quickshell]
 input  = "~/.config/43pr/templates/quickshell-theme.json"
 output = "~/.cache/43pr/quickshell-theme.json"
+[btop]
+input  = "~/.config/43pr/templates/btop.theme"
+output = "~/.config/btop/themes/43pr.theme"
+reload = ["pkill", "-USR2", "-x", "btop"]
+[cava]
+input  = "~/.config/43pr/templates/cava-theme"
+output = "~/.config/cava/themes/43pr"
+
+reload = ["pkill", "-USR2", "-f", "-x", "cava"]

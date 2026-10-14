@@ -13,8 +13,8 @@ Scope {
     // ───────────────────────── Config ─────────────────────────
     // Single source of truth for defaults (used by the adapter AND reset).
     readonly property var defaults: ({
-        position: "top", style: "joined", thickness: 20, margin: 4,
-        scale: 1.0, bgOpacity: 0.7, border: false,
+        position: "left", style: "joined", thickness: 20, margin: 4,
+        scale: 1.0, bgOpacity: 0.5, border: false, radius: Theme.radius, calRadius: 15,
         statsMode: "compact", tooltips: true, tooltipHints: true,
         hidden: "stats,wall,settings",
         startMods: "stats,ws",
@@ -26,6 +26,8 @@ Scope {
     readonly property var sections: ["start", "center", "end"]
     readonly property var statsModes: ["default", "compact"]
 
+    Component.onCompleted: BluetoothState.init()
+    
     FileView {
         id: cfgFile
         path: Quickshell.env("HOME") + "/.config/quickshell/state/bar-state.json"
@@ -42,6 +44,8 @@ Scope {
             property real scale: root.defaults.scale
             property real bgOpacity: root.defaults.bgOpacity
             property bool border: root.defaults.border
+            property int radius: root.defaults.radius            // bar corner radius
+            property int calRadius: root.defaults.calRadius      // calendar popup corner radius
             property string statsMode: root.defaults.statsMode   // "default" | "compact"
             property bool tooltips: root.defaults.tooltips
             property bool tooltipHints: root.defaults.tooltipHints // show "Left click: ..." lines in tooltips
@@ -63,7 +67,7 @@ Scope {
     readonly property int panelThick: vertical ? cfg.thickness + 12 : cfg.thickness
     readonly property int effEdge: strip ? 0 : cfg.margin
     readonly property int effGap: strip ? 0 : 6
-    readonly property real barRadius: strip ? 0 : Theme.radius
+    readonly property real barRadius: strip ? 0 : cfg.radius
     readonly property color bgColor: Qt.alpha(Theme.bg, cfg.bgOpacity)
     readonly property color borderColor: Qt.alpha(Theme.accent, 0.25)
 
@@ -126,7 +130,7 @@ Scope {
         { id: "battery",  l: "Battery" },
         { id: "net",      l: "Network",       cmd: "qs ipc call settings network",
                                               hint: "Open network settings" },
-        { id: "notif",    l: "Notifications", cmd: "qs ipc call notifications toggle", g: "\uDB80\uDC9A",
+        { id: "notif",    l: "Notifications", cmd: "qs ipc call notifications toggle", g: "\uDB80\uDC9C",
                                               tip: "Notifications", hint: "Toggle notification panel" },
         { id: "wall",     l: "Wallpapers",    cmd: "qs -n -p ~/.config/quickshell/hyprquickpaper", g: "\uDB80\uDEE9",
                                               tip: "Wallpapers", hint: "Open wallpaper picker" },
@@ -970,8 +974,11 @@ Scope {
         active: root.settingsOpen
 
         PanelWindow {
+            // Fixed height: content scrolls inside the Flickable instead of
+            // resizing the window (a content-sized window can render a blank
+            // first frame and grows past the screen on the Modules tab).
             implicitWidth: 420
-            implicitHeight: col.implicitHeight + 36
+            implicitHeight: Math.min(540, (screen?.height ?? 800) * 0.85)
             color: "transparent"
             exclusionMode: ExclusionMode.Ignore
             WlrLayershell.layer: WlrLayer.Overlay
@@ -987,14 +994,19 @@ Scope {
                 focus: true
                 Keys.onEscapePressed: root.settingsOpen = false
 
-                ColumnLayout {
-                    id: col
-                    anchors { left: parent.left; right: parent.right; top: parent.top; margins: 18 }
-                    spacing: 12
+                Connections {
+                    target: root
+                    function onSettingsTabChanged() { flick.contentY = 0 }
+                }
 
-                    // header: title · tabs · close
+                // header (pinned): title · tabs · close
+                Item {
+                    id: head
+                    anchors { top: parent.top; left: parent.left; right: parent.right }
+                    height: 54
+
                     RowLayout {
-                        Layout.fillWidth: true
+                        anchors { left: parent.left; right: parent.right; verticalCenter: parent.verticalCenter; margins: 18 }
                         Text {
                             Layout.fillWidth: true
                             text: "Bar settings"
@@ -1006,6 +1018,31 @@ Scope {
                         Seg { options: ["bar", "modules"]; current: root.settingsTab; onPicked: v => root.settingsTab = v }
                         Pill { label: "×"; plain: true; onClicked: root.settingsOpen = false }
                     }
+                }
+
+                // body (scrolls): wheel, drag, or the scrollbar on the right
+                Flickable {
+                    id: flick
+                    anchors { top: head.bottom; bottom: foot.top; left: parent.left; right: parent.right }
+                    contentWidth: width
+                    contentHeight: col.implicitHeight + 16
+                    clip: true
+                    flickableDirection: Flickable.VerticalFlick
+                    boundsBehavior: Flickable.StopAtBounds
+
+                    WheelHandler {
+                        onWheel: e => {
+                            const max = Math.max(0, flick.contentHeight - flick.height);
+                            flick.contentY = Math.max(0, Math.min(max, flick.contentY - e.angleDelta.y / 2));
+                        }
+                    }
+
+                ColumnLayout {
+                    id: col
+                    x: 18
+                    y: 4
+                    width: flick.width - 18 - 26
+                    spacing: 12
 
                     // ── Bar ──
                     ColumnLayout {
@@ -1016,7 +1053,19 @@ Scope {
                         SetRow { label: "Position"; Seg { options: root.positions; current: cfg.position; onPicked: v => cfg.position = v } }
                         SetRow { label: "Style"; Seg { options: root.styles; current: cfg.style; onPicked: v => cfg.style = v } }
                         SetRow { label: "CPU / RAM"; Seg { options: root.statsModes; current: cfg.statsMode; onPicked: v => cfg.statsMode = v } }
-
+                        SetRow {
+                            label: "Opacity  " + Math.round(cfg.bgOpacity * 100) + "%"
+                            Slide { from: 0; to: 1; step: 0.05; value: cfg.bgOpacity; onMoved: v => cfg.bgOpacity = v }
+                        }
+                        SetRow {
+                            label: "Corner radius  " + cfg.radius
+                            enabled: !root.strip
+                            Slide { from: 0; to: 24; step: 1; value: cfg.radius; onMoved: v => cfg.radius = v }
+                        }
+                        SetRow {
+                            label: "Calendar radius  " + cfg.calRadius
+                            Slide { from: 0; to: 32; step: 1; value: cfg.calRadius; onMoved: v => cfg.calRadius = v }
+                        }
                         SetRow {
                             label: "Thickness  " + cfg.thickness
                             Slide { from: 16; to: 40; step: 1; value: cfg.thickness; onMoved: v => cfg.thickness = v }
@@ -1029,10 +1078,6 @@ Scope {
                         SetRow {
                             label: "Text scale  " + cfg.scale.toFixed(2)
                             Slide { from: 0.8; to: 1.5; step: 0.05; value: cfg.scale; onMoved: v => cfg.scale = v }
-                        }
-                        SetRow {
-                            label: "Background  " + Math.round(cfg.bgOpacity * 100) + "%"
-                            Slide { from: 0; to: 1; step: 0.05; value: cfg.bgOpacity; onMoved: v => cfg.bgOpacity = v }
                         }
 
                         SetRow { label: "Border"; Toggle { checked: cfg.border; onToggled: v => cfg.border = v } }
@@ -1076,10 +1121,63 @@ Scope {
                         }
                     }
 
-                    Rule { Layout.fillWidth: true }
+                }   // col
+                }   // flick
+
+                // scrollbar (outside the content so it doesn't scroll away)
+                Rectangle {
+                    visible: flick.contentHeight > flick.height
+                    x: flick.x + flick.width - 14
+                    y: flick.y
+                    width: 4
+                    height: flick.height
+                    radius: 2
+                    color: Qt.alpha(Theme.text, 0.08)
+                }
+
+                Rectangle {
+                    id: sbHandle
+                    visible: flick.contentHeight > flick.height
+                    x: flick.x + flick.width - 14
+                    y: flick.y + flick.visibleArea.yPosition * flick.height
+                    width: 4
+                    height: Math.max(24, flick.height * flick.visibleArea.heightRatio)
+                    radius: 2
+                    color: Theme.text
+                    opacity: sbMa.containsMouse || sbMa.pressed || flick.moving ? 0.7 : 0.3
+                    Behavior on opacity { NumberAnimation { duration: 150 } }
+
+                    MouseArea {
+                        id: sbMa
+                        anchors.fill: parent
+                        anchors.margins: -5
+                        hoverEnabled: true
+                        property real grabY: 0
+
+                        // drive contentY directly (drag.target would break the y binding)
+                        onPressed: m => {
+                            grabY = mapToItem(flick, m.x, m.y).y - flick.visibleArea.yPosition * flick.height;
+                        }
+                        onPositionChanged: m => {
+                            if (!pressed) return;
+                            const span = flick.height - sbHandle.height;
+                            if (span <= 0) return;
+                            const r = Math.max(0, Math.min(1, (mapToItem(flick, m.x, m.y).y - grabY) / span));
+                            flick.contentY = r * (flick.contentHeight - flick.height);
+                        }
+                    }
+                }
+
+                // footer (pinned)
+                Item {
+                    id: foot
+                    anchors { bottom: parent.bottom; left: parent.left; right: parent.right }
+                    height: 52
+
+                    Rule { width: parent.width }
 
                     RowLayout {
-                        Layout.fillWidth: true
+                        anchors { left: parent.left; right: parent.right; verticalCenter: parent.verticalCenter; margins: 18 }
                         Pill { label: "Reset all"; onClicked: root.resetSettings() }
                         Item { Layout.fillWidth: true }
                         Pill { label: "Done"; primary: true; onClicked: root.settingsOpen = false }
@@ -1158,13 +1256,14 @@ Scope {
                             active: clockPanel.calOpen
                             tip: Qt.formatDate(clk.date, "dddd, d MMMM yyyy")
                             primaryHint: clockPanel.calOpen ? "Close calendar" : "Open calendar"
+                            tertiaryHint: "Settings"
                             onPrimary: {
                                 clockPanel.monthOffset = 0;
                                 clockPanel.calOpen = !clockPanel.calOpen;
                             }
+                            onTertiary: root.run("qs ipc call settings toggle")
                         }
                     }
-
                     LazyLoader {
                         active: clockPanel.calOpen
 
@@ -1188,7 +1287,7 @@ Scope {
                             Rectangle {
                                 id: calBox
                                 anchors.fill: parent
-                                radius: 4
+                                radius: cfg.calRadius
                                 color: root.bgColor
                                 border.width: cfg.border ? 1 : 0
                                 border.color: root.borderColor

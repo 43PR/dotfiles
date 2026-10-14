@@ -1,18 +1,5 @@
 import QtQuick
 
-// Labeled 0..1 slider row: optional reset icon, label, track, and a
-// right-aligned value readout — everything a caller previously had to
-// build by hand around a bare track now lives in here.
-//
-// `value` is normalized 0..1 and owned by the caller.
-// `moved` fires continuously while dragging — use it for cheap, local
-//         state updates (e.g. live-formatting `displayText`).
-// `committed` fires once when the drag (or a reset-click) ends — use it
-//         for anything with a side effect (writing a file, shelling out).
-//
-// While dragging, a small bubble above the handle shows the position as
-// a percentage, independent of whatever `displayText` is showing.
-
 Item {
     id: root
 
