@@ -44,8 +44,9 @@ hl.bind(mainMod .. " + V", hl.dsp.exec_cmd("pgrep -x rofi >/dev/null && pkill -x
 
 -- Screenshot fullscreen
 hl.bind("Delete", hl.dsp.exec_cmd("sh -c 'file=" .. home .. "/Pictures/$(date +%s).png; grim \"$file\"; wl-copy < \"$file\"; qs ipc call screenshot notify \"$file\"'"))
+
 -- Screenshot area select
-hl.bind("SHIFT + Delete", hl.dsp.exec_cmd("sh -c 'file=" .. home .. "/Pictures/$(date +%s).png; grim -g \"$(slurp)\" \"$file\"; wl-copy < \"$file\"; qs ipc call screenshot notify \"$file\"'"))
+hl.bind("SHIFT + Delete", hl.dsp.exec_cmd(home .. "/.config/hypr/scripts/screenshot-area.sh"))
 
 -- Keyboard layout
 hl.bind(mainMod .. " + X", hl.dsp.exec_cmd("hyprctl switchxkblayout current next"))
@@ -76,9 +77,19 @@ hl.bind(mainMod .. " + Space", function()
 end)
 
 -- Gpu screen recorder
-hl.bind(mainMod .. " + R", hl.dsp.exec_cmd(
-    "bash -c 'PIDFILE=/tmp/osu-gsr.pid; if [ -f \"$PIDFILE\" ] && kill -0 \"$(cat \"$PIDFILE\")\" 2>/dev/null; then kill -INT \"$(cat \"$PIDFILE\")\"; rm -f \"$PIDFILE\"; else mkdir -p ~/Videos; gpu-screen-recorder -w HDMI-A-1 -f 60 -a default_output -o ~/Videos/$(date +%Y-%m-%d_%H-%M-%S).mp4 & echo $! > \"$PIDFILE\"; fi'"
-))
+hl.bind(mainMod .. " + R", hl.dsp.exec_cmd([==[bash -c '
+PIDFILE="${XDG_RUNTIME_DIR:-/tmp}/gsr.pid"
+if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
+    kill -INT "$(cat "$PIDFILE")"
+    rm -f "$PIDFILE"
+else
+    DIR="$(xdg-user-dir VIDEOS 2>/dev/null || echo "$HOME/Videos")"
+    mkdir -p "$DIR"
+    MON="$(hyprctl monitors | awk "/^Monitor/{n=\$2} /focused: yes/{print n}")"
+    gpu-screen-recorder -w "${MON:-screen}" -f 60 -a default_output -o "$DIR/$(date +%Y-%m-%d_%H-%M-%S).mp4" &
+    echo $! > "$PIDFILE"
+fi
+']==]))
 
 -- Zoom
 local function zoomfunction(value)
@@ -97,6 +108,15 @@ hl.bind(mainMod .. " + mouse_up", function() zoomfunction(0.5) end, { repeating 
 --# Zoom with keypad
 hl.bind(mainMod .. " + code:82", function() zoomfunction(-0.3) end, { repeating = true })
 hl.bind(mainMod .. " + code:86", function() zoomfunction(0.3) end, { repeating = true })
+
+-- Brightness keys
+hl.bind("XF86MonBrightnessUp",
+    hl.dsp.exec_cmd("brightnessctl set 5%+"),
+    { locked = true, repeating = true })
+
+hl.bind("XF86MonBrightnessDown",
+    hl.dsp.exec_cmd("brightnessctl set 5%-"),
+    { locked = true, repeating = true })
 
 -- VERIFY: exit dispatcher. Docs explicitly say to double check the exit
 -- dispatcher call when moving to Lua.

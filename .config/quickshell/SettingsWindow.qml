@@ -10,10 +10,20 @@ Scope {
 
     // ---- resize limits (tweak these) -------------------------------------
     property real minCardWidth: 780
-    property real minCardHeight: 280
+    property real minCardHeight: 255
     property real maxCardWidth: 1600
     property real maxCardHeight: 1100
     property real resizeGripSize: 40     // hit area of each corner grip (px)
+
+    // ---- sidebar collapse (tweak these) ----------------------------------
+    property real sidebarExpandedWidth: 170   // wide enough for the button + SETTINGS title
+    property real sidebarCollapsedWidth: 26   // only the toggle button stays visible
+    property bool sidebarCollapsed: false
+
+    // ---- corner accents --------------------------------------------------
+    property real accentArm: 40          // length of each accent arm (px)
+    property real accentInset: 14        // distance from the card edge (px)
+    property real accentOpacity: 1.0     // 0..1, edited on the Hub page, persisted in settings-state.json
 
     // ---- lifecycle -------------------------------------------------------
     property bool showing: false      // logical "settings are open"
@@ -24,6 +34,11 @@ Scope {
     function show()   { showing = true }
     function hide()   { showing = false }
     function toggle() { showing = !showing }
+
+    function toggleSidebar() {
+        sidebarCollapsed = !sidebarCollapsed
+        saveState()
+    }
 
     onShowingChanged: {
         if (showing) {
@@ -56,14 +71,16 @@ Scope {
 
     property var navItems: [
         { name: "System", icon: "󰒓", page: "SystemPage" },
-        { name: "Audio", icon: "󰕾", page: "AudioPage" },     
-        { name: "Display", icon: "󰍹", page: "DisplayPage" },  
-        { name: "Network", icon: "󰖩", page: "NetworkPage" },    
+        { name: "Audio", icon: "󰕾", page: "AudioPage" },
+        { name: "Display", icon: "󰍹", page: "DisplayPage" },
+        { name: "Input", icon: "󰌌", page: "InputPage" },
+        { name: "Network", icon: "󰖩", page: "NetworkPage" },
         { name: "Bluetooth", icon: "󰂯", page: "BluetoothPage" },
         { name: "Storage", icon: "󰋊", page: "StoragePage" },
-        { name: "Power", icon: "󰐥", page: "PowerPage" },
         { name: "Configs", icon: "󰧮",  page: "ConfigsPage" },
-        { name: "Themes", icon: "󰉼",  page: "ThemesPage" }
+        { name: "Themes", icon: "󰉼",  page: "ThemesPage" },
+        { name: "Power", icon: "󰐥", page: "PowerPage" },
+        { name: "Hub", icon: "󰋜", page: "HubPage" }
     ]
 
     function nextPage() { selectedIndex = (selectedIndex + 1) % navItems.length }
@@ -100,7 +117,9 @@ Scope {
             x: root.freeX,
             y: root.freeY,
             w: root.freeW,
-            h: root.freeH
+            h: root.freeH,
+            sidebarCollapsed: root.sidebarCollapsed,
+            accentOpacity: root.accentOpacity
         }))
     }
 
@@ -238,6 +257,10 @@ Scope {
         onLoaded: {
             try {
                 var s = JSON.parse(stateFile.text())
+                if (typeof s.sidebarCollapsed === "boolean")
+                    root.sidebarCollapsed = s.sidebarCollapsed
+                if (typeof s.accentOpacity === "number")
+                    root.accentOpacity = Math.max(0, Math.min(1, s.accentOpacity))
                 if (["center", "top", "bottom", "left", "right", "free"].indexOf(s.snap) >= 0) {
                     if (typeof s.x === "number") root.freeX = s.x
                     if (typeof s.y === "number") root.freeY = s.y
@@ -258,12 +281,13 @@ Scope {
         function toggle(): void { root.toggle() }
         function show(): void { root.show() }
         function hide(): void { root.hide() }
+        function toggleSidebar(): void { root.toggleSidebar() }
         function sound(): void {
             root.selectedIndex = 1
             root.show()
         }
         function network(): void {
-            root.selectedIndex = 3
+            root.selectedIndex = 4
             root.show()
         }
         function snapTop(): void { root.snapTop() }
@@ -368,10 +392,9 @@ Scope {
                         event.accepted = true
                     }
                 }
-
                 MouseArea {
                     anchors.fill: parent
-                    onClicked: root.hide()
+                    onClicked: if (Theme.clickOutsideClose) root.hide()
                 }
             }
 
@@ -421,48 +444,49 @@ Scope {
                     border.color: Theme.accent
                     border.width: 1
 
-                    // corner accents
-                    Rectangle {
-                        width: 40
-                        height: 2
-                        color: Theme.accent2
-                        anchors {
-                            top: parent.top
-                            left: parent.left
-                            margins: 14
-                        }
-                    }
+                    // corner accents: L-shapes whose outer corner follows Theme.radius.
+                    // One shape is drawn top-left and rotated 0/90/180/270 for the others.
+                    Repeater {
+                        model: ["tl", "tr", "br", "bl"]
 
-                    Rectangle {
-                        width: 2
-                        height: 40
-                        color: Theme.accent2
-                        anchors {
-                            top: parent.top
-                            left: parent.left
-                            margins: 14
-                        }
-                    }
+                        delegate: Shape {
+                            id: accent
+                            required property string modelData
+                            required property int index
 
-                    Rectangle {
-                        width: 40
-                        height: 2
-                        color: Theme.accent2
-                        anchors {
-                            bottom: parent.bottom
-                            right: parent.right
-                            margins: 14
-                        }
-                    }
+                            readonly property real arm: root.accentArm
+                            // Concentric with the card corner: the accent sits `accentInset` px inside the
+                            // card edge, so its outer radius is Theme.radius - accentInset. The path runs
+                            // along the middle of the 2px stroke, hence the extra -1.
+                            readonly property real r: Math.max(0, Math.min(Theme.radius - root.accentInset - 1, arm - 2))
 
-                    Rectangle {
-                        width: 2
-                        height: 40
-                        color: Theme.accent2
-                        anchors {
-                            bottom: parent.bottom
-                            right: parent.right
-                            margins: 14
+                            width: arm
+                            height: arm
+                            x: modelData.charAt(1) === "l" ? root.accentInset : parent.width - width - root.accentInset
+                            y: modelData.charAt(0) === "t" ? root.accentInset : parent.height - height - root.accentInset
+                            rotation: index * 90
+                            opacity: root.accentOpacity
+                            preferredRendererType: Shape.CurveRenderer
+
+                            ShapePath {
+                                strokeColor: Theme.accent2
+                                strokeWidth: 2
+                                fillColor: "transparent"
+                                capStyle: ShapePath.FlatCap
+
+                                // path runs along the middle of the 2px stroke (offset 1px)
+                                startX: 1
+                                startY: accent.arm
+
+                                PathLine { x: 1; y: accent.r + 1 }
+                                PathArc {
+                                    x: accent.r + 1; y: 1
+                                    radiusX: Math.max(accent.r, 0.01)
+                                    radiusY: Math.max(accent.r, 0.01)
+                                    direction: PathArc.Clockwise
+                                }
+                                PathLine { x: accent.arm; y: 1 }
+                            }
                         }
                     }
 
@@ -621,20 +645,91 @@ Scope {
                         anchors.margins: 28
                         spacing: 28
 
-                        // ---- sidebar ----
+                        // ---- sidebar (collapsible) ----
                         Column {
                             id: sidebar
-                            width: 130
+                            width: root.sidebarCollapsed ? root.sidebarCollapsedWidth : root.sidebarExpandedWidth
                             height: parent.height
                             spacing: 12
+                            clip: true
 
-                            Text {
-                                text: " SETTINGS"
-                                color: Theme.text
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 19
-                                font.bold: true
-                                font.letterSpacing: 4
+                            Behavior on width {
+                                NumberAnimation {
+                                    duration: Theme.animMed
+                                    easing.type: Easing.OutCubic
+                                }
+                            }
+
+                            // header: [toggle button] SETTINGS
+                            Item {
+                                id: sidebarHeader
+                                width: parent.width
+                                height: 26
+                                clip: true
+
+                                Row {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    spacing: 10
+
+                                    Rectangle {
+                                        id: collapseButton
+                                        width: 26
+                                        height: 26
+                                        radius: Theme.radius
+                                        color: collapseMouse.containsMouse
+                                            ? Theme.alpha(Theme.accent, 0.10)
+                                            : "transparent"
+                                        border.width: 1
+                                        border.color: collapseMouse.containsMouse ? Theme.accent : Theme.border
+
+                                        Behavior on color {
+                                            ColorAnimation { duration: Theme.animFast }
+                                        }
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: "◀"
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 9
+                                            color: collapseMouse.containsMouse ? Theme.accent : Theme.textDim
+                                            // points left while open, flips to point right when collapsed
+                                            rotation: root.sidebarCollapsed ? 180 : 0
+
+                                            Behavior on rotation {
+                                                NumberAnimation {
+                                                    duration: Theme.animMed
+                                                    easing.type: Easing.OutCubic
+                                                }
+                                            }
+                                        }
+
+                                        MouseArea {
+                                            id: collapseMouse
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: root.toggleSidebar()
+                                        }
+                                    }
+
+                                    Text {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: "SETTINGS"
+                                        color: Theme.text
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 19
+                                        font.bold: true
+                                        font.letterSpacing: 4
+                                        opacity: root.sidebarCollapsed ? 0 : 1
+
+                                        Behavior on opacity {
+                                            NumberAnimation {
+                                                duration: Theme.animFast
+                                                easing.type: Easing.OutCubic
+                                            }
+                                        }
+                                    }
+                                }
                             }
 
                             Rectangle {
@@ -646,12 +741,23 @@ Scope {
                             Flickable {
                                 id: sidebarFlickable
                                 width: parent.width
-                                height: Math.max(0, parent.height - 48)
+                                height: Math.max(0, sidebar.height - sidebarHeader.height - 1 - sidebar.spacing * 2)
                                 contentWidth: width
                                 contentHeight: navColumn.height
                                 clip: true
                                 boundsBehavior: Flickable.StopAtBounds
                                 interactive: contentHeight > height
+
+                                opacity: root.sidebarCollapsed ? 0 : 1
+                                visible: opacity > 0
+                                enabled: !root.sidebarCollapsed
+
+                                Behavior on opacity {
+                                    NumberAnimation {
+                                        duration: Theme.animFast
+                                        easing.type: Easing.OutCubic
+                                    }
+                                }
 
                                 WheelHandler {
                                     target: sidebarFlickable
@@ -700,6 +806,7 @@ Scope {
                                                 height: 20
 
                                                 Text {
+                                                    visible: !Theme.hideSettingsIcons
                                                     width: 18
                                                     height: parent.height
                                                     verticalAlignment: Text.AlignVCenter
@@ -746,6 +853,22 @@ Scope {
                             height: parent.height
                             clip: true
 
+                            // Pages that expose `accentOpacity` (the Hub page) get the current value
+                            // pushed in and report edits back through these signals.
+                            Connections {
+                                target: pageLoader.item
+                                ignoreUnknownSignals: true
+
+                                function onAccentOpacityEdited(value) {
+                                    root.accentOpacity = value
+                                }
+
+                                function onAccentOpacityCommitted(value) {
+                                    root.accentOpacity = value
+                                    root.saveState()
+                                }
+                            }
+
                             Loader {
                                 id: pageLoader
                                 anchors.fill: parent
@@ -756,7 +879,11 @@ Scope {
                                     + ".qml"
 
                                 // quick fade for every freshly loaded page
-                                onLoaded: fadeIn.restart()
+                                onLoaded: {
+                                    if (item && item.accentOpacity !== undefined)
+                                        item.accentOpacity = root.accentOpacity
+                                    fadeIn.restart()
+                                }
 
                                 SequentialAnimation {
                                     id: fadeIn

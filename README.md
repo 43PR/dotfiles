@@ -1,8 +1,8 @@
 <div align="center">
 
-## 43PR — Hyprland
+## 43PR Desktop
 
-Simple Hyprland setup focused on practical keybinds, productivity, and easy to customize.
+A simple, lightweight Hyprland setup focused on productivity, practical keybinds, and easy to customize.
 
 ![Hyprland](https://img.shields.io/badge/Hyprland-0.56.2-8b9aaf?style=for-the-badge&labelColor=101418)
 [![Discord](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Finvites%2FHQwU9SzHj%3Fwith_counts%3Dtrue&query=%24.approximate_member_count&style=for-the-badge&logo=discord&logoColor=ffffff&label=discord&labelColor=101418&color=7289a8)](https://discord.gg/HQwU9SzHj)
@@ -39,7 +39,7 @@ Just made some tweaks to it. Give it some love: [hyprquickpaper](https://github.
 
 ## Keybinds
 
-> **Right-click clock to open bar settings, hover to see actions**
+Right-click the clock to open bar settings, hover to see other actions
 
 | Keybind                 | Action                    |
 | -----------             | ------------------------- |
@@ -55,6 +55,7 @@ Just made some tweaks to it. Give it some love: [hyprquickpaper](https://github.
 | `Super + V`             | Clipboard history         |
 | `Super + I`             | Settings menu             |
 | `Super + W`             | Wallpaper selector        |
+| `Super + S`             | Quick actions             |
 | `Super + O`             | Switch opacity            |
 | `Super + C`             | Notes & Reminders         |
 | `Super + Shift + C`     | Color picker tool         |
@@ -63,15 +64,15 @@ Just made some tweaks to it. Give it some love: [hyprquickpaper](https://github.
 | `Super + Grave`         | Logout menu               |
 | `Super + Tab`           | Lock screen               |
 | `Super + N`             | Notifications             |
-| `Super + S`             | Second launcher           |
+| `Super + R`             | Screen recorder           |
 | `Delete`                | Screenshot fullscreen     |
 | `SHIFT + Delete`        | Screenshot area select    |
 
 > [!note]
 >
-> **Move and resize windows with Super + left/right mouse drag.**
+> Move and resize windows with Super + left/right mouse drag.
 >
-> **You can modify keybinds using HyprMod**
+> You can modify keybinds using HyprMod
 >
 > All keybinds: [.config/hypr/keybinds.lua](.config/hypr/keybinds.lua)
 
@@ -97,9 +98,7 @@ chmod +x install.sh
 ./install.sh
 ```
 
-After the installation finishes log out and back in.
-
-Right-click the clock to open Bar Settings. 
+After the installation finishes log out and back in. 
 
 Dowload and move wallpapers to Pictures/Wallpapers. Wallpaper picker: Super + W.
 

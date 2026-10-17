@@ -20,6 +20,40 @@ Item {
     readonly property string defaultAvatar: imgDir + "/pfp3.png"
     readonly property string customAvatar: imgDir + "/pfp_custom"
 
+    // ── GPU probe (vendor-agnostic) ───────────────────────────
+    // Prints "<usage%> <tempC>"; a field is "-" when unavailable.
+    //   NVIDIA : nvidia-smi
+    //   AMD    : sysfs gpu_busy_percent + hwmon temp (largest-VRAM card wins)
+    //   Intel  : intel_gpu_top (needs CAP_PERFMON or root); temp via sensors
+    readonly property string gpuProbeScript: `
+u=-; t=-
+o=""
+if command -v nvidia-smi >/dev/null 2>&1; then
+  o=$(nvidia-smi --query-gpu=utilization.gpu,temperature.gpu --format=csv,noheader,nounits 2>/dev/null | head -n1)
+fi
+if [ -n "$o" ]; then
+  u=$(echo "$o" | cut -d, -f1 | tr -d ' ')
+  t=$(echo "$o" | cut -d, -f2 | tr -d ' ')
+else
+  best=""; bestmem=-1
+  for d in /sys/class/drm/card[0-9]*/device; do
+    [ -r "$d/gpu_busy_percent" ] || continue
+    m=$(cat "$d/mem_info_vram_total" 2>/dev/null || echo 0)
+    if [ "$m" -gt "$bestmem" ]; then best="$d"; bestmem="$m"; fi
+  done
+  if [ -n "$best" ]; then
+    u=$(cat "$best/gpu_busy_percent" 2>/dev/null || echo -)
+    for h in "$best"/hwmon/hwmon*/temp1_input; do
+      if [ -r "$h" ]; then t=$(( $(cat "$h") / 1000 )); break; fi
+    done
+  elif command -v intel_gpu_top >/dev/null 2>&1; then
+    v=$(intel_gpu_top -J -s 500 -n 2 2>/dev/null | grep -o '"busy": *[0-9.]*' | grep -o '[0-9.]*$' | sort -n | tail -n1)
+    [ -n "$v" ] && u="$v"
+  fi
+fi
+echo "$u $t"
+`
+
     // ── State ─────────────────────────────────────────────────
     property string os: "..."
     property string wm: "Hyprland"
@@ -29,11 +63,14 @@ Item {
     property string memory: "Loading..."
     property string ramSpeed: "Loading..."
     property string cpuTemp: "—"
-    property string gpuTemp: "—"
+    property string gpuTempProbe: "—"      // from nvidia-smi / amdgpu hwmon
+    property string gpuTempSensors: "—"    // fallback from `sensors`
+    readonly property string gpuTemp: gpuTempProbe !== "—" ? gpuTempProbe : gpuTempSensors
     property string currentTime: ""
 
     property real cpuUsage: 0
     property real gpuUsage: 0
+    property bool gpuHasUsage: false
     property real memoryUsage: 0
     property var cpuHistory: []
     property var gpuHistory: []
@@ -51,6 +88,17 @@ Item {
         value = Math.max(0, Math.min(100, value))
         page[type + "Usage"] = value
         page[type + "History"] = page[type + "History"].concat([value]).slice(-historyLength)
+    }
+
+    function updateGpuFromProbe(text) {
+        var p = text.trim().split(/\s+/)
+        var u = parseFloat(p[0])
+        var t = parseFloat(p[1])
+
+        gpuHasUsage = !isNaN(u)
+        if (gpuHasUsage) updateGraph(u, "gpu")
+
+        gpuTempProbe = isNaN(t) ? "—" : Math.round(t) + "°C"
     }
 
     function updateCpuFromStat(line) {
@@ -287,8 +335,12 @@ Item {
         }
     }
     Process {
+        // GPU name: prefer a discrete NVIDIA/AMD/Arc card over a plain iGPU
         command: ["sh", "-c",
-            "lspci 2>/dev/null | grep -Ei 'VGA|3D|Display' | sed -E 's/.*: //; s/ \\(rev.*\\)//' | head -1"]
+            "l=$(lspci 2>/dev/null | grep -Ei 'VGA|3D|Display'); " +
+            "g=$(echo \"$l\" | grep -Ei 'NVIDIA|AMD|ATI|Arc' | head -n1); " +
+            "[ -n \"$g\" ] || g=$(echo \"$l\" | head -n1); " +
+            "echo \"$g\" | sed -E 's/.*: //; s/ \\(rev.*\\)//'"]
         running: true
         stdout: StdioCollector { onStreamFinished: page.gpu = text.trim() || "Unknown" }
     }
@@ -316,21 +368,21 @@ Item {
         onLoaded: page.uptime = page.formatUptime(text())
     }
     Process {
-        // single `sensors` call serves both CPU and GPU temps
+        // single `sensors` call serves CPU temp and the GPU temp fallback
         id: pSensors
         command: ["sensors"]
         stdout: StdioCollector {
             onStreamFinished: {
                 var lines = text.split("\n")
                 page.cpuTemp = page.tempFromSensors(lines, ["Package id 0:", "Tctl:", "Tdie:"])
-                page.gpuTemp = page.tempFromSensors(lines, ["GPU Temp:", "edge:", "junction:", "temp1:"])
+                page.gpuTempSensors = page.tempFromSensors(lines, ["GPU Temp:", "edge:", "junction:"])
             }
         }
     }
     Process {
-        id: pGpuUsage
-        command: ["sh", "-c", "nvtop -s 2>/dev/null | jq -r '.[0].gpu_util' | tr -d '%'"]
-        stdout: StdioCollector { onStreamFinished: page.updateGraph(text, "gpu") }
+        id: pGpu
+        command: ["sh", "-c", page.gpuProbeScript]
+        stdout: StdioCollector { onStreamFinished: page.updateGpuFromProbe(text) }
     }
 
     // ── Avatar processes ──────────────────────────────────────
@@ -385,7 +437,7 @@ Item {
         onTriggered: {
             memInfo.reload()
             page.poll(pSensors)
-            page.poll(pGpuUsage)
+            page.poll(pGpu)
         }
     }
     Timer {
@@ -550,7 +602,7 @@ Item {
                 icon: "󰢮"
                 label: "GPU"
                 valueText: page.gpu
-                badges: [Math.round(page.gpuUsage) + "%", page.gpuTemp]
+                badges: [page.gpuHasUsage ? Math.round(page.gpuUsage) + "%" : "N/A", page.gpuTemp]
                 history: page.gpuHistory
             }
         }

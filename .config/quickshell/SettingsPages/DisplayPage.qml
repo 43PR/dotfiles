@@ -18,6 +18,9 @@ Item {
     property bool nightlightEnabled: false
     property real sliderMarginRight: 10
     property real labelWidth: 96
+    // Slider bounds only. Hyprland's own scale limits were not verified.
+    property real scaleMin: 0.5
+    property real scaleMax: 3.0
     readonly property string stateDir: Quickshell.env("HOME") + "/.config/quickshell/state"
     readonly property var activeMonitors: monitors.filter(m => !m.disabled)
 
@@ -124,6 +127,19 @@ Item {
                 savedState = saved.monitors
             }
         } catch (error) {}
+
+        // Rewrite stale scales (e.g. an old rounded 1.06) that would trigger "Invalid scale".
+        let dirty = false
+        const fixed = {}
+        for (const name of Object.keys(savedState)) {
+            const e = Object.assign({}, savedState[name])
+            if (typeof e.mode === "string" && typeof e.scale === "number") {
+                const s = scaleForMode(e.mode, null, e.scale)
+                if (Math.abs(s - e.scale) > 1e-9) { e.scale = s; dirty = true }
+            }
+            fixed[name] = e
+        }
+        if (dirty) { savedState = fixed; stateSaveTimer.restart() }
     }
 
     function luaFileText() {
@@ -140,7 +156,8 @@ Item {
             lines.push(monitorLua({ name: names[i] }, {
                 mode: entry.mode,
                 position: typeof entry.position === "string" ? entry.position : "auto",
-                scale: typeof entry.scale === "number" ? entry.scale : 1
+                scale: typeof entry.scale === "number" ? scaleForMode(entry.mode, null, entry.scale) : 1,
+                disabled: false
             }))
         }
         return lines.join("\n") + "\n"
@@ -173,6 +190,7 @@ Item {
         id: pReset
         onExited: exitCode => {
             refreshTimer.restart()
+            lateRefreshTimer.restart()
         }
     }
 
@@ -204,23 +222,54 @@ Item {
         return !mon.disabled && page.activeMonitors.length > 0 && mon.x === 0 && mon.y === 0
     }
 
+    // Logs hyprctl output so failed rules are visible in the quickshell terminal,
+    // and refreshes twice because a re-enabled monitor needs a moment to modeset.
     Process {
         id: pShell
+        stdout: StdioCollector {
+            onStreamFinished: if (text.trim().length > 0) console.log("[display] hyprctl:", text.trim())
+        }
+        stderr: StdioCollector {
+            onStreamFinished: if (text.trim().length > 0) console.warn("[display] hyprctl error:", text.trim())
+        }
         onExited: exitCode => {
             refreshTimer.restart()
+            lateRefreshTimer.restart()
         }
     }
 
+    // Hyprland applies each rule immediately, so any intermediate step that lands a monitor
+    // on top of another one triggers the "monitor layout is set up incorrectly" warning.
+    // With 2+ monitors, first park them all to the right of the current layout, then place
+    // them at their final positions. Nothing overlaps at any step.
+    // Valid scales give whole logical sizes; the small tolerance only absorbs float noise
+    // from the scale reported by hyprctl, while Math.ceil still protects against real
+    // sub-pixel overlap.
+    function logicalWidth(mon) { return Math.ceil(mon.width / mon.scale - 0.01) }
+    function logicalHeight(mon) { return Math.ceil(mon.height / mon.scale - 0.01) }
+
     function layoutCommands(ordered) {
         const cmds = []
+
+        if (ordered.length > 1) {
+            let parkX = 0
+            for (let i = 0; i < ordered.length; i++)
+                parkX = Math.max(parkX, ordered[i].x + logicalWidth(ordered[i]))
+            for (let i = 0; i < ordered.length; i++) {
+                const m = ordered[i]
+                cmds.push("hyprctl eval '" + monitorLua(m, { mode: monitorMode(m), position: parkX + "x0", scale: fixedScale(m) }) + "'")
+                parkX += logicalWidth(m)
+            }
+        }
+
         let x = 0
         for (let i = 0; i < ordered.length; i++) {
             const m = ordered[i]
             const mode = monitorMode(m)
             const pos = x + "x0"
-            rememberMonitor(m, { mode: mode, scale: m.scale, position: pos, disabled: false })
-            cmds.push("hyprctl eval '" + monitorLua(m, { mode: mode, position: pos, scale: m.scale }) + "'")
-            x += Math.round(m.width / m.scale)
+            rememberMonitor(m, { mode: mode, scale: fixedScale(m), position: pos, disabled: false })
+            cmds.push("hyprctl eval '" + monitorLua(m, { mode: mode, position: pos, scale: fixedScale(m) }) + "'")
+            x += logicalWidth(m)
         }
         if (ordered.length > 0) cmds.push("hyprctl dispatch focusmonitor '" + ordered[0].name + "'")
         return cmds
@@ -234,19 +283,92 @@ Item {
         pShell.running = true
     }
 
+    // Which side of `ref` the monitor `mon` currently touches ("" when none).
+    function relation(mon, ref) {
+        if (!mon || !ref || mon.name === ref.name) return ""
+        if (mon.x + logicalWidth(mon) === ref.x) return "left"
+        if (mon.x === ref.x + logicalWidth(ref)) return "right"
+        if (mon.y + logicalHeight(mon) === ref.y) return "above"
+        if (mon.y === ref.y + logicalHeight(ref)) return "below"
+        return ""
+    }
+
+    // Place `mon` against `ref` on the given side (top/left edges aligned), then shift the
+    // whole layout so the top-left monitor sits at 0x0. Only monitors whose position
+    // actually changes are touched; if several change they are parked to the right first.
+    function placeMonitor(mon, ref, side) {
+        if (!mon || !ref || mon.name === ref.name || mon.disabled || ref.disabled) return
+
+        let x = ref.x
+        let y = ref.y
+        if (side === "left") x = ref.x - logicalWidth(mon)
+        else if (side === "right") x = ref.x + logicalWidth(ref)
+        else if (side === "above") y = ref.y - logicalHeight(mon)
+        else if (side === "below") y = ref.y + logicalHeight(ref)
+        else return
+
+        const layout = page.activeMonitors.map(m => ({
+            mon: m,
+            x: m.name === mon.name ? x : m.x,
+            y: m.name === mon.name ? y : m.y
+        }))
+
+        let minX = Infinity
+        let minY = Infinity
+        for (let i = 0; i < layout.length; i++) {
+            minX = Math.min(minX, layout[i].x)
+            minY = Math.min(minY, layout[i].y)
+        }
+
+        const changed = []
+        let parkX = 0
+        for (let i = 0; i < layout.length; i++) {
+            const l = layout[i]
+            l.x -= minX
+            l.y -= minY
+            parkX = Math.max(parkX, l.x + logicalWidth(l.mon))
+            if (l.x !== l.mon.x || l.y !== l.mon.y) changed.push(l)
+        }
+        if (changed.length === 0) return
+
+        const cmds = []
+        if (changed.length > 1) {
+            for (let i = 0; i < changed.length; i++) {
+                const m = changed[i].mon
+                cmds.push("hyprctl eval '" + monitorLua(m, { mode: monitorMode(m), position: parkX + "x0", scale: fixedScale(m) }) + "'")
+                parkX += logicalWidth(m)
+            }
+        }
+        for (let i = 0; i < layout.length; i++) {
+            const l = layout[i]
+            const m = l.mon
+            const pos = l.x + "x" + l.y
+            const mode = monitorMode(m)
+            rememberMonitor(m, { mode: mode, scale: fixedScale(m), position: pos, disabled: false })
+        }
+        for (let i = 0; i < changed.length; i++) {
+            const l = changed[i]
+            const m = l.mon
+            cmds.push("hyprctl eval '" + monitorLua(m, { mode: monitorMode(m), position: l.x + "x" + l.y, scale: fixedScale(m) }) + "'")
+        }
+        pShell.command = ["sh", "-c", cmds.join("; ")]
+        pShell.running = true
+    }
+
     function setMonitorEnabled(mon, enabled) {
         if (!mon || !mon.name) return
         let cmds = []
         if (enabled) {
             const entry = savedState[mon.name] || {}
             const mode = typeof entry.mode === "string" ? entry.mode : "preferred"
-            const scale = typeof entry.scale === "number" ? entry.scale : 1
+            const scale = scaleForMode(mode, mon, typeof entry.scale === "number" ? entry.scale : 1)
             rememberMonitor(mon, { mode: mode, scale: scale, position: "auto", disabled: false })
-            cmds.push("hyprctl eval '" + monitorLua(mon, { mode: mode, position: "auto", scale: scale }) + "'")
+            // disabled: false is required. Without it Hyprland keeps the monitor disabled.
+            cmds.push("hyprctl eval '" + monitorLua(mon, { mode: mode, position: "auto", scale: scale, disabled: false }) + "'")
         } else {
             if (page.activeMonitors.length <= 1) return
             const wasMain = isMain(mon)
-            rememberMonitor(mon, { mode: monitorMode(mon), scale: mon.scale, disabled: true })
+            rememberMonitor(mon, { mode: monitorMode(mon), scale: fixedScale(mon), disabled: true })
             cmds.push("hyprctl eval '" + monitorLua(mon, { disabled: true }) + "'")
             if (wasMain) {
                 const rest = page.activeMonitors.filter(m => m.name !== mon.name).sort((a, b) => a.x - b.x)
@@ -282,6 +404,8 @@ Item {
     Process {
         id: pApply
         property var pendingMon: null
+        // Allows at most one retry with Hyprland's suggested scale, so a bad value can't loop.
+        property bool retried: false
 
         stdout: StdioCollector {
             onStreamFinished: {
@@ -289,7 +413,7 @@ Item {
                 if (out.length === 0) return
 
                 const match = out.match(/using suggested scale:\s*([\d.]+)/i)
-                if (match && pApply.pendingMon) {
+                if (match && pApply.pendingMon && !pApply.retried) {
                     const suggested = parseFloat(match[1])
                     page.setScale(pApply.pendingMon, suggested, true)
                 }
@@ -305,35 +429,41 @@ Item {
 
     function gcd(a, b) { while (b) { [a, b] = [b, a % b] }; return a }
 
-    function validScale(mon, requested) {
-        const width = mon.width
-        const height = mon.height
-        let best = requested
+    // Nearest scale Hyprland accepts. Hyprland quantizes scale to multiples of 1/120
+    // (the fractional-scale protocol unit) AND needs width/scale and height/scale to be
+    // whole numbers. So a valid scale is n/120 where n divides gcd(w, h) * 120.
+    // Integer arithmetic keeps the check exact (no float epsilon).
+    function snapScale(w, h, requested) {
+        if (!(w > 0) || !(h > 0) || !isFinite(requested) || requested <= 0) return requested
+        const limit = gcd(w, h) * 120
+        const target = requested * 120
+        let bestN = 0
         let bestDistance = Infinity
-
-        for (let i = 84; i <= 1560; i++) {
-            const scale = i / 120
-            if (scale < 0.7 || scale > 1.3) continue
-
-            const logicalWidth = width / scale
-            const logicalHeight = height / scale
-
-            if (Math.abs(logicalWidth - Math.round(logicalWidth)) < 0.0001 &&
-                Math.abs(logicalHeight - Math.round(logicalHeight)) < 0.0001) {
-                const distance = Math.abs(scale - requested)
-                if (distance < bestDistance) {
-                    best = scale
-                    bestDistance = distance
-                }
-            }
+        for (let n = 12; n <= 1200; n++) {
+            if (limit % n !== 0) continue
+            const d = Math.abs(n - target)
+            if (d < bestDistance) { bestN = n; bestDistance = d }
         }
-
-        return best
+        return bestN > 0 ? bestN / 120 : requested
     }
 
+    // Slider path: clamp to the slider range, then snap.
+    function validScale(mon, requested) {
+        return snapScale(mon.width, mon.height, Math.max(scaleMin, Math.min(scaleMax, requested)))
+    }
+
+    // Any other path: snap against the dimensions of the mode that will actually be applied.
+    function scaleForMode(mode, mon, scale) {
+        const m = String(mode).match(/^(\d+)x(\d+)/)
+        const w = m ? parseInt(m[1]) : (mon ? mon.width : 0)
+        const h = m ? parseInt(m[2]) : (mon ? mon.height : 0)
+        return snapScale(w, h, scale)
+    }
+
+    function fixedScale(mon) { return scaleForMode(monitorMode(mon), mon, mon.scale) }
+
     function setScale(mon, scale, isRetry = false) {
-        const requested = scale
-        const applied = isRetry ? scale : validScale(mon, requested)
+        const applied = validScale(mon, scale)
 
         const idx = page.monitors.findIndex(m => m.name === mon.name)
         if (idx !== -1) {
@@ -345,6 +475,7 @@ Item {
         rememberMonitor(mon, { mode: monitorMode(mon), scale: applied, position: monitorPosition(mon) })
 
         pApply.pendingMon = mon
+        pApply.retried = isRetry
         pApply.command = [
             "hyprctl", "eval",
             monitorLua(mon, { mode: monitorMode(mon), position: mon.x + "x" + mon.y, scale: applied })
@@ -404,7 +535,7 @@ Item {
         if (!mon || !mon.name || !resolution) {
             return
         }
-        const scale = mon.scale !== undefined ? mon.scale : 1
+        const scale = scaleForMode(resolution, mon, mon.scale !== undefined ? mon.scale : 1)
         rememberMonitor(mon, { mode: resolution, scale: scale, position: monitorPosition(mon) })
         const lua = monitorLua(mon, {
             mode: resolution,
@@ -443,7 +574,7 @@ Item {
             return
         }
         const mode = mon.width + "x" + mon.height + "@" + rate.toFixed(2)
-        const scale = mon.scale !== undefined ? mon.scale : 1
+        const scale = scaleForMode(mode, mon, mon.scale !== undefined ? mon.scale : 1)
         rememberMonitor(mon, { mode: mode, scale: scale, position: monitorPosition(mon) })
         const lua = monitorLua(mon, {
             mode: mode,
@@ -457,6 +588,7 @@ Item {
     }
 
     Timer { id: refreshTimer; interval: 250; onTriggered: page.refresh() }
+    Timer { id: lateRefreshTimer; interval: 1500; onTriggered: page.refresh() }
 
     Process {
         id: pEditConfig
@@ -576,6 +708,10 @@ Item {
                         required property var modelData
                         property bool off: modelData.disabled === true
                         property bool main: page.isMain(modelData)
+                        // Position controls: the other active monitors and the one we place against.
+                        property string refName: ""
+                        readonly property var others: page.activeMonitors.filter(m => m.name !== modelData.name)
+                        readonly property var refMon: others.find(m => m.name === refName) || others[0]
                         width: parent.width
                         height: cardColumn.implicitHeight + 20
                         radius: Theme.radius
@@ -677,8 +813,8 @@ Item {
                                     width: parent.width - 36 - 44 - 16
                                     anchors.verticalCenter: parent.verticalCenter
                                     icon: "\uf00e"
-                                    value: Math.max(0, Math.min(1, (card.modelData.scale - 0.7) / 0.6))
-                                    onCommitted: value => page.setScale(card.modelData, 0.7 + value * 0.6)
+                                    value: Math.max(0, Math.min(1, (card.modelData.scale - page.scaleMin) / (page.scaleMax - page.scaleMin)))
+                                    onCommitted: value => page.setScale(card.modelData, page.scaleMin + value * (page.scaleMax - page.scaleMin))
                                 }
 
                                 Text {
@@ -775,6 +911,97 @@ Item {
                                                 anchors.fill: parent; hoverEnabled: true
                                                 cursorShape: Qt.PointingHandCursor
                                                 onClicked: page.setRefreshRate(card.modelData, rateButton.modelData)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Which monitor to position against (only needed with 3+ active monitors).
+                            Row {
+                                visible: !card.off && card.others.length > 1
+                                width: parent.width; spacing: 8
+
+                                Text {
+                                    width: 36; height: 28
+                                    verticalAlignment: Text.AlignVCenter
+                                    text: "OF"; color: Theme.textDim
+                                    font.family: Theme.fontFamily; font.pixelSize: 11
+                                }
+
+                                Flow {
+                                    width: parent.width - 36 - 8; spacing: 6
+
+                                    Repeater {
+                                        model: card.off ? [] : card.others.map(m => m.name)
+
+                                        delegate: Rectangle {
+                                            id: refButton
+                                            required property string modelData
+                                            property bool current: card.refMon !== undefined && card.refMon.name === modelData
+                                            width: 92; height: 28; radius: Theme.radius
+                                            color: current ? Theme.alpha(Theme.accent, 0.10) : (refMouse.containsMouse ? Theme.alpha(Theme.accent, 0.08) : "#00000000")
+                                            border.width: 1
+                                            border.color: current || refMouse.containsMouse ? Theme.accent : Theme.border
+
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: refButton.modelData
+                                                color: Theme.text
+                                                font.family: Theme.fontFamily; font.pixelSize: 11; font.bold: true
+                                            }
+
+                                            MouseArea {
+                                                id: refMouse
+                                                anchors.fill: parent; hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: card.refName = refButton.modelData
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Position controls: place this monitor left / right / above / below the reference.
+                            Row {
+                                visible: !card.off && card.others.length > 0
+                                width: parent.width; spacing: 8
+
+                                Text {
+                                    width: 36; height: 28
+                                    verticalAlignment: Text.AlignVCenter
+                                    text: "POS"; color: Theme.textDim
+                                    font.family: Theme.fontFamily; font.pixelSize: 11
+                                }
+
+                                Flow {
+                                    width: parent.width - 36 - 8; spacing: 6
+
+                                    Repeater {
+                                        model: card.off ? [] : ["LEFT", "RIGHT", "ABOVE", "BELOW"]
+
+                                        delegate: Rectangle {
+                                            id: posButton
+                                            required property string modelData
+                                            property string side: modelData.toLowerCase()
+                                            property bool current: card.refMon !== undefined && page.relation(card.modelData, card.refMon) === side
+                                            width: 76; height: 28; radius: Theme.radius
+                                            color: current ? Theme.alpha(Theme.accent, 0.10) : (posMouse.containsMouse ? Theme.alpha(Theme.accent, 0.08) : "#00000000")
+                                            border.width: 1
+                                            border.color: current || posMouse.containsMouse ? Theme.accent : Theme.border
+
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: posButton.modelData
+                                                color: Theme.text
+                                                font.family: Theme.fontFamily; font.pixelSize: 11; font.bold: true
+                                            }
+
+                                            MouseArea {
+                                                id: posMouse
+                                                anchors.fill: parent; hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: page.placeMonitor(card.modelData, card.refMon, posButton.side)
                                             }
                                         }
                                     }

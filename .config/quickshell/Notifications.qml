@@ -17,6 +17,7 @@ Scope {
     property int maxHistory: 100
 
     property bool dnd: false
+    property bool soundEnabled: true
     property bool panelOpen: false
     property bool stateReady: false
     property bool dirsReady: false
@@ -30,6 +31,10 @@ Scope {
     readonly property bool movedFromDefault: offsetX !== 0 || offsetY !== 0
 
     readonly property string home: Quickshell.env("HOME")
+
+    // toast lifetimes (ms) when the app gives no timeout
+    readonly property int normalTimeout: 6000
+    readonly property int criticalTimeout: 20000
 
     // ---- lifecycle: window is mounted only when needed ---------------------
     readonly property bool wanted: panelOpen || server.trackedNotifications.values.length > 0
@@ -62,11 +67,47 @@ Scope {
     // ---- helpers (no window dependencies) ----------------------------------
     function px(n) { return Math.round(n * ui); }
     function imgSrc(p) { return !p ? "" : (p.startsWith("/") ? "file://" + p : p); }
-    function thumbSrc(image, icon) {
-        if (image && image !== "") return imgSrc(image);
-        if (icon && icon !== "") return Quickshell.iconPath(icon, true);
+
+    function guessKind(app, summary) {
+        const s = ((app || "") + " " + (summary || "")).toLowerCase();
+        if (/todo|remind/.test(s)) return "reminder";
+        if (/usb|disk|drive|device|mount|eject|removed|unplug|storage|udisks|udiskie/.test(s)) return "usb";
+        if (/batter/.test(s)) return "battery";
         return "";
     }
+    function resolveIcon(image, icon, app, summary) {
+        const kind = guessKind(app, summary);
+        if (kind === "reminder") return "";
+        if (image && image !== "" && !String(image).startsWith("image://icon"))
+            return imgSrc(image);
+        const cands = [];
+        if (icon && icon !== "") cands.push(icon);
+        if (app && app !== "") {
+            cands.push(app);
+            cands.push(app.toLowerCase());
+        }
+        if (kind === "usb")
+            cands.push("drive-removable-media-usb", "drive-removable-media", "media-removable", "usb-creator-gtk", "drive-harddisk-usb");
+        else if (kind === "battery")
+            cands.push("battery-caution", "battery");
+        cands.push("dialog-information");
+
+        for (let i = 0; i < cands.length; i++) {
+            const c = cands[i];
+            if (c.startsWith("/")) return "file://" + c;
+            if (c.startsWith("image://")) return c;
+            const p = String(Quickshell.iconPath(c, true) || "");
+            // reject empty results and the "missing icon" placeholder
+            if (p !== "" && p.indexOf("missing") === -1) return p;
+        }
+        return "";
+    }
+
+    // glyph shown when no icon could be resolved
+    function glyphFor(app, summary) {
+        return guessKind(app, summary) === "reminder" ? "󰂞" : "󰂚";
+    }
+
     function fmtTime(ms) {
         const d = new Date(ms);
         return d.toDateString() === new Date().toDateString()
@@ -77,10 +118,31 @@ Scope {
     function removeHistory(i) { history.remove(i); saveTimer.restart(); }
     function clearHistory() { history.clear(); saveTimer.restart(); }
     function toggleDnd() { dnd = !dnd; stateTimer.restart(); }
+    function toggleSound() { soundEnabled = !soundEnabled; stateTimer.restart(); }
     function resetPosition() {
         offsetX = 0;
         offsetY = 0;
         stateTimer.restart();
+    }
+
+    // ---- sound ----------------------------------------------------------------
+    // Plays a freedesktop sound-theme file (package: sound-theme-freedesktop) via
+    // pipewire/pulse; falls back to libcanberra if the file isn't there.
+    function playSound(name) {
+        if (!soundEnabled) return;
+        Quickshell.execDetached([
+            "sh", "-c",
+            'f="/usr/share/sounds/freedesktop/stereo/$1.oga"; '
+            + 'if [ -f "$f" ]; then pw-play "$f" 2>/dev/null || paplay "$f" 2>/dev/null; '
+            + 'else canberra-gtk-play -i "$1" 2>/dev/null; fi',
+            "sh", name
+        ]);
+    }
+
+    function soundFor(n) {
+        if (n.appName === "Todo") return "alarm-clock-elapsed";
+        if (n.urgency === NotificationUrgency.Critical) return "dialog-warning";
+        return "message-new-instant";
     }
 
     IpcHandler {
@@ -90,6 +152,8 @@ Scope {
         function close(): void { root.panelOpen = false; }
         function clear(): void { root.clearHistory(); }
         function dnd(): void { root.toggleDnd(); }
+        function isDnd(): bool { return root.dnd; }
+        function sound(): void { root.toggleSound(); }
     }
 
     // ---- persisted UI state -------------------------------------------------
@@ -105,6 +169,7 @@ Scope {
             try {
                 const s = JSON.parse(text());
                 if (typeof s.dnd === "boolean") root.dnd = s.dnd;
+                if (typeof s.soundEnabled === "boolean") root.soundEnabled = s.soundEnabled;
                 if (typeof s.menuSize === "number") root.menuSize = Math.max(60, Math.min(200, Math.round(s.menuSize)));
                 if (typeof s.offsetX === "number") root.offsetX = s.offsetX;
                 if (typeof s.offsetY === "number") root.offsetY = s.offsetY;
@@ -132,6 +197,7 @@ Scope {
             if (!root.stateReady || !root.dirsReady) { stateTimer.restart(); return; }
             stateFile.setText(JSON.stringify({
                 dnd: root.dnd,
+                soundEnabled: root.soundEnabled,
                 menuSize: root.menuSize,
                 offsetX: root.offsetX,
                 offsetY: root.offsetY
@@ -189,6 +255,7 @@ Scope {
 
         onNotification: n => {
             n.tracked = !(root.dnd && n.urgency !== NotificationUrgency.Critical);
+            if (n.tracked) root.playSound(root.soundFor(n));
             if (n.transient) return;
 
             const img = (n.image && !String(n.image).startsWith("image://")) ? String(n.image) : "";
@@ -262,6 +329,7 @@ Scope {
         property real ui: 1
         property real size: 40
         property string src: ""
+        property string glyph: "󰂚"
         width: Math.round(size * ui)
         height: width
         radius: Math.round(8 * ui)
@@ -278,7 +346,7 @@ Scope {
         Text {
             anchors.centerIn: parent
             visible: im.status !== Image.Ready
-            text: "󰂚"
+            text: th.glyph
             font.family: Theme.iconFont
             font.pixelSize: Math.round(th.size * 0.45 * th.ui)
             color: Theme.text
@@ -447,13 +515,32 @@ Scope {
                         Timer {
                             id: gone
                             interval: 220
-                            onTriggered: wrapper.wasExpired ? wrapper.modelData.expire() : wrapper.modelData.dismiss()
+                            onTriggered: {
+                                const n = wrapper.modelData;
+                                try {
+                                    if (wrapper.wasExpired) n.expire(); else n.dismiss();
+                                    // belt and braces: make sure it really leaves the tracked list
+                                    if (n) n.tracked = false;
+                                } catch (e) { }
+                            }
                         }
 
+                        // Auto-close. Critical toasts used to never expire (which left e.g.
+                        // "USB removed" stuck on screen); they now time out too, just later.
                         Timer {
-                            interval: wrapper.modelData.expireTimeout > 0 ? wrapper.modelData.expireTimeout * 1000 : 6000
-                            running: !wrapper.critical && !hover.containsMouse && !wrapper.leaving
+                            id: life
+                            interval: wrapper.modelData.expireTimeout > 0
+                                      ? wrapper.modelData.expireTimeout * 1000
+                                      : (wrapper.critical ? root.criticalTimeout : root.normalTimeout)
+                            running: !hover.containsMouse && !wrapper.leaving
                             onTriggered: wrapper.close(true)
+                        }
+
+                        // a replaced/updated notification gets a fresh lifetime
+                        Connections {
+                            target: wrapper.modelData
+                            function onSummaryChanged() { life.restart(); }
+                            function onBodyChanged() { life.restart(); }
                         }
 
                         Rectangle {
@@ -488,7 +575,9 @@ Scope {
                                     id: thumb
                                     ui: root.ui
                                     color: Theme.bg
-                                    src: root.thumbSrc(wrapper.modelData.image, wrapper.modelData.appIcon)
+                                    src: root.resolveIcon(wrapper.modelData.image, wrapper.modelData.appIcon,
+                                                          wrapper.modelData.appName, wrapper.modelData.summary)
+                                    glyph: root.glyphFor(wrapper.modelData.appName, wrapper.modelData.summary)
                                     anchors.verticalCenter: parent.verticalCenter
                                 }
 
@@ -645,6 +734,13 @@ Scope {
 
                             IconBtn {
                                 ui: root.ui
+                                icon: root.soundEnabled ? "󰕾" : "󰖁"
+                                tip: "Sound: " + (root.soundEnabled ? "ON" : "OFF")
+                                rest: root.soundEnabled ? 0.08 : 0.3
+                                onClicked: root.toggleSound()
+                            }
+                            IconBtn {
+                                ui: root.ui
                                 icon: root.dnd ? "󰂛" : "󰂚"
                                 tip: "Do Not Disturb: " + (root.dnd ? "ON" : "OFF")
                                 rest: root.dnd ? 0.3 : 0.08
@@ -718,7 +814,8 @@ Scope {
                                 ui: root.ui
                                 size: 32
                                 color: Theme.alpha(Theme.text, 0.1)
-                                src: root.thumbSrc(entry.image, entry.appIcon)
+                                src: root.resolveIcon(entry.image, entry.appIcon, entry.appName, entry.summary)
+                                glyph: root.glyphFor(entry.appName, entry.summary)
                                 anchors { left: parent.left; leftMargin: root.px(10); verticalCenter: parent.verticalCenter }
                             }
 

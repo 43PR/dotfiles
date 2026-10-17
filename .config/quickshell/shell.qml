@@ -5,6 +5,7 @@ ShellRoot {
     ScreenshotOsd {}
     SettingsWindow {}
     Notifications {}
+    RecorderOSD {}
     PowerMenu {}
     Bar {}
     Todo {}

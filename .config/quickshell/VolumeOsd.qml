@@ -14,16 +14,17 @@ Scope {
     property real winH: 0
     property real hitW: 0
 
-    // Must be longer than the fade-out (OsdCard opacity/scale = 150ms).
+    // Must be longer than the fade-out (OsdCard opacity/scale = fadeMs).
     Timer {
         id: unmountTimer
-        interval: 250
+        interval: root.fadeMs + 100
         onTriggered: {
             root.mounted = false
             root.winW = 0
             root.winH = 0
             root.hitW = 0
             root.hovered = false
+            root.hoverTip = ""
         }
     }
 
@@ -38,6 +39,7 @@ Scope {
         portraitWidth: { min: 200,  max: 400,   def: 260,  step: 20,  unit: "px" },
         flyoutWidth:   { min: 200,  max: 500,   def: 320,  step: 20,  unit: "px" },
         artSize:       { min: 32,   max: 96,    def: 52,   step: 4,   unit: "px" },
+        cardRadius:    { min: 0,    max: 40,    def: 24,   step: 2,   unit: "px" },
         barCount:      { min: 4,    max: 64,    def: 24,   step: 2,   unit: "" },
         barRadius:     { min: 0,    max: 20,    def: 20,   step: 2,   unit: "px", full: true },
         barSpacing:    { min: 1,    max: 10,    def: 3,    step: 1,   unit: "px" },
@@ -45,6 +47,8 @@ Scope {
         barFps:        { min: 15,   max: 60,    def: 30,   step: 5,   unit: " fps" },
         mediaTimeout:  { min: 500,  max: 15000, def: 3000, step: 500, unit: "s" },
         volTimeout:    { min: 300,  max: 8000,  def: 1200, step: 100, unit: "s" },
+        fadeMs:        { min: 0,    max: 500,   def: 150,  step: 25,  unit: " ms" },
+        volStep:       { min: 1,    max: 20,    def: 5,    step: 1,   unit: "%" },
         bgOpacity:     { min: 10,   max: 100,   def: Math.max(10, Math.round((Theme.bg.a ?? 1) * 20) * 5),        step: 5, unit: "%" },
         artOpacity:    { min: 20,   max: 100,   def: Math.max(20, Math.round((Theme.bgAlpha ?? 1) * 20) * 5),    step: 5, unit: "%" },
         barOpacity:    { min: 30,   max: 100,   def: 90,   step: 5,   unit: "%" },
@@ -53,14 +57,23 @@ Scope {
     readonly property var numKeys: Object.keys(numSpec)
 
     readonly property var boolDefaults: ({
+        showTips: true,
         showVisualizer: true,
         trackChangeOsd: true,
         showArt: true,
+        showControls: true,
         musicOnly: true,
         artistBelow: false,
-        portrait: true
+        portrait: true,
+        showBorder: false,
+        accentBars: false,
+        scrollVolume: true
     })
     readonly property var boolKeys: Object.keys(boolDefaults)
+
+    // One-line explanations shown under each setting (when tips are on).
+    readonly property var hints: ({
+    })
 
     readonly property var posKeys: ["offsetX", "offsetY", "volOffsetX", "volOffsetY"]
 
@@ -74,6 +87,7 @@ Scope {
     property int portraitWidth: numSpec.portraitWidth.def
     property int flyoutWidth: numSpec.flyoutWidth.def
     property int artSize: numSpec.artSize.def
+    property int cardRadius: numSpec.cardRadius.def
     property int barCount: numSpec.barCount.def
     property int barRadius: numSpec.barRadius.def
     property int barSpacing: numSpec.barSpacing.def
@@ -81,17 +95,24 @@ Scope {
     property int barFps: numSpec.barFps.def
     property int mediaTimeout: numSpec.mediaTimeout.def
     property int volTimeout: numSpec.volTimeout.def
+    property int fadeMs: numSpec.fadeMs.def
+    property int volStep: numSpec.volStep.def
     property int bgOpacity: numSpec.bgOpacity.def
     property int artOpacity: numSpec.artOpacity.def
     property int barOpacity: numSpec.barOpacity.def
     property int barDimOpacity: numSpec.barDimOpacity.def
 
+    property bool showTips: boolDefaults.showTips
     property bool showVisualizer: boolDefaults.showVisualizer
     property bool trackChangeOsd: boolDefaults.trackChangeOsd
     property bool showArt: boolDefaults.showArt
+    property bool showControls: boolDefaults.showControls
     property bool musicOnly: boolDefaults.musicOnly
     property bool artistBelow: boolDefaults.artistBelow
     property bool portrait: boolDefaults.portrait
+    property bool showBorder: boolDefaults.showBorder
+    property bool accentBars: boolDefaults.accentBars
+    property bool scrollVolume: boolDefaults.scrollVolume
 
     readonly property real scaleFactor: osdScale / 100
 
@@ -102,6 +123,7 @@ Scope {
     readonly property real curY: showMedia ? offsetY : volOffsetY
 
     readonly property bool mediaMoved: offsetX !== 0 || offsetY !== 0
+    readonly property bool volMoved: volOffsetX !== 0 || volOffsetY !== 0
 
     readonly property bool modified:
         posKeys.some(k => root[k] !== 0)
@@ -242,6 +264,17 @@ Scope {
         function onMutedChanged() { root.triggerOsd() }
     }
 
+    // Mouse wheel over a popup: change the volume.
+    function nudgeVolume(dy) {
+        if (!scrollVolume || !sink?.audio || dy === 0)
+            return
+        if (muted && dy > 0)
+            sink.audio.muted = false
+        var v = sink.audio.volume + (dy > 0 ? 1 : -1) * volStep / 100
+        sink.audio.volume = Math.max(0, Math.min(1, v))
+        hideTimer.restart()
+    }
+
     // ---- OSD state ---------------------------------------------------------
     property bool ready: false
     property bool showing: false
@@ -251,6 +284,7 @@ Scope {
     property bool dragging: false
     property bool pinned: false
     property bool hovered: false     // driven by a Binding inside the OSD window
+    property string hoverTip: ""     // tooltip text of the control under the pointer
 
     Timer {
         interval: 2000
@@ -343,6 +377,7 @@ Scope {
             settingsOpen = false
             dragging = false
             pinned = false
+            hoverTip = ""
             unmountTimer.restart()
         }
     }
@@ -375,7 +410,7 @@ Scope {
         return v + s.unit
     }
 
-    // Only called while the user drags the handle. Saved offsets are never
+    // Only called while the user drags the card. Saved offsets are never
     // rewritten by window resizes, so a transient window/card size during
     // mount can no longer squeeze the position you left it at.
     function setPosition(x, y) {
@@ -627,6 +662,7 @@ Scope {
                     Component.onCompleted: root.hitW = width
                 }
 
+                // ---- volume popup ----
                 OsdCard {
                     id: flyout
                     host: root
@@ -640,6 +676,19 @@ Scope {
                     HoverHandler {
                         id: flyoutHover
                         enabled: flyout.open
+                    }
+
+                    // The whole card is the drag handle.
+                    DragArea {
+                        anchors.fill: parent
+                        enabled: flyout.open
+                        host: root
+                        scene: scene
+                    }
+
+                    WheelHandler {
+                        enabled: flyout.open && root.scrollVolume
+                        onWheel: event => root.nudgeVolume(event.angleDelta.y)
                     }
 
                     Text {
@@ -693,6 +742,7 @@ Scope {
                     }
                 }
 
+                // ---- media popup ----
                 OsdCard {
                     id: mediaPanel
                     host: root
@@ -701,7 +751,7 @@ Scope {
                     open: win.reveal && root.showing && root.showMedia
                     width: root.portrait ? root.portraitWidth : root.mediaWidth
                     height: mediaCol.height + 28
-                    radius: 24
+                    radius: root.cardRadius
 
                     readonly property bool artShown: root.showArt
                         && root.artUrl !== "" && artImg.status !== Image.Error
@@ -711,9 +761,18 @@ Scope {
                         enabled: mediaPanel.open
                     }
 
-                    MouseArea {
+                    // Background, album art and text all drag the card.
+                    // Declared before the content so buttons stay clickable on top.
+                    DragArea {
                         anchors.fill: parent
                         enabled: mediaPanel.open
+                        host: root
+                        scene: scene
+                    }
+
+                    WheelHandler {
+                        enabled: mediaPanel.open && root.scrollVolume
+                        onWheel: event => root.nudgeVolume(event.angleDelta.y)
                     }
 
                     Column {
@@ -832,7 +891,7 @@ Scope {
                                     x: index * (visualizer.barWidth + visualizer.barSpacing)
                                     width: visualizer.barWidth
                                     radius: Math.min(root.barRadius, width / 2)
-                                    color: Theme.text
+                                    color: root.accentBars ? Theme.accent : Theme.text
                                     opacity: (((index + 0.5) / root.barCount) <= root.progress
                                               ? root.barOpacity : root.barDimOpacity) / 100
                                     height: Math.max(3, ((root.bars[index] ?? 0) / 100) * visualizer.height)
@@ -853,7 +912,7 @@ Scope {
                                 width: parent.width
                                 height: 4
                                 radius: Math.min(root.barRadius, 2)
-                                color: Theme.text
+                                color: root.accentBars ? Theme.accent : Theme.text
                                 opacity: root.barDimOpacity / 100
                             }
                             Rectangle {
@@ -861,14 +920,15 @@ Scope {
                                 width: parent.width * root.progress
                                 height: 4
                                 radius: Math.min(root.barRadius, 2)
-                                color: Theme.text
+                                color: root.accentBars ? Theme.accent : Theme.text
                                 opacity: root.barOpacity / 100
                             }
                         }
 
                         Item {
+                            visible: root.showControls
                             width: parent.width
-                            height: 26
+                            height: root.showControls ? 26 : 0
 
                             Row {
                                 anchors.centerIn: parent
@@ -878,22 +938,26 @@ Scope {
                                     text: "󰒮"
                                     font.pixelSize: 19
                                     onClicked: root.mediaCmd("previous")
+                                    onHoveredChanged: root.hoverTip = hovered ? "Previous track" : ""
                                 }
                                 GlyphButton {
                                     text: root.playing ? "󰏤" : "󰐊"
                                     font.pixelSize: 21
                                     onClicked: root.mediaCmd("play-pause")
+                                    onHoveredChanged: root.hoverTip = hovered ? (root.playing ? "Pause" : "Play") : ""
                                 }
                                 GlyphButton {
                                     text: "󰒭"
                                     font.pixelSize: 19
                                     onClicked: root.mediaCmd("next")
+                                    onHoveredChanged: root.hoverTip = hovered ? "Next track" : ""
                                 }
                             }
                         }
                     }
                 }
 
+                // ---- tools bar under the card: hint text + pin + settings ----
                 Item {
                     id: tools
                     width: win.activeCard.width
@@ -906,35 +970,32 @@ Scope {
                     scale: root.scaleFactor
                     visible: opacity > 0
                     opacity: (root.showing && (root.hovered || root.dragging)) ? 1 : 0
-                    Behavior on opacity { NumberAnimation { duration: 150 } }
+                    Behavior on opacity { NumberAnimation { duration: root.fadeMs } }
 
                     HoverHandler {
                         id: toolsHover
                         enabled: root.showing
                     }
 
-                    Item {
-                        anchors.centerIn: parent
-                        width: 60
-                        height: parent.height
-
-                        Rectangle {
-                            anchors.centerIn: parent
-                            width: 36; height: 4; radius: 2
-                            color: Theme.text
-                            opacity: (dragArea.containsMouse || root.dragging) ? 1 : 0.3
-                            Behavior on opacity { NumberAnimation { duration: 150 } }
-                        }
-
-                        DragArea {
-                            id: dragArea
-                            anchors.fill: parent
-                            host: root
-                            scene: scene
-                        }
+                    // Context hint / tooltip of whatever is under the pointer.
+                    Text {
+                        visible: root.showTips
+                        anchors.left: parent.left
+                        anchors.leftMargin: 10
+                        anchors.right: root.showMedia ? pinButton.left : parent.right
+                        anchors.rightMargin: 8
+                        anchors.verticalCenter: parent.verticalCenter
+                        elide: Text.ElideRight
+                        font.pixelSize: 10
+                        color: Theme.textDim
+                        horizontalAlignment: root.showMedia ? Text.AlignLeft : Text.AlignHCenter
+                        text: root.dragging ? ""
+                            : root.hoverTip !== "" ? root.hoverTip
+                            : "RMB for settings · Drag to move · double-click resets"
                     }
 
                     FooterButton {
+                        id: pinButton
                         visible: root.showMedia
                         anchors.right: settingsButton.left
                         anchors.rightMargin: 8
@@ -946,6 +1007,8 @@ Scope {
                         active: root.pinned
                         opacity: (hovered || root.pinned) ? 1 : 0.3
                         onClicked: root.togglePinned()
+                        onHoveredChanged: root.hoverTip = hovered
+                            ? (root.pinned ? "Unpin (allow auto-hide)" : "Pin open (disable auto-hide)") : ""
                     }
 
                     // Settings only cover the media popup now, so the button
@@ -963,6 +1026,7 @@ Scope {
                         active: root.settingsOpen
                         opacity: (hovered || root.settingsOpen) ? 1 : 0.3
                         onClicked: root.toggleSettings()
+                        onHoveredChanged: root.hoverTip = hovered ? "Settings" : ""
                     }
                 }
             }
@@ -981,7 +1045,7 @@ Scope {
 
             color: "transparent"
             implicitWidth: 420
-            implicitHeight: Math.min(560, (screen?.height ?? 800) * 0.85)
+            implicitHeight: Math.min(600, (screen?.height ?? 800) * 0.85)
             exclusionMode: ExclusionMode.Ignore
 
             WlrLayershell.layer: WlrLayer.Overlay
@@ -1017,8 +1081,8 @@ Scope {
                     }
                     Text {
                         x: 20; y: 34
-                        text: "Hover a popup and drag its handle to move it."
-                        font.pixelSize: 10
+                        text: "Drag to move it. Right-click to open settings"
+                        font.pixelSize: 12
                         color: Theme.textDim
                     }
                     Text {
@@ -1067,12 +1131,17 @@ Scope {
                         x: 20
                         width: flick.width - 48
 
+                        SectionHeader { text: "Hints" }
+                        ToggleRow { host: root; key: "showTips"; label: "Tooltips & hints"; checked: root.showTips }
+
                         SectionHeader { text: "Global" }
                         SliderRow { host: root; key: "osdScale"; label: "Scale" }
+                        SliderRow { host: root; key: "fadeMs"; label: "Animation speed" }
 
                         SectionHeader { text: "Content" }
                         ToggleRow { host: root; key: "showArt"; label: "Album art"; checked: root.showArt }
                         ToggleRow { host: root; key: "showVisualizer"; label: "Visualizer"; checked: root.showVisualizer }
+                        ToggleRow { host: root; key: "showControls"; label: "Playback buttons"; checked: root.showControls }
 
                         SectionHeader { text: "Layout" }
                         ToggleRow { host: root; key: "portrait"; label: "Portrait layout"; checked: root.portrait }
@@ -1094,6 +1163,8 @@ Scope {
                             label: "Art size"
                             enabled: root.showArt && !root.portrait
                         }
+                        SliderRow { host: root; key: "cardRadius"; label: "Corner radius" }
+                        ToggleRow { host: root; key: "showBorder"; label: "Border"; checked: root.showBorder }
 
                         SectionHeader { text: "Visualizer" }
                         SliderRow { host: root; key: "barCount"; label: "Bars"; enabled: root.showVisualizer }
@@ -1101,6 +1172,7 @@ Scope {
                         SliderRow { host: root; key: "barHeight"; label: "Height" }
                         SliderRow { host: root; key: "barRadius"; label: "Round" }
                         SliderRow { host: root; key: "barFps"; label: "Frame rate"; enabled: root.showVisualizer }
+                        ToggleRow { host: root; key: "accentBars"; label: "Accent colour"; checked: root.accentBars }
 
                         SectionHeader { text: "Opacity" }
                         SliderRow { host: root; key: "bgOpacity"; label: "Background" }
@@ -1112,15 +1184,27 @@ Scope {
                         ToggleRow { host: root; key: "musicOnly"; label: "Music players only"; checked: root.musicOnly }
                         ToggleRow { host: root; key: "trackChangeOsd"; label: "Pop up on track change"; checked: root.trackChangeOsd }
                         SliderRow { host: root; key: "mediaTimeout"; label: "Media hide after" }
+                        ToggleRow { host: root; key: "scrollVolume"; label: "Scroll to change volume"; checked: root.scrollVolume }
+                        SliderRow { host: root; key: "volStep"; label: "Scroll step"; enabled: root.scrollVolume }
 
                         SectionHeader { text: "Volume popup" }
                         SliderRow { host: root; key: "volTimeout"; label: "Volume hide after" }
 
                         SectionHeader { text: "Position" }
-                        ActionButton {
-                            label: "Reset media position"
-                            enabled: root.mediaMoved
-                            onClicked: root.resetPos(true)
+                        Row {
+                            spacing: 8
+                            ActionButton {
+                                id: resetMediaBtn
+                                label: "Reset media position"
+                                enabled: root.mediaMoved
+                                onClicked: root.resetPos(true)
+                            }
+                            ActionButton {
+                                id: resetVolBtn
+                                label: "Reset volume position"
+                                enabled: root.volMoved
+                                onClicked: root.resetPos(false)
+                            }
                         }
                     }
                 }
@@ -1192,13 +1276,16 @@ Scope {
                     }
 
                     ActionButton {
+                        id: resetAllBtn
                         x: 20
                         anchors.verticalCenter: parent.verticalCenter
                         label: "Reset all"
                         enabled: root.modified
                         onClicked: root.resetAll()
                     }
+
                     ActionButton {
+                        id: doneBtn
                         anchors.right: parent.right
                         anchors.rightMargin: 20
                         anchors.verticalCenter: parent.verticalCenter
@@ -1219,6 +1306,8 @@ Scope {
         property real yOffset: 0
 
         color: host.cardColor
+        border.width: host.showBorder ? 1 : 0
+        border.color: Theme.alpha(Theme.text, 0.12)
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.horizontalCenterOffset: xOffset
         anchors.top: parent.top
@@ -1228,8 +1317,8 @@ Scope {
         visible: opacity > 0
         scale: (open ? 1 : 0.9) * host.scaleFactor
 
-        Behavior on opacity { NumberAnimation { duration: 150 } }
-        Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+        Behavior on opacity { NumberAnimation { duration: host.fadeMs } }
+        Behavior on scale { NumberAnimation { duration: host.fadeMs; easing.type: Easing.OutCubic } }
     }
 
     component FooterButton: Rectangle {
@@ -1262,12 +1351,22 @@ Scope {
     }
 
     component GlyphButton: Text {
+        id: gb
+        readonly property bool hovered: gbArea.containsMouse
         signal clicked()
         font.family: "Symbols Nerd Font"
         color: Theme.text
-        MouseArea { anchors.fill: parent; onClicked: parent.clicked() }
+        opacity: hovered ? 1 : 0.8
+        Behavior on opacity { NumberAnimation { duration: 120 } }
+        MouseArea {
+            id: gbArea
+            anchors.fill: parent
+            hoverEnabled: true
+            onClicked: gb.clicked()
+        }
     }
 
+    // Fill a card with this to make the whole card draggable.
     component DragArea: MouseArea {
         id: da
         property var host
@@ -1278,7 +1377,7 @@ Scope {
         property real startY: 0
 
         hoverEnabled: true
-        acceptedButtons: Qt.LeftButton
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
         cursorShape: host.dragging ? Qt.ClosedHandCursor : Qt.OpenHandCursor
 
         function finish() {
@@ -1287,8 +1386,12 @@ Scope {
             host.dragging = false
             host.saveState()
         }
-
         onPressed: function (mouse) {
+            if (mouse.button === Qt.RightButton) {
+                if (host.showMedia)
+                host.toggleSettings()
+                return
+            }
             var p = da.mapToItem(da.scene, mouse.x, mouse.y)
             pressX = p.x
             pressY = p.y
@@ -1304,13 +1407,17 @@ Scope {
         }
         onReleased: finish()
         onCanceled: finish()
-        onDoubleClicked: host.resetPos(host.showMedia)
+        onDoubleClicked: function (mouse) {
+            if (mouse.button === Qt.LeftButton)
+            host.resetPos(host.showMedia)
+        }
     }
 
     component ActionButton: Rectangle {
         id: ab
         property string label: ""
         property bool primary: false
+        readonly property bool hovered: abArea.containsMouse
         signal clicked()
 
         implicitWidth: abText.implicitWidth + 28
@@ -1365,8 +1472,12 @@ Scope {
         property string label: ""
         property bool checked: false
 
+        readonly property string hint: host.hints[key] ?? ""
+        readonly property bool showHint: host.showTips && hint !== ""
+        readonly property real hintH: showHint ? trHint.implicitHeight + 2 : 0
+
         width: parent?.width ?? 0
-        height: 34
+        height: 34 + hintH
         opacity: enabled ? 1 : 0.4
 
         Rectangle {
@@ -1381,7 +1492,7 @@ Scope {
             anchors.left: parent.left
             anchors.right: sw.left
             anchors.rightMargin: 12
-            anchors.verticalCenter: parent.verticalCenter
+            y: tr.showHint ? 4 : 9
             text: tr.label
             elide: Text.ElideRight
             font.pixelSize: 12
@@ -1389,10 +1500,22 @@ Scope {
             color: Theme.text
         }
 
+        Text {
+            id: trHint
+            visible: tr.showHint
+            x: 0
+            y: 21
+            width: parent.width - 48
+            text: tr.hint
+            wrapMode: Text.WordWrap
+            font.pixelSize: 10
+            color: Theme.textDim
+        }
+
         Rectangle {
             id: sw
             anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
+            y: 7
             width: 36; height: 20; radius: 10
             color: tr.checked ? Theme.accent : "transparent"
             border.width: 1
@@ -1428,8 +1551,12 @@ Scope {
         readonly property real ratio: Math.max(0, Math.min(1,
             (host[key] - spec.min) / (spec.max - spec.min)))
 
+        readonly property string hint: host.hints[key] ?? ""
+        readonly property bool showHint: host.showTips && hint !== ""
+        readonly property real hintH: showHint ? srHint.implicitHeight + 2 : 0
+
         width: parent?.width ?? 0
-        height: 44
+        height: 44 + hintH
         opacity: enabled ? 1 : 0.4
 
         Text {
@@ -1449,11 +1576,23 @@ Scope {
             color: Theme.textDim
         }
 
+        Text {
+            id: srHint
+            visible: sr.showHint
+            x: 0
+            y: 22
+            width: parent.width
+            text: sr.hint
+            wrapMode: Text.WordWrap
+            font.pixelSize: 10
+            color: Theme.textDim
+        }
+
         Rectangle {
             id: track
             anchors.left: parent.left
             anchors.right: parent.right
-            y: 30
+            y: 30 + sr.hintH
             height: 4
             radius: 2
             color: Theme.alpha(Theme.text, 0.15)
@@ -1479,7 +1618,7 @@ Scope {
         MouseArea {
             id: sliderArea
             anchors.fill: parent
-            anchors.topMargin: 20
+            anchors.topMargin: 20 + sr.hintH
             enabled: sr.enabled
 
             function apply(mx) {

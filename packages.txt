@@ -34,6 +34,7 @@ xdg-utils
 awww
 grim
 slurp
+gpu-screen-recorder
 imagemagick
 matugen
 

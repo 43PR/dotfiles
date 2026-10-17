@@ -13,10 +13,21 @@ Scope {
     // ───────────────────────── Config ─────────────────────────
     // Single source of truth for defaults (used by the adapter AND reset).
     readonly property var defaults: ({
+        // layout
         position: "left", style: "joined", thickness: 20, margin: 4,
+        reserveSpace: true, allScreens: true,
+        // appearance
         scale: 1.0, bgOpacity: 0.5, border: false, radius: Theme.radius, calRadius: 15,
-        statsMode: "compact", tooltips: true, tooltipHints: true,
-        hidden: "stats,wall,settings",
+        // tooltips
+        tooltips: true, tooltipHints: true, tipDelay: 450,
+        // modules
+        modPad: 20, wsDot: 10, wsGap: 8, wsScroll: true,
+        statsMode: "compact", statsWarn: 85, batLowPct: 15,
+        volStep: 2, volMax: 100,
+        // clock / calendar
+        clock24: true, clockSeconds: false, weekMonday: true,
+        // module placement
+        hidden: "stats,wall,settings,tasks",
         startMods: "stats,ws",
         centerMods: "clock",
         endMods: "media,volume,battery,net,notif,wall,settings,power"
@@ -27,7 +38,7 @@ Scope {
     readonly property var statsModes: ["default", "compact"]
 
     Component.onCompleted: BluetoothState.init()
-    
+
     FileView {
         id: cfgFile
         path: Quickshell.env("HOME") + "/.config/quickshell/state/bar-state.json"
@@ -41,14 +52,28 @@ Scope {
             property string style: root.defaults.style
             property int thickness: root.defaults.thickness
             property int margin: root.defaults.margin
+            property bool reserveSpace: root.defaults.reserveSpace   // push windows away from the bar
+            property bool allScreens: root.defaults.allScreens       // false → first screen only
             property real scale: root.defaults.scale
             property real bgOpacity: root.defaults.bgOpacity
             property bool border: root.defaults.border
             property int radius: root.defaults.radius            // bar corner radius
             property int calRadius: root.defaults.calRadius      // calendar popup corner radius
-            property string statsMode: root.defaults.statsMode   // "default" | "compact"
             property bool tooltips: root.defaults.tooltips
             property bool tooltipHints: root.defaults.tooltipHints // show "Left click: ..." lines in tooltips
+            property int tipDelay: root.defaults.tipDelay        // ms before a tooltip appears
+            property int modPad: root.defaults.modPad            // horizontal padding of text modules
+            property int wsDot: root.defaults.wsDot              // workspace dot size
+            property int wsGap: root.defaults.wsGap              // gap between workspace dots
+            property bool wsScroll: root.defaults.wsScroll       // scroll on workspaces to switch
+            property string statsMode: root.defaults.statsMode   // "default" | "compact"
+            property int statsWarn: root.defaults.statsWarn      // CPU/RAM % that turns red
+            property int batLowPct: root.defaults.batLowPct      // battery % that turns red
+            property int volStep: root.defaults.volStep          // % per scroll notch
+            property int volMax: root.defaults.volMax            // max volume %
+            property bool clock24: root.defaults.clock24
+            property bool clockSeconds: root.defaults.clockSeconds
+            property bool weekMonday: root.defaults.weekMonday   // calendar week starts on Monday
             property string hidden: root.defaults.hidden         // comma list of disabled modules
             property string startMods: root.defaults.startMods
             property string centerMods: root.defaults.centerMods
@@ -59,6 +84,7 @@ Scope {
     Timer { id: saveTimer; interval: 300; onTriggered: cfgFile.writeAdapter() }
 
     function resetSettings() { for (const k in defaults) cfg[k] = defaults[k]; }
+    readonly property bool modified: Object.keys(defaults).some(k => cfg[k] !== defaults[k])
 
     // ───────────────────────── Derived layout ─────────────────────────
     readonly property bool vertical: cfg.position === "left" || cfg.position === "right"
@@ -76,6 +102,7 @@ Scope {
     readonly property var sz: ({
         stat: s(12), clock: s(12), marquee: s(11),
         icon: s(16), batIcon: s(13), batText: s(12), power: s(13),
+        taskIcon: s(18),
         calTime: s(30), calDate: s(12), calMonth: s(13), calArrow: s(16),
         calWeekday: s(11), calDay: s(12)
     })
@@ -90,6 +117,35 @@ Scope {
         return alongBar ? effGap : 0;
     }
 
+    // ───────────────────────── Clock formatting ─────────────────────────
+    function clockText(d) {
+        const h24 = d.getHours();
+        const h12 = h24 % 12 || 12;
+        const mm = String(d.getMinutes()).padStart(2, "0");
+        const ss = String(d.getSeconds()).padStart(2, "0");
+        if (cfg.clock24)
+        return (cfg.clockSeconds
+        ? String(h24).padStart(2, "0") + ":" + mm + ":" + ss
+        : String(h24).padStart(2, "0") + ":" + mm);
+        const suffix = h24 >= 12 ? "PM" : "AM";
+        return cfg.clockSeconds
+        ? h12 + ":" + mm + ":" + ss + " " + suffix
+        : h12 + ":" + mm + " " + suffix;
+    }
+    function clockVText(d) {
+        const h24 = d.getHours();
+        const h = cfg.clock24
+        ? String(h24).padStart(2, "0")
+        : String(h24 % 12 || 12);
+        const mm = String(d.getMinutes()).padStart(2, "0");
+        const parts = [h, mm];
+        if (cfg.clockSeconds)
+        parts.push(String(d.getSeconds()).padStart(2, "0"));
+        if (!cfg.clock24)
+        parts.push(h24 >= 12 ? "PM" : "AM");
+        return parts.join("\n");
+    }
+
     // ───────────────────────── Battery ─────────────────────────
     readonly property var battery: UPower.devices.values.find(d => d.isLaptopBattery)
         ?? (UPower.displayDevice && UPower.displayDevice.isPresent
@@ -100,7 +156,7 @@ Scope {
         && (battery.state === UPowerDeviceState.Charging
             || battery.state === UPowerDeviceState.PendingCharge
             || battery.state === UPowerDeviceState.FullyCharged)
-    readonly property bool batLow: battery !== null && !batCharging && batPct <= 15
+    readonly property bool batLow: battery !== null && !batCharging && batPct <= cfg.batLowPct
     readonly property var batIcons: ["\uf244", "\uf243", "\uf242", "\uf241", "\uf240"]
     readonly property string batIcon: batIcons[batPct >= 90 ? 4 : batPct >= 65 ? 3 : batPct >= 40 ? 2 : batPct >= 15 ? 1 : 0]
 
@@ -125,6 +181,7 @@ Scope {
     readonly property var moduleDefs: [
         { id: "stats",    l: "CPU / RAM" },
         { id: "ws",       l: "Workspaces" },
+        { id: "tasks",    l: "Open apps" },
         { id: "media",    l: "Media" },
         { id: "volume",   l: "Volume" },
         { id: "battery",  l: "Battery" },
@@ -142,7 +199,7 @@ Scope {
     readonly property var moduleIds: moduleDefs.map(d => d.id)
     readonly property var defMap: moduleDefs.reduce((m, d) => { m[d.id] = d; return m; }, {})
     readonly property var comps: ({
-        stats: statsC, ws: wsC, media: mediaC, volume: volumeC, battery: batteryC, icon: iconC
+        stats: statsC, ws: wsC, tasks: tasksC, media: mediaC, volume: volumeC, battery: batteryC, icon: iconC
     })
 
     function csv(str) { return str === "" ? [] : str.split(","); }
@@ -205,7 +262,6 @@ Scope {
     // ───────────────────────── State / IPC ─────────────────────────
     property bool barVisible: true
     property bool settingsOpen: false
-    property string settingsTab: "bar"      // "bar" | "modules"
     property bool barLive: true
 
     function rebuildBar() { barLive = false; rebuildTimer.restart(); }
@@ -363,7 +419,7 @@ Scope {
         onHotChanged: if (!hot) { shown = false; suppressed = false; }
 
         Timer {
-            interval: 450
+            interval: cfg.tipDelay
             running: tp.hot && tp.usable && !tp.shown
             onTriggered: tp.shown = true
         }
@@ -520,7 +576,7 @@ Scope {
         property bool bold: false
         property real yOffset: 0
         property int spacing: root.sizeIconGap
-        property int padX: 20
+        property int padX: cfg.modPad
 
         readonly property color fg: warning ? Theme.danger : active ? Theme.accent : color
         readonly property string shown: root.vertical ? vtext : text
@@ -597,151 +653,475 @@ Scope {
         }
     }
 
-    // ── Settings-window widgets ──
+    // ───────────────────────── Settings-window widgets ─────────────────────────
+    // Same look as the power-menu settings: section headers, label + value
+    // sliders, toggle rows, pill buttons and in-window hover hints.
+
     component Rule: Rectangle {
         height: 1
         color: Qt.alpha(Theme.text, 0.12)
     }
 
-    // Dimmed automatically when `enabled: false` is set on it or a parent.
-    component Toggle: Rectangle {
-        id: tg
+    // Small hover hint drawn inside the settings window (no extra popup
+    // surface). Respects the "Tooltips" setting. The host row raises its own
+    // z while `shown` so the hint isn't covered by the rows below it.
+    component SetTip: Rectangle {
+        id: stp
+        property string text: ""
+        property bool hovered: false
+        property bool shown: false
+        readonly property bool wanted: cfg.tooltips && text !== "" && hovered
+
+        onWantedChanged: {
+            if (wanted) {
+                stDelay.restart();
+            } else {
+                stDelay.stop();
+                shown = false;
+            }
+        }
+        Timer { id: stDelay; interval: cfg.tipDelay; onTriggered: stp.shown = stp.wanted }
+
+        z: 1000
+        x: 0
+        y: parent.height + 2
+        width: stText.implicitWidth + 16
+        height: stText.implicitHeight + 10
+        radius: 6
+        color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, 1)
+        border.width: 1
+        border.color: Qt.alpha(Theme.text, 0.15)
+        opacity: shown ? 1 : 0
+        visible: opacity > 0
+        Behavior on opacity { NumberAnimation { duration: 120 } }
+
+        Text {
+            id: stText
+            anchors.centerIn: parent
+            text: stp.text
+            font.family: Theme.iconFont
+            font.pixelSize: 10
+            color: Theme.text
+        }
+    }
+
+    component SectionHeader: Item {
+        property string text: ""
+        Layout.fillWidth: true
+        implicitHeight: 32
+
+        Text {
+            anchors.left: parent.left
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 4
+            text: parent.text
+            font.family: Theme.iconFont
+            font.pixelSize: 10
+            font.bold: true
+            font.letterSpacing: 1.2
+            font.capitalization: Font.AllUppercase
+            color: Theme.textDim
+        }
+    }
+
+    // Pure switch visual with its own click handling.
+    component ToggleSwitch: Rectangle {
+        id: sw
         property bool checked: false
         signal toggled(bool v)
-        implicitWidth: 34
-        implicitHeight: 18
-        radius: 9
-        opacity: enabled ? 1 : 0.4
-        color: Qt.alpha(checked ? Theme.accent : Theme.text, checked ? 0.6 : 0.15)
+        width: 36; height: 20; radius: 10
+        color: checked ? Theme.accent : "transparent"
+        border.width: 1
+        border.color: checked ? Theme.accent : Qt.alpha(Theme.text, 0.3)
+        Behavior on color { ColorAnimation { duration: 150 } }
+
         Rectangle {
-            width: 14; height: 14; radius: 7; y: 2
-            x: tg.checked ? 18 : 2
-            color: Theme.text
-            Behavior on x { NumberAnimation { duration: 120 } }
+            width: 14; height: 14; radius: 7
+            anchors.verticalCenter: parent.verticalCenter
+            x: sw.checked ? parent.width - width - 3 : 3
+            color: sw.checked ? Theme.bg : Theme.text
+            Behavior on x { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
         }
         MouseArea {
             anchors.fill: parent
             cursorShape: Qt.PointingHandCursor
-            onClicked: tg.toggled(!tg.checked)
+            onClicked: sw.toggled(!sw.checked)
         }
     }
 
-    // `step` snaps the value (0 = continuous)
-    component Slide: Item {
-        id: sl
-        property real from: 0
-        property real to: 1
-        property real value: 0
-        property real step: 0
-        readonly property real frac: (value - from) / (to - from)
-        signal moved(real v)
-        implicitWidth: 160
-        implicitHeight: 20
-        opacity: enabled ? 1 : 0.4
-
-        Rectangle {
-            anchors.verticalCenter: parent.verticalCenter
-            width: parent.width; height: 4; radius: 2
-            color: Qt.alpha(Theme.text, 0.15)
-            Rectangle { width: parent.width * sl.frac; height: 4; radius: 2; color: Theme.accent }
-        }
-        Rectangle {
-            anchors.verticalCenter: parent.verticalCenter
-            x: (sl.width - width) * sl.frac
-            width: 12; height: 12; radius: 6
-            color: Theme.text
-        }
-        MouseArea {
-            anchors.fill: parent
-            cursorShape: Qt.PointingHandCursor
-            function upd(px) {
-                const v = sl.from + Math.max(0, Math.min(1, px / width)) * (sl.to - sl.from);
-                sl.moved(sl.step > 0 ? +(Math.round(v / sl.step) * sl.step).toFixed(3) : v);
-            }
-            onPressed: m => upd(m.x)
-            onPositionChanged: m => { if (pressed) upd(m.x); }
-        }
-    }
-
-    // One button style for everything clickable in the settings window.
-    //   plain    → transparent until selected/hovered (tabs, segments)
-    //   primary  → accent-filled (Done)
-    component Pill: Rectangle {
-        id: pl
-        property string label: ""
-        property bool selected: false
-        property bool plain: false
-        property bool primary: false
-        signal clicked()
-        implicitWidth: Math.max(24, lbl.implicitWidth + 18)
-        implicitHeight: 24
-        radius: height / 2
-        opacity: enabled ? 1 : 0.35
-        color: selected || primary ? Qt.alpha(Theme.accent, 0.4)
-             : plMa.containsMouse ? Qt.alpha(Theme.text, 0.14)
-             : plain ? "transparent" : Qt.alpha(Theme.text, 0.08)
-        Behavior on color { ColorAnimation { duration: 100 } }
-        Text {
-            id: lbl
-            anchors.centerIn: parent
-            text: pl.label
-            color: pl.plain && !pl.selected ? Theme.textDim : Theme.text
-            font.family: Theme.iconFont
-            font.pixelSize: 11
-            font.capitalization: Font.Capitalize
-        }
-        MouseArea {
-            id: plMa
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: pl.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-            onClicked: pl.clicked()
-        }
-    }
-
-    // Segmented control built from Pills
-    component Seg: Rectangle {
+    // Segmented control (position, style, section …)
+    component SegControl: Rectangle {
         id: seg
         property var options: []
         property string current: ""
         signal picked(string v)
         implicitWidth: segRow.implicitWidth + 4
-        implicitHeight: 26
-        radius: 13
+        implicitHeight: 24
+        radius: 12
+        opacity: enabled ? 1 : 0.4
         color: Qt.alpha(Theme.text, 0.08)
+
         Row {
             id: segRow
             anchors.centerIn: parent
             Repeater {
                 model: seg.options
-                delegate: Pill {
+                delegate: Rectangle {
+                    id: opt
                     required property string modelData
-                    height: 22
-                    plain: true
-                    label: modelData
-                    selected: modelData === seg.current
-                    onClicked: seg.picked(modelData)
+                    implicitWidth: optText.implicitWidth + 14
+                    width: implicitWidth
+                    height: 20
+                    radius: 10
+                    color: modelData === seg.current ? Qt.alpha(Theme.accent, 0.4)
+                         : optMa.containsMouse ? Qt.alpha(Theme.text, 0.14) : "transparent"
+                    Behavior on color { ColorAnimation { duration: 100 } }
+                    Text {
+                        id: optText
+                        anchors.centerIn: parent
+                        text: opt.modelData
+                        font.family: Theme.iconFont
+                        font.pixelSize: 10
+                        font.capitalization: Font.Capitalize
+                        color: opt.modelData === seg.current ? Theme.text : Theme.textDim
+                    }
+                    MouseArea {
+                        id: optMa
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: seg.picked(opt.modelData)
+                    }
                 }
             }
         }
     }
 
-    // Label on the left; whatever you put inside goes on the right.
-    component SetRow: RowLayout {
-        property string label: ""
-        Layout.fillWidth: true
-        spacing: 8
-        opacity: enabled ? 1 : 0.4
+    component ArrowBtn: Rectangle {
+        id: arb
+        property string glyph: ""
+        signal clicked()
+        implicitWidth: 22
+        implicitHeight: 22
+        radius: 6
+        opacity: enabled ? 1 : 0.35
+        color: Qt.alpha(Theme.text, arbMa.containsMouse && enabled ? 0.18 : 0.08)
+        Behavior on color { ColorAnimation { duration: 100 } }
         Text {
-            Layout.fillWidth: true
-            text: parent.label
-            elide: Text.ElideRight
+            anchors.centerIn: parent
+            text: arb.glyph
+            font.pixelSize: 9
             color: Theme.text
-            font.family: Theme.iconFont
-            font.pixelSize: 12
+        }
+        MouseArea {
+            id: arbMa
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: arb.clicked()
         }
     }
 
+    component ToggleRow: Item {
+        id: tr
+        property string label: ""
+        property string tip: ""
+        property bool checked: false
+        signal toggled(bool v)
+
+        Layout.fillWidth: true
+        implicitHeight: 34
+        z: trTip.shown ? 100 : 0
+        opacity: enabled ? 1 : 0.4
+
+        Rectangle {
+            anchors.fill: parent
+            anchors.leftMargin: -8
+            anchors.rightMargin: -8
+            radius: 8
+            color: trMa.containsMouse && tr.enabled ? Qt.alpha(Theme.text, 0.06) : "transparent"
+        }
+
+        Text {
+            anchors.left: parent.left
+            anchors.right: trSw.left
+            anchors.rightMargin: 12
+            anchors.verticalCenter: parent.verticalCenter
+            text: tr.label
+            elide: Text.ElideRight
+            font.family: Theme.iconFont
+            font.pixelSize: 12
+            font.bold: true
+            color: Theme.text
+        }
+
+        MouseArea {
+            id: trMa
+            anchors.fill: parent
+            hoverEnabled: true
+            onClicked: tr.toggled(!tr.checked)
+        }
+
+        ToggleSwitch {
+            id: trSw
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            checked: tr.checked
+            onToggled: v => tr.toggled(v)
+        }
+
+        SetTip { id: trTip; text: tr.tip; hovered: trMa.containsMouse }
+    }
+
+    // Label on the left, segmented choice on the right.
+    component SegRow: Item {
+        id: sgr
+        property string label: ""
+        property string tip: ""
+        property var options: []
+        property string current: ""
+        signal picked(string v)
+
+        Layout.fillWidth: true
+        implicitHeight: 38
+        z: sgTip.shown ? 100 : 0
+        opacity: enabled ? 1 : 0.4
+
+        MouseArea { id: sgMa; anchors.fill: parent; hoverEnabled: true; acceptedButtons: Qt.NoButton }
+
+        RowLayout {
+            anchors.fill: parent
+            spacing: 8
+            Text {
+                Layout.fillWidth: true
+                text: sgr.label
+                elide: Text.ElideRight
+                font.family: Theme.iconFont
+                font.pixelSize: 12
+                font.bold: true
+                color: Theme.text
+            }
+            SegControl {
+                options: sgr.options
+                current: sgr.current
+                onPicked: v => sgr.picked(v)
+            }
+        }
+
+        SetTip { id: sgTip; text: sgr.tip; hovered: sgMa.containsMouse }
+    }
+
+    // Label + value on top, track below. Writes through `moved`; the
+    // adapter debounces saving, so nothing to do on release.
+    component SliderRow: Item {
+        id: sr
+        property string label: ""
+        property string tip: ""
+        property real from: 0
+        property real to: 1
+        property real step: 1
+        property real value: 0
+        property string unit: ""
+        property real displayScale: 1
+        property int decimals: 0
+        signal moved(real v)
+
+        readonly property real ratio: to > from ? Math.max(0, Math.min(1, (value - from) / (to - from))) : 0
+
+        Layout.fillWidth: true
+        implicitHeight: 44
+        z: srTip.shown ? 100 : 0
+        opacity: enabled ? 1 : 0.4
+
+        Text {
+            anchors.left: parent.left
+            y: 6
+            text: sr.label
+            font.family: Theme.iconFont
+            font.pixelSize: 12
+            font.bold: true
+            color: Theme.text
+        }
+
+        Text {
+            anchors.right: parent.right
+            y: 6
+            text: (sr.value * sr.displayScale).toFixed(sr.decimals) + sr.unit
+            font.family: Theme.iconFont
+            font.pixelSize: 11
+            color: Theme.textDim
+        }
+
+        Rectangle {
+            id: track
+            anchors.left: parent.left
+            anchors.right: parent.right
+            y: 30
+            height: 4
+            radius: 2
+            color: Qt.alpha(Theme.text, 0.15)
+
+            Rectangle {
+                width: knob.x + knob.width / 2
+                height: parent.height
+                radius: 2
+                color: Theme.accent
+            }
+            Rectangle {
+                id: knob
+                width: 14
+                height: 14
+                radius: 7
+                anchors.verticalCenter: parent.verticalCenter
+                x: sr.ratio * (track.width - width)
+                color: Theme.text
+            }
+        }
+
+        MouseArea {
+            id: srMa
+            anchors.fill: parent
+            anchors.topMargin: 20
+            hoverEnabled: true
+            // keeps the page from scrolling while a slider is being dragged
+            preventStealing: true
+            cursorShape: Qt.PointingHandCursor
+
+            function apply(mx) {
+                const usable = track.width - knob.width;
+                if (usable <= 0) return;
+                const r = Math.max(0, Math.min(1, (mx - knob.width / 2) / usable));
+                const v = sr.from + r * (sr.to - sr.from);
+                sr.moved(sr.step > 0 ? +(Math.round(v / sr.step) * sr.step).toFixed(3) : v);
+            }
+            onPressed: m => apply(m.x)
+            onPositionChanged: m => { if (pressed) apply(m.x); }
+        }
+
+        SetTip { id: srTip; text: sr.tip; hovered: srMa.containsMouse && !srMa.pressed }
+    }
+
+    // One row of the "Modules" list: enable · section · move earlier / later
+    component ModuleRow: Item {
+        id: mr
+        property var def: ({})
+        Layout.fillWidth: true
+        implicitHeight: 38
+
+        RowLayout {
+            anchors.fill: parent
+            spacing: 6
+
+            Text {
+                Layout.fillWidth: true
+                text: mr.def.l ?? ""
+                elide: Text.ElideRight
+                font.family: Theme.iconFont
+                font.pixelSize: 12
+                font.bold: true
+                color: Theme.text
+            }
+            ToggleSwitch {
+                enabled: !mr.def.fixed
+                opacity: enabled ? 1 : 0.4
+                checked: !!mr.def.fixed || root.isOn(mr.def.id)
+                onToggled: v => root.setOn(mr.def.id, v)
+            }
+            SegControl {
+                options: root.sections
+                current: root.sectionOf(mr.def.id)
+                onPicked: v => root.moveTo(mr.def.id, v)
+            }
+            ArrowBtn {
+                glyph: root.vertical ? "\u25B2" : "\u25C0"
+                enabled: root.canShift(mr.def.id, -1)
+                onClicked: root.shiftBy(mr.def.id, -1)
+            }
+            ArrowBtn {
+                glyph: root.vertical ? "\u25BC" : "\u25B6"
+                enabled: root.canShift(mr.def.id, 1)
+                onClicked: root.shiftBy(mr.def.id, 1)
+            }
+        }
+    }
+
+    component ActionButton: Rectangle {
+        id: ab
+        property string label: ""
+        property bool primary: false
+        signal clicked()
+
+        implicitWidth: abText.implicitWidth + 28
+        width: implicitWidth
+        height: 30
+        radius: 15
+        opacity: enabled ? 1 : 0.4
+        color: primary
+            ? Theme.accent
+            : Qt.alpha(Theme.text, abArea.containsMouse ? 0.18 : 0.1)
+        Behavior on color { ColorAnimation { duration: 120 } }
+
+        Text {
+            id: abText
+            anchors.centerIn: parent
+            text: ab.label
+            font.family: Theme.iconFont
+            font.pixelSize: 11
+            font.bold: true
+            color: ab.primary ? Theme.bg : Theme.text
+        }
+        MouseArea {
+            id: abArea
+            anchors.fill: parent
+            hoverEnabled: true
+            enabled: ab.enabled
+            cursorShape: Qt.PointingHandCursor
+            onClicked: ab.clicked()
+        }
+    }
+
+    // One line of the controls cheat-sheet: description left, chip right.
+    component KeyRow: Item {
+        id: kr
+        property string keys: ""
+        property string desc: ""
+
+        Layout.fillWidth: true
+        implicitHeight: 26
+
+        Text {
+            anchors.left: parent.left
+            anchors.right: chip.left
+            anchors.rightMargin: 12
+            anchors.verticalCenter: parent.verticalCenter
+            text: kr.desc
+            elide: Text.ElideRight
+            font.family: Theme.iconFont
+            font.pixelSize: 11
+            color: Theme.text
+        }
+        Rectangle {
+            id: chip
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            width: chipText.implicitWidth + 14
+            height: 18
+            radius: 5
+            color: Qt.alpha(Theme.text, 0.08)
+            Text {
+                id: chipText
+                anchors.centerIn: parent
+                text: kr.keys
+                font.family: Theme.iconFont
+                font.pixelSize: 10
+                font.bold: true
+                color: Theme.textDim
+            }
+        }
+    }
+
+
+    // ───────────────────────── Bar helper components ─────────────────────────
     component Arrow: Item {
         id: ar
         property string glyph: ""
@@ -826,10 +1206,10 @@ Scope {
                     glyph: compact ? (isCpu ? "\uDB81\uDE1A" : "\uDB80\uDF5B") : ""
                     text: compact ? val + "%" : modelData + " " + val + "%"
                     spacing: compact ? 4 : root.sizeIconGap
-                    padX: compact ? 12 : 20
+                    padX: compact ? Math.max(0, cfg.modPad - 8) : cfg.modPad
 
                     interactive: false
-                    warning: val >= 85
+                    warning: val >= cfg.statsWarn
                     tip: isCpu ? "CPU usage: " + val + "%"
                                : "Memory: " + root.memUsedG.toFixed(1) + " / " + root.memTotalG.toFixed(1)
                                  + " GiB (" + val + "%)"
@@ -847,7 +1227,7 @@ Scope {
             Lane {
                 id: wsLane
                 anchors.centerIn: parent
-                gap: 8
+                gap: cfg.wsGap
 
                 Repeater {
                     model: Hyprland.workspaces
@@ -856,9 +1236,11 @@ Scope {
                         required property var modelData
                         visible: modelData.id > 0
                         Layout.alignment: Qt.AlignCenter
-                        implicitWidth: root.vertical ? 10 : (modelData.focused ? 32 : 10)
-                        implicitHeight: root.vertical ? (modelData.focused ? 24 : 10) : 10
-                        radius: 5
+                        implicitWidth: root.vertical ? cfg.wsDot
+                                     : (modelData.focused ? Math.round(cfg.wsDot * 3.2) : cfg.wsDot)
+                        implicitHeight: root.vertical ? (modelData.focused ? Math.round(cfg.wsDot * 2.4) : cfg.wsDot)
+                                                      : cfg.wsDot
+                        radius: cfg.wsDot / 2
                         color: modelData.urgent ? Theme.danger
                              : modelData.focused ? Qt.alpha(Theme.accent, 0.2)
                              : dotMa.containsMouse ? Theme.accent2
@@ -892,13 +1274,48 @@ Scope {
             }
 
             WheelHandler {
+                enabled: cfg.wsScroll
                 acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
                 onWheel: e => root.run("hyprctl dispatch 'hl.dsp.focus({workspace=\"e"
                                        + (e.angleDelta.y > 0 ? "+1" : "-1") + "\"})'")
             }
         }
     }
-
+    Component {
+        id: tasksC
+        Lane {
+            gap: 2
+            Repeater {
+                model: ToplevelManager.toplevels
+                delegate: Interactive {
+                    id: task
+                    required property var modelData
+                    readonly property var entry: DesktopEntries.heuristicLookup(modelData.appId)
+                    Layout.alignment: Qt.AlignCenter
+                    implicitWidth: root.vertical ? root.panelThick : root.sz.taskIcon + 10
+                    implicitHeight: root.vertical ? root.sz.taskIcon + 10
+                                                  : Math.max(root.panelThick - 2, root.sz.taskIcon + 6)
+                    active: modelData.activated
+                    tip: modelData.title !== "" ? modelData.title : modelData.appId
+                    primaryHint: "Focus window"
+                    tertiaryHint: "Close window"
+                    onPrimary: modelData.activate()
+                    onTertiary: modelData.close()
+                    Image {
+                        anchors.centerIn: parent
+                        width: root.sz.taskIcon
+                        height: root.sz.taskIcon
+                        sourceSize: Qt.size(width, height)
+                        asynchronous: true
+                        smooth: true
+                        opacity: task.modelData.activated ? 1 : 0.75
+                        source: Quickshell.iconPath(task.entry?.icon ?? task.modelData.appId.toLowerCase(),
+                                                    "application-x-executable")
+                    }
+                }
+            }
+        }
+    }
     Component {
         id: mediaC
         Interactive {
@@ -948,7 +1365,8 @@ Scope {
             onSecondary: root.run("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle")
             onScrolled: delta => {
                 if (!ready) return;
-                sink.audio.volume = Math.max(0, Math.min(1.0, sink.audio.volume + (delta / 120) * 0.02));
+                sink.audio.volume = Math.max(0, Math.min(cfg.volMax / 100,
+                    sink.audio.volume + (delta / 120) * (cfg.volStep / 100)));
             }
         }
     }
@@ -956,15 +1374,10 @@ Scope {
     Component {
         id: batteryC
         Mod {
-            baseSize: root.sz.batText
-            glyphSize: root.sz.batIcon
-            glyph: (root.batCharging ? "\uf0e7 " : "") + root.batIcon
-            vglyph: root.batIcon
-            text: root.batPct + "%"
-            vtext: root.batPct + ""
-            interactive: false
+            glyphSize: root.sz.icon
+            glyph: root.batIcon
             warning: root.batLow
-            active: root.vertical && root.batCharging
+            active: root.batCharging
             tip: root.batTip
         }
     }
@@ -974,11 +1387,11 @@ Scope {
         active: root.settingsOpen
 
         PanelWindow {
+            id: settingsWin
             // Fixed height: content scrolls inside the Flickable instead of
-            // resizing the window (a content-sized window can render a blank
-            // first frame and grows past the screen on the Modules tab).
+            // resizing the window.
             implicitWidth: 420
-            implicitHeight: Math.min(540, (screen?.height ?? 800) * 0.85)
+            implicitHeight: Math.min(640, (screen?.height ?? 800) * 0.85)
             color: "transparent"
             exclusionMode: ExclusionMode.Ignore
             WlrLayershell.layer: WlrLayer.Overlay
@@ -991,138 +1404,259 @@ Scope {
                 color: Theme.bg
                 border.width: 1
                 border.color: Qt.alpha(Theme.text, 0.12)
+            }
+
+            FocusScope {
+                anchors.fill: parent
                 focus: true
                 Keys.onEscapePressed: root.settingsOpen = false
 
-                Connections {
-                    target: root
-                    function onSettingsTabChanged() { flick.contentY = 0 }
-                }
-
-                // header (pinned): title · tabs · close
+                // header (pinned)
                 Item {
                     id: head
-                    anchors { top: parent.top; left: parent.left; right: parent.right }
-                    height: 54
+                    anchors.top: parent.top
+                    width: parent.width
+                    height: 60
 
-                    RowLayout {
-                        anchors { left: parent.left; right: parent.right; verticalCenter: parent.verticalCenter; margins: 18 }
-                        Text {
-                            Layout.fillWidth: true
-                            text: "Bar settings"
-                            color: Theme.text
-                            font.family: Theme.iconFont
-                            font.pixelSize: 15
-                            font.bold: true
+                    Text {
+                        x: 20; y: 12
+                        text: "Bar settings"
+                        font.family: Theme.iconFont
+                        font.pixelSize: 15
+                        font.bold: true
+                        color: Theme.text
+                    }
+                    Text {
+                        x: 20; y: 34
+                        text: "Changes apply instantly and are saved automatically."
+                        font.family: Theme.iconFont
+                        font.pixelSize: 11
+                        color: Theme.textDim
+                    }
+                    Text {
+                        anchors.right: parent.right
+                        anchors.rightMargin: 20
+                        y: 10
+                        width: 24; height: 24
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                        text: "×"
+                        font.pixelSize: 22
+                        color: closeArea.containsMouse ? Theme.text : Theme.textDim
+                        MouseArea {
+                            id: closeArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.settingsOpen = false
                         }
-                        Seg { options: ["bar", "modules"]; current: root.settingsTab; onPicked: v => root.settingsTab = v }
-                        Pill { label: "×"; plain: true; onClicked: root.settingsOpen = false }
                     }
                 }
 
-                // body (scrolls): wheel, drag, or the scrollbar on the right
+                // body: mouse wheel / touchpad scroll natively; sliders keep
+                // their drag via preventStealing
                 Flickable {
                     id: flick
-                    anchors { top: head.bottom; bottom: foot.top; left: parent.left; right: parent.right }
+                    anchors.top: head.bottom
+                    anchors.topMargin: 4
+                    anchors.bottom: foot.top
+                    anchors.left: parent.left
+                    anchors.right: parent.right
                     contentWidth: width
                     contentHeight: col.implicitHeight + 16
                     clip: true
                     flickableDirection: Flickable.VerticalFlick
                     boundsBehavior: Flickable.StopAtBounds
 
-                    WheelHandler {
-                        onWheel: e => {
-                            const max = Math.max(0, flick.contentHeight - flick.height);
-                            flick.contentY = Math.max(0, Math.min(max, flick.contentY - e.angleDelta.y / 2));
-                        }
-                    }
-
-                ColumnLayout {
-                    id: col
-                    x: 18
-                    y: 4
-                    width: flick.width - 18 - 26
-                    spacing: 12
-
-                    // ── Bar ──
                     ColumnLayout {
-                        visible: root.settingsTab === "bar"
-                        Layout.fillWidth: true
-                        spacing: 10
+                        id: col
+                        x: 20
+                        width: flick.width - 48
+                        spacing: 0
 
-                        SetRow { label: "Position"; Seg { options: root.positions; current: cfg.position; onPicked: v => cfg.position = v } }
-                        SetRow { label: "Style"; Seg { options: root.styles; current: cfg.style; onPicked: v => cfg.style = v } }
-                        SetRow { label: "CPU / RAM"; Seg { options: root.statsModes; current: cfg.statsMode; onPicked: v => cfg.statsMode = v } }
-                        SetRow {
-                            label: "Opacity  " + Math.round(cfg.bgOpacity * 100) + "%"
-                            Slide { from: 0; to: 1; step: 0.05; value: cfg.bgOpacity; onMoved: v => cfg.bgOpacity = v }
+                        // ── Hints ──
+                        SectionHeader { text: "Hints" }
+                        ToggleRow {
+                            label: "Show tooltips"
+                            checked: cfg.tooltips
+                            onToggled: v => cfg.tooltips = v
                         }
-                        SetRow {
-                            label: "Corner radius  " + cfg.radius
-                            enabled: !root.strip
-                            Slide { from: 0; to: 24; step: 1; value: cfg.radius; onMoved: v => cfg.radius = v }
-                        }
-                        SetRow {
-                            label: "Calendar radius  " + cfg.calRadius
-                            Slide { from: 0; to: 32; step: 1; value: cfg.calRadius; onMoved: v => cfg.calRadius = v }
-                        }
-                        SetRow {
-                            label: "Thickness  " + cfg.thickness
-                            Slide { from: 16; to: 40; step: 1; value: cfg.thickness; onMoved: v => cfg.thickness = v }
-                        }
-                        SetRow {
-                            label: "Edge margin  " + cfg.margin
-                            enabled: !root.strip
-                            Slide { from: 0; to: 16; step: 1; value: cfg.margin; onMoved: v => cfg.margin = v }
-                        }
-                        SetRow {
-                            label: "Text scale  " + cfg.scale.toFixed(2)
-                            Slide { from: 0.8; to: 1.5; step: 0.05; value: cfg.scale; onMoved: v => cfg.scale = v }
-                        }
-
-                        SetRow { label: "Border"; Toggle { checked: cfg.border; onToggled: v => cfg.border = v } }
-                        SetRow { label: "Tooltips"; Toggle { checked: cfg.tooltips; onToggled: v => cfg.tooltips = v } }
-                        SetRow {
+                        ToggleRow {
                             label: "Hints in tooltips"
+                            checked: cfg.tooltipHints
                             enabled: cfg.tooltips
-                            Toggle { checked: cfg.tooltipHints; onToggled: v => cfg.tooltipHints = v }
+                            onToggled: v => cfg.tooltipHints = v
                         }
-                    }
+                        SliderRow {
+                            label: "Tooltip delay"
+                            enabled: cfg.tooltips
+                            from: 0; to: 1500; step: 50; unit: " ms"
+                            value: cfg.tipDelay
+                            onMoved: v => cfg.tipDelay = v
+                        }
 
-                    // ── Modules ──
-                    ColumnLayout {
-                        visible: root.settingsTab === "modules"
-                        Layout.fillWidth: true
-                        spacing: 8
+                        // ── Layout ──
+                        SectionHeader { text: "Layout" }
+                        SegRow {
+                            label: "Position"
+                            options: root.positions
+                            current: cfg.position
+                            onPicked: v => cfg.position = v
+                        }
+                        SegRow {
+                            label: "Style"
+                            options: root.styles
+                            current: cfg.style
+                            onPicked: v => cfg.style = v
+                        }
+                        SliderRow {
+                            label: "Thickness"
+                            from: 16; to: 40; step: 1; unit: " px"
+                            value: cfg.thickness
+                            onMoved: v => cfg.thickness = v
+                        }
+                        SliderRow {
+                            label: "Edge margin"
+                            enabled: !root.strip
+                            from: 0; to: 16; step: 1; unit: " px"
+                            value: cfg.margin
+                            tip: "Gap between the bar and the screen edge"
+                            onMoved: v => cfg.margin = v
+                        }
+                        ToggleRow {
+                            label: "Reserve screen space"
+                            checked: cfg.reserveSpace
+                            tip: "Off: windows may overlap the bar"
+                            onToggled: v => cfg.reserveSpace = v
+                        }
+                        ToggleRow {
+                            label: "Show on all monitors"
+                            checked: cfg.allScreens
+                            onToggled: v => cfg.allScreens = v
+                        }
 
+                        // ── Appearance ──
+                        SectionHeader { text: "Appearance" }
+                        SliderRow {
+                            label: "Background opacity"
+                            from: 0; to: 1; step: 0.05; unit: "%"; displayScale: 100
+                            value: cfg.bgOpacity
+                            onMoved: v => cfg.bgOpacity = v
+                        }
+                        SliderRow {
+                            label: "Corner radius"
+                            enabled: !root.strip
+                            from: 0; to: 24; step: 1; unit: " px"
+                            value: cfg.radius
+                            onMoved: v => cfg.radius = v
+                        }
+                        SliderRow {
+                            label: "Calendar radius"
+                            from: 0; to: 32; step: 1; unit: " px"
+                            value: cfg.calRadius
+                            onMoved: v => cfg.calRadius = v
+                        }
+                        SliderRow {
+                            label: "Text scale"
+                            from: 0.8; to: 1.5; step: 0.05; unit: "×"; decimals: 2
+                            value: cfg.scale
+                            onMoved: v => cfg.scale = v
+                        }
+                        ToggleRow {
+                            label: "Border"
+                            checked: cfg.border
+                            onToggled: v => cfg.border = v
+                        }
+
+                        // ── Clock & calendar ──
+                        SectionHeader { text: "Clock & calendar" }
+                        ToggleRow {
+                            label: "24-hour clock"
+                            checked: cfg.clock24
+                            onToggled: v => cfg.clock24 = v
+                        }
+                        ToggleRow {
+                            label: "Show seconds"
+                            checked: cfg.clockSeconds
+                            onToggled: v => cfg.clockSeconds = v
+                        }
+                        SegRow {
+                            label: "Week starts on"
+                            options: ["monday", "sunday"]
+                            current: cfg.weekMonday ? "monday" : "sunday"
+                            onPicked: v => cfg.weekMonday = (v === "monday")
+                        }
+
+                        // ── Modules ──
+                        SectionHeader { text: "Module appearance" }
+                        SliderRow {
+                            label: "Module padding"
+                            from: 0; to: 40; step: 2; unit: " px"
+                            value: cfg.modPad
+                            tip: "Horizontal space around text modules"
+                            onMoved: v => cfg.modPad = v
+                        }
+                        SliderRow {
+                            label: "Workspace dot size"
+                            from: 6; to: 18; step: 1; unit: " px"
+                            value: cfg.wsDot
+                            onMoved: v => cfg.wsDot = v
+                        }
+                        SliderRow {
+                            label: "Workspace dot spacing"
+                            from: 0; to: 20; step: 1; unit: " px"
+                            value: cfg.wsGap
+                            onMoved: v => cfg.wsGap = v
+                        }
+                        ToggleRow {
+                            label: "Scroll to switch workspace"
+                            checked: cfg.wsScroll
+                            onToggled: v => cfg.wsScroll = v
+                        }
+                        SegRow {
+                            label: "CPU / RAM style"
+                            options: root.statsModes
+                            current: cfg.statsMode
+                            onPicked: v => cfg.statsMode = v
+                        }
+                        SliderRow {
+                            label: "High CPU / RAM warning"
+                            from: 50; to: 100; step: 5; unit: "%"
+                            value: cfg.statsWarn
+                            tip: "Usage at or above this turns red"
+                            onMoved: v => cfg.statsWarn = v
+                        }
+                        SliderRow {
+                            label: "Low battery warning"
+                            from: 5; to: 50; step: 5; unit: "%"
+                            value: cfg.batLowPct
+                            onMoved: v => cfg.batLowPct = v
+                        }
+                        SliderRow {
+                            label: "Volume scroll step"
+                            from: 1; to: 10; step: 1; unit: "%"
+                            value: cfg.volStep
+                            onMoved: v => cfg.volStep = v
+                        }
+                        SliderRow {
+                            label: "Maximum volume"
+                            from: 100; to: 150; step: 5; unit: "%"
+                            value: cfg.volMax
+                            tip: "Above 100% may distort on some speakers"
+                            onMoved: v => cfg.volMax = v
+                        }
+
+                        // ── Module list ──
+                        SectionHeader { text: "Modules" }
                         Repeater {
                             model: root.moduleDefs
-                            delegate: SetRow {
+                            delegate: ModuleRow {
                                 required property var modelData
-                                label: modelData.l
-
-                                Toggle {
-                                    enabled: !modelData.fixed
-                                    checked: !!modelData.fixed || root.isOn(modelData.id)
-                                    onToggled: v => root.setOn(modelData.id, v)
-                                }
-                                Seg { options: root.sections; current: root.sectionOf(modelData.id); onPicked: v => root.moveTo(modelData.id, v) }
-                                Pill {
-                                    label: root.vertical ? "\u25B2" : "\u25C0"
-                                    enabled: root.canShift(modelData.id, -1)
-                                    onClicked: root.shiftBy(modelData.id, -1)
-                                }
-                                Pill {
-                                    label: root.vertical ? "\u25BC" : "\u25B6"
-                                    enabled: root.canShift(modelData.id, 1)
-                                    onClicked: root.shiftBy(modelData.id, 1)
-                                }
+                                def: modelData
                             }
                         }
                     }
-
-                }   // col
-                }   // flick
+                }
 
                 // scrollbar (outside the content so it doesn't scroll away)
                 Rectangle {
@@ -1152,6 +1686,7 @@ Scope {
                         anchors.fill: parent
                         anchors.margins: -5
                         hoverEnabled: true
+                        preventStealing: true
                         property real grabY: 0
 
                         // drive contentY directly (drag.target would break the y binding)
@@ -1171,16 +1706,26 @@ Scope {
                 // footer (pinned)
                 Item {
                     id: foot
-                    anchors { bottom: parent.bottom; left: parent.left; right: parent.right }
-                    height: 52
+                    anchors.bottom: parent.bottom
+                    width: parent.width
+                    height: 58
 
                     Rule { width: parent.width }
 
-                    RowLayout {
-                        anchors { left: parent.left; right: parent.right; verticalCenter: parent.verticalCenter; margins: 18 }
-                        Pill { label: "Reset all"; onClicked: root.resetSettings() }
-                        Item { Layout.fillWidth: true }
-                        Pill { label: "Done"; primary: true; onClicked: root.settingsOpen = false }
+                    ActionButton {
+                        x: 20
+                        anchors.verticalCenter: parent.verticalCenter
+                        label: "Reset all"
+                        enabled: root.modified
+                        onClicked: root.resetSettings()
+                    }
+                    ActionButton {
+                        anchors.right: parent.right
+                        anchors.rightMargin: 20
+                        anchors.verticalCenter: parent.verticalCenter
+                        label: "Done"
+                        primary: true
+                        onClicked: root.settingsOpen = false
                     }
                 }
             }
@@ -1189,7 +1734,9 @@ Scope {
 
     // ───────────────────────── The bar ─────────────────────────
     Variants {
-        model: root.barLive ? Quickshell.screens : []
+        model: root.barLive
+            ? (cfg.allScreens ? Quickshell.screens : Quickshell.screens.slice(0, 1))
+            : []
 
         PanelWindow {
             id: bar
@@ -1204,6 +1751,7 @@ Scope {
             }
             implicitWidth: root.vertical ? root.panelThick + root.effEdge : 0
             implicitHeight: root.vertical ? 0 : root.panelThick + root.effEdge
+            exclusionMode: cfg.reserveSpace ? ExclusionMode.Auto : ExclusionMode.Ignore
             color: "transparent"
             visible: root.barVisible
 
@@ -1244,15 +1792,18 @@ Scope {
                     property bool calOpen: false
                     property int monthOffset: 0
 
-                    SystemClock { id: clk; precision: SystemClock.Minutes }
+                    SystemClock {
+                        id: clk
+                        precision: cfg.clockSeconds ? SystemClock.Seconds : SystemClock.Minutes
+                    }
 
                     Component {
                         id: clockC
                         Mod {
                             bold: true
                             baseSize: root.sz.clock
-                            text: Qt.formatDateTime(clk.date, "HH:mm")
-                            vtext: Qt.formatDateTime(clk.date, "HH") + "\n" + Qt.formatDateTime(clk.date, "mm")
+                            text: root.clockText(clk.date)
+                            vtext: root.clockVText(clk.date)
                             active: clockPanel.calOpen
                             tip: Qt.formatDate(clk.date, "dddd, d MMMM yyyy")
                             primaryHint: clockPanel.calOpen ? "Close calendar" : "Open calendar"
@@ -1292,7 +1843,7 @@ Scope {
                                 border.width: cfg.border ? 1 : 0
                                 border.color: root.borderColor
 
-                                readonly property int firstDay: 1
+                                readonly property int firstDay: cfg.weekMonday ? 1 : 0
                                 readonly property int cellW: 36
                                 readonly property int cellH: 30
                                 readonly property int pad: 16
@@ -1327,7 +1878,7 @@ Scope {
                                     Column {
                                         spacing: 2
                                         Text {
-                                            text: Qt.formatTime(calBox.now, "HH:mm")
+                                            text: root.clockText(calBox.now)
                                             color: Theme.text
                                             font.family: Theme.iconFont
                                             font.pixelSize: root.sz.calTime

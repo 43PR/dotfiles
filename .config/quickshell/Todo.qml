@@ -15,7 +15,7 @@ Scope {
     property var targetScreen: Quickshell.screens[0]
     property real winW: 0             // reported by the window while mounted
     property real winH: 0
-    property real panelH: 0
+    property real panelH: 0           // MINIMUM panel height (notes list hidden), used for clamping
 
     onShowingChanged: {
         if (showing) {
@@ -46,32 +46,77 @@ Scope {
     property int maxItems: 200
 
     property bool ready: false
-    property bool dragging: false
-    property int remaining: 0
-    property int menuSize: 100
+    property bool dragging: false     // moving the panel
+    property int menuSize: 100        // COMPONENT scale (%): panel, spacing, text
+    property int textSize: 100        // TEXT size (%): fonts only, on top of the component scale
     property real offsetX: 0
     property real offsetY: 0
 
+    // wheel accumulators so touchpads / smooth wheels step once per notch
+    property real wheelAccText: 0
+    property real wheelAccScale: 0
+
     readonly property int defaultSize: 100
+    readonly property int defaultText: 100
     readonly property real ui: menuSize / 100
+    readonly property real tx: textSize / 100
     readonly property int cardWidth: Math.round(baseWidth * ui)
     readonly property int rowHeight: Math.round(baseRow * ui)
-    readonly property bool movedFromDefault: offsetX !== 0 || offsetY !== 0 || menuSize !== defaultSize
 
     readonly property string statePath: Quickshell.env("HOME") + "/.config/quickshell/state/todo-state.json"
 
     onMenuSizeChanged: if (root.showing) root.setPosition(root.offsetX, root.offsetY)
+    onCardWidthChanged: if (root.showing) root.setPosition(root.offsetX, root.offsetY)
 
     // dynamicRoles: remindAt can be 0 (int) or a big epoch-ms value (double)
     ListModel { id: todos; dynamicRoles: true }
 
+    // layout size: follows the component scale only
     function px(n) { return Math.round(n * ui) }
+    // font size: follows the component scale AND the text size
+    function fpx(n) { return Math.round(n * ui * tx) }
 
+    // component scale
     function setSize(v) {
-        root.menuSize = Math.max(60, Math.min(200, v))
+        root.menuSize = Math.max(60, Math.min(200, Math.round(v)))
         saveTimer.restart()
     }
 
+    // text size
+    function setTextSize(v) {
+        root.textSize = Math.max(60, Math.min(200, Math.round(v)))
+        saveTimer.restart()
+    }
+
+    // Ctrl + wheel -> text size. One 5% step per 120 units of angleDelta (one wheel notch)
+    function wheelText(delta) {
+        root.wheelAccText += delta
+        while (root.wheelAccText >= 120) {
+            root.wheelAccText -= 120
+            root.setTextSize(root.textSize + 5)
+        }
+        while (root.wheelAccText <= -120) {
+            root.wheelAccText += 120
+            root.setTextSize(root.textSize - 5)
+        }
+    }
+
+    // Shift + wheel -> component scale
+    function wheelScale(delta) {
+        root.wheelAccScale += delta
+        while (root.wheelAccScale >= 120) {
+            root.wheelAccScale -= 120
+            root.setSize(root.menuSize + 5)
+        }
+        while (root.wheelAccScale <= -120) {
+            root.wheelAccScale += 120
+            root.setSize(root.menuSize - 5)
+        }
+    }
+
+    // The panel can go anywhere on screen: right edge .. left edge, top edge .. bottom edge.
+    // offsetX: rightMargin = sideGap - offsetX, so offsetX = sideGap puts the panel flush right.
+    // offsetY: topMargin = topGap + offsetY, so offsetY = -topGap puts the panel flush top.
     function setPosition(x, y) {
         if (root.winW <= 0 || root.winH <= 0) {
             root.offsetX = x
@@ -79,25 +124,20 @@ Scope {
             return
         }
         var maxX = root.sideGap
-        var minX = Math.min(maxX, root.cardWidth + 2 * root.sideGap - root.winW)
-        var minY = 0
-        var maxY = Math.max(minY, root.winH - root.panelH - 2 * root.topGap)
+        var minX = Math.min(maxX, root.cardWidth + root.sideGap - root.winW)
+        var minY = -root.topGap
+        var maxY = Math.max(minY, root.winH - root.panelH - root.topGap)
         root.offsetX = Math.max(minX, Math.min(maxX, x))
         root.offsetY = Math.max(minY, Math.min(maxY, y))
     }
 
+    // double-click on the drag handle: back to defaults (position, scale, text size)
     function resetPosition() {
         root.offsetX = 0
         root.offsetY = 0
         root.menuSize = root.defaultSize
+        root.textSize = root.defaultText
         saveTimer.restart()
-    }
-
-    function recount() {
-        var n = 0
-        for (var i = 0; i < todos.count; i++)
-            if (!todos.get(i).done) n++
-        root.remaining = n
     }
 
     function saveNow() {
@@ -114,22 +154,18 @@ Scope {
         }
         store.setText(JSON.stringify({
             menuSize: root.menuSize,
+            textSize: root.textSize,
             offsetX: root.offsetX,
             offsetY: root.offsetY,
             items: out
         }))
     }
 
-    function changed() {
-        root.recount()
-        saveTimer.restart()
-    }
-
     function addTodo(t) {
         t = t.trim()
         if (t === "" || todos.count >= root.maxItems) return
         todos.insert(0, { title: t, done: false, remindAt: 0, notified: false })
-        root.changed()
+        saveTimer.restart()
     }
 
     function editTodo(i, t) {
@@ -140,18 +176,19 @@ Scope {
 
     function toggleTodo(i) {
         todos.setProperty(i, "done", !todos.get(i).done)
-        root.changed()
+        saveTimer.restart()
     }
 
     function removeTodo(i) {
         todos.remove(i)
-        root.changed()
+        saveTimer.restart()
     }
 
-    function clearDone() {
-        for (var i = todos.count - 1; i >= 0; i--)
-            if (todos.get(i).done) todos.remove(i)
-        root.changed()
+    // right-click drag: move a note to another position in the list
+    function moveTodo(from, to) {
+        if (from === to || from < 0 || to < 0 || from >= todos.count || to >= todos.count) return
+        todos.move(from, to, 1)
+        saveTimer.restart()
     }
 
     // ---- reminders ---------------------------------------------------------
@@ -165,33 +202,79 @@ Scope {
 
     function clearReminder(i) { root.setReminder(i, 0) }
 
-    function tomorrowNine() {
-        var d = new Date()
-        d.setDate(d.getDate() + 1)
-        d.setHours(9, 0, 0, 0)
-        return d.getTime()
+    // Accepted:
+    //   relative:   "30s" "45m" "2h" "1d" (a bare number = minutes)
+    //   time:       "14:30" "14:30:15" "2pm" "2:30pm" "2:30 pm"  (next occurrence)
+    //   day + time: "tmr 9am" "tomorrow 14:30" "fri 2:30pm" "2d 1pm" "today 6pm"
+    // Returns epoch ms, or 0 if invalid.
+    function parseTime(s) {
+        var m = s.match(/^(\d{1,2})(?::(\d{2}))?(?::(\d{2}))?\s*(am|pm)?$/)
+        if (!m) return null
+        // a bare number is not a time (it is handled as relative minutes)
+        if (m[2] === undefined && m[4] === undefined) return null
+        var hh = parseInt(m[1])
+        var mm = m[2] !== undefined ? parseInt(m[2]) : 0
+        var ss = m[3] !== undefined ? parseInt(m[3]) : 0
+        if (mm > 59 || ss > 59) return null
+        if (m[4] !== undefined) {
+            if (hh < 1 || hh > 12) return null
+            if (m[4] === "am") hh = (hh === 12) ? 0 : hh
+            else hh = (hh === 12) ? 12 : hh + 12
+        } else if (hh > 23) {
+            return null
+        }
+        return { h: hh, m: mm, s: ss }
     }
 
-    // "45" / "45m" / "2h" / "1d" -> relative, "14:30" -> next occurrence. 0 = invalid
     function parseWhen(s) {
         s = s.trim().toLowerCase()
-        var m = s.match(/^(\d+)\s*(m|min|h|hr|d)?$/)
+
+        // relative: 30s / 45m / 2h / 1d
+        var m = s.match(/^(\d+)\s*(s|sec|m|min|h|hr|d)?$/)
         if (m) {
             var n = parseInt(m[1])
             var u = m[2] || "m"
-            var ms = u.charAt(0) === "h" ? 3600000 : (u === "d" ? 86400000 : 60000)
+            var ms
+            if (u === "s" || u === "sec") ms = 1000
+            else if (u.charAt(0) === "h") ms = 3600000
+            else if (u === "d") ms = 86400000
+            else ms = 60000
             return n > 0 ? Date.now() + n * ms : 0
         }
-        m = s.match(/^(\d{1,2}):(\d{2})$/)
-        if (m) {
-            var hh = parseInt(m[1]), mm = parseInt(m[2])
-            if (hh > 23 || mm > 59) return 0
-            var d = new Date()
-            d.setHours(hh, mm, 0, 0)
-            if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1)
-            return d.getTime()
+
+        // optional day word in front: today / tmr / tomorrow / fri / 2d
+        var dayOffset = -1          // -1 = no day given
+        var weekday = -1
+        var rest = s
+        var dm = s.match(/^(\S+)\s+(.+)$/)
+        if (dm) {
+            var tok = dm[1]
+            var dd
+            if (tok === "today") dayOffset = 0
+            else if (tok === "tomorrow" || tok === "tmr" || tok === "tom") dayOffset = 1
+            else if ((dd = tok.match(/^(\d+)d$/))) dayOffset = parseInt(dd[1])
+            else if (/^(sun|mon|tue|wed|thu|fri|sat)[a-z]*$/.test(tok))
+                weekday = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"].indexOf(tok.slice(0, 3))
+            if (dayOffset >= 0 || weekday >= 0) rest = dm[2]
         }
-        return 0
+
+        var t = root.parseTime(rest)
+        if (!t) return 0
+
+        var d = new Date()
+        d.setHours(t.h, t.m, t.s, 0)
+
+        if (weekday >= 0) {
+            var diff = (weekday - new Date().getDay() + 7) % 7
+            d.setDate(d.getDate() + diff)
+            if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 7)   // same weekday, time passed -> next week
+        } else if (dayOffset >= 0) {
+            d.setDate(d.getDate() + dayOffset)
+            if (d.getTime() <= Date.now()) return 0                      // explicit day, but already in the past
+        } else if (d.getTime() <= Date.now()) {
+            d.setDate(d.getDate() + 1)                                   // plain time: next occurrence
+        }
+        return d.getTime()
     }
 
     function formatWhen(ts) {
@@ -199,7 +282,7 @@ Scope {
         var now = new Date()
         var tom = new Date()
         tom.setDate(now.getDate() + 1)
-        var hm = Qt.formatTime(d, "HH:mm")
+        var hm = Qt.formatTime(d, d.getSeconds() !== 0 ? "HH:mm:ss" : "HH:mm")
         if (d.toDateString() === now.toDateString()) return "Today " + hm
         if (d.toDateString() === tom.toDateString()) return "Tomorrow " + hm
         return Qt.formatDate(d, "d MMM") + " " + hm
@@ -209,7 +292,8 @@ Scope {
         Quickshell.execDetached([
             "notify-send",
             "-a", "Todo",
-            "-i", "appointment-soon",
+            "-u", "critical",
+            "--",
             "Reminder",
             title
         ])
@@ -230,10 +314,11 @@ Scope {
         if (fired) saveTimer.restart()
     }
 
-    // lives on the Scope, so reminders fire even while the panel is closed
+    // lives on the Scope, so reminders fire even while the panel is closed.
+    // 1 s so second-level reminders are accurate.
     Timer {
         id: reminderTimer
-        interval: 10000
+        interval: 1000
         repeat: true
         running: root.ready
         triggeredOnStart: true
@@ -258,6 +343,8 @@ Scope {
                 if (!Array.isArray(data)) {
                     if (typeof data.menuSize === "number")
                         root.menuSize = Math.max(60, Math.min(200, Math.round(data.menuSize)))
+                    if (typeof data.textSize === "number")
+                        root.textSize = Math.max(60, Math.min(200, Math.round(data.textSize)))
                     if (typeof data.offsetX === "number") root.offsetX = data.offsetX
                     if (typeof data.offsetY === "number") root.offsetY = data.offsetY
                 }
@@ -274,7 +361,6 @@ Scope {
                 console.warn("todo: could not read saved state:", e)
             }
             root.ready = true
-            root.recount()
         }
         onLoadFailed: root.ready = true
     }
@@ -300,45 +386,14 @@ Scope {
     }
 
     // ---- small reusable components ---------------------------------------
-    component FooterButton: Rectangle {
-        id: fb
-        property real ui: 1
-        property string label: ""
-        property int fontSize: 11
-        property color textColor: Theme.textDim
-        readonly property bool hovered: fbArea.containsMouse
-        signal clicked()
-
-        width: Math.round(24 * ui)
-        height: width
-        radius: Math.round(8 * ui)
-        color: Theme.bg
-        Behavior on color { ColorAnimation { duration: 120 } }
-        Behavior on opacity { NumberAnimation { duration: 120 } }
-
-        Text {
-            anchors.centerIn: parent
-            text: fb.label
-            font.pixelSize: Math.round(fb.fontSize * fb.ui)
-            font.bold: true
-            color: fb.hovered ? Theme.text : fb.textColor
-        }
-
-        MouseArea {
-            id: fbArea
-            anchors.fill: parent
-            hoverEnabled: true
-            onClicked: fb.clicked()
-        }
-    }
-
     component ChipBtn: Rectangle {
         id: chip
         property real ui: 1
+        property real tx: 1
         property string label: ""
         signal clicked()
 
-        height: Math.round(24 * ui)
+        height: Math.max(Math.round(24 * ui), chipText.implicitHeight + Math.round(8 * ui))
         width: chipText.implicitWidth + Math.round(20 * ui)
         radius: Math.round(8 * ui)
         color: chipArea.containsMouse ? Theme.alpha(Theme.text, 0.18) : Theme.alpha(Theme.text, 0.08)
@@ -348,7 +403,7 @@ Scope {
             id: chipText
             anchors.centerIn: parent
             text: chip.label
-            font.pixelSize: Math.round(11 * chip.ui)
+            font.pixelSize: Math.round(11 * chip.ui * chip.tx)
             color: Theme.text
         }
 
@@ -358,15 +413,6 @@ Scope {
             hoverEnabled: true
             onClicked: chip.clicked()
         }
-    }
-
-    component SizeBtn: Text {
-        signal clicked()
-        height: 16
-        verticalAlignment: Text.AlignVCenter
-        horizontalAlignment: Text.AlignHCenter
-        color: Theme.text
-        MouseArea { anchors.fill: parent; onClicked: parent.clicked() }
     }
 
     // ---- the window: only exists while mounted ---------------------------
@@ -387,9 +433,8 @@ Scope {
             exclusionMode: ExclusionMode.Ignore
             WlrLayershell.layer: WlrLayer.Overlay
             WlrLayershell.namespace: "todo"
-            WlrLayershell.keyboardFocus: root.showing ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
-
-            mask: Region { item: root.showing ? menuRoot : null }
+            WlrLayershell.keyboardFocus: root.showing ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+            mask: Region { item: root.showing ? panel : null }
 
             onWidthChanged: {
                 root.winW = width
@@ -411,18 +456,12 @@ Scope {
                 id: menuRoot
                 anchors.fill: parent
                 focus: true
-
                 Keys.onEscapePressed: root.closeMenu()
-
-                MouseArea {
-                    anchors.fill: parent
-                    onClicked: root.closeMenu()
-                }
-
                 Rectangle {
                     id: panel
                     width: root.cardWidth
-                    height: panelCol.height + root.px(28)
+                    // panelCol top margin (6) + bottom padding (6)
+                    height: panelCol.height + root.px(12)
                     radius: root.px(20)
                     color: "transparent"
 
@@ -434,9 +473,29 @@ Scope {
                     opacity: win.reveal ? 1 : 0
                     visible: opacity > 0
 
+                    // ---- space accounting for the notes list ----------------
+                    // Height of everything except the list (list visible: 2 gaps).
+                    readonly property real chromeH: root.px(12) + header.height + inputBox.height
+                                                    + panelCol.spacing * 2
+                    // Vertical room left below the panel's top edge for the list.
+                    readonly property real listAvail: root.winH - root.topGap - root.offsetY - chromeH
+                    // The list hides itself when there isn't room for a row.
+                    readonly property bool listFits: listAvail >= root.rowHeight
+                    // Smallest the panel can ever be (list hidden). Used to clamp dragging
+                    // so the panel can reach the very bottom of the screen.
+                    readonly property real minH: chromeH - panelCol.spacing
+                                                 + (todos.count === 0 ? root.px(40) + panelCol.spacing : 0)
+
+                    onMinHChanged: {
+                        root.panelH = minH
+                        if (root.showing) root.setPosition(root.offsetX, root.offsetY)
+                    }
+
                     // the panel starts invisible (fade-in), so focus the input
                     // as soon as it actually becomes visible
                     onVisibleChanged: if (visible && root.showing) input.forceActiveFocus()
+
+                    Component.onCompleted: root.panelH = panel.minH
 
                     Behavior on anchors.rightMargin {
                         enabled: !root.dragging && root.showing
@@ -450,11 +509,6 @@ Scope {
                         NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
                     }
 
-                    onHeightChanged: {
-                        root.panelH = height
-                        if (root.showing) root.setPosition(root.offsetX, root.offsetY)
-                    }
-
                     MouseArea { anchors.fill: parent }
 
                     Column {
@@ -462,13 +516,15 @@ Scope {
                         anchors.top: parent.top
                         anchors.left: parent.left
                         anchors.right: parent.right
-                        anchors.margins: root.px(14)
+                        anchors.topMargin: root.px(6)
+                        anchors.leftMargin: root.px(14)
+                        anchors.rightMargin: root.px(14)
                         spacing: root.px(10)
 
                         Item {
                             id: header
                             width: parent.width
-                            height: root.px(24)
+                            height: root.px(18)
 
                             Rectangle {
                                 anchors.centerIn: parent
@@ -524,54 +580,38 @@ Scope {
                         }
 
                         Rectangle {
+                            id: inputBox
                             width: parent.width
-                            height: Math.max(root.rowHeight, input.contentHeight + root.px(24))
+                            // the placeholder can wrap to two lines, so it counts toward the height
+                            height: Math.max(root.rowHeight,
+                                             Math.max(input.contentHeight,
+                                                      input.text === "" ? hint.implicitHeight : 0)
+                                             + root.px(24))
                             radius: root.px(12)
                             color: Theme.bg
                             border.width: input.activeFocus ? 1 : 0
                             border.color: Theme.accent
                             Behavior on color { ColorAnimation { duration: 120 } }
 
-                            Rectangle {
-                                id: addThumb
-                                width: root.px(32)
-                                height: width
-                                radius: root.px(8)
-                                anchors.left: parent.left
-                                anchors.leftMargin: root.px(10)
-                                anchors.top: parent.top
-                                anchors.topMargin: root.px(8)
-                                color: Theme.bg
-
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: "+"
-                                    font.pixelSize: root.px(16)
-                                    font.bold: true
-                                    color: Theme.text
-                                }
-
-                                MouseArea {
-                                    id: addArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    onClicked: {
-                                        root.addTodo(input.text)
-                                        input.text = ""
-                                        input.forceActiveFocus()
-                                    }
+                            // click anywhere in the box (not just on the text) to focus the input
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.IBeamCursor
+                                onClicked: {
+                                    input.forceActiveFocus()
+                                    input.cursorPosition = input.length
                                 }
                             }
 
                             TextEdit {
                                 id: input
-                                anchors.left: addThumb.right
-                                anchors.leftMargin: root.px(10)
+                                anchors.left: parent.left
+                                anchors.leftMargin: root.px(14)
                                 anchors.right: parent.right
                                 anchors.rightMargin: root.px(12)
                                 anchors.top: parent.top
                                 anchors.topMargin: root.px(12)
-                                font.pixelSize: root.px(12)
+                                font.pixelSize: root.fpx(12)
                                 color: Theme.text
                                 selectionColor: Theme.accent
                                 selectedTextColor: Theme.bg
@@ -595,9 +635,12 @@ Scope {
                                 }
 
                                 Text {
+                                    id: hint
                                     visible: input.text === "" && !input.inputMethodComposing
-                                    text: "Add a note/task…  (Shift+Enter = new line)"
-                                    font.pixelSize: root.px(12)
+                                    width: parent.width
+                                    wrapMode: Text.WordWrap
+                                    text: "Enter Save | Shift+Enter New line | Ctrl+Scroll Text size | Shift+Scroll Scale"
+                                    font.pixelSize: root.fpx(11)
                                     color: Theme.textDim
                                     opacity: 0.7
                                 }
@@ -611,15 +654,16 @@ Scope {
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                             text: "Nothing to do"
-                            font.pixelSize: root.px(11)
+                            font.pixelSize: root.fpx(11)
                             color: Theme.textDim
                         }
 
                         ListView {
                             id: list
-                            visible: todos.count > 0
+                            // hides itself when the panel is dragged so low there's no room
+                            visible: todos.count > 0 && panel.listFits
                             width: parent.width
-                            height: Math.max(0, Math.min(contentHeight, root.winH - root.topGap - root.offsetY - root.px(240)))
+                            height: Math.max(0, Math.min(contentHeight, panel.listAvail))
                             clip: true
                             spacing: root.px(8)
                             model: todos
@@ -635,6 +679,8 @@ Scope {
 
                                 // reminder picker open?
                                 property bool picking: false
+                                // being dragged with right-click
+                                property bool reordering: false
 
                                 width: list.width
                                 height: Math.max(root.rowHeight,
@@ -643,20 +689,25 @@ Scope {
                                                  + root.px(24))
                                 radius: root.px(12)
                                 color: Theme.bg
-                                border.width: edit.activeFocus ? 1 : 0
+                                border.width: (edit.activeFocus || entry.reordering) ? 1 : 0
                                 border.color: Theme.accent
+                                z: entry.reordering ? 2 : 1
                                 Behavior on color { ColorAnimation { duration: 120 } }
 
                                 MouseArea {
                                     id: hoverArea
                                     anchors.fill: parent
                                     hoverEnabled: true
-                                    acceptedButtons: Qt.NoButton
+                                    acceptedButtons: Qt.LeftButton
+                                    onClicked: {
+                                        edit.forceActiveFocus()
+                                        edit.cursorPosition = edit.length
+                                    }
                                 }
 
                                 Rectangle {
                                     id: check
-                                    width: root.px(24)
+                                    width: root.px(15)
                                     height: width
                                     radius: root.px(8)
                                     anchors.left: parent.left
@@ -672,7 +723,7 @@ Scope {
                                         anchors.centerIn: parent
                                         visible: entry.done
                                         text: "✓"
-                                        font.pixelSize: root.px(13)
+                                        font.pixelSize: root.fpx(13)
                                         font.bold: true
                                         color: Theme.bg
                                     }
@@ -686,12 +737,12 @@ Scope {
                                 TextEdit {
                                     id: edit
                                     anchors.left: check.right
-                                    anchors.leftMargin: root.px(12)
+                                    anchors.leftMargin: root.px(11)
                                     anchors.right: bellBtn.left
                                     anchors.rightMargin: root.px(6)
                                     anchors.top: parent.top
-                                    anchors.topMargin: root.px(12)
-                                    font.pixelSize: root.px(12)
+                                    anchors.topMargin: root.px(11)
+                                    font.pixelSize: root.fpx(11)
                                     font.strikeout: entry.done
                                     color: entry.done ? Theme.textDim : Theme.text
                                     opacity: entry.done ? 0.7 : 1
@@ -737,7 +788,7 @@ Scope {
                                         visible: entry.remindAt > 0
                                         text: "⏰ " + root.formatWhen(entry.remindAt)
                                               + (entry.notified ? "  ·  sent" : "")
-                                        font.pixelSize: root.px(10)
+                                        font.pixelSize: root.fpx(10)
                                         color: entry.notified ? Theme.textDim : Theme.accent
                                     }
 
@@ -747,20 +798,20 @@ Scope {
                                         spacing: root.px(6)
 
                                         Repeater {
+                                            // s = seconds
                                             model: [
-                                                { l: "5m", m: 5 },
-                                                { l: "25m", m: 25 },
-                                                { l: "1h",  m: 60 },
+                                                { l: "5m",  s: 300 },
+                                                { l: "25m", s: 1500 },
+                                                { l: "1h",  s: 3600 },
                                             ]
 
                                             delegate: ChipBtn {
                                                 required property var modelData
                                                 ui: root.ui
+                                                tx: root.tx
                                                 label: modelData.l
                                                 onClicked: {
-                                                    root.setReminder(entry.index,
-                                                        modelData.m < 0 ? root.tomorrowNine()
-                                                                        : Date.now() + modelData.m * 60000)
+                                                    root.setReminder(entry.index, Date.now() + modelData.s * 1000)
                                                     entry.picking = false
                                                 }
                                             }
@@ -769,6 +820,7 @@ Scope {
                                         ChipBtn {
                                             visible: entry.remindAt > 0
                                             ui: root.ui
+                                            tx: root.tx
                                             label: "Clear"
                                             onClicked: {
                                                 root.clearReminder(entry.index)
@@ -782,7 +834,7 @@ Scope {
                                         visible: entry.picking
                                         property bool bad: false
                                         width: parent.width
-                                        height: root.px(26)
+                                        height: Math.max(root.px(26), customInput.contentHeight + root.px(10))
                                         radius: root.px(8)
                                         color: Theme.alpha(Theme.text, 0.08)
                                         border.width: (customInput.activeFocus || bad) ? 1 : 0
@@ -794,7 +846,7 @@ Scope {
                                             anchors.leftMargin: root.px(8)
                                             anchors.rightMargin: root.px(8)
                                             verticalAlignment: TextInput.AlignVCenter
-                                            font.pixelSize: root.px(11)
+                                            font.pixelSize: root.fpx(11)
                                             color: Theme.text
                                             selectionColor: Theme.accent
                                             selectedTextColor: Theme.bg
@@ -824,8 +876,8 @@ Scope {
                                             Text {
                                                 visible: customInput.text === ""
                                                 anchors.verticalCenter: parent.verticalCenter
-                                                text: "Custom: 14:30 · tmr 10:30am · 2d 1pm (Enter)"
-                                                font.pixelSize: root.px(11)
+                                                text: "e.g. 15m · 20:10 · 9am · 2:30pm · fri 14:30"
+                                                font.pixelSize: root.fpx(11)
                                                 color: Theme.textDim
                                                 opacity: 0.7
                                             }
@@ -838,14 +890,14 @@ Scope {
                                     width: root.px(24)
                                     height: width
                                     anchors.right: delBtn.left
-                                    anchors.rightMargin: root.px(2)
+                                    anchors.rightMargin: root.px(0)
                                     anchors.top: parent.top
                                     anchors.topMargin: root.px(12)
 
                                     Text {
                                         anchors.centerIn: parent
                                         text: "⏰"
-                                        font.pixelSize: root.px(12)
+                                        font.pixelSize: root.fpx(12)
                                         color: Theme.textDim
                                         opacity: (entry.remindAt > 0 && !entry.notified) || entry.picking ? 1
                                                  : (hoverArea.containsMouse || bellArea.containsMouse) ? 0.9
@@ -877,7 +929,7 @@ Scope {
                                     Text {
                                         anchors.centerIn: parent
                                         text: "✕"
-                                        font.pixelSize: root.px(12)
+                                        font.pixelSize: root.fpx(12)
                                         color: delArea.containsMouse ? Theme.danger : Theme.textDim
                                         opacity: (hoverArea.containsMouse || delArea.containsMouse) ? 1 : 0.4
                                         Behavior on opacity { NumberAnimation { duration: 120 } }
@@ -890,48 +942,67 @@ Scope {
                                         onClicked: root.removeTodo(entry.index)
                                     }
                                 }
+
+                                // Right-click + drag: reorder this note.
+                                // Last child = topmost; only reacts to the right button,
+                                // so left-clicks still reach the checkbox, text, bell and ✕.
+                                MouseArea {
+                                    id: reorderArea
+                                    anchors.fill: parent
+                                    acceptedButtons: Qt.RightButton
+                                    preventStealing: true
+
+                                    onPressed: entry.reordering = true
+                                    onReleased: entry.reordering = false
+                                    onCanceled: entry.reordering = false
+
+                                    onPositionChanged: function (mouse) {
+                                        if (!pressed) return
+                                        // cursor position in the list's content coordinates
+                                        var p = reorderArea.mapToItem(list.contentItem, mouse.x, mouse.y)
+                                        var idx = list.indexAt(list.width / 2, p.y)
+                                        if (idx < 0) {
+                                            if (p.y <= 0) idx = 0                                       // above the first note
+                                            else if (p.y >= list.contentHeight) idx = todos.count - 1   // below the last note
+                                            else return                                                 // in the gap between notes
+                                        }
+                                        if (idx === entry.index) return
+                                        var it = list.itemAtIndex(idx)
+                                        if (!it) return
+                                        // swap only after crossing the middle of the other note, so notes
+                                        // of different heights don't flip back and forth
+                                        var mid = it.y + it.height / 2
+                                        if ((idx > entry.index && p.y > mid) || (idx < entry.index && p.y < mid))
+                                            root.moveTodo(entry.index, idx)
+                                    }
+                                }
                             }
                         }
+                    }
 
-                        Item {
-                            width: parent.width
-                            height: root.px(24)
-
-                            Row {
-                                id: sizeRow
-                                anchors.left: parent.left
-                                anchors.leftMargin: 2
-                                anchors.verticalCenter: parent.verticalCenter
-                                spacing: 4
-                                opacity: sizeHover.hovered ? 0.9 : 0.35
-
-                                Behavior on opacity { NumberAnimation { duration: 150 } }
-                                HoverHandler { id: sizeHover }
-
-                                SizeBtn { text: "−"; width: 16; font.pixelSize: 12; onClicked: root.setSize(root.menuSize - 10) }
-                                SizeBtn { text: "+"; width: 16; font.pixelSize: 12; onClicked: root.setSize(root.menuSize + 10) }
-                            }
-
-                            Row {
-                                anchors.right: parent.right
-                                anchors.verticalCenter: parent.verticalCenter
-                                spacing: root.px(6)
-
-                                FooterButton {
-                                    ui: root.ui
-                                    label: "↺"
-                                    fontSize: 13
-                                    opacity: root.movedFromDefault ? 1 : 0.4
-                                    onClicked: root.resetPosition()
-                                }
-
-                                FooterButton {
-                                    ui: root.ui
-                                    label: "✓"
-                                    fontSize: 12
-                                    opacity: (todos.count - root.remaining) > 0 ? 1 : 0.4
-                                    onClicked: root.clearDone()
-                                }
+                    // Topmost overlay for wheel shortcuts:
+                    //   Ctrl  + scroll -> text size only
+                    //   Shift + scroll -> component scale
+                    // Plain scroll passes through so the list scrolls normally.
+                    // Starts below the header so the drag handle keeps its hover/cursor.
+                    MouseArea {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        anchors.top: parent.top
+                        anchors.topMargin: panelCol.anchors.topMargin + header.height + panelCol.spacing
+                        z: 100
+                        acceptedButtons: Qt.NoButton   // never steals clicks
+                        onWheel: function (wheel) {
+                            var dy = wheel.angleDelta.y !== 0 ? wheel.angleDelta.y : wheel.angleDelta.x
+                            if (wheel.modifiers & Qt.ControlModifier) {
+                                root.wheelText(dy)
+                                wheel.accepted = true
+                            } else if (wheel.modifiers & Qt.ShiftModifier) {
+                                root.wheelScale(dy)
+                                wheel.accepted = true
+                            } else {
+                                wheel.accepted = false
                             }
                         }
                     }
