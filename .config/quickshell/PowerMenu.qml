@@ -36,7 +36,7 @@ Scope {
 
     // ---- settings specs (numbers) ----------------------------------------
     readonly property var numSpec: ({
-        menuSize:     { min: 70,  max: 160, def: 100, step: 10, unit: "%" },
+        menuSize:     { min: 70,  max: 260, def: 100, step: 10, unit: "%" },
         animMs:       { min: 0,   max: 500, def: 200, step: 20, unit: " ms" },
 
         cardWidth:    { min: 60, max: 700, def: 284, step: 5, unit: "px" },
@@ -55,11 +55,12 @@ Scope {
         panelOpacity: { min: 0,   max: 100, def: 0,   step: 5,  unit: "%" },
         itemOpacity:  { min: 0,   max: 100, def: Math.round((Theme.bg.a ?? 1) * 20) * 5, step: 5, unit: "%" },
         hoverBoost:   { min: 0,   max: 40,  def: 12,  step: 2,  unit: "%" },
-        dimOpacity:   { min: 0,   max: 80,  def: 0,   step: 5,  unit: "%" }
+        dimOpacity:   { min: 0,   max: 100,  def: 0,   step: 5,  unit: "%" }
     })
     readonly property var numKeys: Object.keys(numSpec)
 
     readonly property var boolDefaults: ({
+        showTooltips: true,
         horizontal: false,
         showIcons: true,
         showLabels: true,
@@ -95,6 +96,7 @@ Scope {
     property int hoverBoost: numSpec.hoverBoost.def
     property int dimOpacity: numSpec.dimOpacity.def
 
+    property bool showTooltips: boolDefaults.showTooltips
     property bool horizontal: boolDefaults.horizontal
     property bool showIcons: boolDefaults.showIcons
     property bool showLabels: boolDefaults.showLabels
@@ -151,6 +153,20 @@ Scope {
     readonly property var visibleActions: actions.filter(function (a) {
         return root.hiddenNames.indexOf(a.name) < 0
     })
+
+    // rows shown in the "Keybinds" section at the end of the settings menu
+    readonly property var keybindInfo: [
+        { keys: "Super + Grave",          desc: "Power menu" },
+        { keys: "Esc / Click outside",    desc: "Close menu / settings" },
+        { keys: "↑ ↓ ← → Tab",            desc: "Move selection" },
+        { keys: "Enter / Space / LMB",    desc: "Run selected action" },
+        { keys: "C / RMB (any button)",   desc: "Open settings" }
+    ].concat(actions.map(function (a) {
+        return { keys: a.key.toUpperCase(), desc: a.label }
+    })).concat([
+        { keys: "Drag handle",            desc: "Move the menu" },
+        { keys: "Double-click handle",    desc: "Reset position" }
+    ])
 
     function iconFile(name) {
         if (!root.lightMode) return name
@@ -235,12 +251,6 @@ Scope {
         var s = numSpec[key]
         root[key] = clamp(v, s.min, s.max)
         reclamp()
-    }
-
-    function stepNumber(key, dir) {
-        var s = numSpec[key]
-        setNumber(key, root[key] + dir * s.step)
-        saveState()
     }
 
     function toggleSetting(key) {
@@ -494,7 +504,11 @@ Scope {
                     }
                     onHeightChanged: if (root.showing) root.setPosition(root.offsetX, root.offsetY)
 
-                    MouseArea { anchors.fill: parent }
+                    // swallow clicks on the panel background (also right clicks)
+                    MouseArea {
+                        anchors.fill: parent
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                    }
 
                     Column {
                         id: panelCol
@@ -504,17 +518,18 @@ Scope {
                         anchors.margins: root.panelPadding
                         spacing: 6
 
-                        // ---- drag handle ----
+                        // ---- drag handle (right click opens settings) ----
                         Item {
                             id: header
                             width: parent.width
                             height: 12
+                            z: headerTip.shown ? 100 : 0
 
                             Rectangle {
                                 anchors.centerIn: parent
                                 width: 36; height: 4; radius: 2
                                 color: Theme.bg
-                                opacity: (dragArea.containsMouse || root.dragging) ? 1 : 0.1
+                                opacity: (dragArea.containsMouse || root.dragging) ? 1 : 0
                                 Behavior on opacity { NumberAnimation { duration: 150 } }
                             }
 
@@ -522,13 +537,17 @@ Scope {
                                 id: dragArea
                                 anchors.fill: parent
                                 hoverEnabled: true
-                                acceptedButtons: Qt.LeftButton
+                                acceptedButtons: Qt.LeftButton | Qt.RightButton
                                 cursorShape: root.dragging ? Qt.ClosedHandCursor : Qt.OpenHandCursor
                                 property real pressX: 0
                                 property real pressY: 0
                                 property real startX: 0
                                 property real startY: 0
                                 onPressed: function (mouse) {
+                                    if (mouse.button === Qt.RightButton) {
+                                        root.openSettings()
+                                        return
+                                    }
                                     var p = dragArea.mapToItem(menuRoot, mouse.x, mouse.y)
                                     pressX = p.x
                                     pressY = p.y
@@ -551,7 +570,18 @@ Scope {
                                     root.dragging = false
                                     root.saveState()
                                 }
-                                onDoubleClicked: root.resetPosition()
+                                onDoubleClicked: function (mouse) {
+                                    if (mouse.button === Qt.LeftButton)
+                                        root.resetPosition()
+                                }
+                            }
+
+                            Tip {
+                                id: headerTip
+                                allowed: root.showTooltips
+                                hovered: dragArea.containsMouse && !root.dragging
+                                side: "below"
+                                text: "Drag to move · double-click to reset · right-click: settings"
                             }
                         }
 
@@ -573,6 +603,7 @@ Scope {
                                     readonly property bool pending: root.confirmName === modelData.name
                                     readonly property int count: root.visibleActions.length
 
+                                    z: entryTip.shown ? 100 : 0
                                     width: root.horizontal
                                         ? Math.max(0, (actionGrid.width - root.itemSpacing * (count - 1)) / count)
                                         : actionGrid.width
@@ -650,30 +681,40 @@ Scope {
                                         id: entryArea
                                         anchors.fill: parent
                                         hoverEnabled: true
+                                        acceptedButtons: Qt.LeftButton | Qt.RightButton
                                         onEntered: if (root.hoverSelect) root.currentIndex = entry.index
-                                        onClicked: {
+                                        onClicked: mouse => {
+                                            if (mouse.button === Qt.RightButton) {
+                                                root.openSettings()
+                                                return
+                                            }
                                             root.currentIndex = entry.index
                                             root.runAction(entry.modelData)
                                         }
+                                    }
+
+                                    Tip {
+                                        id: entryTip
+                                        allowed: root.showTooltips
+                                        hovered: entryArea.containsMouse
+                                        side: root.horizontal ? "below" : "left"
+                                        text: entry.modelData.label
+                                            + " (" + entry.modelData.key.toUpperCase() + ")"
+                                            + " · right-click: settings"
                                     }
                                 }
                             }
                         }
 
-                        // ---- footer: size controls + settings button ----
+                        // ---- footer: settings button ----
                         Item {
                             visible: root.showFooter
                             width: parent.width
                             height: 16
-
-                            SizeControl {
-                                anchors.left: parent.left
-                                anchors.leftMargin: 2
-                                anchors.verticalCenter: parent.verticalCenter
-                                onStep: function (d) { root.stepNumber("menuSize", d) }
-                            }
+                            z: footTip.shown ? 100 : 0
 
                             FooterButton {
+                                id: footBtn
                                 anchors.right: parent.right
                                 anchors.verticalCenter: parent.verticalCenter
                                 label: "󰒓"
@@ -681,6 +722,15 @@ Scope {
                                 active: root.settingsOpen
                                 opacity: (hovered || root.settingsOpen) ? 1 : 0.1
                                 onClicked: root.toggleSettings()
+                                onRightClicked: root.openSettings()
+                            }
+
+                            Tip {
+                                id: footTip
+                                allowed: root.showTooltips
+                                hovered: footBtn.hovered
+                                side: "belowEnd"
+                                text: "Settings (C or right-click)"
                             }
                         }
                     }
@@ -734,11 +784,12 @@ Scope {
                     }
                     Text {
                         x: 20; y: 34
-                        text: "Drag the menu's handle to move it, double-click it to reset."
-                        font.pixelSize: 10
+                        text: "Drag the handle to move."
+                        font.pixelSize: 12
                         color: Theme.textDim
                     }
                     Text {
+                        id: closeX
                         anchors.right: parent.right
                         anchors.rightMargin: 20
                         y: 10
@@ -753,6 +804,12 @@ Scope {
                             anchors.fill: parent
                             hoverEnabled: true
                             onClicked: root.closeSettings()
+                        }
+                        Tip {
+                            allowed: root.showTooltips
+                            hovered: closeArea.containsMouse
+                            side: "belowEnd"
+                            text: "Close (Esc)"
                         }
                     }
                 }
@@ -772,30 +829,36 @@ Scope {
                     flickableDirection: Flickable.VerticalFlick
                     boundsBehavior: Flickable.StopAtBounds
 
-                    WheelHandler {
-                        onWheel: event => {
-                            var max = Math.max(0, flick.contentHeight - flick.height)
-                            flick.contentY = Math.max(0, Math.min(max, flick.contentY - event.angleDelta.y / 2))
-                        }
-                    }
-
                     Column {
                         id: contentCol
                         x: 20
                         width: flick.width - 48
 
+                        SectionHeader { text: "Hints" }
+                        ToggleRow {
+                            host: root
+                            key: "showTooltips"
+                            label: "Show tooltips / hints"
+                            checked: root.showTooltips
+                            tip: "Turn off to hide all hover hints"
+                        }
+                        ToggleRow {
+                            host: root
+                            key: "showFooter"
+                            label: "Settings button"
+                            checked: root.showFooter
+                            tip: "Hides the gear button; C and right-click still work"
+                        }
                         SectionHeader { text: "Global" }
-                        SliderRow { host: root; key: "menuSize"; label: "Scale" }
-                        SliderRow { host: root; key: "animMs"; label: "Animation duration" }
+                        SliderRow { host: root; key: "menuSize"; label: "Scale"; tip: "Overall size of the power menu" }
+                        SliderRow { host: root; key: "animMs"; label: "Animation duration"; tip: "0 disables animations" }
 
                         SectionHeader { text: "Layout" }
-                        ToggleRow { host: root; key: "horizontal"; label: "Horizontal layout"; checked: root.horizontal }
+                        ToggleRow { host: root; key: "horizontal"; label: "Horizontal layout"; checked: root.horizontal; tip: "Show actions in a row instead of a list" }
                         SliderRow { host: root; key: "cardWidth"; label: "Width" }
                         SliderRow { host: root; key: "itemHeight"; label: "Item height" }
                         SliderRow { host: root; key: "itemSpacing"; label: "Item spacing" }
                         SliderRow { host: root; key: "panelPadding"; label: "Panel padding" }
-                        SliderRow { host: root; key: "topGap"; label: "Top margin" }
-                        SliderRow { host: root; key: "sideGap"; label: "Right margin" }
 
                         SectionHeader { text: "Content" }
                         ToggleRow { host: root; key: "showIcons"; label: "Icons"; checked: root.showIcons }
@@ -806,12 +869,7 @@ Scope {
                             label: "Key hints"
                             checked: root.showKeyHints
                             enabled: !root.horizontal
-                        }
-                        ToggleRow {
-                            host: root
-                            key: "showFooter"
-                            label: "Footer controls (scale / settings)"
-                            checked: root.showFooter
+                            tip: "Small key badges (vertical layout only)"
                         }
 
                         SectionHeader { text: "Appearance" }
@@ -828,7 +886,7 @@ Scope {
                         SliderRow { host: root; key: "dimOpacity"; label: "Dim screen behind menu" }
 
                         SectionHeader { text: "Behavior" }
-                        ToggleRow { host: root; key: "confirmDangerous"; label: "Confirm shutdown / reboot / logout"; checked: root.confirmDangerous }
+                        ToggleRow { host: root; key: "confirmDangerous"; label: "Confirm shutdown / reboot / logout"; checked: root.confirmDangerous; tip: "Requires a second press to confirm" }
                         ToggleRow { host: root; key: "wrapNav"; label: "Wrap around when navigating"; checked: root.wrapNav }
                         ToggleRow { host: root; key: "hoverSelect"; label: "Hover selects item"; checked: root.hoverSelect }
                         ToggleRow { host: root; key: "closeOnOutside"; label: "Close on click outside"; checked: root.closeOnOutside }
@@ -849,7 +907,19 @@ Scope {
                         ActionButton {
                             label: "Reset position"
                             enabled: root.movedFromDefault
+                            tipsOn: root.showTooltips
+                            tip: "Move the menu back to its default spot"
                             onClicked: root.resetPosition()
+                        }
+
+                        SectionHeader { text: "Keybinds" }
+                        Repeater {
+                            model: root.keybindInfo
+                            delegate: KeyRow {
+                                required property var modelData
+                                keys: modelData.keys
+                                desc: modelData.desc
+                            }
                         }
                     }
                 }
@@ -925,6 +995,9 @@ Scope {
                         anchors.verticalCenter: parent.verticalCenter
                         label: "Reset all"
                         enabled: root.modified
+                        tipsOn: root.showTooltips
+                        tip: "Restore every setting to its default"
+                        tipSide: "above"
                         onClicked: root.resetAll()
                     }
                     ActionButton {
@@ -933,6 +1006,9 @@ Scope {
                         anchors.verticalCenter: parent.verticalCenter
                         label: "Done"
                         primary: true
+                        tipsOn: root.showTooltips
+                        tip: "Close settings (Esc)"
+                        tipSide: "above"
                         onClicked: root.closeSettings()
                     }
                 }
@@ -941,6 +1017,64 @@ Scope {
     }
 
     // ---- reusable components -----------------------------------------------
+
+    // Lightweight hover hint drawn inside the host's own window (no extra
+    // popup surface). Appears after a short delay, only if `allowed`.
+    // The host should raise its own z while `shown` so the hint isn't covered
+    // by siblings.
+    component Tip: Rectangle {
+        id: tp
+        property string text: ""
+        property bool allowed: false
+        property bool hovered: false
+        // left | below | belowStart | belowEnd | above
+        property string side: "belowStart"
+        property bool shown: false
+        readonly property bool wanted: allowed && text !== "" && hovered
+
+        onWantedChanged: {
+            if (wanted) {
+                tipDelay.restart()
+            } else {
+                tipDelay.stop()
+                shown = false
+            }
+        }
+
+        Timer {
+            id: tipDelay
+            interval: 450
+            onTriggered: tp.shown = tp.wanted
+        }
+
+        z: 1000
+        width: tipText.implicitWidth + 16
+        height: tipText.implicitHeight + 10
+        radius: 6
+        color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, 1)
+        border.width: 1
+        border.color: Theme.alpha(Theme.text, 0.15)
+        opacity: shown ? 1 : 0
+        visible: opacity > 0
+        Behavior on opacity { NumberAnimation { duration: 120 } }
+
+        x: side === "left" ? -width - 8
+         : side === "below" ? (parent.width - width) / 2
+         : side === "belowEnd" ? parent.width - width
+         : 0
+        y: side === "left" ? (parent.height - height) / 2
+         : side === "above" ? -height - 4
+         : parent.height + 4
+
+        Text {
+            id: tipText
+            anchors.centerIn: parent
+            text: tp.text
+            font.pixelSize: 10
+            color: Theme.text
+        }
+    }
+
     component FooterButton: Rectangle {
         id: fb
         property string label: ""
@@ -949,6 +1083,7 @@ Scope {
         property color textColor: Theme.textDim
         readonly property bool hovered: fbArea.containsMouse
         signal clicked()
+        signal rightClicked()
 
         width: 16; height: 16; radius: 6
         color: Theme.bg
@@ -968,42 +1103,30 @@ Scope {
             id: fbArea
             anchors.fill: parent
             hoverEnabled: true
-            onClicked: fb.clicked()
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            onClicked: mouse => {
+                if (mouse.button === Qt.RightButton)
+                    fb.rightClicked()
+                else
+                    fb.clicked()
+            }
         }
-    }
-
-    component SizeBtn: Text {
-        signal clicked()
-        height: 14
-        verticalAlignment: Text.AlignVCenter
-        horizontalAlignment: Text.AlignHCenter
-        color: Theme.text
-        MouseArea { anchors.fill: parent; onClicked: parent.clicked() }
-    }
-
-    component SizeControl: Row {
-        id: sc
-        signal step(int delta)
-
-        spacing: 4
-        opacity: scHover.hovered ? 0.9 : 0.35
-        Behavior on opacity { NumberAnimation { duration: 150 } }
-        HoverHandler { id: scHover }
-
-        SizeBtn { text: "−"; width: 16; font.pixelSize: 12; onClicked: sc.step(-1) }
-        SizeBtn { text: "+"; width: 16; font.pixelSize: 12; onClicked: sc.step(1) }
     }
 
     component ActionButton: Rectangle {
         id: ab
         property string label: ""
         property bool primary: false
+        property string tip: ""
+        property bool tipsOn: false
+        property string tipSide: "belowStart"
         signal clicked()
 
         implicitWidth: abText.implicitWidth + 28
         width: implicitWidth
         height: 30
         radius: 15
+        z: abTip.shown ? 100 : 0
         opacity: enabled ? 1 : 0.4
         color: primary
             ? Theme.accent
@@ -1026,6 +1149,14 @@ Scope {
             enabled: ab.enabled
             onClicked: ab.clicked()
         }
+
+        Tip {
+            id: abTip
+            allowed: ab.tipsOn
+            hovered: abArea.containsMouse
+            side: ab.tipSide
+            text: ab.tip
+        }
     }
 
     component SectionHeader: Item {
@@ -1046,6 +1177,46 @@ Scope {
         }
     }
 
+    // One line of the keybind cheat-sheet: description left, key chip right.
+    component KeyRow: Item {
+        id: kr
+        property string keys: ""
+        property string desc: ""
+
+        width: parent?.width ?? 0
+        height: 26
+
+        Text {
+            anchors.left: parent.left
+            anchors.right: chip.left
+            anchors.rightMargin: 12
+            anchors.verticalCenter: parent.verticalCenter
+            text: kr.desc
+            elide: Text.ElideRight
+            font.pixelSize: 11
+            color: Theme.text
+        }
+
+        Rectangle {
+            id: chip
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            width: chipText.implicitWidth + 14
+            height: 18
+            radius: 5
+            color: Theme.alpha(Theme.text, 0.08)
+
+            Text {
+                id: chipText
+                anchors.centerIn: parent
+                text: kr.keys
+                font.pixelSize: 10
+                font.bold: true
+                color: Theme.textDim
+            }
+        }
+    }
+
     // Toggle row. With a `key` it flips that boolean setting on the host;
     // without one it just emits `toggled()` (used for the action list).
     component ToggleRow: Item {
@@ -1053,11 +1224,13 @@ Scope {
         property var host
         property string key: ""
         property string label: ""
+        property string tip: ""
         property bool checked: false
         signal toggled()
 
         width: parent?.width ?? 0
         height: 34
+        z: trTip.shown ? 100 : 0
         opacity: enabled ? 1 : 0.4
 
         Rectangle {
@@ -1111,6 +1284,14 @@ Scope {
                     tr.toggled()
             }
         }
+
+        Tip {
+            id: trTip
+            allowed: tr.host ? tr.host.showTooltips : false
+            hovered: trArea.containsMouse
+            side: "belowStart"
+            text: tr.tip
+        }
     }
 
     // Self-contained minimal slider. Reads/writes a numSpec entry on the
@@ -1120,6 +1301,7 @@ Scope {
         property var host
         property string key: ""
         property string label: ""
+        property string tip: ""
 
         readonly property var spec: host.numSpec[key]
         readonly property real ratio: Math.max(0, Math.min(1,
@@ -1127,6 +1309,7 @@ Scope {
 
         width: parent?.width ?? 0
         height: 44
+        z: srTip.shown ? 100 : 0
         opacity: enabled ? 1 : 0.4
 
         Text {
@@ -1177,6 +1360,8 @@ Scope {
             id: sliderArea
             anchors.fill: parent
             anchors.topMargin: 20
+            hoverEnabled: true
+            preventStealing: true  
             enabled: sr.enabled
 
             function apply(mx) {
@@ -1192,6 +1377,14 @@ Scope {
             onPressed: mouse => apply(mouse.x)
             onPositionChanged: mouse => { if (pressed) apply(mouse.x) }
             onReleased: sr.host.saveState()
+        }
+
+        Tip {
+            id: srTip
+            allowed: sr.host ? sr.host.showTooltips : false
+            hovered: sliderArea.containsMouse && !sliderArea.pressed
+            side: "belowStart"
+            text: sr.tip
         }
     }
 }

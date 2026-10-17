@@ -140,7 +140,8 @@ Item {
             lines.push(monitorLua({ name: names[i] }, {
                 mode: entry.mode,
                 position: typeof entry.position === "string" ? entry.position : "auto",
-                scale: typeof entry.scale === "number" ? entry.scale : 1
+                scale: typeof entry.scale === "number" ? entry.scale : 1,
+                disabled: false
             }))
         }
         return lines.join("\n") + "\n"
@@ -173,6 +174,7 @@ Item {
         id: pReset
         onExited: exitCode => {
             refreshTimer.restart()
+            lateRefreshTimer.restart()
         }
     }
 
@@ -204,15 +206,43 @@ Item {
         return !mon.disabled && page.activeMonitors.length > 0 && mon.x === 0 && mon.y === 0
     }
 
+    // Logs hyprctl output so failed rules are visible in the quickshell terminal,
+    // and refreshes twice because a re-enabled monitor needs a moment to modeset.
     Process {
         id: pShell
+        stdout: StdioCollector {
+            onStreamFinished: if (text.trim().length > 0) console.log("[display] hyprctl:", text.trim())
+        }
+        stderr: StdioCollector {
+            onStreamFinished: if (text.trim().length > 0) console.warn("[display] hyprctl error:", text.trim())
+        }
         onExited: exitCode => {
             refreshTimer.restart()
+            lateRefreshTimer.restart()
         }
     }
 
+    // Hyprland applies each rule immediately, so any intermediate step that lands a monitor
+    // on top of another one triggers the "monitor layout is set up incorrectly" warning.
+    // With 2+ monitors, first park them all to the right of the current layout, then place
+    // them at their final positions. Nothing overlaps at any step.
+    // Math.ceil avoids a sub-pixel overlap when width / scale is fractional.
+    function logicalWidth(mon) { return Math.ceil(mon.width / mon.scale) }
+
     function layoutCommands(ordered) {
         const cmds = []
+
+        if (ordered.length > 1) {
+            let parkX = 0
+            for (let i = 0; i < ordered.length; i++)
+                parkX = Math.max(parkX, ordered[i].x + logicalWidth(ordered[i]))
+            for (let i = 0; i < ordered.length; i++) {
+                const m = ordered[i]
+                cmds.push("hyprctl eval '" + monitorLua(m, { mode: monitorMode(m), position: parkX + "x0", scale: m.scale }) + "'")
+                parkX += logicalWidth(m)
+            }
+        }
+
         let x = 0
         for (let i = 0; i < ordered.length; i++) {
             const m = ordered[i]
@@ -220,7 +250,7 @@ Item {
             const pos = x + "x0"
             rememberMonitor(m, { mode: mode, scale: m.scale, position: pos, disabled: false })
             cmds.push("hyprctl eval '" + monitorLua(m, { mode: mode, position: pos, scale: m.scale }) + "'")
-            x += Math.round(m.width / m.scale)
+            x += logicalWidth(m)
         }
         if (ordered.length > 0) cmds.push("hyprctl dispatch focusmonitor '" + ordered[0].name + "'")
         return cmds
@@ -242,7 +272,8 @@ Item {
             const mode = typeof entry.mode === "string" ? entry.mode : "preferred"
             const scale = typeof entry.scale === "number" ? entry.scale : 1
             rememberMonitor(mon, { mode: mode, scale: scale, position: "auto", disabled: false })
-            cmds.push("hyprctl eval '" + monitorLua(mon, { mode: mode, position: "auto", scale: scale }) + "'")
+            // disabled: false is required. Without it Hyprland keeps the monitor disabled.
+            cmds.push("hyprctl eval '" + monitorLua(mon, { mode: mode, position: "auto", scale: scale, disabled: false }) + "'")
         } else {
             if (page.activeMonitors.length <= 1) return
             const wasMain = isMain(mon)
@@ -457,6 +488,7 @@ Item {
     }
 
     Timer { id: refreshTimer; interval: 250; onTriggered: page.refresh() }
+    Timer { id: lateRefreshTimer; interval: 1500; onTriggered: page.refresh() }
 
     Process {
         id: pEditConfig
