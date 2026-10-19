@@ -14,6 +14,13 @@ QtObject {
     readonly property int animMed: 220
     readonly property int animSlow: 380
 
+    // ---- Global text sizes (px) ----
+    readonly property int textSizeTitle: 18     
+    readonly property int textSizeSection: 15  
+    readonly property int textSizeGroup: 12    
+    readonly property int textSizeBody: 11     
+    readonly property int textSizeSmall: 10     
+
     property real bgAlpha: 0.7
     property color _bgBase: palette.bg || '#000000'
     property color bg: alpha(_bgBase, bgAlpha)

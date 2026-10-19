@@ -9,21 +9,21 @@ Scope {
     id: root
 
     // ---- resize limits (tweak these) -------------------------------------
-    property real minCardWidth: 780
+    property real minCardWidth: 700
     property real minCardHeight: 255
     property real maxCardWidth: 1600
     property real maxCardHeight: 1100
     property real resizeGripSize: 40     // hit area of each corner grip (px)
 
     // ---- sidebar collapse (tweak these) ----------------------------------
-    property real sidebarExpandedWidth: 170   // wide enough for the button + SETTINGS title
-    property real sidebarCollapsedWidth: 26   // only the toggle button stays visible
+    property real sidebarExpandedWidth: 130   // current expanded width (drag the divider to change)
+    property real sidebarDefaultWidth: 80    // double-click the divider to reset to this
+    property real sidebarMinWidth: 30
+    property real sidebarMaxWidth: 420
+    property real sidebarHandleHitWidth: 9    // invisible grab area around the 1px divider line
+    property bool sidebarResizing: false
+    property real sidebarCollapsedWidth: 37   // only the toggle button stays visible
     property bool sidebarCollapsed: false
-
-    // ---- corner accents --------------------------------------------------
-    property real accentArm: 40          // length of each accent arm (px)
-    property real accentInset: 14        // distance from the card edge (px)
-    property real accentOpacity: 1.0     // 0..1, edited on the Hub page, persisted in settings-state.json
 
     // ---- lifecycle -------------------------------------------------------
     property bool showing: false      // logical "settings are open"
@@ -47,6 +47,8 @@ Scope {
         } else {
             dragging = false
             resizing = false
+            sidebarResizing = false
+            searchQuery = ""
             unmountTimer.restart()
         }
     }
@@ -73,15 +75,31 @@ Scope {
         { name: "System", icon: "󰒓", page: "SystemPage" },
         { name: "Audio", icon: "󰕾", page: "AudioPage" },
         { name: "Display", icon: "󰍹", page: "DisplayPage" },
-        { name: "Input", icon: "󰌌", page: "InputPage" },
+        { name: "Appearance", icon: "󰏘", page: "AppearancePage" },
+        { name: "Configs", icon: "󰧮",  page: "ConfigsPage" },
+        { name: "Themes", icon: "󰉼",  page: "ThemesPage" },
+        { name: "Bar", icon: "󰖔",  page: "BarPage" },
+        { name: "Input", icon: "󰍽", page: "InputPage" },
         { name: "Network", icon: "󰖩", page: "NetworkPage" },
         { name: "Bluetooth", icon: "󰂯", page: "BluetoothPage" },
         { name: "Storage", icon: "󰋊", page: "StoragePage" },
-        { name: "Configs", icon: "󰧮",  page: "ConfigsPage" },
-        { name: "Themes", icon: "󰉼",  page: "ThemesPage" },
-        { name: "Power", icon: "󰐥", page: "PowerPage" },
-        { name: "Hub", icon: "󰋜", page: "HubPage" }
+        { name: "Updates", icon: "󰚰",  page: "UpdatesPage" },
     ]
+
+    // ---- search -----------------------------------------------------------
+    property string searchQuery: ""
+
+    // navItems filtered by the search text; origIndex keeps the real page index
+    property var filteredNavItems: {
+        var q = searchQuery.trim().toLowerCase()
+        var out = []
+        for (var i = 0; i < navItems.length; i++) {
+            if (q === "" || navItems[i].name.toLowerCase().indexOf(q) >= 0)
+                out.push({ name: navItems[i].name, icon: navItems[i].icon,
+                           page: navItems[i].page, origIndex: i })
+        }
+        return out
+    }
 
     function nextPage() { selectedIndex = (selectedIndex + 1) % navItems.length }
     function prevPage() { selectedIndex = (selectedIndex - 1 + navItems.length) % navItems.length }
@@ -119,8 +137,22 @@ Scope {
             w: root.freeW,
             h: root.freeH,
             sidebarCollapsed: root.sidebarCollapsed,
-            accentOpacity: root.accentOpacity
+            sidebarWidth: root.sidebarExpandedWidth
         }))
+    }
+
+    function setSidebarWidth(w) {
+        sidebarExpandedWidth = clampRange(w, sidebarMinWidth, sidebarMaxWidth)
+    }
+
+    function resetSidebarWidth() {
+        setSidebarWidth(sidebarDefaultWidth)
+        saveState()
+    }
+
+    function finishSidebarResize() {
+        sidebarResizing = false
+        saveState()
     }
 
     function clampX(v) {
@@ -259,8 +291,8 @@ Scope {
                 var s = JSON.parse(stateFile.text())
                 if (typeof s.sidebarCollapsed === "boolean")
                     root.sidebarCollapsed = s.sidebarCollapsed
-                if (typeof s.accentOpacity === "number")
-                    root.accentOpacity = Math.max(0, Math.min(1, s.accentOpacity))
+                if (typeof s.sidebarWidth === "number")
+                    root.setSidebarWidth(s.sidebarWidth)
                 if (["center", "top", "bottom", "left", "right", "free"].indexOf(s.snap) >= 0) {
                     if (typeof s.x === "number") root.freeX = s.x
                     if (typeof s.y === "number") root.freeY = s.y
@@ -276,20 +308,16 @@ Scope {
         }
     }
 
-    IpcHandler {
+    IpcHandler { // ipc call
         target: "settings"
         function toggle(): void { root.toggle() }
         function show(): void { root.show() }
         function hide(): void { root.hide() }
         function toggleSidebar(): void { root.toggleSidebar() }
-        function sound(): void {
-            root.selectedIndex = 1
-            root.show()
-        }
-        function network(): void {
-            root.selectedIndex = 4
-            root.show()
-        }
+        function resetSidebarWidth(): void { root.resetSidebarWidth() }
+        function sound(): void { root.selectedIndex = 1, root.show() } 
+        function network(): void { root.selectedIndex = 8, root.show() }
+        function bar(): void { root.selectedIndex = 6, root.show() }
         function snapTop(): void { root.snapTop() }
         function snapCenter(): void { root.snapCenter() }
         function snapBottom(): void { root.snapBottom() }
@@ -303,17 +331,6 @@ Scope {
 
         PanelWindow {
             id: win
-
-            // `reveal` drives the open animation. A freshly created window has
-            // to build its render resources (first frame, offscreen texture of
-            // the card, glyphs, shape geometry, first page compile) and all of
-            // that lands in the middle of the animation, so the first frames
-            // are dropped and it looks like a different, stuttery animation.
-            //
-            // So: once the window has its size, the card is drawn once while
-            // practically invisible (`prewarm`), and `reveal` only flips after
-            // a few frames have really been presented and the first page is
-            // loaded. A timer is the fallback if no frame signal arrives.
             property bool reveal: false
             property bool sized: false
             property bool warm: false       // fallback so a broken page can't keep the window hidden
@@ -358,8 +375,21 @@ Scope {
             WlrLayershell.namespace: "settings"
             WlrLayershell.keyboardFocus: root.showing ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
+            // Input region: the whole screen only when click-outside-to-close is on (the backdrop
+            // has to catch those clicks). Otherwise only the card takes input and every click
+            // outside it passes through to the windows underneath.
+            // The card's rect is bound explicitly (rather than via `item: card`) so the input
+            // region always follows drags, resizes and snaps, with a little padding so the
+            // drag tab and snap buttons at the very top edge are never clipped.
             mask: Region {
-                item: root.showing ? backdrop : null
+                readonly property real pad: 16
+                readonly property bool cardOnly: root.showing && !Theme.clickOutsideClose
+
+                item: root.showing && Theme.clickOutsideClose ? backdrop : null
+                x: Math.round(root.cardX) - pad
+                y: Math.round(root.cardY) - pad
+                width: cardOnly ? Math.round(root.cardWidth) + pad * 2 : 0
+                height: cardOnly ? Math.round(root.cardHeight) + pad * 2 : 0
             }
 
             function syncSize() {
@@ -374,6 +404,21 @@ Scope {
             onWidthChanged: syncSize()
             onHeightChanged: syncSize()
             Component.onCompleted: syncSize()
+
+            // Ctrl+F: expand the sidebar if collapsed, focus the search box and select its text
+            function focusSearch() {
+                if (root.sidebarCollapsed)
+                    root.toggleSidebar()
+                searchInput.forceActiveFocus()
+                searchInput.selectAll()
+            }
+
+            Shortcut {
+                sequence: "Ctrl+F"
+                context: Qt.WindowShortcut
+                enabled: root.showing
+                onActivated: win.focusSearch()
+            }
 
             Rectangle {
                 id: backdrop
@@ -432,6 +477,22 @@ Scope {
                     }
                 }
 
+                Behavior on width {
+                    enabled: !root.dragging && !root.resizing && win.reveal
+                    NumberAnimation {
+                        duration: Theme.animMed
+                        easing.type: Easing.OutCubic
+                    }
+                }
+
+                Behavior on height {
+                    enabled: !root.dragging && !root.resizing && win.reveal
+                    NumberAnimation {
+                        duration: Theme.animMed
+                        easing.type: Easing.OutCubic
+                    }
+                }
+
                 MouseArea {
                     anchors.fill: parent
                     onClicked: {}
@@ -444,56 +505,10 @@ Scope {
                     border.color: Theme.accent
                     border.width: 1
 
-                    // corner accents: L-shapes whose outer corner follows Theme.radius.
-                    // One shape is drawn top-left and rotated 0/90/180/270 for the others.
-                    Repeater {
-                        model: ["tl", "tr", "br", "bl"]
-
-                        delegate: Shape {
-                            id: accent
-                            required property string modelData
-                            required property int index
-
-                            readonly property real arm: root.accentArm
-                            // Concentric with the card corner: the accent sits `accentInset` px inside the
-                            // card edge, so its outer radius is Theme.radius - accentInset. The path runs
-                            // along the middle of the 2px stroke, hence the extra -1.
-                            readonly property real r: Math.max(0, Math.min(Theme.radius - root.accentInset - 1, arm - 2))
-
-                            width: arm
-                            height: arm
-                            x: modelData.charAt(1) === "l" ? root.accentInset : parent.width - width - root.accentInset
-                            y: modelData.charAt(0) === "t" ? root.accentInset : parent.height - height - root.accentInset
-                            rotation: index * 90
-                            opacity: root.accentOpacity
-                            preferredRendererType: Shape.CurveRenderer
-
-                            ShapePath {
-                                strokeColor: Theme.accent2
-                                strokeWidth: 2
-                                fillColor: "transparent"
-                                capStyle: ShapePath.FlatCap
-
-                                // path runs along the middle of the 2px stroke (offset 1px)
-                                startX: 1
-                                startY: accent.arm
-
-                                PathLine { x: 1; y: accent.r + 1 }
-                                PathArc {
-                                    x: accent.r + 1; y: 1
-                                    radiusX: Math.max(accent.r, 0.01)
-                                    radiusY: Math.max(accent.r, 0.01)
-                                    direction: PathArc.Clockwise
-                                }
-                                PathLine { x: accent.arm; y: 1 }
-                            }
-                        }
-                    }
-
                     // drag handle + snap buttons
                     Item {
                         id: positionHandle
-                        width: 140
+                        width: 100
                         height: 9
                         anchors {
                             top: parent.top
@@ -598,15 +613,7 @@ Scope {
                             spacing: 20
 
                             Text {
-                                text: "◀"
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 6
-                                color: Theme.textDim
-                                anchors.verticalCenter: parent.verticalCenter
-                                MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: root.snapLeft() }
-                            }
-                            Text {
-                                text: "▲"
+                                text: "●"
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 8
                                 color: Theme.textDim
@@ -622,45 +629,37 @@ Scope {
                                 MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: root.snapCenter() }
                             }
                             Text {
-                                text: "▼"
+                                text: "●"
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 8
                                 color: Theme.textDim
                                 anchors.verticalCenter: parent.verticalCenter
                                 MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: root.snapBottom() }
                             }
-                            Text {
-                                text: "▶"
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 6
-                                color: Theme.textDim
-                                anchors.verticalCenter: parent.verticalCenter
-                                MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: root.snapRight() }
-                            }
                         }
                     }
 
                     Row {
                         anchors.fill: parent
-                        anchors.margins: 28
-                        spacing: 28
+                        anchors.margins: 16
+                        spacing: 15
 
                         // ---- sidebar (collapsible) ----
                         Column {
                             id: sidebar
                             width: root.sidebarCollapsed ? root.sidebarCollapsedWidth : root.sidebarExpandedWidth
                             height: parent.height
-                            spacing: 12
+                            spacing: 10
                             clip: true
 
                             Behavior on width {
+                                enabled: !root.sidebarResizing
                                 NumberAnimation {
                                     duration: Theme.animMed
                                     easing.type: Easing.OutCubic
                                 }
                             }
 
-                            // header: [toggle button] SETTINGS
                             Item {
                                 id: sidebarHeader
                                 width: parent.width
@@ -677,28 +676,54 @@ Scope {
                                         height: 26
                                         radius: Theme.radius
                                         color: collapseMouse.containsMouse
-                                            ? Theme.alpha(Theme.accent, 0.10)
+                                            ? Theme.alpha(Theme.text, 0.08)
                                             : "transparent"
                                         border.width: 1
-                                        border.color: collapseMouse.containsMouse ? Theme.accent : Theme.border
+                                        border.color: collapseMouse.containsMouse
+                                            ? Theme.alpha(Theme.text, 0.18)
+                                            : "transparent"
 
                                         Behavior on color {
                                             ColorAnimation { duration: Theme.animFast }
                                         }
 
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: "◀"
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: 9
-                                            color: collapseMouse.containsMouse ? Theme.accent : Theme.textDim
-                                            // points left while open, flips to point right when collapsed
-                                            rotation: root.sidebarCollapsed ? 180 : 0
+                                        Behavior on border.color {
+                                            ColorAnimation { duration: Theme.animFast }
+                                        }
 
-                                            Behavior on rotation {
-                                                NumberAnimation {
-                                                    duration: Theme.animMed
-                                                    easing.type: Easing.OutCubic
+                                        // ChatGPT-style sidebar icon
+                                        Item {
+                                            anchors.centerIn: parent
+                                            width: 16
+                                            height: 16
+
+                                            // Rounded window outline
+                                            Rectangle {
+                                                anchors.fill: parent
+                                                radius: 3
+                                                color: "transparent"
+                                                border.width: 1.4
+                                                border.color: collapseMouse.containsMouse
+                                                    ? Theme.accent
+                                                    : Theme.textDim
+                                            }
+
+                                            // Sidebar divider
+                                            Rectangle {
+                                                x: root.sidebarCollapsed ? 5 : 7
+                                                y: 1.5
+                                                width: 1.3
+                                                height: parent.height - 3
+                                                radius: 1
+                                                color: collapseMouse.containsMouse
+                                                    ? Theme.accent
+                                                    : Theme.textDim
+
+                                                Behavior on x {
+                                                    NumberAnimation {
+                                                        duration: Theme.animMed
+                                                        easing.type: Easing.OutCubic
+                                                    }
                                                 }
                                             }
                                         }
@@ -712,20 +737,90 @@ Scope {
                                         }
                                     }
 
-                                    Text {
+                                    // Search box (replaces the old "SETTINGS" title)
+                                    Rectangle {
+                                        id: searchBox
                                         anchors.verticalCenter: parent.verticalCenter
-                                        text: "SETTINGS"
-                                        color: Theme.text
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: 19
-                                        font.bold: true
-                                        font.letterSpacing: 4
+                                        width: root.sidebarExpandedWidth - collapseButton.width - 10
+                                        height: 26
+                                        radius: Theme.radius
+                                        color: "transparent"
+                                        border.width: 1
+                                        border.color: searchInput.activeFocus
+                                            ? Theme.accent
+                                            : Theme.border
                                         opacity: root.sidebarCollapsed ? 0 : 1
 
                                         Behavior on opacity {
                                             NumberAnimation {
                                                 duration: Theme.animFast
                                                 easing.type: Easing.OutCubic
+                                            }
+                                        }
+
+                                        Text {
+                                            id: searchIcon
+                                            anchors.left: parent.left
+                                            anchors.leftMargin: 8
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            text: "󰍉"
+                                            font.family: Theme.iconFont
+                                            font.pixelSize: 12
+                                            color: searchInput.activeFocus
+                                                ? Theme.accent
+                                                : Theme.textDim
+                                            visible: !Theme.hideSettingsIcons
+                                        }
+
+                                        TextInput {
+                                            id: searchInput
+                                            anchors.left: Theme.hideSettingsIcons
+                                                ? parent.left
+                                                : searchIcon.right
+                                            anchors.leftMargin: 8
+                                            anchors.right: parent.right
+                                            anchors.rightMargin: 8
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            clip: true
+                                            enabled: !root.sidebarCollapsed
+                                            color: Theme.text
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 12
+                                            selectByMouse: true
+
+                                            onTextChanged: root.searchQuery = text
+
+                                            // Enter jumps to the first match
+                                            onAccepted: {
+                                                if (root.filteredNavItems.length > 0)
+                                                    root.selectedIndex = root.filteredNavItems[0].origIndex
+                                            }
+
+                                            // Esc clears the box first; a further Esc closes settings
+                                            Keys.onEscapePressed: {
+                                                if (text !== "") {
+                                                    root.searchQuery = ""
+                                                } else {
+                                                    focus = false
+                                                    root.hide()
+                                                }
+                                            }
+
+                                            // Keep the box in sync when searchQuery is cleared from outside
+                                            Connections {
+                                                target: root
+                                                function onSearchQueryChanged() {
+                                                    if (searchInput.text !== root.searchQuery)
+                                                        searchInput.text = root.searchQuery
+                                                }
+                                            }
+
+                                            Text {
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                text: "Search…"
+                                                font: parent.font
+                                                color: Theme.textDim
+                                                visible: parent.text === "" && !parent.activeFocus
                                             }
                                         }
                                     }
@@ -747,17 +842,9 @@ Scope {
                                 clip: true
                                 boundsBehavior: Flickable.StopAtBounds
                                 interactive: contentHeight > height
-
-                                opacity: root.sidebarCollapsed ? 0 : 1
-                                visible: opacity > 0
-                                enabled: !root.sidebarCollapsed
-
-                                Behavior on opacity {
-                                    NumberAnimation {
-                                        duration: Theme.animFast
-                                        easing.type: Easing.OutCubic
-                                    }
-                                }
+                                opacity: 1
+                                visible: true
+                                enabled: true
 
                                 WheelHandler {
                                     target: sidebarFlickable
@@ -774,66 +861,57 @@ Scope {
                                     spacing: 4
 
                                     Repeater {
-                                        model: root.navItems
+                                        model: root.filteredNavItems
                                         delegate: Rectangle {
                                             required property var modelData
                                             required property int index
+                                            readonly property bool isSelected: root.selectedIndex === modelData.origIndex
+
                                             width: sidebar.width
                                             height: 38
                                             radius: Theme.radius
-                                            color: root.selectedIndex === index
+                                            color: isSelected
                                                 ? Theme.alpha(Theme.accent, 0.12)
                                                 : "transparent"
-                                            border.width: root.selectedIndex === index ? 1 : 0
+                                            border.width: isSelected ? 1 : 0
                                             border.color: Theme.accent
 
-                                            Rectangle {
-                                                visible: root.selectedIndex === index
-                                                width: 3
-                                                height: parent.height - 10
-                                                anchors {
-                                                    verticalCenter: parent.verticalCenter
-                                                    left: parent.left
-                                                }
-                                                color: Theme.accent2
-                                            }
-
-                                            Row {
+                                            // Icon – always visible, centers itself when collapsed
+                                            Text {
+                                                id: navIcon
+                                                visible: !Theme.hideSettingsIcons
                                                 anchors.verticalCenter: parent.verticalCenter
                                                 anchors.left: parent.left
-                                                anchors.leftMargin: 16
-                                                spacing: 12
+                                                anchors.leftMargin: root.sidebarCollapsed
+                                                    ? Math.max(0, (parent.width - 18) / 2)
+                                                    : 12
+                                                width: 18
                                                 height: 20
+                                                verticalAlignment: Text.AlignVCenter
+                                                horizontalAlignment: Text.AlignHCenter
+                                                text: modelData.icon
+                                                font.family: Theme.iconFont
+                                                font.pixelSize: 14
+                                                color: isSelected ? Theme.text : Theme.textDim
+                                            }
 
-                                                Text {
-                                                    visible: !Theme.hideSettingsIcons
-                                                    width: 18
-                                                    height: parent.height
-                                                    verticalAlignment: Text.AlignVCenter
-                                                    horizontalAlignment: Text.AlignHCenter
-                                                    text: modelData.icon
-                                                    font.family: Theme.iconFont
-                                                    font.pixelSize: 14
-                                                    color: root.selectedIndex === index
-                                                        ? Theme.text
-                                                        : Theme.textDim
-                                                }
-
-                                                Text {
-                                                    height: parent.height
-                                                    verticalAlignment: Text.AlignVCenter
-                                                    text: modelData.name
-                                                    font.family: Theme.fontFamily
-                                                    font.pixelSize: 13
-                                                    color: root.selectedIndex === index
-                                                        ? Theme.text
-                                                        : Theme.textDim
-                                                }
+                                            // Label – only visible when expanded
+                                            Text {
+                                                visible: !root.sidebarCollapsed
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                anchors.left: navIcon.right
+                                                anchors.leftMargin: 10
+                                                height: 20
+                                                verticalAlignment: Text.AlignVCenter
+                                                text: modelData.name
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 13
+                                                color: isSelected ? Theme.text : Theme.textDim
                                             }
 
                                             MouseArea {
                                                 anchors.fill: parent
-                                                onClicked: root.selectedIndex = index
+                                                onClicked: root.selectedIndex = modelData.origIndex
                                             }
                                         }
                                     }
@@ -841,10 +919,56 @@ Scope {
                             }
                         }
 
-                        Rectangle {
+                        // ---- sidebar divider + thin drag handle ----
+                        // 1px line; the MouseArea is a few px wider so it's easy to grab.
+                        // Drag to resize the sidebar, double-click to reset its width.
+                        Item {
+                            id: sidebarDivider
                             width: 1
                             height: parent.height
-                            color: Theme.border
+                            z: 5
+
+                            Rectangle {
+                                anchors.fill: parent
+                                color: !root.sidebarCollapsed
+                                       && (sidebarResizeArea.containsMouse || root.sidebarResizing)
+                                    ? Theme.accent
+                                    : Theme.border
+
+                                Behavior on color {
+                                    ColorAnimation { duration: Theme.animFast }
+                                }
+                            }
+
+                            MouseArea {
+                                id: sidebarResizeArea
+                                x: -Math.floor(root.sidebarHandleHitWidth / 2)
+                                width: root.sidebarHandleHitWidth
+                                height: parent.height
+                                enabled: !root.sidebarCollapsed
+                                hoverEnabled: true
+                                acceptedButtons: Qt.LeftButton
+                                cursorShape: Qt.SplitHCursor
+
+                                property real pressX: 0
+                                property real startW: 0
+
+                                onPressed: function (mouse) {
+                                    pressX = sidebarResizeArea.mapToItem(null, mouse.x, mouse.y).x
+                                    startW = root.sidebarExpandedWidth
+                                    root.sidebarResizing = true
+                                }
+
+                                onPositionChanged: function (mouse) {
+                                    if (!pressed || !root.sidebarResizing) return
+                                    var px = sidebarResizeArea.mapToItem(null, mouse.x, mouse.y).x
+                                    root.setSidebarWidth(startW + (px - pressX))
+                                }
+
+                                onReleased: if (root.sidebarResizing) root.finishSidebarResize()
+                                onCanceled: if (root.sidebarResizing) root.finishSidebarResize()
+                                onDoubleClicked: root.resetSidebarWidth()
+                            }
                         }
 
                         // ---- page area: one page loaded at a time ----
@@ -852,22 +976,6 @@ Scope {
                             width: parent.width - sidebar.width - 29
                             height: parent.height
                             clip: true
-
-                            // Pages that expose `accentOpacity` (the Hub page) get the current value
-                            // pushed in and report edits back through these signals.
-                            Connections {
-                                target: pageLoader.item
-                                ignoreUnknownSignals: true
-
-                                function onAccentOpacityEdited(value) {
-                                    root.accentOpacity = value
-                                }
-
-                                function onAccentOpacityCommitted(value) {
-                                    root.accentOpacity = value
-                                    root.saveState()
-                                }
-                            }
 
                             Loader {
                                 id: pageLoader
@@ -879,11 +987,7 @@ Scope {
                                     + ".qml"
 
                                 // quick fade for every freshly loaded page
-                                onLoaded: {
-                                    if (item && item.accentOpacity !== undefined)
-                                        item.accentOpacity = root.accentOpacity
-                                    fadeIn.restart()
-                                }
+                                onLoaded: fadeIn.restart()
 
                                 SequentialAnimation {
                                     id: fadeIn
@@ -903,12 +1007,18 @@ Scope {
                                     }
                                 }
                             }
+                            Connections {
+                                target: pageLoader.item
+                                ignoreUnknownSignals: true   // other pages don't have these signals
+                                function onCloseRequested() { root.hide() }
+                                function onSearchFocusReleased() { backdrop.forceActiveFocus() }
+                            }
                         }
                     }
 
-                    // ---- corner resize grips (sit over the corner accents) ----
+                    // ---- corner resize grips ----
                     Repeater {
-                        model: ["tl", "tr", "bl", "br"]
+                        model: ["tr", "bl", "br"]
 
                         delegate: MouseArea {
                             id: grip

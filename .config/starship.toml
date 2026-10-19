@@ -1,19 +1,73 @@
-format = """
-$directory$git_branch$git_status
-$character
-"""
 
+"$schema" = "https://starship.rs/config-schema.json"
+
+format = """
+$directory\
+$git_branch\
+$git_status\
+$python\
+$nodejs\
+$rust\
+$cmd_duration\
+$line_break\
+$character"""
+
+add_newline = false
+
+# Current directory
 [directory]
 style = "bold white"
 truncation_length = 3
+truncate_to_repo = false
+read_only = " "
 
+# Git branch
 [git_branch]
 symbol = "󰘬 "
 style = "bright-black"
+format = "[$symbol$branch]($style) "
 
+# Git status
 [git_status]
 style = "bright-black"
+format = '([$all_status$ahead_behind]($style) )'
+conflicted = "✘"
+ahead = "⇡"
+behind = "⇣"
+diverged = "⇕"
+untracked = "?"
+modified = "!"
+staged = "+"
+stashed = "$"
 
+# Python projects
+[python]
+symbol = " "
+style = "bright-black"
+format = '[$symbol$version( \($virtualenv\)) ]($style)'
+
+# Node.js projects
+[nodejs]
+symbol = " "
+style = "bright-black"
+format = '[$symbol$version ]($style)'
+
+# Rust projects
+[rust]
+symbol = " "
+style = "bright-black"
+format = '[$symbol$version ]($style)'
+
+# Show long-running commands
+[cmd_duration]
+min_time = 2000
+show_milliseconds = false
+format = '[took $duration]($style) '
+style = "bright-black"
+
+# Prompt arrow
 [character]
 success_symbol = "[❯](white)"
 error_symbol = "[❯](bold white)"
+vimcmd_symbol = "[❮](white)"
+

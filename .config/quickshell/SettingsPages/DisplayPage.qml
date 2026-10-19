@@ -10,7 +10,7 @@ Item {
     property var monitors: []
     property var savedState: ({})
     property real marginLeft: 0
-    property real marginRight: 55
+    property real marginRight: 10
     property real marginTop: 0
     property real marginBottom: 0
     property real brightnessValue: 0.6
@@ -157,6 +157,7 @@ Item {
                 mode: entry.mode,
                 position: typeof entry.position === "string" ? entry.position : "auto",
                 scale: typeof entry.scale === "number" ? scaleForMode(entry.mode, null, entry.scale) : 1,
+                transform: typeof entry.transform === "number" ? entry.transform : 0,
                 disabled: false
             }))
         }
@@ -180,8 +181,9 @@ Item {
 
     function rememberMonitor(mon, fields) {
         if (!mon || !mon.name) return
+        const base = typeof mon.transform === "number" ? { transform: mon.transform } : {}
         const next = Object.assign({}, savedState)
-        next[mon.name] = Object.assign({}, next[mon.name] || {}, fields)
+        next[mon.name] = Object.assign({}, next[mon.name] || {}, base, fields)
         savedState = next
         stateSaveTimer.restart()
     }
@@ -213,6 +215,11 @@ Item {
         if (options.mode !== undefined) values.push("mode = \"" + luaString(options.mode) + "\"")
         if (options.position !== undefined) values.push("position = \"" + luaString(options.position) + "\"")
         if (options.scale !== undefined) values.push("scale = " + options.scale)
+        // Hyprland resets transform to 0 when a rule omits it, so always send the current one with a mode.
+        const transform = options.transform !== undefined
+            ? options.transform
+            : (options.mode !== undefined && typeof mon.transform === "number" ? mon.transform : undefined)
+        if (transform !== undefined) values.push("transform = " + transform)
         if (options.disabled !== undefined) values.push("disabled = " + options.disabled)
         if (options.mirrorOf !== undefined) values.push("mirrorOf = \"" + luaString(options.mirrorOf) + "\"")
         return "hl.monitor({" + values.join(",") + "})"
@@ -245,8 +252,16 @@ Item {
     // Valid scales give whole logical sizes; the small tolerance only absorbs float noise
     // from the scale reported by hyprctl, while Math.ceil still protects against real
     // sub-pixel overlap.
-    function logicalWidth(mon) { return Math.ceil(mon.width / mon.scale - 0.01) }
-    function logicalHeight(mon) { return Math.ceil(mon.height / mon.scale - 0.01) }
+    // Transforms 1 and 3 (and 5 and 7) rotate by 90 degrees, which swaps width and height.
+    function swapsAxes(t) { return (t & 1) === 1 }
+    function logicalWidthFor(mon, t) {
+        return Math.ceil((swapsAxes(t) ? mon.height : mon.width) / mon.scale - 0.01)
+    }
+    function logicalHeightFor(mon, t) {
+        return Math.ceil((swapsAxes(t) ? mon.width : mon.height) / mon.scale - 0.01)
+    }
+    function logicalWidth(mon) { return logicalWidthFor(mon, mon.transform || 0) }
+    function logicalHeight(mon) { return logicalHeightFor(mon, mon.transform || 0) }
 
     function layoutCommands(ordered) {
         const cmds = []
@@ -355,6 +370,61 @@ Item {
         pShell.running = true
     }
 
+    // Rotate a monitor. Rotating changes its footprint, so monitors to its right or below
+    // are shifted by the size difference to avoid overlap. Changed monitors are parked first.
+    function setTransform(mon, t) {
+        if (!mon || !mon.name || mon.disabled) return
+        const cur = mon.transform || 0
+        if (cur === t) return
+
+        const dw = logicalWidthFor(mon, t) - logicalWidthFor(mon, cur)
+        const dh = logicalHeightFor(mon, t) - logicalHeightFor(mon, cur)
+        const oldRight = mon.x + logicalWidthFor(mon, cur)
+        const oldBottom = mon.y + logicalHeightFor(mon, cur)
+
+        const layout = page.activeMonitors.map(m => {
+            const isTarget = m.name === mon.name
+            return {
+                mon: m,
+                transform: isTarget ? t : (m.transform || 0),
+                x: !isTarget && m.x >= oldRight ? m.x + dw : m.x,
+                y: !isTarget && m.y >= oldBottom ? m.y + dh : m.y,
+                force: isTarget
+            }
+        })
+
+        const changed = layout.filter(l => l.force || l.x !== l.mon.x || l.y !== l.mon.y)
+
+        const cmds = []
+        if (changed.length > 1) {
+            let parkX = 0
+            for (let i = 0; i < layout.length; i++)
+                parkX = Math.max(parkX, layout[i].x + logicalWidthFor(layout[i].mon, layout[i].transform))
+            for (let i = 0; i < changed.length; i++) {
+                const l = changed[i]
+                cmds.push("hyprctl eval '" + monitorLua(l.mon, {
+                    mode: monitorMode(l.mon), position: parkX + "x0",
+                    scale: fixedScale(l.mon), transform: l.transform }) + "'")
+                parkX += logicalWidthFor(l.mon, l.transform)
+            }
+        }
+
+        for (let i = 0; i < layout.length; i++) {
+            const l = layout[i]
+            rememberMonitor(l.mon, {
+                mode: monitorMode(l.mon), scale: fixedScale(l.mon),
+                position: l.x + "x" + l.y, transform: l.transform, disabled: false })
+        }
+        for (let i = 0; i < changed.length; i++) {
+            const l = changed[i]
+            cmds.push("hyprctl eval '" + monitorLua(l.mon, {
+                mode: monitorMode(l.mon), position: l.x + "x" + l.y,
+                scale: fixedScale(l.mon), transform: l.transform }) + "'")
+        }
+        pShell.command = ["sh", "-c", cmds.join("; ")]
+        pShell.running = true
+    }
+
     function setMonitorEnabled(mon, enabled) {
         if (!mon || !mon.name) return
         let cmds = []
@@ -362,9 +432,11 @@ Item {
             const entry = savedState[mon.name] || {}
             const mode = typeof entry.mode === "string" ? entry.mode : "preferred"
             const scale = scaleForMode(mode, mon, typeof entry.scale === "number" ? entry.scale : 1)
-            rememberMonitor(mon, { mode: mode, scale: scale, position: "auto", disabled: false })
+            // A disabled monitor may report transform 0, so restore the saved one.
+            const transform = typeof entry.transform === "number" ? entry.transform : 0
+            rememberMonitor(mon, { mode: mode, scale: scale, position: "auto", transform: transform, disabled: false })
             // disabled: false is required. Without it Hyprland keeps the monitor disabled.
-            cmds.push("hyprctl eval '" + monitorLua(mon, { mode: mode, position: "auto", scale: scale, disabled: false }) + "'")
+            cmds.push("hyprctl eval '" + monitorLua(mon, { mode: mode, position: "auto", scale: scale, transform: transform, disabled: false }) + "'")
         } else {
             if (page.activeMonitors.length <= 1) return
             const wasMain = isMain(mon)
@@ -634,7 +706,7 @@ Item {
 
             Text {
                 text: "DISPLAY"; color: Theme.text
-                font.family: Theme.fontFamily; font.pixelSize: 19; font.letterSpacing: 3
+                font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeTitle; font.letterSpacing: 3
             }
 
             Rectangle { width: parent.width; height: 1; color: Theme.border }
@@ -647,14 +719,14 @@ Item {
                     color: Theme.alpha(Theme.accent2, 0.10); border.width: 1; border.color: Theme.border
                     Text {
                         anchors.centerIn: parent; text: "\uf185"; color: Theme.accent2
-                        font.family: Theme.iconFont; font.pixelSize: 12
+                        font.family: Theme.iconFont; font.pixelSize: Theme.textSizeGroup
                     }
                 }
 
                 Text {
                     width: page.labelWidth; anchors.verticalCenter: parent.verticalCenter
                     text: "BRIGHTNESS"; color: Theme.text
-                    font.family: Theme.fontFamily; font.pixelSize: 15
+                    font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeGroup
                 }
 
                 Slider {
@@ -670,15 +742,17 @@ Item {
 
                 Rectangle {
                     width: 28; height: 28; radius: Theme.radius; anchors.verticalCenter: parent.verticalCenter
-                    color: page.nightlightEnabled ? Theme.alpha(Theme.accent, 0.10) : Theme.alpha("#A0A0A0", 0.15)
-                    border.width: 1; border.color: page.nightlightEnabled ? Theme.accent : Theme.border
+                    color: page.nightlightEnabled ? Theme.alpha(Theme.accent, 0.10) : (nightlightMouse.containsMouse ? Theme.alpha(Theme.accent, 0.08) : Theme.alpha("#A0A0A0", 0.15))
+                    border.width: 1; border.color: page.nightlightEnabled || nightlightMouse.containsMouse ? Theme.accent : Theme.border
                     Text {
                         anchors.centerIn: parent; text: "\uf186"
-                        color: page.nightlightEnabled ? Theme.accent : "#A0A0A0"
-                        font.family: Theme.iconFont; font.pixelSize: 12
+                        color: page.nightlightEnabled || nightlightMouse.containsMouse ? Theme.accent : "#A0A0A0"
+                        font.family: Theme.iconFont; font.pixelSize: Theme.textSizeGroup
                     }
                     MouseArea {
-                        anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                        id: nightlightMouse
+                        anchors.fill: parent; hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
                         onClicked: page.nightlightEnabled ? page.nightlightOff() : page.nightlightOn()
                     }
                 }
@@ -686,7 +760,7 @@ Item {
                 Text {
                     width: page.labelWidth; anchors.verticalCenter: parent.verticalCenter
                     text: "NIGHTLIGHT"; color: page.nightlightEnabled ? Theme.text : Theme.text
-                    font.family: Theme.fontFamily; font.pixelSize: 15
+                    font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeGroup
                 }
 
                 Slider {
@@ -736,13 +810,13 @@ Item {
                                     Text {
                                         text: card.modelData.name
                                         color: card.off ? Theme.textDim : Theme.text
-                                        font.family: Theme.fontFamily; font.pixelSize: 14; font.bold: true
+                                        font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeSection; font.bold: true
                                     }
 
                                     Text {
                                         visible: !card.off
                                         text: card.modelData.width + "x" + card.modelData.height + " @ " + Math.round(card.modelData.refreshRate) + "Hz"
-                                        color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: 12
+                                        color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeGroup
                                     }
                                 }
 
@@ -762,7 +836,7 @@ Item {
                                             anchors.centerIn: parent
                                             text: card.main ? "MAIN" : "SET MAIN"
                                             color: card.main ? Theme.accent : Theme.text
-                                            font.family: Theme.fontFamily; font.pixelSize: 11; font.bold: true; font.letterSpacing: 1
+                                            font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody; font.bold: true; font.letterSpacing: 1
                                         }
 
                                         MouseArea {
@@ -785,7 +859,7 @@ Item {
                                             anchors.centerIn: parent
                                             text: card.off ? "ENABLE" : "DISABLE"
                                             color: Theme.text
-                                            font.family: Theme.fontFamily; font.pixelSize: 11; font.bold: true; font.letterSpacing: 1
+                                            font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody; font.bold: true; font.letterSpacing: 1
                                         }
 
                                         MouseArea {
@@ -806,7 +880,7 @@ Item {
                                     id: scaleLabel
                                     width: 36; anchors.verticalCenter: parent.verticalCenter
                                     text: "SCALE"; color: Theme.textDim
-                                    font.family: Theme.fontFamily; font.pixelSize: 11
+                                    font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
                                 }
 
                                 Slider {
@@ -822,27 +896,23 @@ Item {
                                     horizontalAlignment: Text.AlignRight
                                     text: card.modelData.scale.toFixed(2) + "x"
                                     color: Theme.text
-                                    font.family: Theme.fontFamily; font.pixelSize: 11
+                                    font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
                                 }
                             }
 
                             Row {
                                 visible: !card.off
                                 width: parent.width; spacing: 8
-
                                 Text {
                                     width: 36; height: 28
                                     verticalAlignment: Text.AlignVCenter
                                     text: "RES"; color: Theme.textDim
-                                    font.family: Theme.fontFamily; font.pixelSize: 11
+                                    font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
                                 }
-
                                 Flow {
                                     width: parent.width - 36 - 8; spacing: 6
-
                                     Repeater {
                                         model: card.off ? [] : page.resolutionList(card.modelData)
-
                                         delegate: Rectangle {
                                             id: resButton
                                             required property string modelData
@@ -851,14 +921,12 @@ Item {
                                             color: current ? Theme.alpha(Theme.accent, 0.10) : (resMouse.containsMouse ? Theme.alpha(Theme.accent, 0.08) : "#00000000")
                                             border.width: 1
                                             border.color: current || resMouse.containsMouse ? Theme.accent : Theme.border
-
                                             Text {
                                                 anchors.centerIn: parent
                                                 text: resButton.modelData
                                                 color: Theme.text
-                                                font.family: Theme.fontFamily; font.pixelSize: 11; font.bold: true
+                                                font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody; font.bold: true
                                             }
-
                                             MouseArea {
                                                 id: resMouse
                                                 anchors.fill: parent; hoverEnabled: true
@@ -876,20 +944,17 @@ Item {
                             Row {
                                 visible: !card.off
                                 width: parent.width; spacing: 8
-
                                 Text {
                                     width: 36; height: 28
                                     verticalAlignment: Text.AlignVCenter
                                     text: "HZ"; color: Theme.textDim
-                                    font.family: Theme.fontFamily; font.pixelSize: 11
+                                    font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
                                 }
 
                                 Flow {
                                     width: parent.width - 36 - 8; spacing: 6
-
                                     Repeater {
                                         model: card.off ? [] : page.refreshRates(card.modelData)
-
                                         delegate: Rectangle {
                                             id: rateButton
                                             required property var modelData
@@ -898,14 +963,12 @@ Item {
                                             color: current ? Theme.alpha(Theme.accent, 0.10) : (rateMouse.containsMouse ? Theme.alpha(Theme.accent, 0.08) : "#00000000")
                                             border.width: 1
                                             border.color: current || rateMouse.containsMouse ? Theme.accent : Theme.border
-
                                             Text {
                                                 anchors.centerIn: parent
                                                 text: rateButton.modelData.toFixed(2)
                                                 color: Theme.text
-                                                font.family: Theme.fontFamily; font.pixelSize: 11; font.bold: true
+                                                font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody; font.bold: true
                                             }
-
                                             MouseArea {
                                                 id: rateMouse
                                                 anchors.fill: parent; hoverEnabled: true
@@ -917,24 +980,66 @@ Item {
                                 }
                             }
 
-                            // Which monitor to position against (only needed with 3+ active monitors).
+                            // Rotation: 0 / 90 / 180 / 270 degrees (Hyprland transform 0-3).
                             Row {
-                                visible: !card.off && card.others.length > 1
+                                visible: !card.off
                                 width: parent.width; spacing: 8
-
                                 Text {
                                     width: 36; height: 28
                                     verticalAlignment: Text.AlignVCenter
-                                    text: "OF"; color: Theme.textDim
-                                    font.family: Theme.fontFamily; font.pixelSize: 11
+                                    text: "ROT"; color: Theme.textDim
+                                    font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
                                 }
 
                                 Flow {
                                     width: parent.width - 36 - 8; spacing: 6
+                                    Repeater {
+                                        model: card.off ? [] : [
+                                            { label: "0°", value: 0 },
+                                            { label: "90°", value: 1 },
+                                            { label: "180°", value: 2 },
+                                            { label: "270°", value: 3 }
+                                        ]
+                                        delegate: Rectangle {
+                                            id: rotButton
+                                            required property var modelData
+                                            property bool current: (card.modelData.transform || 0) === modelData.value
+                                            width: 76; height: 28; radius: Theme.radius
+                                            color: current ? Theme.alpha(Theme.accent, 0.10) : (rotMouse.containsMouse ? Theme.alpha(Theme.accent, 0.08) : "#00000000")
+                                            border.width: 1
+                                            border.color: current || rotMouse.containsMouse ? Theme.accent : Theme.border
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: rotButton.modelData.label
+                                                color: Theme.text
+                                                font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody; font.bold: true
+                                            }
+                                            MouseArea {
+                                                id: rotMouse
+                                                anchors.fill: parent; hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: page.setTransform(card.modelData, rotButton.modelData.value)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
 
+                            // Which monitor to position against (only needed with 3+ active monitors).
+                            Row {
+                                visible: !card.off && card.others.length > 1
+                                width: parent.width; spacing: 8
+                                Text {
+                                    width: 36; height: 28
+                                    verticalAlignment: Text.AlignVCenter
+                                    text: "OF"; color: Theme.textDim
+                                    font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
+                                }
+
+                                Flow {
+                                    width: parent.width - 36 - 8; spacing: 6
                                     Repeater {
                                         model: card.off ? [] : card.others.map(m => m.name)
-
                                         delegate: Rectangle {
                                             id: refButton
                                             required property string modelData
@@ -943,14 +1048,12 @@ Item {
                                             color: current ? Theme.alpha(Theme.accent, 0.10) : (refMouse.containsMouse ? Theme.alpha(Theme.accent, 0.08) : "#00000000")
                                             border.width: 1
                                             border.color: current || refMouse.containsMouse ? Theme.accent : Theme.border
-
                                             Text {
                                                 anchors.centerIn: parent
                                                 text: refButton.modelData
                                                 color: Theme.text
-                                                font.family: Theme.fontFamily; font.pixelSize: 11; font.bold: true
+                                                font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody; font.bold: true
                                             }
-
                                             MouseArea {
                                                 id: refMouse
                                                 anchors.fill: parent; hoverEnabled: true
@@ -966,20 +1069,17 @@ Item {
                             Row {
                                 visible: !card.off && card.others.length > 0
                                 width: parent.width; spacing: 8
-
                                 Text {
                                     width: 36; height: 28
                                     verticalAlignment: Text.AlignVCenter
                                     text: "POS"; color: Theme.textDim
-                                    font.family: Theme.fontFamily; font.pixelSize: 11
+                                    font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
                                 }
 
                                 Flow {
                                     width: parent.width - 36 - 8; spacing: 6
-
                                     Repeater {
                                         model: card.off ? [] : ["LEFT", "RIGHT", "ABOVE", "BELOW"]
-
                                         delegate: Rectangle {
                                             id: posButton
                                             required property string modelData
@@ -989,14 +1089,12 @@ Item {
                                             color: current ? Theme.alpha(Theme.accent, 0.10) : (posMouse.containsMouse ? Theme.alpha(Theme.accent, 0.08) : "#00000000")
                                             border.width: 1
                                             border.color: current || posMouse.containsMouse ? Theme.accent : Theme.border
-
                                             Text {
                                                 anchors.centerIn: parent
                                                 text: posButton.modelData
                                                 color: Theme.text
-                                                font.family: Theme.fontFamily; font.pixelSize: 11; font.bold: true
+                                                font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody; font.bold: true
                                             }
-
                                             MouseArea {
                                                 id: posMouse
                                                 anchors.fill: parent; hoverEnabled: true
@@ -1017,12 +1115,10 @@ Item {
                 color: resetMouse.containsMouse ? Theme.alpha(Theme.accent, 0.08) : "#00000000"
                 border.width: 1
                 border.color: resetMouse.containsMouse ? Theme.accent : Theme.border
-
                 Text {
                     anchors.centerIn: parent; text: "RESET TO CONFIG"; color: Theme.text
-                    font.family: Theme.fontFamily; font.pixelSize: 12; font.bold: true; font.letterSpacing: 1
+                    font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeGroup; font.bold: true; font.letterSpacing: 1
                 }
-
                 MouseArea {
                     id: resetMouse
                     anchors.fill: parent; hoverEnabled: true

@@ -1,4 +1,4 @@
--- MONITORS.LUA
+-- monitors.lua
 -- https://wiki.hypr.land/Configuring/Monitors/
 -- Find your monitor names with:
 --   hyprctl monitors

@@ -9,10 +9,22 @@ menu       = "rofi -show drun"
 fileManager = "thunar"
 browser    = "brave"
 
+-- Overrides written by Quickshell (Settings > Configs): mainMod, browser.
+-- Must load before keybinds.lua, which reads these globals when binding.
+do
+    local f = os.getenv("HOME") .. "/.config/quickshell/state/prefs.lua"
+    local fh = io.open(f, "r")
+    if fh then
+        fh:close()
+        local ok, err = pcall(dofile, f)
+        if not ok then print("state/prefs.lua failed: " .. tostring(err)) end
+    end
+end
+
 ---- AUTOSTART ----
 
 hl.on("hyprland.start", function()
-    -- hl.exec_cmd("dunst") replaced with quickshell 
+    -- hl.exec_cmd("dunst") replaced with quickshell
     hl.exec_cmd("nm-applet")
     hl.exec_cmd("wl-paste --type text --watch cliphist store")
     hl.exec_cmd("wl-paste --type image --watch cliphist store")
@@ -59,11 +71,23 @@ hl.config({
     },
 })
 
+local f = os.getenv("HOME") .. "/.config/quickshell/state/devices.lua"
+if io.open(f, "r") then dofile(f) end
+
 ---- SPLIT-OUT FILES ----
 
 require("monitors")
 require("keybinds")
 require("look")
+do
+    local f = os.getenv("HOME") .. "/.config/quickshell/state/look.lua"
+    local fh = io.open(f, "r")
+    if fh then
+        fh:close()
+        local ok, err = pcall(dofile, f)
+        if not ok then print("state/look.lua failed: " .. tostring(err)) end
+    end
+end
 require("rules")
 
 -- HyprMod managed settings
