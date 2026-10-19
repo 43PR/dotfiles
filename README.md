@@ -13,7 +13,7 @@ A simple, lightweight Hyprland setup focused on productivity, practical keybinds
 
 </div>
 
-<img width="1920" height="1080" alt="1792044634" src="https://github.com/user-attachments/assets/3c468b4c-abb2-4484-963f-ad83f3134e19" />
+<img width="1920" height="1080" alt="1792462138" src="https://github.com/user-attachments/assets/10324a99-1038-431f-9f64-0183e2e04276" />
 
 Wallpapers: https://wallhaven.cc/user/43pr
 
@@ -39,7 +39,7 @@ Just made some tweaks to it. Give it some love: [hyprquickpaper](https://github.
 
 ## Keybinds
 
-Right-click the clock to open bar settings, hover to see other actions
+Right-click the clock to open bar settings. Hover over elements to see actions. To close components use Esc key or use the same keybind. 
 
 | Keybind                 | Action                    |
 | -----------             | ------------------------- |
@@ -54,17 +54,17 @@ Right-click the clock to open bar settings, hover to see other actions
 | `Super + B`             | Browser                   |
 | `Super + V`             | Clipboard history         |
 | `Super + I`             | Settings menu             |
-| `Super + W`             | Wallpaper selector        |
 | `Super + S`             | Quick actions             |
 | `Super + O`             | Switch opacity            |
 | `Super + C`             | Notes & Reminders         |
+| `Super + W`             | Wallpaper selector        |
 | `Super + Shift + C`     | Color picker tool         |
 | `Super + Mouse wheel`   | Zoom in/out               |
 | `Super + Shift + W`     | Toggle bar                |
 | `Super + Grave`         | Logout menu               |
 | `Super + Tab`           | Lock screen               |
 | `Super + N`             | Notifications             |
-| `Super + R`             | Screen recorder           |
+| `Super + R`             | Toggle screen recorder    |
 | `Delete`                | Screenshot fullscreen     |
 | `SHIFT + Delete`        | Screenshot area select    |
 
@@ -141,11 +141,6 @@ You can check the reminders printed at the end of the run.
 >
 > to restart Quickshell automatically.
 
-> [!note]
-> 
-> Custom-gpu parts are specific to my hardware.
->
-> For issues with the wallpaper picker, you can clear the cache from the Storage page in Settings.
 
 
 

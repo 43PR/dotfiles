@@ -7,7 +7,7 @@ import "../"
 Item {
     id: page
     property real marginLeft: 0
-    property real marginRight: 55
+    property real marginRight: 10
     property real marginTop: 0
     property real marginBottom: 0
     property real sliderMarginRight: 10
@@ -38,7 +38,7 @@ Item {
             text: label
             color: Theme.textDim
             font.family: Theme.fontFamily
-            font.pixelSize: 13
+            font.pixelSize: Theme.textSizeGroup
             font.bold: true
             font.letterSpacing: 2
         }
@@ -53,7 +53,7 @@ Item {
                 text: "\uf120"
                 color: Theme.textDim
                 font.family: Theme.iconFont
-                font.pixelSize: 13
+                font.pixelSize: Theme.textSizeGroup
                 anchors.verticalCenter: parent.verticalCenter
             }
 
@@ -61,7 +61,7 @@ Item {
                 text: "EDIT " + path.split("/").pop().toUpperCase()
                 color: Theme.textDim
                 font.family: Theme.fontFamily
-                font.pixelSize: 12
+                font.pixelSize: Theme.textSizeGroup
                 font.bold: true
                 font.letterSpacing: 1
                 anchors.verticalCenter: parent.verticalCenter
@@ -124,7 +124,7 @@ Item {
                 text: "CONFIGS"
                 color: Theme.text
                 font.family: Theme.fontFamily
-                font.pixelSize: 19
+                font.pixelSize: Theme.textSizeTitle
                 font.letterSpacing: 3
             }
 
@@ -138,7 +138,7 @@ Item {
                 text: "HYPRLAND"
                 color: Theme.text
                 font.family: Theme.fontFamily
-                font.pixelSize: 16
+                font.pixelSize: Theme.textSizeSection
                 font.letterSpacing: 3
             }
 
@@ -180,7 +180,7 @@ Item {
                 text: "ROFI"
                 color: Theme.text
                 font.family: Theme.fontFamily
-                font.pixelSize: 16
+                font.pixelSize: Theme.textSizeSection
                 font.letterSpacing: 3
             }
             Rectangle {

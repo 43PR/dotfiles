@@ -17,7 +17,7 @@ Scope {
         position: "left", style: "joined", thickness: 20, margin: 4,
         reserveSpace: true, allScreens: true,
         // appearance
-        scale: 1.0, bgOpacity: 0.5, border: false, radius: Theme.radius, calRadius: 15,
+        scale: 1.0, bgOpacity: 0.5, border: false, radius: 16, calRadius: 15,
         // tooltips
         tooltips: true, tooltipHints: true, tipDelay: 450,
         // modules
@@ -37,13 +37,17 @@ Scope {
     readonly property var sections: ["start", "center", "end"]
     readonly property var statsModes: ["default", "compact"]
 
+    // Live config object, edited by BarPage (the settings page).
+    readonly property var config: cfg
+
     Component.onCompleted: BluetoothState.init()
 
     FileView {
         id: cfgFile
         path: Quickshell.env("HOME") + "/.config/quickshell/state/bar-state.json"
         printErrors: false
-        onAdapterUpdated: saveTimer.restart()
+        watchChanges: true                 // BarPage writes this file; pick its changes up live
+        onFileChanged: reload()
         onLoadFailed: error => { if (error === FileViewError.FileNotFound) writeAdapter(); }
 
         adapter: JsonAdapter {
@@ -81,7 +85,9 @@ Scope {
         }
     }
 
+    // Only the bar's own changes (IPC) are saved from here; BarPage saves its own.
     Timer { id: saveTimer; interval: 300; onTriggered: cfgFile.writeAdapter() }
+    function save() { saveTimer.restart(); }
 
     function resetSettings() { for (const k in defaults) cfg[k] = defaults[k]; }
     readonly property bool modified: Object.keys(defaults).some(k => cfg[k] !== defaults[k])
@@ -261,7 +267,6 @@ Scope {
 
     // ───────────────────────── State / IPC ─────────────────────────
     property bool barVisible: true
-    property bool settingsOpen: false
     property bool barLive: true
 
     function rebuildBar() { barLive = false; rebuildTimer.restart(); }
@@ -272,22 +277,35 @@ Scope {
         function onStyleChanged() { root.rebuildBar(); }
     }
 
+    // Bar settings now live on the BarPage of the settings app.
+    // Adjust the IPC call below if your settings app names the page differently.
+    function openSettings() { run("qs ipc call settings bar"); }
+
     IpcHandler {
         target: "bar"
         function toggle(): void { root.barVisible = !root.barVisible; }
         function show(): void { root.barVisible = true; }
         function hide(): void { root.barVisible = false; }
-        function setPosition(pos: string): void { if (root.positions.indexOf(pos) >= 0) cfg.position = pos; }
+        function setPosition(pos: string): void {
+            if (root.positions.indexOf(pos) >= 0) { cfg.position = pos; root.save(); }
+        }
         function cyclePosition(): void {
             cfg.position = root.positions[(root.positions.indexOf(cfg.position) + 1) % 4];
+            root.save();
         }
-        function setStyle(st: string): void { if (root.styles.indexOf(st) >= 0) cfg.style = st; }
-        function setStatsMode(mode: string): void { if (root.statsModes.indexOf(mode) >= 0) cfg.statsMode = mode; }
-        function customize(): void { root.settingsOpen = !root.settingsOpen; }
+        function setStyle(st: string): void {
+            if (root.styles.indexOf(st) >= 0) { cfg.style = st; root.save(); }
+        }
+        function setStatsMode(mode: string): void {
+            if (root.statsModes.indexOf(mode) >= 0) { cfg.statsMode = mode; root.save(); }
+        }
+        function customize(): void { root.openSettings(); }
         function moveModule(id: string, section: string): void {
-            if (root.valid(id) && root.sections.indexOf(section) >= 0) root.moveTo(id, section);
+            if (root.valid(id) && root.sections.indexOf(section) >= 0) { root.moveTo(id, section); root.save(); }
         }
-        function shiftModule(id: string, delta: int): void { if (root.valid(id)) root.shiftBy(id, delta); }
+        function shiftModule(id: string, delta: int): void {
+            if (root.valid(id)) { root.shiftBy(id, delta); root.save(); }
+        }
     }
 
     // ───────────────────────── System stats ─────────────────────────
@@ -509,7 +527,7 @@ Scope {
 
         function secondaryAction() {
             if (secondaryHint !== "") secondary();
-            else root.settingsOpen = !root.settingsOpen;
+            else root.openSettings();
         }
 
         opacity: disabled ? 0.4 : 1
@@ -653,475 +671,12 @@ Scope {
         }
     }
 
-    // ───────────────────────── Settings-window widgets ─────────────────────────
-    // Same look as the power-menu settings: section headers, label + value
-    // sliders, toggle rows, pill buttons and in-window hover hints.
-
+    // ───────────────────────── Bar helper components ─────────────────────────
     component Rule: Rectangle {
         height: 1
         color: Qt.alpha(Theme.text, 0.12)
     }
 
-    // Small hover hint drawn inside the settings window (no extra popup
-    // surface). Respects the "Tooltips" setting. The host row raises its own
-    // z while `shown` so the hint isn't covered by the rows below it.
-    component SetTip: Rectangle {
-        id: stp
-        property string text: ""
-        property bool hovered: false
-        property bool shown: false
-        readonly property bool wanted: cfg.tooltips && text !== "" && hovered
-
-        onWantedChanged: {
-            if (wanted) {
-                stDelay.restart();
-            } else {
-                stDelay.stop();
-                shown = false;
-            }
-        }
-        Timer { id: stDelay; interval: cfg.tipDelay; onTriggered: stp.shown = stp.wanted }
-
-        z: 1000
-        x: 0
-        y: parent.height + 2
-        width: stText.implicitWidth + 16
-        height: stText.implicitHeight + 10
-        radius: 6
-        color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, 1)
-        border.width: 1
-        border.color: Qt.alpha(Theme.text, 0.15)
-        opacity: shown ? 1 : 0
-        visible: opacity > 0
-        Behavior on opacity { NumberAnimation { duration: 120 } }
-
-        Text {
-            id: stText
-            anchors.centerIn: parent
-            text: stp.text
-            font.family: Theme.iconFont
-            font.pixelSize: 10
-            color: Theme.text
-        }
-    }
-
-    component SectionHeader: Item {
-        property string text: ""
-        Layout.fillWidth: true
-        implicitHeight: 32
-
-        Text {
-            anchors.left: parent.left
-            anchors.bottom: parent.bottom
-            anchors.bottomMargin: 4
-            text: parent.text
-            font.family: Theme.iconFont
-            font.pixelSize: 10
-            font.bold: true
-            font.letterSpacing: 1.2
-            font.capitalization: Font.AllUppercase
-            color: Theme.textDim
-        }
-    }
-
-    // Pure switch visual with its own click handling.
-    component ToggleSwitch: Rectangle {
-        id: sw
-        property bool checked: false
-        signal toggled(bool v)
-        width: 36; height: 20; radius: 10
-        color: checked ? Theme.accent : "transparent"
-        border.width: 1
-        border.color: checked ? Theme.accent : Qt.alpha(Theme.text, 0.3)
-        Behavior on color { ColorAnimation { duration: 150 } }
-
-        Rectangle {
-            width: 14; height: 14; radius: 7
-            anchors.verticalCenter: parent.verticalCenter
-            x: sw.checked ? parent.width - width - 3 : 3
-            color: sw.checked ? Theme.bg : Theme.text
-            Behavior on x { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
-        }
-        MouseArea {
-            anchors.fill: parent
-            cursorShape: Qt.PointingHandCursor
-            onClicked: sw.toggled(!sw.checked)
-        }
-    }
-
-    // Segmented control (position, style, section …)
-    component SegControl: Rectangle {
-        id: seg
-        property var options: []
-        property string current: ""
-        signal picked(string v)
-        implicitWidth: segRow.implicitWidth + 4
-        implicitHeight: 24
-        radius: 12
-        opacity: enabled ? 1 : 0.4
-        color: Qt.alpha(Theme.text, 0.08)
-
-        Row {
-            id: segRow
-            anchors.centerIn: parent
-            Repeater {
-                model: seg.options
-                delegate: Rectangle {
-                    id: opt
-                    required property string modelData
-                    implicitWidth: optText.implicitWidth + 14
-                    width: implicitWidth
-                    height: 20
-                    radius: 10
-                    color: modelData === seg.current ? Qt.alpha(Theme.accent, 0.4)
-                         : optMa.containsMouse ? Qt.alpha(Theme.text, 0.14) : "transparent"
-                    Behavior on color { ColorAnimation { duration: 100 } }
-                    Text {
-                        id: optText
-                        anchors.centerIn: parent
-                        text: opt.modelData
-                        font.family: Theme.iconFont
-                        font.pixelSize: 10
-                        font.capitalization: Font.Capitalize
-                        color: opt.modelData === seg.current ? Theme.text : Theme.textDim
-                    }
-                    MouseArea {
-                        id: optMa
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: seg.picked(opt.modelData)
-                    }
-                }
-            }
-        }
-    }
-
-    component ArrowBtn: Rectangle {
-        id: arb
-        property string glyph: ""
-        signal clicked()
-        implicitWidth: 22
-        implicitHeight: 22
-        radius: 6
-        opacity: enabled ? 1 : 0.35
-        color: Qt.alpha(Theme.text, arbMa.containsMouse && enabled ? 0.18 : 0.08)
-        Behavior on color { ColorAnimation { duration: 100 } }
-        Text {
-            anchors.centerIn: parent
-            text: arb.glyph
-            font.pixelSize: 9
-            color: Theme.text
-        }
-        MouseArea {
-            id: arbMa
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: arb.clicked()
-        }
-    }
-
-    component ToggleRow: Item {
-        id: tr
-        property string label: ""
-        property string tip: ""
-        property bool checked: false
-        signal toggled(bool v)
-
-        Layout.fillWidth: true
-        implicitHeight: 34
-        z: trTip.shown ? 100 : 0
-        opacity: enabled ? 1 : 0.4
-
-        Rectangle {
-            anchors.fill: parent
-            anchors.leftMargin: -8
-            anchors.rightMargin: -8
-            radius: 8
-            color: trMa.containsMouse && tr.enabled ? Qt.alpha(Theme.text, 0.06) : "transparent"
-        }
-
-        Text {
-            anchors.left: parent.left
-            anchors.right: trSw.left
-            anchors.rightMargin: 12
-            anchors.verticalCenter: parent.verticalCenter
-            text: tr.label
-            elide: Text.ElideRight
-            font.family: Theme.iconFont
-            font.pixelSize: 12
-            font.bold: true
-            color: Theme.text
-        }
-
-        MouseArea {
-            id: trMa
-            anchors.fill: parent
-            hoverEnabled: true
-            onClicked: tr.toggled(!tr.checked)
-        }
-
-        ToggleSwitch {
-            id: trSw
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            checked: tr.checked
-            onToggled: v => tr.toggled(v)
-        }
-
-        SetTip { id: trTip; text: tr.tip; hovered: trMa.containsMouse }
-    }
-
-    // Label on the left, segmented choice on the right.
-    component SegRow: Item {
-        id: sgr
-        property string label: ""
-        property string tip: ""
-        property var options: []
-        property string current: ""
-        signal picked(string v)
-
-        Layout.fillWidth: true
-        implicitHeight: 38
-        z: sgTip.shown ? 100 : 0
-        opacity: enabled ? 1 : 0.4
-
-        MouseArea { id: sgMa; anchors.fill: parent; hoverEnabled: true; acceptedButtons: Qt.NoButton }
-
-        RowLayout {
-            anchors.fill: parent
-            spacing: 8
-            Text {
-                Layout.fillWidth: true
-                text: sgr.label
-                elide: Text.ElideRight
-                font.family: Theme.iconFont
-                font.pixelSize: 12
-                font.bold: true
-                color: Theme.text
-            }
-            SegControl {
-                options: sgr.options
-                current: sgr.current
-                onPicked: v => sgr.picked(v)
-            }
-        }
-
-        SetTip { id: sgTip; text: sgr.tip; hovered: sgMa.containsMouse }
-    }
-
-    // Label + value on top, track below. Writes through `moved`; the
-    // adapter debounces saving, so nothing to do on release.
-    component SliderRow: Item {
-        id: sr
-        property string label: ""
-        property string tip: ""
-        property real from: 0
-        property real to: 1
-        property real step: 1
-        property real value: 0
-        property string unit: ""
-        property real displayScale: 1
-        property int decimals: 0
-        signal moved(real v)
-
-        readonly property real ratio: to > from ? Math.max(0, Math.min(1, (value - from) / (to - from))) : 0
-
-        Layout.fillWidth: true
-        implicitHeight: 44
-        z: srTip.shown ? 100 : 0
-        opacity: enabled ? 1 : 0.4
-
-        Text {
-            anchors.left: parent.left
-            y: 6
-            text: sr.label
-            font.family: Theme.iconFont
-            font.pixelSize: 12
-            font.bold: true
-            color: Theme.text
-        }
-
-        Text {
-            anchors.right: parent.right
-            y: 6
-            text: (sr.value * sr.displayScale).toFixed(sr.decimals) + sr.unit
-            font.family: Theme.iconFont
-            font.pixelSize: 11
-            color: Theme.textDim
-        }
-
-        Rectangle {
-            id: track
-            anchors.left: parent.left
-            anchors.right: parent.right
-            y: 30
-            height: 4
-            radius: 2
-            color: Qt.alpha(Theme.text, 0.15)
-
-            Rectangle {
-                width: knob.x + knob.width / 2
-                height: parent.height
-                radius: 2
-                color: Theme.accent
-            }
-            Rectangle {
-                id: knob
-                width: 14
-                height: 14
-                radius: 7
-                anchors.verticalCenter: parent.verticalCenter
-                x: sr.ratio * (track.width - width)
-                color: Theme.text
-            }
-        }
-
-        MouseArea {
-            id: srMa
-            anchors.fill: parent
-            anchors.topMargin: 20
-            hoverEnabled: true
-            // keeps the page from scrolling while a slider is being dragged
-            preventStealing: true
-            cursorShape: Qt.PointingHandCursor
-
-            function apply(mx) {
-                const usable = track.width - knob.width;
-                if (usable <= 0) return;
-                const r = Math.max(0, Math.min(1, (mx - knob.width / 2) / usable));
-                const v = sr.from + r * (sr.to - sr.from);
-                sr.moved(sr.step > 0 ? +(Math.round(v / sr.step) * sr.step).toFixed(3) : v);
-            }
-            onPressed: m => apply(m.x)
-            onPositionChanged: m => { if (pressed) apply(m.x); }
-        }
-
-        SetTip { id: srTip; text: sr.tip; hovered: srMa.containsMouse && !srMa.pressed }
-    }
-
-    // One row of the "Modules" list: enable · section · move earlier / later
-    component ModuleRow: Item {
-        id: mr
-        property var def: ({})
-        Layout.fillWidth: true
-        implicitHeight: 38
-
-        RowLayout {
-            anchors.fill: parent
-            spacing: 6
-
-            Text {
-                Layout.fillWidth: true
-                text: mr.def.l ?? ""
-                elide: Text.ElideRight
-                font.family: Theme.iconFont
-                font.pixelSize: 12
-                font.bold: true
-                color: Theme.text
-            }
-            ToggleSwitch {
-                enabled: !mr.def.fixed
-                opacity: enabled ? 1 : 0.4
-                checked: !!mr.def.fixed || root.isOn(mr.def.id)
-                onToggled: v => root.setOn(mr.def.id, v)
-            }
-            SegControl {
-                options: root.sections
-                current: root.sectionOf(mr.def.id)
-                onPicked: v => root.moveTo(mr.def.id, v)
-            }
-            ArrowBtn {
-                glyph: root.vertical ? "\u25B2" : "\u25C0"
-                enabled: root.canShift(mr.def.id, -1)
-                onClicked: root.shiftBy(mr.def.id, -1)
-            }
-            ArrowBtn {
-                glyph: root.vertical ? "\u25BC" : "\u25B6"
-                enabled: root.canShift(mr.def.id, 1)
-                onClicked: root.shiftBy(mr.def.id, 1)
-            }
-        }
-    }
-
-    component ActionButton: Rectangle {
-        id: ab
-        property string label: ""
-        property bool primary: false
-        signal clicked()
-
-        implicitWidth: abText.implicitWidth + 28
-        width: implicitWidth
-        height: 30
-        radius: 15
-        opacity: enabled ? 1 : 0.4
-        color: primary
-            ? Theme.accent
-            : Qt.alpha(Theme.text, abArea.containsMouse ? 0.18 : 0.1)
-        Behavior on color { ColorAnimation { duration: 120 } }
-
-        Text {
-            id: abText
-            anchors.centerIn: parent
-            text: ab.label
-            font.family: Theme.iconFont
-            font.pixelSize: 11
-            font.bold: true
-            color: ab.primary ? Theme.bg : Theme.text
-        }
-        MouseArea {
-            id: abArea
-            anchors.fill: parent
-            hoverEnabled: true
-            enabled: ab.enabled
-            cursorShape: Qt.PointingHandCursor
-            onClicked: ab.clicked()
-        }
-    }
-
-    // One line of the controls cheat-sheet: description left, chip right.
-    component KeyRow: Item {
-        id: kr
-        property string keys: ""
-        property string desc: ""
-
-        Layout.fillWidth: true
-        implicitHeight: 26
-
-        Text {
-            anchors.left: parent.left
-            anchors.right: chip.left
-            anchors.rightMargin: 12
-            anchors.verticalCenter: parent.verticalCenter
-            text: kr.desc
-            elide: Text.ElideRight
-            font.family: Theme.iconFont
-            font.pixelSize: 11
-            color: Theme.text
-        }
-        Rectangle {
-            id: chip
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            width: chipText.implicitWidth + 14
-            height: 18
-            radius: 5
-            color: Qt.alpha(Theme.text, 0.08)
-            Text {
-                id: chipText
-                anchors.centerIn: parent
-                text: kr.keys
-                font.family: Theme.iconFont
-                font.pixelSize: 10
-                font.bold: true
-                color: Theme.textDim
-            }
-        }
-    }
-
-
-    // ───────────────────────── Bar helper components ─────────────────────────
     component Arrow: Item {
         id: ar
         property string glyph: ""
@@ -1177,8 +732,10 @@ Scope {
     Component {
         id: iconC
         Mod {
+            id: ic
             property var def: root.defMap[mid] ?? ({})
             readonly property bool isNet: mid === "net"
+            readonly property bool isNotif: mid === "notif"
             baseSize: mid === "power" ? root.sz.power : root.sz.icon
             yOffset: root.iconYOffset
             text: isNet ? root.netGlyph : (def.g ?? "")
@@ -1186,6 +743,30 @@ Scope {
             primaryHint: def.hint ?? ""
             warning: isNet && root.netState === "disconnected"
             onPrimary: if (def.cmd) root.run(def.cmd)
+
+            // Notification count badge (top-right of the icon)
+            Rectangle {
+                visible: ic.isNotif && root.notifCount > 0
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.horizontalCenterOffset: Math.round(root.sz.icon / 2)
+                anchors.verticalCenterOffset: -Math.round(root.sz.icon / 2) + 1
+                width: Math.max(height, badgeText.implicitWidth + 6)
+                height: Math.max(11, badgeText.implicitHeight + 1)
+                radius: height / 2
+                color: Theme.bg
+
+                Text {
+                    id: badgeText
+                    anchors.centerIn: parent
+                    text: root.notifCount > 9 ? "9+" : root.notifCount
+                    color: Theme.text
+                    font.family: Theme.iconFont
+                    font.pixelSize: Math.max(8, root.s(8))
+                    font.bold: true
+                    renderType: Text.NativeRendering
+                }
+            }
         }
     }
 
@@ -1257,7 +838,7 @@ Scope {
                             acceptedButtons: Qt.LeftButton | Qt.RightButton
                             onPressed: { dotTip.suppressed = true; dotTip.shown = false; }
                             onClicked: mouse => {
-                                if (mouse.button === Qt.RightButton) root.settingsOpen = !root.settingsOpen;
+                                if (mouse.button === Qt.RightButton) root.openSettings();
                                 else dot.modelData.activate();
                             }
                         }
@@ -1382,356 +963,6 @@ Scope {
         }
     }
 
-    // ───────────────────────── Settings window ─────────────────────────
-    LazyLoader {
-        active: root.settingsOpen
-
-        PanelWindow {
-            id: settingsWin
-            // Fixed height: content scrolls inside the Flickable instead of
-            // resizing the window.
-            implicitWidth: 420
-            implicitHeight: Math.min(640, (screen?.height ?? 800) * 0.85)
-            color: "transparent"
-            exclusionMode: ExclusionMode.Ignore
-            WlrLayershell.layer: WlrLayer.Overlay
-            WlrLayershell.namespace: "bar-settings"
-            WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
-
-            Rectangle {
-                anchors.fill: parent
-                radius: 20
-                color: Theme.bg
-                border.width: 1
-                border.color: Qt.alpha(Theme.text, 0.12)
-            }
-
-            FocusScope {
-                anchors.fill: parent
-                focus: true
-                Keys.onEscapePressed: root.settingsOpen = false
-
-                // header (pinned)
-                Item {
-                    id: head
-                    anchors.top: parent.top
-                    width: parent.width
-                    height: 60
-
-                    Text {
-                        x: 20; y: 12
-                        text: "Bar settings"
-                        font.family: Theme.iconFont
-                        font.pixelSize: 15
-                        font.bold: true
-                        color: Theme.text
-                    }
-                    Text {
-                        x: 20; y: 34
-                        text: "Changes apply instantly and are saved automatically."
-                        font.family: Theme.iconFont
-                        font.pixelSize: 11
-                        color: Theme.textDim
-                    }
-                    Text {
-                        anchors.right: parent.right
-                        anchors.rightMargin: 20
-                        y: 10
-                        width: 24; height: 24
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                        text: "×"
-                        font.pixelSize: 22
-                        color: closeArea.containsMouse ? Theme.text : Theme.textDim
-                        MouseArea {
-                            id: closeArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: root.settingsOpen = false
-                        }
-                    }
-                }
-
-                // body: mouse wheel / touchpad scroll natively; sliders keep
-                // their drag via preventStealing
-                Flickable {
-                    id: flick
-                    anchors.top: head.bottom
-                    anchors.topMargin: 4
-                    anchors.bottom: foot.top
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    contentWidth: width
-                    contentHeight: col.implicitHeight + 16
-                    clip: true
-                    flickableDirection: Flickable.VerticalFlick
-                    boundsBehavior: Flickable.StopAtBounds
-
-                    ColumnLayout {
-                        id: col
-                        x: 20
-                        width: flick.width - 48
-                        spacing: 0
-
-                        // ── Hints ──
-                        SectionHeader { text: "Hints" }
-                        ToggleRow {
-                            label: "Show tooltips"
-                            checked: cfg.tooltips
-                            onToggled: v => cfg.tooltips = v
-                        }
-                        ToggleRow {
-                            label: "Hints in tooltips"
-                            checked: cfg.tooltipHints
-                            enabled: cfg.tooltips
-                            onToggled: v => cfg.tooltipHints = v
-                        }
-                        SliderRow {
-                            label: "Tooltip delay"
-                            enabled: cfg.tooltips
-                            from: 0; to: 1500; step: 50; unit: " ms"
-                            value: cfg.tipDelay
-                            onMoved: v => cfg.tipDelay = v
-                        }
-
-                        // ── Layout ──
-                        SectionHeader { text: "Layout" }
-                        SegRow {
-                            label: "Position"
-                            options: root.positions
-                            current: cfg.position
-                            onPicked: v => cfg.position = v
-                        }
-                        SegRow {
-                            label: "Style"
-                            options: root.styles
-                            current: cfg.style
-                            onPicked: v => cfg.style = v
-                        }
-                        SliderRow {
-                            label: "Thickness"
-                            from: 16; to: 40; step: 1; unit: " px"
-                            value: cfg.thickness
-                            onMoved: v => cfg.thickness = v
-                        }
-                        SliderRow {
-                            label: "Edge margin"
-                            enabled: !root.strip
-                            from: 0; to: 16; step: 1; unit: " px"
-                            value: cfg.margin
-                            tip: "Gap between the bar and the screen edge"
-                            onMoved: v => cfg.margin = v
-                        }
-                        ToggleRow {
-                            label: "Reserve screen space"
-                            checked: cfg.reserveSpace
-                            tip: "Off: windows may overlap the bar"
-                            onToggled: v => cfg.reserveSpace = v
-                        }
-                        ToggleRow {
-                            label: "Show on all monitors"
-                            checked: cfg.allScreens
-                            onToggled: v => cfg.allScreens = v
-                        }
-
-                        // ── Appearance ──
-                        SectionHeader { text: "Appearance" }
-                        SliderRow {
-                            label: "Background opacity"
-                            from: 0; to: 1; step: 0.05; unit: "%"; displayScale: 100
-                            value: cfg.bgOpacity
-                            onMoved: v => cfg.bgOpacity = v
-                        }
-                        SliderRow {
-                            label: "Corner radius"
-                            enabled: !root.strip
-                            from: 0; to: 24; step: 1; unit: " px"
-                            value: cfg.radius
-                            onMoved: v => cfg.radius = v
-                        }
-                        SliderRow {
-                            label: "Calendar radius"
-                            from: 0; to: 32; step: 1; unit: " px"
-                            value: cfg.calRadius
-                            onMoved: v => cfg.calRadius = v
-                        }
-                        SliderRow {
-                            label: "Text scale"
-                            from: 0.8; to: 1.5; step: 0.05; unit: "×"; decimals: 2
-                            value: cfg.scale
-                            onMoved: v => cfg.scale = v
-                        }
-                        ToggleRow {
-                            label: "Border"
-                            checked: cfg.border
-                            onToggled: v => cfg.border = v
-                        }
-
-                        // ── Clock & calendar ──
-                        SectionHeader { text: "Clock & calendar" }
-                        ToggleRow {
-                            label: "24-hour clock"
-                            checked: cfg.clock24
-                            onToggled: v => cfg.clock24 = v
-                        }
-                        ToggleRow {
-                            label: "Show seconds"
-                            checked: cfg.clockSeconds
-                            onToggled: v => cfg.clockSeconds = v
-                        }
-                        SegRow {
-                            label: "Week starts on"
-                            options: ["monday", "sunday"]
-                            current: cfg.weekMonday ? "monday" : "sunday"
-                            onPicked: v => cfg.weekMonday = (v === "monday")
-                        }
-
-                        // ── Modules ──
-                        SectionHeader { text: "Module appearance" }
-                        SliderRow {
-                            label: "Module padding"
-                            from: 0; to: 40; step: 2; unit: " px"
-                            value: cfg.modPad
-                            tip: "Horizontal space around text modules"
-                            onMoved: v => cfg.modPad = v
-                        }
-                        SliderRow {
-                            label: "Workspace dot size"
-                            from: 6; to: 18; step: 1; unit: " px"
-                            value: cfg.wsDot
-                            onMoved: v => cfg.wsDot = v
-                        }
-                        SliderRow {
-                            label: "Workspace dot spacing"
-                            from: 0; to: 20; step: 1; unit: " px"
-                            value: cfg.wsGap
-                            onMoved: v => cfg.wsGap = v
-                        }
-                        ToggleRow {
-                            label: "Scroll to switch workspace"
-                            checked: cfg.wsScroll
-                            onToggled: v => cfg.wsScroll = v
-                        }
-                        SegRow {
-                            label: "CPU / RAM style"
-                            options: root.statsModes
-                            current: cfg.statsMode
-                            onPicked: v => cfg.statsMode = v
-                        }
-                        SliderRow {
-                            label: "High CPU / RAM warning"
-                            from: 50; to: 100; step: 5; unit: "%"
-                            value: cfg.statsWarn
-                            tip: "Usage at or above this turns red"
-                            onMoved: v => cfg.statsWarn = v
-                        }
-                        SliderRow {
-                            label: "Low battery warning"
-                            from: 5; to: 50; step: 5; unit: "%"
-                            value: cfg.batLowPct
-                            onMoved: v => cfg.batLowPct = v
-                        }
-                        SliderRow {
-                            label: "Volume scroll step"
-                            from: 1; to: 10; step: 1; unit: "%"
-                            value: cfg.volStep
-                            onMoved: v => cfg.volStep = v
-                        }
-                        SliderRow {
-                            label: "Maximum volume"
-                            from: 100; to: 150; step: 5; unit: "%"
-                            value: cfg.volMax
-                            tip: "Above 100% may distort on some speakers"
-                            onMoved: v => cfg.volMax = v
-                        }
-
-                        // ── Module list ──
-                        SectionHeader { text: "Modules" }
-                        Repeater {
-                            model: root.moduleDefs
-                            delegate: ModuleRow {
-                                required property var modelData
-                                def: modelData
-                            }
-                        }
-                    }
-                }
-
-                // scrollbar (outside the content so it doesn't scroll away)
-                Rectangle {
-                    visible: flick.contentHeight > flick.height
-                    x: flick.x + flick.width - 14
-                    y: flick.y
-                    width: 4
-                    height: flick.height
-                    radius: 2
-                    color: Qt.alpha(Theme.text, 0.08)
-                }
-
-                Rectangle {
-                    id: sbHandle
-                    visible: flick.contentHeight > flick.height
-                    x: flick.x + flick.width - 14
-                    y: flick.y + flick.visibleArea.yPosition * flick.height
-                    width: 4
-                    height: Math.max(24, flick.height * flick.visibleArea.heightRatio)
-                    radius: 2
-                    color: Theme.text
-                    opacity: sbMa.containsMouse || sbMa.pressed || flick.moving ? 0.7 : 0.3
-                    Behavior on opacity { NumberAnimation { duration: 150 } }
-
-                    MouseArea {
-                        id: sbMa
-                        anchors.fill: parent
-                        anchors.margins: -5
-                        hoverEnabled: true
-                        preventStealing: true
-                        property real grabY: 0
-
-                        // drive contentY directly (drag.target would break the y binding)
-                        onPressed: m => {
-                            grabY = mapToItem(flick, m.x, m.y).y - flick.visibleArea.yPosition * flick.height;
-                        }
-                        onPositionChanged: m => {
-                            if (!pressed) return;
-                            const span = flick.height - sbHandle.height;
-                            if (span <= 0) return;
-                            const r = Math.max(0, Math.min(1, (mapToItem(flick, m.x, m.y).y - grabY) / span));
-                            flick.contentY = r * (flick.contentHeight - flick.height);
-                        }
-                    }
-                }
-
-                // footer (pinned)
-                Item {
-                    id: foot
-                    anchors.bottom: parent.bottom
-                    width: parent.width
-                    height: 58
-
-                    Rule { width: parent.width }
-
-                    ActionButton {
-                        x: 20
-                        anchors.verticalCenter: parent.verticalCenter
-                        label: "Reset all"
-                        enabled: root.modified
-                        onClicked: root.resetSettings()
-                    }
-                    ActionButton {
-                        anchors.right: parent.right
-                        anchors.rightMargin: 20
-                        anchors.verticalCenter: parent.verticalCenter
-                        label: "Done"
-                        primary: true
-                        onClicked: root.settingsOpen = false
-                    }
-                }
-            }
-        }
-    }
-
     // ───────────────────────── The bar ─────────────────────────
     Variants {
         model: root.barLive
@@ -1807,12 +1038,14 @@ Scope {
                             active: clockPanel.calOpen
                             tip: Qt.formatDate(clk.date, "dddd, d MMMM yyyy")
                             primaryHint: clockPanel.calOpen ? "Close calendar" : "Open calendar"
+                            secondaryHint: "Bar settings"
                             tertiaryHint: "Settings"
                             onPrimary: {
                                 clockPanel.monthOffset = 0;
                                 clockPanel.calOpen = !clockPanel.calOpen;
-                            }
-                            onTertiary: root.run("qs ipc call settings toggle")
+                                }
+                                onSecondary: root.run("qs ipc call settings bar")
+                                onTertiary: root.run("qs ipc call settings toggle")
                         }
                     }
                     LazyLoader {

@@ -8,7 +8,7 @@
     fg:          {{fg_soft|alpha=ff}};
     fg-muted:    {{fg_muted|alpha=ff}};
     fg-dark:     {{fg_dark}};
-    fg-selected: {{fg}};
+    fg-selected: {{fg_muted|alpha=ff}};
     accent:      {{highlight|alpha=ff}};
     accent-soft: {{highlight|alpha=33}};
     urgent:      {{urgent|alpha=ff}};

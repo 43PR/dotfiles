@@ -1,3 +1,4 @@
+-- ~/.config/hypr/look.lua
 ---- LOOK AND FEEL ----
 
 hl.config({ render = { expand_undersized_textures = false}})

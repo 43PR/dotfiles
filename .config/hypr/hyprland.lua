@@ -59,11 +59,23 @@ hl.config({
     },
 })
 
+local f = os.getenv("HOME") .. "/.config/quickshell/state/devices.lua"
+if io.open(f, "r") then dofile(f) end
+
 ---- SPLIT-OUT FILES ----
 
 require("monitors")
 require("keybinds")
 require("look")
+do
+    local f = os.getenv("HOME") .. "/.config/quickshell/state/look.lua"
+    local fh = io.open(f, "r")
+    if fh then
+        fh:close()
+        local ok, err = pcall(dofile, f)
+        if not ok then print("state/look.lua failed: " .. tostring(err)) end
+    end
+end
 require("rules")
 
 -- HyprMod managed settings
