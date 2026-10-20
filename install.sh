@@ -80,8 +80,8 @@ fi
 source /etc/os-release
 
 # Arch-compatible distributions normally identify themselves
-# through ID_LIKE=arch or ID=arch.
-if [[ "${ID:-}" != "arch" && "${ID_LIKE:-}" != *arch* ]]; then
+# through ID_LIKE=arch, ID=arch, or ID=artix.
+if [[ "${ID:-}" != "arch" && "${ID:-}" != "artix" && "${ID_LIKE:-}" != *arch* ]]; then
     error "This installer is intended for Arch-compatible Linux distributions."
     error "Detected: ${PRETTY_NAME:-unknown}"
     exit 1
