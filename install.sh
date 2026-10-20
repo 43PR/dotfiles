@@ -107,6 +107,7 @@ fi
 # --------------------------------------------------
 
 PACKAGE_FILE="$REPO_DIR/packages.txt"
+DINIT_PACKAGE_FILE="$REPO_DIR/packages-dinit.txt"
 
 if [[ ! -f "$PACKAGE_FILE" ]]; then
     error "packages.txt not found."
@@ -153,6 +154,18 @@ fi
 mapfile -t PACKAGES < <(
     grep -vE '^[[:space:]]*(#|$)' "$PACKAGE_FILE"
 )
+
+if command -v dinitctl >/dev/null 2>&1; then
+    if [[ -f "$DINIT_PACKAGE_FILE" ]]; then
+        mapfile -t DINIT_PACKAGES < <(
+            grep -vE '^[[:space:]]*(#|$)' "$DINIT_PACKAGE_FILE"
+        )
+        PACKAGES+=("${DINIT_PACKAGES[@]}")
+        info "Dinit detected; adding Dinit-specific packages."
+    else
+        warning "Dinit detected, but $DINIT_PACKAGE_FILE was not found."
+    fi
+fi
 
 OFFICIAL_PACKAGES=()
 AUR_PACKAGES=()
@@ -358,8 +371,22 @@ if command -v systemctl >/dev/null 2>&1; then
     systemctl --user enable --now wireplumber.service
 
     success "PipeWire configured."
+elif command -v dinitctl >/dev/null 2>&1; then
+    info "Enabling PipeWire with Dinit..."
+
+    for service in pipewire wireplumber pipewire-pulse; do
+        if [[ ! -e "$HOME/.config/dinit.d/boot.d/$service" ]]; then
+            if dinitctl --user enable "$service"; then
+                success "$service enabled."
+            else
+                warning "Failed to enable $service with Dinit."
+            fi
+        fi
+    done
+
+    success "PipeWire configured with Dinit."
 else
-    warning "systemctl was not found; skipping PipeWire service setup."
+    warning "Neither systemctl nor dinitctl was found; skipping PipeWire service setup."
 fi
 
 # --------------------------------------------------
@@ -374,6 +401,36 @@ if command -v systemctl >/dev/null 2>&1; then
             success "power-profiles-daemon enabled."
         else
             warning "Failed to enable power-profiles-daemon."
+        fi
+    else
+        warning "power-profiles-daemon is not installed; the Power page will not work."
+    fi
+elif command -v dinitctl >/dev/null 2>&1; then
+    for service in userspawn networkmanager bluetoothd; do
+        if [[ -e "/etc/dinit.d/$service" && ! -e "/etc/dinit.d/boot.d/$service" ]]; then
+            if sudo dinitctl enable "$service"; then
+                success "$service enabled."
+            else
+                warning "Failed to enable $service with Dinit."
+            fi
+        fi
+    done
+
+    if pacman -Qi power-profiles-daemon >/dev/null 2>&1; then
+        if [[ -e "/etc/dinit.d/power-profiles-daemon" ]]; then
+            info "Enabling power-profiles-daemon with Dinit..."
+
+            if [[ ! -e "/etc/dinit.d/boot.d/power-profiles-daemon" ]]; then
+                if sudo dinitctl enable power-profiles-daemon; then
+                    success "power-profiles-daemon enabled."
+                else
+                    warning "Failed to enable power-profiles-daemon with Dinit."
+                fi
+            else
+                info "power-profiles-daemon is already enabled."
+            fi
+        else
+            warning "No Dinit service file found for power-profiles-daemon; the Power page will not work."
         fi
     else
         warning "power-profiles-daemon is not installed; the Power page will not work."

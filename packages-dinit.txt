@@ -1,0 +1,27 @@
+# 43PR/dotfiles
+# Install e.g.: sudo pacman -S cava
+# Remove e.g.: sudo pacman -R cava
+#
+# Names that aren't in the official repos are installed from the AUR
+# automatically by install.sh (if an AUR helper is available).
+
+# --------------------------------------------------
+# Networking / Bluetooth
+# --------------------------------------------------
+
+networkmanager-dinit
+bluez-dinit
+
+# --------------------------------------------------
+# Audio
+# --------------------------------------------------
+
+pipewire-dinit
+pipewire-pulse-dinit
+wireplumber-dinit
+
+# --------------------------------------------------
+# System Monitoring / Hardware
+# --------------------------------------------------
+
+power-profiles-daemon-dinit
