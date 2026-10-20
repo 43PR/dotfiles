@@ -113,6 +113,7 @@ Item {
 
     readonly property var layoutOptions: [
         { id: "dwindle", label: "DWINDLE" },
+        { id: "scrolling", label: "SCROLLING" },
         { id: "master",  label: "MASTER" }
     ]
 
@@ -300,7 +301,7 @@ Item {
                     if (saved.look[k] !== undefined && typeof saved.look[k] === typeof n[k])
                         n[k] = saved.look[k]
                 }
-                if (["dwindle", "master"].indexOf(n.layout) === -1) n.layout = lookDefaults.layout
+                if (["dwindle", "scrolling", "master"].indexOf(n.layout) === -1) n.layout = lookDefaults.layout
                 if (["slide", "slidefade", "slidevert", "slidefadevert"].indexOf(n.workspaceStyle) === -1)
                     n.workspaceStyle = lookDefaults.workspaceStyle
                 look = n
