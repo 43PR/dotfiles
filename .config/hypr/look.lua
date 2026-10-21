@@ -1,5 +1,8 @@
 -- ~/.config/hypr/look.lua
 ---- LOOK AND FEEL ----
+local colors = { active = "rgba(FFFFFFFF)", inactive = "rgba(33333366)" }
+local ok, c = pcall(dofile, os.getenv("HOME") .. "/.config/hypr/colors.lua")
+if ok and type(c) == "table" then colors = c end
 
 hl.config({ render = { expand_undersized_textures = false}})
 hl.config({
@@ -11,7 +14,11 @@ hl.config({
             bottom = 8,
             left = 8,
         },
-        border_size = 0,
+        border_size = 1,
+        col = {
+            active_border   = colors.active,
+            inactive_border = colors.inactive,
+        },
         resize_on_border = true,
         allow_tearing = false,
         layout = "dwindle",

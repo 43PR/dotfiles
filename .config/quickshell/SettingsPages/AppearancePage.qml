@@ -21,6 +21,8 @@ Item {
     readonly property real tiltMax: 15
     readonly property real radiusMin: 0
     readonly property real radiusMax: 35
+    readonly property real blurAlphaCap: Math.max(0, round2(Theme.bgAlpha - 0.05))
+    readonly property real effectiveBlurAlpha: Math.min(look.blurLayerAlpha, blurAlphaCap)
 
     function clamp01(v) { return Math.max(0, Math.min(1, v)) }
     function round2(v) { return Math.round(v * 100) / 100 }
@@ -73,6 +75,8 @@ Item {
         blurSize: 5,
         blurPasses: 1,
         blurVibrancy: 0.2,
+        blurLayers: true,        
+        blurLayerAlpha: 0.1, 
         shadowRange: 4,
         shadowPower: 3,
         speedWindows: 5,
@@ -113,6 +117,7 @@ Item {
 
     readonly property var layoutOptions: [
         { id: "dwindle", label: "DWINDLE" },
+        { id: "scrolling", label: "SCROLLING" },
         { id: "master",  label: "MASTER" }
     ]
 
@@ -192,6 +197,11 @@ Item {
         stmts.push(animLine("border",     l.speedBorder,     "default"))
         stmts.push(animLine("fade",       l.speedFade,       "default"))
         stmts.push(animLine("workspaces", l.speedWorkspaces, "default", l.workspaceStyle))
+        const layerBlur = fxOn && l.blurLayers
+        stmts.push("hl.layer_rule({ name = \"qs\", match = { namespace = \"^(quickshell|settings|notifications|powermenu|powermenu-settings|mediaosd|mediaosd-settings|recorder-osd|todo|wheel|colorpicker|colorpicker-editor)$\" }, blur = "
+        + (layerBlur ? "true" : "false")
+        + ", blur_popups = " + (layerBlur ? "true" : "false")
+        + ", ignore_alpha = " + round2(effectiveBlurAlpha) + " })")
         return stmts
     }
 
@@ -227,6 +237,13 @@ Item {
         applyTimer.restart()
         saveTimer.restart()
     }
+    Connections {
+    target: Theme
+    function onBgAlphaChanged() {
+        applyTimer.restart()
+        saveTimer.restart()
+    }
+}
 
     // ------------------------------------------------------------------
     // Apply / persist
@@ -301,6 +318,7 @@ Item {
                         n[k] = saved.look[k]
                 }
                 if (["dwindle", "master"].indexOf(n.layout) === -1) n.layout = lookDefaults.layout
+                if (["dwindle", "scrolling", "master"].indexOf(n.layout) === -1) n.layout = lookDefaults.layout
                 if (["slide", "slidefade", "slidevert", "slidefadevert"].indexOf(n.workspaceStyle) === -1)
                     n.workspaceStyle = lookDefaults.workspaceStyle
                 look = n
@@ -822,7 +840,15 @@ Item {
                 Card {
                     Column {
                         width: parent.width; spacing: 6
-
+                        ToggleRow {
+                            label: "BLUR PANELS"; checked: page.look.blurLayers
+                            onToggled: v => page.setLook("blurLayers", v)
+                        }
+                        Stepper {
+                            label: "PANEL BLUR THRESHOLD"; value: page.effectiveBlurAlpha
+                            from: 0; to: page.blurAlphaCap; step: 0.05; decimals: 2
+                            onMoved: v => page.setLook("blurLayerAlpha", v)
+                        }
                         // ---- background opacity ----
                         Row {
                             width: parent.width; spacing: 8

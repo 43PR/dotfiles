@@ -1,4 +1,18 @@
 @import "colors.css";
+
+@define-color window_bg_color @gtk_bg;
+@define-color view_bg_color @gtk_bg;
+@define-color headerbar_bg_color @gtk_bg;
+@define-color sidebar_bg_color @gtk_bg;
+@define-color card_bg_color @gtk_bg;
+@define-color popover_bg_color @gtk_bg;
+@define-color window_fg_color @gtk_fg;
+@define-color view_fg_color @gtk_fg;
+@define-color headerbar_fg_color @gtk_fg;
+@define-color sidebar_fg_color @gtk_fg;
+@define-color card_fg_color @gtk_fg;
+@define-color popover_fg_color @gtk_fg;
+
 window,
 .background,
 headerbar,

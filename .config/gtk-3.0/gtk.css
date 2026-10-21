@@ -22,3 +22,15 @@ treeview.view text {
 * {
     color: @gtk_fg;
 }
+toolbar,
+toolbar * {
+    background-color: @gtk_bg;
+    background-image: none;
+}
+menubar,
+menubar *,
+notebook,
+notebook * {
+    background-color: @gtk_bg;
+    background-image: none;
+}

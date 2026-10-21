@@ -5,27 +5,38 @@
 input  = "~/.config/43pr/templates/kitty.conf"
 output = "~/.config/kitty/matugen.conf"
 reload = ["pkill", "-USR1", "-x", "kitty"]
+
 [rofi]
 input  = "~/.config/43pr/templates/rofi-colors.rasi"
 output = "~/.config/rofi/colors.rasi"
+
 [hyprlock]
 input  = "~/.config/43pr/templates/hyprlock-colors.conf"
 output = "~/.config/hypr/hyprlock-colors.conf"
+
 [gtk3]
 input  = "~/.config/43pr/templates/gtk-colors.css"
 output = "~/.config/gtk-3.0/colors.css"
+
 [gtk4]
 input  = "~/.config/43pr/templates/gtk-colors.css"
 output = "~/.config/gtk-4.0/colors.css"
+
 [quickshell]
 input  = "~/.config/43pr/templates/quickshell-theme.json"
 output = "~/.cache/43pr/quickshell-theme.json"
+
 [btop]
 input  = "~/.config/43pr/templates/btop.theme"
 output = "~/.config/btop/themes/43pr.theme"
 reload = ["pkill", "-USR2", "-x", "btop"]
+
 [cava]
 input  = "~/.config/43pr/templates/cava-theme"
 output = "~/.config/cava/themes/43pr"
-
 reload = ["pkill", "-USR2", "-f", "-x", "cava"]
+
+[hypr]
+input  = "~/.config/43pr/templates/hypr-colors.lua"
+output = "~/.config/hypr/colors.lua"
+reload = ["hyprctl", "reload"]
