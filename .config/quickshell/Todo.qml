@@ -68,6 +68,10 @@ Scope {
     onMenuSizeChanged: if (root.showing) root.setPosition(root.offsetX, root.offsetY)
     onCardWidthChanged: if (root.showing) root.setPosition(root.offsetX, root.offsetY)
 
+    // Each note has:
+    //   heading   - the note's title (optional, single line)
+    //   title     - the note's body text (name kept for compatibility with old saved state)
+    //   done, remindAt, notified, collapsed
     // dynamicRoles: remindAt can be 0 (int) or a big epoch-ms value (double)
     ListModel { id: todos; dynamicRoles: true }
 
@@ -146,10 +150,12 @@ Scope {
         for (var i = 0; i < todos.count; i++) {
             var e = todos.get(i)
             out.push({
+                heading: e.heading,
                 title: e.title,
                 done: e.done,
                 remindAt: e.remindAt,
-                notified: e.notified
+                notified: e.notified,
+                collapsed: e.collapsed
             })
         }
         store.setText(JSON.stringify({
@@ -161,21 +167,44 @@ Scope {
         }))
     }
 
+    // returns true when a note was actually added
     function addTodo(t) {
         t = t.trim()
-        if (t === "" || todos.count >= root.maxItems) return
-        todos.insert(0, { title: t, done: false, remindAt: 0, notified: false })
+        if (t === "" || todos.count >= root.maxItems) return false
+        todos.insert(0, {
+            heading: "",
+            title: t,
+            done: false,
+            remindAt: 0,
+            notified: false,
+            collapsed: false
+        })
         saveTimer.restart()
+        return true
     }
 
+    // body text
     function editTodo(i, t) {
         if (i < 0 || i >= todos.count) return
         todos.setProperty(i, "title", t)
         saveTimer.restart()
     }
 
+    // note title
+    function editHeading(i, h) {
+        if (i < 0 || i >= todos.count) return
+        todos.setProperty(i, "heading", h)
+        saveTimer.restart()
+    }
+
     function toggleTodo(i) {
         todos.setProperty(i, "done", !todos.get(i).done)
+        saveTimer.restart()
+    }
+
+    function toggleCollapsed(i) {
+        if (i < 0 || i >= todos.count) return
+        todos.setProperty(i, "collapsed", !todos.get(i).collapsed)
         saveTimer.restart()
     }
 
@@ -306,7 +335,8 @@ Scope {
         for (var i = 0; i < todos.count; i++) {
             var e = todos.get(i)
             if (!e.done && e.remindAt > 0 && !e.notified && e.remindAt <= now) {
-                root.notify(e.title)
+                // prefer the note's title; fall back to its body text
+                root.notify(e.heading !== "" ? e.heading : e.title)
                 todos.setProperty(i, "notified", true)
                 fired = true
             }
@@ -351,10 +381,12 @@ Scope {
                 for (var i = 0; i < arr.length; i++) {
                     if (typeof arr[i].title === "string")
                         todos.append({
+                            heading: typeof arr[i].heading === "string" ? arr[i].heading : "",
                             title: arr[i].title,
                             done: arr[i].done === true,
                             remindAt: typeof arr[i].remindAt === "number" ? arr[i].remindAt : 0,
-                            notified: arr[i].notified === true
+                            notified: arr[i].notified === true,
+                            collapsed: arr[i].collapsed === true
                         })
                 }
             } catch (e) {
@@ -524,7 +556,7 @@ Scope {
                         Item {
                             id: header
                             width: parent.width
-                            height: root.px(18)
+                            height: root.px(38)
 
                             Rectangle {
                                 anchors.centerIn: parent
@@ -577,6 +609,7 @@ Scope {
 
                                 onDoubleClicked: root.resetPosition()
                             }
+
                         }
 
                         Rectangle {
@@ -624,8 +657,7 @@ Scope {
                                         e.accepted = true
                                         if (e.modifiers & Qt.ShiftModifier) {
                                             input.insert(input.cursorPosition, "\n")
-                                        } else {
-                                            root.addTodo(input.text)
+                                        } else if (root.addTodo(input.text)) {
                                             input.text = ""
                                         }
                                     } else if (e.key === Qt.Key_Escape) {
@@ -639,7 +671,7 @@ Scope {
                                     visible: input.text === "" && !input.inputMethodComposing
                                     width: parent.width
                                     wrapMode: Text.WordWrap
-                                    text: "Enter Save | Shift+Enter New line | Ctrl+Scroll Text size | Shift+Scroll Scale"
+                                    text: "Enter: Save | Shift+Enter: New line | Ctrl+Scroll: Text size | Shift+Scroll: Scale"
                                     font.pixelSize: root.fpx(11)
                                     color: Theme.textDim
                                     opacity: 0.7
@@ -672,24 +704,28 @@ Scope {
                             delegate: Rectangle {
                                 id: entry
                                 required property int index
+                                required property string heading
                                 required property string title
                                 required property bool done
                                 required property real remindAt
                                 required property bool notified
+                                required property bool collapsed
 
                                 // reminder picker open?
                                 property bool picking: false
                                 // being dragged with right-click
                                 property bool reordering: false
 
+                                // a collapsed note never shows the reminder picker
+                                onCollapsedChanged: if (entry.collapsed) entry.picking = false
+
                                 width: list.width
                                 height: Math.max(root.rowHeight,
-                                                 edit.contentHeight + extras.height
-                                                 + (extras.height > 0 ? root.px(6) : 0)
-                                                 + root.px(24))
+                                                 content.height + root.px(22),
+                                                 btnCol.height + root.px(16))
                                 radius: root.px(12)
                                 color: Theme.bg
-                                border.width: (edit.activeFocus || entry.reordering) ? 1 : 0
+                                border.width: (edit.activeFocus || titleEdit.activeFocus || entry.reordering) ? 1 : 0
                                 border.color: Theme.accent
                                 z: entry.reordering ? 2 : 1
                                 Behavior on color { ColorAnimation { duration: 120 } }
@@ -700,8 +736,13 @@ Scope {
                                     hoverEnabled: true
                                     acceptedButtons: Qt.LeftButton
                                     onClicked: {
-                                        edit.forceActiveFocus()
-                                        edit.cursorPosition = edit.length
+                                        // clicking a collapsed note expands it
+                                        if (entry.collapsed) {
+                                            root.toggleCollapsed(entry.index)
+                                        } else {
+                                            edit.forceActiveFocus()
+                                            edit.cursorPosition = edit.length
+                                        }
                                     }
                                 }
 
@@ -734,218 +775,308 @@ Scope {
                                     }
                                 }
 
-                                TextEdit {
-                                    id: edit
+                                // title + body + reminder stuff, stacked
+                                Column {
+                                    id: content
                                     anchors.left: check.right
                                     anchors.leftMargin: root.px(11)
-                                    anchors.right: bellBtn.left
+                                    anchors.right: btnCol.left
                                     anchors.rightMargin: root.px(6)
                                     anchors.top: parent.top
                                     anchors.topMargin: root.px(11)
-                                    font.pixelSize: root.fpx(11)
-                                    font.strikeout: entry.done
-                                    color: entry.done ? Theme.textDim : Theme.text
-                                    opacity: entry.done ? 0.7 : 1
-                                    selectionColor: Theme.accent
-                                    selectedTextColor: Theme.bg
-                                    wrapMode: TextEdit.Wrap
-                                    selectByMouse: true
-                                    textFormat: TextEdit.PlainText
+                                    spacing: root.px(4)
 
-                                    Component.onCompleted: edit.text = entry.title
+                                    // note title (single line)
+                                    TextInput {
+                                        id: titleEdit
+                                        width: content.width
+                                        visible: !entry.collapsed || entry.heading !== "" || titleEdit.activeFocus
+                                        font.pixelSize: root.fpx(12)
+                                        font.bold: true
+                                        font.strikeout: entry.done
+                                        color: entry.done ? Theme.textDim : Theme.text
+                                        opacity: entry.done ? 0.7 : 1
+                                        selectionColor: Theme.accent
+                                        selectedTextColor: Theme.bg
+                                        selectByMouse: true
+                                        clip: true
 
-                                    onTextChanged: {
-                                        if (edit.activeFocus)
-                                            root.editTodo(entry.index, edit.text)
-                                    }
+                                        Component.onCompleted: titleEdit.text = entry.heading
 
-                                    Keys.onPressed: function (e) {
-                                        if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter) {
-                                            e.accepted = true
-                                            if (e.modifiers & Qt.ShiftModifier) {
-                                                edit.insert(edit.cursorPosition, "\n")
-                                            } else {
-                                                input.forceActiveFocus()
-                                            }
-                                        } else if (e.key === Qt.Key_Escape) {
-                                            e.accepted = true
-                                            root.closeMenu()
+                                        onTextChanged: {
+                                            if (titleEdit.activeFocus)
+                                                root.editHeading(entry.index, titleEdit.text)
                                         }
-                                    }
-                                }
 
-                                // reminder label + picker, below the text
-                                Column {
-                                    id: extras
-                                    anchors.left: edit.left
-                                    anchors.right: parent.right
-                                    anchors.rightMargin: root.px(12)
-                                    anchors.top: edit.bottom
-                                    anchors.topMargin: root.px(6)
-                                    spacing: root.px(6)
-
-                                    Text {
-                                        visible: entry.remindAt > 0
-                                        text: "⏰ " + root.formatWhen(entry.remindAt)
-                                              + (entry.notified ? "  ·  sent" : "")
-                                        font.pixelSize: root.fpx(10)
-                                        color: entry.notified ? Theme.textDim : Theme.accent
-                                    }
-
-                                    Flow {
-                                        visible: entry.picking
-                                        width: parent.width
-                                        spacing: root.px(6)
-
-                                        Repeater {
-                                            // s = seconds
-                                            model: [
-                                                { l: "5m",  s: 300 },
-                                                { l: "25m", s: 1500 },
-                                                { l: "1h",  s: 3600 },
-                                            ]
-
-                                            delegate: ChipBtn {
-                                                required property var modelData
-                                                ui: root.ui
-                                                tx: root.tx
-                                                label: modelData.l
-                                                onClicked: {
-                                                    root.setReminder(entry.index, Date.now() + modelData.s * 1000)
-                                                    entry.picking = false
-                                                }
+                                        Keys.onPressed: function (e) {
+                                            if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter
+                                                    || e.key === Qt.Key_Tab) {
+                                                e.accepted = true
+                                                if (entry.collapsed) input.forceActiveFocus()
+                                                else edit.forceActiveFocus()
+                                            } else if (e.key === Qt.Key_Escape) {
+                                                e.accepted = true
+                                                root.closeMenu()
                                             }
                                         }
 
-                                        ChipBtn {
-                                            visible: entry.remindAt > 0
-                                            ui: root.ui
-                                            tx: root.tx
-                                            label: "Clear"
-                                            onClicked: {
-                                                root.clearReminder(entry.index)
-                                                entry.picking = false
-                                            }
-                                        }
-                                    }
-
-                                    Rectangle {
-                                        id: customBox
-                                        visible: entry.picking
-                                        property bool bad: false
-                                        width: parent.width
-                                        height: Math.max(root.px(26), customInput.contentHeight + root.px(10))
-                                        radius: root.px(8)
-                                        color: Theme.alpha(Theme.text, 0.08)
-                                        border.width: (customInput.activeFocus || bad) ? 1 : 0
-                                        border.color: bad ? Theme.danger : Theme.accent
-
-                                        TextInput {
-                                            id: customInput
-                                            anchors.fill: parent
-                                            anchors.leftMargin: root.px(8)
-                                            anchors.rightMargin: root.px(8)
-                                            verticalAlignment: TextInput.AlignVCenter
+                                        Text {
+                                            visible: titleEdit.text === "" && !entry.collapsed
+                                                     && !titleEdit.inputMethodComposing
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            text: "Title"
                                             font.pixelSize: root.fpx(11)
-                                            color: Theme.text
-                                            selectionColor: Theme.accent
-                                            selectedTextColor: Theme.bg
-                                            clip: true
+                                            font.bold: false
+                                            color: Theme.textDim
+                                            opacity: 0.5
+                                        }
+                                    }
 
-                                            onTextChanged: customBox.bad = false
+                                    // collapsed + no title: show the first line of the body instead
+                                    Text {
+                                        visible: entry.collapsed && entry.heading === ""
+                                        width: content.width
+                                        text: entry.title.split("\n")[0] !== "" ? entry.title.split("\n")[0] : "(empty)"
+                                        elide: Text.ElideRight
+                                        maximumLineCount: 1
+                                        font.pixelSize: root.fpx(11)
+                                        font.strikeout: entry.done
+                                        color: entry.done ? Theme.textDim : Theme.text
+                                        opacity: entry.done ? 0.7 : 1
+                                    }
 
-                                            Keys.onPressed: function (e) {
-                                                if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter) {
-                                                    e.accepted = true
-                                                    var ts = root.parseWhen(customInput.text)
-                                                    if (ts > 0) {
-                                                        root.setReminder(entry.index, ts)
-                                                        customInput.text = ""
-                                                        entry.picking = false
-                                                        input.forceActiveFocus()
-                                                    } else {
-                                                        customBox.bad = true
-                                                    }
-                                                } else if (e.key === Qt.Key_Escape) {
-                                                    e.accepted = true
-                                                    entry.picking = false
+                                    // note body
+                                    TextEdit {
+                                        id: edit
+                                        width: content.width
+                                        visible: !entry.collapsed
+                                        font.pixelSize: root.fpx(11)
+                                        font.strikeout: entry.done
+                                        color: entry.done ? Theme.textDim : Theme.text
+                                        opacity: entry.done ? 0.7 : 1
+                                        selectionColor: Theme.accent
+                                        selectedTextColor: Theme.bg
+                                        wrapMode: TextEdit.Wrap
+                                        selectByMouse: true
+                                        textFormat: TextEdit.PlainText
+
+                                        Component.onCompleted: edit.text = entry.title
+
+                                        onTextChanged: {
+                                            if (edit.activeFocus)
+                                                root.editTodo(entry.index, edit.text)
+                                        }
+
+                                        Keys.onPressed: function (e) {
+                                            if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter) {
+                                                e.accepted = true
+                                                if (e.modifiers & Qt.ShiftModifier) {
+                                                    edit.insert(edit.cursorPosition, "\n")
+                                                } else {
                                                     input.forceActiveFocus()
                                                 }
+                                            } else if (e.key === Qt.Key_Escape) {
+                                                e.accepted = true
+                                                root.closeMenu()
+                                            }
+                                        }
+                                    }
+
+                                    // reminder label + picker, below the text
+                                    Column {
+                                        id: extras
+                                        width: content.width
+                                        // an empty Column would still add spacing to `content`
+                                        visible: entry.remindAt > 0 || entry.picking
+                                        spacing: root.px(6)
+
+                                        Text {
+                                            visible: entry.remindAt > 0
+                                            text: "⏰ " + root.formatWhen(entry.remindAt)
+                                                  + (entry.notified ? "  ·  sent" : "")
+                                            font.pixelSize: root.fpx(10)
+                                            color: entry.notified ? Theme.textDim : Theme.accent
+                                        }
+
+                                        Flow {
+                                            visible: entry.picking
+                                            width: parent.width
+                                            spacing: root.px(6)
+
+                                            Repeater {
+                                                // s = seconds
+                                                model: [
+                                                    { l: "5m",  s: 300 },
+                                                    { l: "25m", s: 1500 },
+                                                    { l: "1h",  s: 3600 },
+                                                ]
+
+                                                delegate: ChipBtn {
+                                                    required property var modelData
+                                                    ui: root.ui
+                                                    tx: root.tx
+                                                    label: modelData.l
+                                                    onClicked: {
+                                                        root.setReminder(entry.index, Date.now() + modelData.s * 1000)
+                                                        entry.picking = false
+                                                    }
+                                                }
                                             }
 
-                                            Text {
-                                                visible: customInput.text === ""
-                                                anchors.verticalCenter: parent.verticalCenter
-                                                text: "e.g. 15m · 20:10 · 9am · 2:30pm · fri 14:30"
+                                            ChipBtn {
+                                                visible: entry.remindAt > 0
+                                                ui: root.ui
+                                                tx: root.tx
+                                                label: "Clear"
+                                                onClicked: {
+                                                    root.clearReminder(entry.index)
+                                                    entry.picking = false
+                                                }
+                                            }
+                                        }
+
+                                        Rectangle {
+                                            id: customBox
+                                            visible: entry.picking
+                                            property bool bad: false
+                                            width: parent.width
+                                            height: Math.max(root.px(26), customInput.contentHeight + root.px(10))
+                                            radius: root.px(8)
+                                            color: Theme.alpha(Theme.text, 0.08)
+                                            border.width: (customInput.activeFocus || bad) ? 1 : 0
+                                            border.color: bad ? Theme.danger : Theme.accent
+
+                                            TextInput {
+                                                id: customInput
+                                                anchors.fill: parent
+                                                anchors.leftMargin: root.px(8)
+                                                anchors.rightMargin: root.px(8)
+                                                verticalAlignment: TextInput.AlignVCenter
                                                 font.pixelSize: root.fpx(11)
-                                                color: Theme.textDim
-                                                opacity: 0.7
+                                                color: Theme.text
+                                                selectionColor: Theme.accent
+                                                selectedTextColor: Theme.bg
+                                                clip: true
+
+                                                onTextChanged: customBox.bad = false
+
+                                                Keys.onPressed: function (e) {
+                                                    if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter) {
+                                                        e.accepted = true
+                                                        var ts = root.parseWhen(customInput.text)
+                                                        if (ts > 0) {
+                                                            root.setReminder(entry.index, ts)
+                                                            customInput.text = ""
+                                                            entry.picking = false
+                                                            input.forceActiveFocus()
+                                                        } else {
+                                                            customBox.bad = true
+                                                        }
+                                                    } else if (e.key === Qt.Key_Escape) {
+                                                        e.accepted = true
+                                                        entry.picking = false
+                                                        input.forceActiveFocus()
+                                                    }
+                                                }
+
+                                                Text {
+                                                    visible: customInput.text === ""
+                                                    anchors.verticalCenter: parent.verticalCenter
+                                                    text: "e.g. 15m · 20:10 · 9am · 2:30pm · fri 14:30"
+                                                    font.pixelSize: root.fpx(11)
+                                                    color: Theme.textDim
+                                                    opacity: 0.7
+                                                }
                                             }
                                         }
                                     }
                                 }
 
-                                Item {
-                                    id: bellBtn
-                                    width: root.px(24)
-                                    height: width
-                                    anchors.right: delBtn.left
-                                    anchors.rightMargin: root.px(0)
-                                    anchors.top: parent.top
-                                    anchors.topMargin: root.px(12)
-
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: "⏰"
-                                        font.pixelSize: root.fpx(12)
-                                        color: Theme.textDim
-                                        opacity: (entry.remindAt > 0 && !entry.notified) || entry.picking ? 1
-                                                 : (hoverArea.containsMouse || bellArea.containsMouse) ? 0.9
-                                                 : 0.4
-                                        Behavior on opacity { NumberAnimation { duration: 120 } }
-                                    }
-
-                                    MouseArea {
-                                        id: bellArea
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        onClicked: {
-                                            entry.picking = !entry.picking
-                                            if (entry.picking)
-                                                Qt.callLater(function () { customInput.forceActiveFocus() })
-                                        }
-                                    }
-                                }
-
-                                Item {
-                                    id: delBtn
-                                    width: root.px(24)
-                                    height: width
+                                // Right-hand button stack, top to bottom:
+                                //   ✕ delete
+                                //   ⏰ reminder   (hidden while the note is collapsed)
+                                //   ▾/▸ collapse / expand
+                                Column {
+                                    id: btnCol
                                     anchors.right: parent.right
                                     anchors.rightMargin: root.px(10)
                                     anchors.top: parent.top
-                                    anchors.topMargin: root.px(12)
+                                    anchors.topMargin: root.px(8)
+                                    spacing: 0
+                                    Item {
+                                        id: collapseBtn
+                                        width: root.px(22)
+                                        height: width
 
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: "✕"
-                                        font.pixelSize: root.fpx(12)
-                                        color: delArea.containsMouse ? Theme.danger : Theme.textDim
-                                        opacity: (hoverArea.containsMouse || delArea.containsMouse) ? 1 : 0.4
-                                        Behavior on opacity { NumberAnimation { duration: 120 } }
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: entry.collapsed ? "⌵" : "⌃"
+                                            font.pixelSize: root.fpx(12)
+                                            color: collapseArea.containsMouse ? Theme.accent : Theme.textDim
+                                            opacity: (hoverArea.containsMouse || collapseArea.containsMouse) ? 1 : 0.4
+                                            Behavior on opacity { NumberAnimation { duration: 120 } }
+                                        }
+
+                                        MouseArea {
+                                            id: collapseArea
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            onClicked: root.toggleCollapsed(entry.index)
+                                        }
                                     }
+                                    Item {
+                                        id: bellBtn
+                                        width: root.px(22)
+                                        height: width
+                                        visible: !entry.collapsed
 
-                                    MouseArea {
-                                        id: delArea
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        onClicked: root.removeTodo(entry.index)
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: "󰂚"
+                                            font.pixelSize: root.fpx(12)
+                                            color: Theme.textDim
+                                            opacity: (entry.remindAt > 0 && !entry.notified) || entry.picking ? 1
+                                                     : (hoverArea.containsMouse || bellArea.containsMouse) ? 0.9
+                                                     : 0.4
+                                            Behavior on opacity { NumberAnimation { duration: 120 } }
+                                        }
+
+                                        MouseArea {
+                                            id: bellArea
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            onClicked: {
+                                                entry.picking = !entry.picking
+                                                if (entry.picking)
+                                                    Qt.callLater(function () { customInput.forceActiveFocus() })
+                                            }
+                                        }
+                                    }
+                                    Item {
+                                        id: delBtn
+                                        width: root.px(22)
+                                        height: width
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: "✕"
+                                            font.pixelSize: root.fpx(12)
+                                            color: delArea.containsMouse ? Theme.danger : Theme.textDim
+                                            opacity: (hoverArea.containsMouse || delArea.containsMouse) ? 1 : 0.4
+                                            Behavior on opacity { NumberAnimation { duration: 120 } }
+                                        }
+
+                                        MouseArea {
+                                            id: delArea
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            onClicked: root.removeTodo(entry.index)
+                                        }
                                     }
                                 }
-
                                 // Right-click + drag: reorder this note.
                                 // Last child = topmost; only reacts to the right button,
-                                // so left-clicks still reach the checkbox, text, bell and ✕.
+                                // so left-clicks still reach the checkbox, text, buttons.
                                 MouseArea {
                                     id: reorderArea
                                     anchors.fill: parent

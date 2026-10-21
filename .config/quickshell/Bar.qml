@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Effects
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
@@ -123,6 +124,57 @@ Scope {
         return alongBar ? effGap : 0;
     }
 
+    // ───────────────────────── App icon resolution ─────────────────────────
+    // Resolves an icon for ANY window (rofi, Steam, Electron apps, XWayland
+    // classes, Flatpaks, reverse-DNS app ids, absolute icon paths, ...).
+    // Tries many candidates and returns the first that actually exists.
+    function iconFor(appId) {
+        const id = appId ?? "";
+        const low = id.toLowerCase();
+        const cands = [];
+        const add = c => { if (c && c !== "" && cands.indexOf(c) < 0) cands.push(c); };
+
+        // 1) desktop entry (matches StartupWMClass, id, name, ...)
+        let entry = null;
+        try {
+            entry = DesktopEntries.heuristicLookup(id)
+                 ?? DesktopEntries.heuristicLookup(low)
+                 ?? DesktopEntries.byId(id)
+                 ?? DesktopEntries.byId(low);
+        } catch (e) { entry = null; }
+        if (entry) {
+            add(entry.icon);
+            add(entry.id);
+            add((entry.id ?? "").toLowerCase());
+        }
+
+        // 2) the app id itself, in several spellings
+        add(id);
+        add(low);
+        add(low.replace(/\s+/g, "-"));
+        add(low.replace(/[._\s]+/g, "-"));
+        const parts = low.split(".");
+        if (parts.length > 1) {
+            add(parts[parts.length - 1]);          // org.gnome.Nautilus → nautilus
+            add(parts.slice(-2).join("-"));
+        }
+        const dash = low.split("-");
+        if (dash.length > 1) add(dash[0]);         // google-chrome-stable → google
+
+        // 3) first candidate that resolves wins
+        for (const c of cands) {
+            if (c.startsWith("/")) return "file://" + c;      // absolute path in .desktop
+            if (c.startsWith("file://") || c.startsWith("image://")) return c;
+            const p = Quickshell.iconPath(c, true);            // true → "" when missing
+            if (p !== "") return p;
+        }
+
+        // 4) generic fallbacks
+        return Quickshell.iconPath("application-x-executable", true)
+            || Quickshell.iconPath("application-default-icon", true)
+            || Quickshell.iconPath("image-missing");
+    }
+
     // ───────────────────────── Clock formatting ─────────────────────────
     function clockText(d) {
         const h24 = d.getHours();
@@ -130,25 +182,25 @@ Scope {
         const mm = String(d.getMinutes()).padStart(2, "0");
         const ss = String(d.getSeconds()).padStart(2, "0");
         if (cfg.clock24)
-        return (cfg.clockSeconds
-        ? String(h24).padStart(2, "0") + ":" + mm + ":" + ss
-        : String(h24).padStart(2, "0") + ":" + mm);
+            return (cfg.clockSeconds
+                ? String(h24).padStart(2, "0") + ":" + mm + ":" + ss
+                : String(h24).padStart(2, "0") + ":" + mm);
         const suffix = h24 >= 12 ? "PM" : "AM";
         return cfg.clockSeconds
-        ? h12 + ":" + mm + ":" + ss + " " + suffix
-        : h12 + ":" + mm + " " + suffix;
+            ? h12 + ":" + mm + ":" + ss + " " + suffix
+            : h12 + ":" + mm + " " + suffix;
     }
     function clockVText(d) {
         const h24 = d.getHours();
         const h = cfg.clock24
-        ? String(h24).padStart(2, "0")
-        : String(h24 % 12 || 12);
+            ? String(h24).padStart(2, "0")
+            : String(h24 % 12 || 12);
         const mm = String(d.getMinutes()).padStart(2, "0");
         const parts = [h, mm];
         if (cfg.clockSeconds)
-        parts.push(String(d.getSeconds()).padStart(2, "0"));
+            parts.push(String(d.getSeconds()).padStart(2, "0"));
         if (!cfg.clock24)
-        parts.push(h24 >= 12 ? "PM" : "AM");
+            parts.push(h24 >= 12 ? "PM" : "AM");
         return parts.join("\n");
     }
 
@@ -223,7 +275,7 @@ Scope {
     function modVisible(id) {
         if (!isOn(id)) return false;
         switch (id) {
-        case "stats":   return !vertical || cfg.statsMode === "compact";   // compact fits vertical bars
+        case "stats":   return true;   // icon-sized, fits any bar orientation
         case "media":   return Marquee.player !== null && Marquee.title !== "";
         case "battery": return battery !== null;
         default:        return true;
@@ -464,7 +516,7 @@ Scope {
 
                 Rectangle {
                     anchors.fill: parent
-                    radius: 6
+                    radius: Math.min(cfg.radius, height / 2)
                     color: root.bgColor
                     border.width: 1
                     border.color: root.borderColor
@@ -770,30 +822,78 @@ Scope {
         }
     }
 
-    // CPU / RAM — "default": `CPU 12%`   "compact": small icon + `12%`
+    // CPU / RAM — rounded badges, value only (no %)
+    //   "compact": round badge, same size as the app icons, number only
+    //   "default": capsule with label + number ("CPU 12" / stacked on vertical bars)
     Component {
         id: statsC
         Lane {
+            gap: 2
             Repeater {
                 model: ["CPU", "RAM"]
-                delegate: Mod {
+                delegate: Interactive {
+                    id: stat
                     required property string modelData
                     readonly property bool isCpu: modelData === "CPU"
                     readonly property bool compact: cfg.statsMode === "compact"
                     readonly property int val: isCpu ? root.cpuUsage : root.memPercent
+                    readonly property color fg: warning ? Theme.danger : Theme.text
+                    readonly property int fontPx: Math.round(root.sz.taskIcon * 0.5)
 
-                    baseSize: root.sz.stat
-                    glyphSize: root.sz.stat + 2
-                    glyph: compact ? (isCpu ? "\uDB81\uDE1A" : "\uDB80\uDF5B") : ""
-                    text: compact ? val + "%" : modelData + " " + val + "%"
-                    spacing: compact ? 4 : root.sizeIconGap
-                    padX: compact ? Math.max(0, cfg.modPad - 8) : cfg.modPad
+                    Layout.alignment: Qt.AlignCenter
+                    implicitWidth: root.vertical ? root.panelThick : badge.width + 8
+                    implicitHeight: root.vertical ? badge.height + 8
+                                                  : Math.max(root.panelThick - 2, badge.height + 6)
 
                     interactive: false
                     warning: val >= cfg.statsWarn
                     tip: isCpu ? "CPU usage: " + val + "%"
                                : "Memory: " + root.memUsedG.toFixed(1) + " / " + root.memTotalG.toFixed(1)
                                  + " GiB (" + val + "%)"
+
+                    Rectangle {
+                        id: badge
+                        anchors.centerIn: parent
+                        // compact: circle the size of an app icon
+                        // default: capsule sized to its label + number
+                        width: stat.compact ? root.sz.taskIcon
+                             : root.vertical ? root.sz.taskIcon + 6
+                             : statRow.implicitWidth + 14
+                        height: stat.compact ? root.sz.taskIcon
+                              : root.vertical ? statRow.implicitHeight + 10
+                              : root.sz.taskIcon
+                        radius: Math.min(width, height) / 2
+                        color: Qt.alpha(stat.fg, 0.045)
+                        border.width: 1
+                        border.color: Qt.alpha(stat.fg, 0.18)
+
+                        GridLayout {
+                            id: statRow
+                            anchors.centerIn: parent
+                            flow: root.vertical ? GridLayout.TopToBottom : GridLayout.LeftToRight
+                            rowSpacing: 0
+                            columnSpacing: 4
+
+                            Text {
+                                visible: !stat.compact
+                                Layout.alignment: Qt.AlignCenter
+                                text: stat.modelData
+                                color: Qt.alpha(stat.fg, 0.75)
+                                font.family: Theme.iconFont
+                                font.pixelSize: stat.fontPx - 1
+                                renderType: Text.NativeRendering
+                            }
+                            Text {
+                                Layout.alignment: Qt.AlignCenter
+                                text: stat.val
+                                color: stat.fg
+                                font.family: Theme.iconFont
+                                font.bold: true
+                                font.pixelSize: stat.fontPx
+                                renderType: Text.NativeRendering
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -862,6 +962,8 @@ Scope {
             }
         }
     }
+
+    // Open apps — icons resolved by root.iconFor() so every app gets one
     Component {
         id: tasksC
         Lane {
@@ -871,7 +973,6 @@ Scope {
                 delegate: Interactive {
                     id: task
                     required property var modelData
-                    readonly property var entry: DesktopEntries.heuristicLookup(modelData.appId)
                     Layout.alignment: Qt.AlignCenter
                     implicitWidth: root.vertical ? root.panelThick : root.sz.taskIcon + 10
                     implicitHeight: root.vertical ? root.sz.taskIcon + 10
@@ -883,15 +984,23 @@ Scope {
                     onPrimary: modelData.activate()
                     onTertiary: modelData.close()
                     Image {
+                        id: appIcon
                         anchors.centerIn: parent
                         width: root.sz.taskIcon
                         height: root.sz.taskIcon
                         sourceSize: Qt.size(width, height)
                         asynchronous: true
                         smooth: true
+                        visible: false          // rendered through the tint effect below
+                        source: root.iconFor(task.modelData.appId)
+                    }
+                    // Flat monochrome icon in Theme.text (accent when the window is focused)
+                    MultiEffect {
+                        anchors.fill: appIcon
+                        source: appIcon
+                        colorization: 1.0
+                        colorizationColor: task.modelData.activated ? Theme.accent : Theme.text
                         opacity: task.modelData.activated ? 1 : 0.75
-                        source: Quickshell.iconPath(task.entry?.icon ?? task.modelData.appId.toLowerCase(),
-                                                    "application-x-executable")
                     }
                 }
             }
@@ -1043,9 +1152,9 @@ Scope {
                             onPrimary: {
                                 clockPanel.monthOffset = 0;
                                 clockPanel.calOpen = !clockPanel.calOpen;
-                                }
-                                onSecondary: root.run("qs ipc call settings bar")
-                                onTertiary: root.run("qs ipc call settings toggle")
+                            }
+                            onSecondary: root.run("qs ipc call settings bar")
+                            onTertiary: root.run("qs ipc call settings toggle")
                         }
                     }
                     LazyLoader {

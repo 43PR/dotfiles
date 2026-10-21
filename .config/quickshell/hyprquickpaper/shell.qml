@@ -70,7 +70,7 @@ PanelWindow {
         id: folderModel
         folder: "file://" + main.wallpaperPath
         showDirs: false
-        nameFilters: ["*.png", "*.jpg", "*.jpeg", "*.webp"]
+        nameFilters: ["*.png", "*.jpg", "*.jpeg", "*.webp", "*.gif"]
         sortField: FolderListModel.Name
     }
 
@@ -193,6 +193,7 @@ PanelWindow {
             height: list.tileHeight
 
             property bool active: index === list.selectedIndex
+            readonly property bool isGif: fileName.toLowerCase().endsWith(".gif")
             readonly property real baseWidth: list.tileWidth
             readonly property real baseCenterX: x - list.contentX + baseWidth / 2
             readonly property real distance: Math.abs(baseCenterX - list.viewportCenterX)
@@ -266,6 +267,22 @@ PanelWindow {
                     onStatusChanged: {
                         if (status === Image.Error) { alt.text = "Caching"; retryTimer.start() }
                     }
+                }
+                AnimatedImage {                        
+                    id: gifImage
+                    anchors.fill: parent
+                    z: 5
+                    // only load/play the real GIF for the selected tile
+                    source: (delegateItem.isGif && delegateItem.active)
+                    ? "file://" + filePath : ""
+                    visible: status === AnimatedImage.Ready
+                    playing: visible
+                    fillMode: Image.PreserveAspectCrop
+                    asynchronous: true
+                    cache: false
+                    smooth: true
+                    opacity: 0.95
+                    transform: Shear { xFactor: main.skewFactor }
                 }
 
                 Rectangle {
