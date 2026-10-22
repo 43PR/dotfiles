@@ -57,7 +57,7 @@ Item {
         { id: "wallpapers",    label: "WALLPAPERS PICKER",           def: "W" },
         { id: "record",        label: "TOGGLE SCREEN RECORDING",     def: "R" },
         { id: "notifications", label: "NOTIFICATIONS",               def: "N" },
-        { id: "theme",         label: "TOGGLE DARK/LIGHT MODE",      def: "." },
+        { id: "theme",         label: "TOGGLE DARK/LIGHT MODE",      def: "period" },
         { id: "bar",           label: "TOGGLE BAR",                  def: "SHIFT + W" },
         { id: "layout",        label: "KB LAYOUT",                   def: "X" },
         // noSuper: bound as-is in keybinds.lua, SUPER is not prepended
@@ -84,8 +84,8 @@ Item {
 
     function chordOf(d) {
         if (d.chord) return d.chord
-        if (d.noSuper) return keyOf(d.id).toUpperCase()
-        return "SUPER + " + keyOf(d.id)
+        if (d.noSuper) return prettyKey(d.id).toUpperCase()
+        return "SUPER + " + prettyKey(d.id)
     }
 
     readonly property var shownBinds: {
@@ -108,6 +108,18 @@ Item {
 
     function keyOf(id) {
         return bindKeys[id] || bindDefs.find(d => d.id === id)?.def || "?"
+    }
+
+    // keyOf() returns what is written to binds.lua (an xkb keysym name);
+    // prettyKey() returns what the UI shows (the symbol on the keycap).
+    readonly property var keySymbols: ({
+        period: ".", comma: ",", slash: "/", minus: "-", equal: "=",
+        semicolon: ";", apostrophe: "'", bracketleft: "[", bracketright: "]",
+        backslash: "\\", GRAVE: "`"
+    })
+
+    function prettyKey(id) {
+        return keyOf(id).split(" + ").map(p => keySymbols[p] || p).join(" + ")
     }
 
     function luaName(id) { return "kb_" + id }
@@ -442,8 +454,8 @@ Item {
                       : (page.editingId === row.bindId
                          ? "PRESS A KEY"
                          : (row.noSuper
-                            ? page.keyOf(row.bindId).toUpperCase()
-                            : "SUPER + " + page.keyOf(row.bindId)))
+                            ? page.prettyKey(row.bindId).toUpperCase()
+                            : "SUPER + " + page.prettyKey(row.bindId)))
                 color: page.editingId === row.bindId
                        ? Theme.accent : Theme.text
                 font.family: Theme.fontFamily

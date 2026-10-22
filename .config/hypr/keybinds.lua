@@ -64,38 +64,107 @@ do
     end
 end
 
+-- Symbols are not valid Hyprland key names, so map them to their xkb keysym
+-- names. The settings GUI can emit them (e.g. "." for the theme bind), and an
+-- unparsable key string otherwise aborts the rest of this file.
+local keysym_names = {
+    ["."] = "period",
+    [","] = "comma",
+    ["/"] = "slash",
+    ["-"] = "minus",
+    ["="] = "equal",
+    [";"] = "semicolon",
+    ["'"] = "apostrophe",
+    ["`"] = "GRAVE",
+    ["["] = "bracketleft",
+    ["]"] = "bracketright",
+    ["\\"] = "backslash",
+}
+
+local function normalize_key(value)
+    local text = tostring(value or "")
+    local whole = text:match("^%s*(.-)%s*$")
+    if keysym_names[whole] then
+        return keysym_names[whole]
+    end
+
+    local parts = {}
+    for token in text:gmatch("[^+]+") do
+        local trimmed = token:match("^%s*(.-)%s*$")
+        if trimmed ~= "" then
+            parts[#parts + 1] = keysym_names[trimmed] or trimmed
+        end
+    end
+    if #parts == 0 then
+        return whole
+    end
+    return table.concat(parts, " + ")
+end
+
+terminal_key      = normalize_key(terminal_key)
+launcher_key      = normalize_key(launcher_key)
+wheel_key         = normalize_key(wheel_key)
+files_key         = normalize_key(files_key)
+browser_key       = normalize_key(browser_key)
+close_key         = normalize_key(close_key)
+lock_key          = normalize_key(lock_key)
+power_key         = normalize_key(power_key)
+settings_key      = normalize_key(settings_key)
+wallpapers_key    = normalize_key(wallpapers_key)
+colorpicker_key   = normalize_key(colorpicker_key)
+fullscreen_key    = normalize_key(fullscreen_key)
+opacity_key       = normalize_key(opacity_key)
+theme_key         = normalize_key(theme_key)
+notifications_key = normalize_key(notifications_key)
+todo_key          = normalize_key(todo_key)
+bar_key           = normalize_key(bar_key)
+clipboard_key     = normalize_key(clipboard_key)
+layout_key        = normalize_key(layout_key)
+float_key         = normalize_key(float_key)
+record_key        = normalize_key(record_key)
+shot_key          = normalize_key(shot_key)
+shot_area_key     = normalize_key(shot_area_key)
+
+-- A single bad key string must not take the rest of the config down with it.
+local function bind(keys, ...)
+    local ok, err = pcall(hl.bind, keys, ...)
+    if not ok then
+        print("keybinds.lua: skipped bind '" .. tostring(keys) .. "': " .. tostring(err))
+    end
+end
+
 local home = os.getenv("HOME")
 local menu = "rofi -show drun"
 
-hl.bind(mainMod .. " + " .. terminal_key,      hl.dsp.exec_cmd(terminal))
-hl.bind(mainMod .. " + " .. launcher_key,      hl.dsp.exec_cmd("pgrep -x rofi >/dev/null && pkill -x rofi || " .. menu))
-hl.bind(mainMod .. " + " .. wheel_key,         hl.dsp.exec_cmd("qs ipc call wheel toggle"))
-hl.bind(mainMod .. " + " .. files_key,         hl.dsp.exec_cmd(fileManager))
-hl.bind(mainMod .. " + " .. browser_key,       hl.dsp.exec_cmd(browser))
-hl.bind(mainMod .. " + " .. close_key,         hl.dsp.window.close())
-hl.bind(mainMod .. " + " .. lock_key,          hl.dsp.exec_cmd("hyprlock"))
-hl.bind(mainMod .. " + " .. power_key,         hl.dsp.exec_cmd("qs ipc call powermenu toggle"))
-hl.bind(mainMod .. " + " .. settings_key,      hl.dsp.exec_cmd("qs ipc call settings toggle"))
-hl.bind(mainMod .. " + " .. wallpapers_key,    hl.dsp.exec_cmd("qs -n -p ~/.config/quickshell/hyprquickpaper"))
-hl.bind(mainMod .. " + " .. colorpicker_key,   hl.dsp.exec_cmd("qs -n -p ~/.config/quickshell/colorpicker"))
-hl.bind(mainMod .. " + " .. fullscreen_key,    hl.dsp.window.fullscreen({ mode = 0 }))
-hl.bind(mainMod .. " + " .. opacity_key,       hl.dsp.exec_cmd(home .. "/.config/hypr/scripts/opacity.sh"))
-hl.bind(mainMod .. " + " .. theme_key,         hl.dsp.exec_cmd("python3 " .. home .. "/.config/43pr/bin/theme.py toggle"))
-hl.bind(mainMod .. " + " .. notifications_key, hl.dsp.exec_cmd("qs ipc call notifications toggle"))
-hl.bind(mainMod .. " + " .. todo_key,          hl.dsp.exec_cmd("qs ipc call todo toggle"))
+bind(mainMod .. " + " .. terminal_key,      hl.dsp.exec_cmd(terminal))
+bind(mainMod .. " + " .. launcher_key,      hl.dsp.exec_cmd("pgrep -x rofi >/dev/null && pkill -x rofi || " .. menu))
+bind(mainMod .. " + " .. wheel_key,         hl.dsp.exec_cmd("qs ipc call wheel toggle"))
+bind(mainMod .. " + " .. files_key,         hl.dsp.exec_cmd(fileManager))
+bind(mainMod .. " + " .. browser_key,       hl.dsp.exec_cmd(browser))
+bind(mainMod .. " + " .. close_key,         hl.dsp.window.close())
+bind(mainMod .. " + " .. lock_key,          hl.dsp.exec_cmd("hyprlock"))
+bind(mainMod .. " + " .. power_key,         hl.dsp.exec_cmd("qs ipc call powermenu toggle"))
+bind(mainMod .. " + " .. settings_key,      hl.dsp.exec_cmd("qs ipc call settings toggle"))
+bind(mainMod .. " + " .. wallpapers_key,    hl.dsp.exec_cmd("qs -n -p ~/.config/quickshell/hyprquickpaper"))
+bind(mainMod .. " + " .. colorpicker_key,   hl.dsp.exec_cmd("qs -n -p ~/.config/quickshell/colorpicker"))
+bind(mainMod .. " + " .. fullscreen_key,    hl.dsp.window.fullscreen({ mode = 0 }))
+bind(mainMod .. " + " .. opacity_key,       hl.dsp.exec_cmd(home .. "/.config/hypr/scripts/opacity.sh"))
+bind(mainMod .. " + " .. theme_key,         hl.dsp.exec_cmd("python3 " .. home .. "/.config/43pr/bin/theme.py toggle"))
+bind(mainMod .. " + " .. notifications_key, hl.dsp.exec_cmd("qs ipc call notifications toggle"))
+bind(mainMod .. " + " .. todo_key,          hl.dsp.exec_cmd("qs ipc call todo toggle"))
 
-hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
-hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
+bind(mainMod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
+bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 
-hl.bind(mainMod .. " + " .. bar_key, hl.dsp.exec_cmd("qs ipc call bar toggle"))
-hl.bind(mainMod .. " + " .. clipboard_key, hl.dsp.exec_cmd("pgrep -x rofi >/dev/null && pkill -x rofi || cliphist list | rofi -dmenu -p '' | cliphist decode | wl-copy"))
+bind(mainMod .. " + " .. bar_key, hl.dsp.exec_cmd("qs ipc call bar toggle"))
+bind(mainMod .. " + " .. clipboard_key, hl.dsp.exec_cmd("pgrep -x rofi >/dev/null && pkill -x rofi || cliphist list | rofi -dmenu -p '' | cliphist decode | wl-copy"))
 
-hl.bind(shot_key, hl.dsp.exec_cmd("sh -c 'file=" .. home .. "/Pictures/$(date +%s).png; grim \"$file\"; wl-copy < \"$file\"; qs ipc call screenshot notify \"$file\"'"))
-hl.bind(shot_area_key, hl.dsp.exec_cmd(home .. "/.config/hypr/scripts/screenshot-area.sh"))
+bind(shot_key, hl.dsp.exec_cmd("sh -c 'file=" .. home .. "/Pictures/$(date +%s).png; grim \"$file\"; wl-copy < \"$file\"; qs ipc call screenshot notify \"$file\"'"))
+bind(shot_area_key, hl.dsp.exec_cmd(home .. "/.config/hypr/scripts/screenshot-area.sh"))
 
-hl.bind(mainMod .. " + " .. layout_key, hl.dsp.exec_cmd("hyprctl switchxkblayout current next"))
+bind(mainMod .. " + " .. layout_key, hl.dsp.exec_cmd("hyprctl switchxkblayout current next"))
 
-hl.bind(mainMod .. " + " .. float_key, function()
+bind(mainMod .. " + " .. float_key, function()
     hl.dispatch(hl.dsp.window.float({ action = "toggle" }))
     local w = hl.get_active_window()
     if w ~= nil and w.floating then
@@ -113,7 +182,7 @@ hl.bind(mainMod .. " + " .. float_key, function()
     end
 end)
 
-hl.bind(mainMod .. " + " .. record_key, hl.dsp.exec_cmd([==[bash -c '
+bind(mainMod .. " + " .. record_key, hl.dsp.exec_cmd([==[bash -c '
 PIDFILE="${XDG_RUNTIME_DIR:-/tmp}/gsr.pid"
 if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
     kill -INT "$(cat "$PIDFILE")"
@@ -137,40 +206,40 @@ local function zoomfunction(value)
         hl.config({ cursor = { zoom_factor = zoomvalue + value } })
     end
 end
-hl.bind(mainMod .. " + mouse_down", function() zoomfunction(-0.5) end, { repeating = true })
-hl.bind(mainMod .. " + mouse_up", function() zoomfunction(0.5) end, { repeating = true })
-hl.bind(mainMod .. " + code:82", function() zoomfunction(-0.3) end, { repeating = true })
-hl.bind(mainMod .. " + code:86", function() zoomfunction(0.3) end, { repeating = true })
+bind(mainMod .. " + mouse_down", function() zoomfunction(-0.5) end, { repeating = true })
+bind(mainMod .. " + mouse_up", function() zoomfunction(0.5) end, { repeating = true })
+bind(mainMod .. " + code:82", function() zoomfunction(-0.3) end, { repeating = true })
+bind(mainMod .. " + code:86", function() zoomfunction(0.3) end, { repeating = true })
 
-hl.bind("XF86MonBrightnessUp", hl.dsp.exec_cmd("brightnessctl set 5%+"), { locked = true, repeating = true })
-hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("brightnessctl set 5%-"), { locked = true, repeating = true })
+bind("XF86MonBrightnessUp", hl.dsp.exec_cmd("brightnessctl set 5%+"), { locked = true, repeating = true })
+bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("brightnessctl set 5%-"), { locked = true, repeating = true })
 
 for i = 1, 10 do
     local key = i % 10
-    hl.bind(mainMod .. " + " .. key, hl.dsp.focus({ workspace = i }))
-    hl.bind(mainMod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = i }))
+    bind(mainMod .. " + " .. key, hl.dsp.focus({ workspace = i }))
+    bind(mainMod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = i }))
 end
 
-hl.bind(mainMod .. " + SHIFT + E", hl.dsp.exit())
+bind(mainMod .. " + SHIFT + E", hl.dsp.exit())
 
-hl.bind(mainMod .. " + H", hl.dsp.focus({ direction = "left" }))
-hl.bind(mainMod .. " + J", hl.dsp.focus({ direction = "down" }))
-hl.bind(mainMod .. " + K", hl.dsp.focus({ direction = "up" }))
-hl.bind(mainMod .. " + L", hl.dsp.focus({ direction = "right" }))
+bind(mainMod .. " + H", hl.dsp.focus({ direction = "left" }))
+bind(mainMod .. " + J", hl.dsp.focus({ direction = "down" }))
+bind(mainMod .. " + K", hl.dsp.focus({ direction = "up" }))
+bind(mainMod .. " + L", hl.dsp.focus({ direction = "right" }))
 
-hl.bind(mainMod .. " + SHIFT + H", hl.dsp.window.move({ direction = "left" }))
-hl.bind(mainMod .. " + SHIFT + J", hl.dsp.window.move({ direction = "down" }))
-hl.bind(mainMod .. " + SHIFT + K", hl.dsp.window.move({ direction = "up" }))
-hl.bind(mainMod .. " + SHIFT + L", hl.dsp.window.move({ direction = "right" }))
+bind(mainMod .. " + SHIFT + H", hl.dsp.window.move({ direction = "left" }))
+bind(mainMod .. " + SHIFT + J", hl.dsp.window.move({ direction = "down" }))
+bind(mainMod .. " + SHIFT + K", hl.dsp.window.move({ direction = "up" }))
+bind(mainMod .. " + SHIFT + L", hl.dsp.window.move({ direction = "right" }))
 
-hl.bind(mainMod .. " + CTRL + H", hl.dsp.window.resize({ x = -40, y = 0 }), { repeating = true })
-hl.bind(mainMod .. " + CTRL + L", hl.dsp.window.resize({ x = 40, y = 0 }), { repeating = true })
-hl.bind(mainMod .. " + CTRL + K", hl.dsp.window.resize({ x = 0, y = -40 }), { repeating = true })
-hl.bind(mainMod .. " + CTRL + J", hl.dsp.window.resize({ x = 0, y = 40 }), { repeating = true })
+bind(mainMod .. " + CTRL + H", hl.dsp.window.resize({ x = -40, y = 0 }), { repeating = true })
+bind(mainMod .. " + CTRL + L", hl.dsp.window.resize({ x = 40, y = 0 }), { repeating = true })
+bind(mainMod .. " + CTRL + K", hl.dsp.window.resize({ x = 0, y = -40 }), { repeating = true })
+bind(mainMod .. " + CTRL + J", hl.dsp.window.resize({ x = 0, y = 40 }), { repeating = true })
 
-hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+"), { locked = true, repeating = true })
-hl.bind("XF86AudioLowerVolume", hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"), { locked = true, repeating = true })
-hl.bind("XF86AudioMute", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"), { locked = true })
-hl.bind("XF86AudioPlay", hl.dsp.exec_cmd("playerctl play-pause"), { locked = true })
-hl.bind("XF86AudioNext", hl.dsp.exec_cmd("playerctl next"), { locked = true })
-hl.bind("XF86AudioPrev", hl.dsp.exec_cmd("playerctl previous"), { locked = true })
+bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+"), { locked = true, repeating = true })
+bind("XF86AudioLowerVolume", hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"), { locked = true, repeating = true })
+bind("XF86AudioMute", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"), { locked = true })
+bind("XF86AudioPlay", hl.dsp.exec_cmd("playerctl play-pause"), { locked = true })
+bind("XF86AudioNext", hl.dsp.exec_cmd("playerctl next"), { locked = true })
+bind("XF86AudioPrev", hl.dsp.exec_cmd("playerctl previous"), { locked = true })
