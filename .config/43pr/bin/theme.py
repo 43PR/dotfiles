@@ -26,6 +26,16 @@ STATE = STATE_DIR / "state.json"
 GTK_THEME_DARK = "auto"
 GTK_THEME_LIGHT = "Adwaita"
 
+# Generated folder-icon theme: a thin overlay on Papirus holding only recolored
+# folder icons (see generate_icons). theme.py switches icon-theme itself.
+# Two names, alternated on every run: GTK only reloads icons on a real name change.
+ICON_NAMES = ("43pr-icons-a", "43pr-icons-b")
+ICON_ROOT = Path(os.environ.get("XDG_DATA_HOME", HOME / ".local/share")) / "icons"
+ICON_BASE_DARK = "Papirus-Dark"
+ICON_BASE_LIGHT = "Papirus-Light"
+ICON_ACCENT_KEYS = ("accent", "primary", "gtk_accent")   # first key present in the palette wins
+GTK_RELOAD = HOME / ".config/hypr/scripts/gtk-reload.sh"
+
 HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
 NAME = re.compile(r"^[A-Za-z0-9._-]+$")
 TOKEN = re.compile(r"\{\{\s*([A-Za-z0-9_]+)((?:\s*\|\s*[a-z0-9]+(?:=[0-9a-fA-Fx.]+)?)*)\s*\}\}")
@@ -250,6 +260,147 @@ def from_wallpaper(path):
     return merged(json.loads(MATUGEN_OUT.read_text()))
 
 
+# ---------- folder icons + live GTK reload ----------
+
+HEX6 = re.compile(r"#[0-9a-fA-F]{6}\b")
+
+
+def _hex_hls(c):
+    h = c.lstrip("#")
+    r, g, b = (int(h[i:i + 2], 16) / 255 for i in (0, 2, 4))
+    return colorsys.rgb_to_hls(r, g, b)
+
+
+def _hls_hex(h, l, s):
+    r, g, b = colorsys.hls_to_rgb(h % 1.0, min(1.0, max(0.0, l)), min(1.0, max(0.0, s)))
+    return "#%02x%02x%02x" % (round(r * 255), round(g * 255), round(b * 255))
+
+
+def icon_base_dir(dark):
+    data = Path(os.environ.get("XDG_DATA_HOME", HOME / ".local/share"))
+    roots = [data / "icons", HOME / ".icons", Path("/usr/local/share/icons"), Path("/usr/share/icons")]
+    for name in (ICON_BASE_DARK if dark else ICON_BASE_LIGHT, "Papirus"):
+        for root in roots:
+            if (root / name / "index.theme").is_file():
+                return root / name
+    return None
+
+
+def gsettings_get(key):
+    if not shutil.which("gsettings"):
+        return ""
+    try:
+        r = subprocess.run(["gsettings", "get", "org.gnome.desktop.interface", key],
+                           stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=5)
+        return r.stdout.strip().strip("'")
+    except Exception:
+        return ""
+
+
+def set_icon_theme(name):
+    """Point gsettings and both settings.ini files at the freshly generated theme."""
+    for d in ("gtk-3.0", "gtk-4.0"):
+        try:
+            set_ini_key(CFG / d / "settings.ini", "gtk-icon-theme-name", name)
+        except Exception as e:
+            warn(f"could not update {d}/settings.ini: {e}")
+    if shutil.which("gsettings"):
+        try:
+            subprocess.run(["gsettings", "set", "org.gnome.desktop.interface", "icon-theme", name],
+                           stdin=subprocess.DEVNULL, capture_output=True, timeout=5)
+        except Exception as e:
+            warn(f"gsettings icon-theme failed: {e}")
+
+
+def generate_icons(pal, dark):
+    """Write the inactive ICON_NAMES theme: Papirus' folder-blue* icons recolored to the palette accent.
+    Hue is replaced, saturation/lightness are scaled relative to the icon's main
+    blue, so shading and the neutral highlights survive. The system theme is
+    only read, never modified."""
+    accent = next((pal[k] for k in ICON_ACCENT_KEYS if k in pal), None)
+    if not accent:
+        warn(f"no accent key found in palette (tried {ICON_ACCENT_KEYS}); folder icons unchanged")
+        return 0
+    base = icon_base_dir(dark)
+    if not base:
+        warn("Papirus icon theme not found; folder icons unchanged")
+        return 0
+    places = sorted(d for d in base.glob("*/places")
+                    if d.is_dir() and re.fullmatch(r"\d+x\d+", d.parent.name))
+    sources = {f: f.read_text() for d in places for f in d.glob("folder-blue*.svg")
+               if f.is_file() and not f.is_symlink()}
+    counts = {}
+    for text in sources.values():
+        for c in HEX6.findall(text):
+            counts[c.lower()] = counts.get(c.lower(), 0) + 1
+    sat = [(n, c) for c, n in counts.items() if _hex_hls(c)[2] > 0.3]
+    if not sat:
+        warn(f"no folder-blue*.svg with saturated colors under {base}; folder icons unchanged")
+        return 0
+    _, ref_l, ref_s = _hex_hls(max(sat)[1])      # the icon's main blue
+    ah, al, a_s = _hex_hls(accent)
+
+    def recolor(m):
+        h, l, s = _hex_hls(m.group(0))
+        w = min(1.0, s / ref_s)                  # 0 for greys/whites, 1 for the main blue
+        return _hls_hex(ah if s > 0.05 else h, l + (al - ref_l) * w, s * a_s / ref_s)
+
+    active = gsettings_get("icon-theme")          # write the one that is NOT in use
+    name = ICON_NAMES[1] if active == ICON_NAMES[0] else ICON_NAMES[0]
+    dest = ICON_ROOT / name
+    tmp = ICON_ROOT / (name + ".43pr-tmp")
+    shutil.rmtree(tmp, ignore_errors=True)
+    written, dirs = 0, []
+    for d in places:
+        rel = d.relative_to(base).as_posix()
+        out = tmp / rel
+        out.mkdir(parents=True)
+        for f in d.iterdir():
+            if not f.name.startswith("folder-blue") and not f.is_symlink():
+                continue
+            if f.is_symlink():                    # folder.svg -> folder-blue.svg etc.
+                target = os.readlink(f)
+                if "/" not in target and target.startswith("folder-blue"):
+                    os.symlink(target, out / f.name)
+                    written += 1
+            elif f.name in {p.name for p in sources if p.parent == d}:
+                (out / f.name).write_text(HEX6.sub(recolor, sources[f]))
+                written += 1
+        dirs.append(rel)
+    index = ["[Icon Theme]", f"Name={name}", "Comment=Generated by 43pr theme.py",
+             f"Inherits={base.name}", "Directories=" + ",".join(dirs), ""]
+    for rel in dirs:
+        index += [f"[{rel}]", f"Size={rel.split('x')[0]}", "Context=Places", "Type=Fixed", ""]
+    (tmp / "index.theme").write_text("\n".join(index))
+    shutil.rmtree(dest, ignore_errors=True)
+    os.replace(tmp, dest)
+    if shutil.which("gtk-update-icon-cache"):
+        subprocess.run(["gtk-update-icon-cache", "-q", "-f", "-t", str(dest)],
+                       stdin=subprocess.DEVNULL, capture_output=True, timeout=30)
+    set_icon_theme(name)
+    return written
+
+
+def reload_gtk(dark=None):
+    """Make running GTK apps (Thunar...) re-read CSS and icons. Never raises.
+
+    Must be called AFTER all gsettings/settings.ini syncing is finished, and the
+    intended gtk-theme is passed to the script explicitly so it never has to
+    guess it from (possibly half-toggled) live state."""
+    if not GTK_RELOAD.is_file():
+        return
+    cmd = ["bash", str(GTK_RELOAD)]
+    if dark is None:
+        dark = load_state().get("mode_appearance", "dark") == "dark"
+    theme = resolve_gtk_theme(dark)
+    if theme:
+        cmd.append(theme)
+    try:
+        subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, timeout=15)
+    except Exception as e:
+        warn(f"gtk reload failed: {e}")
+
+
 # ---------- rendering ----------
 
 def render(text, pal, where):
@@ -285,6 +436,8 @@ def render(text, pal, where):
 
 
 def apply_palette(pal):
+    """Render templates, regenerate icons, run reload hooks.
+    NOTE: does not reload GTK; callers do that once, after GTK sync (reload_gtk)."""
     targets = load_toml(TARGETS) if TARGETS.exists() else {}
     CACHE.mkdir(parents=True, exist_ok=True)
     stage = Path(tempfile.mkdtemp(prefix=".stage-", dir=CACHE))
@@ -307,6 +460,10 @@ def apply_palette(pal):
         atomic_write(PALETTE, json.dumps(pal, indent=2))
     finally:
         shutil.rmtree(stage, ignore_errors=True)
+    try:                                           # folder icons follow the accent
+        generate_icons(pal, palette_appearance(pal) == "dark")
+    except Exception as e:
+        warn(f"icon theme generation failed: {e}")
     for h in hooks:                                # 3. reload consumers last
         try:
             r = subprocess.run(h, stdin=subprocess.DEVNULL, capture_output=True, timeout=10)
@@ -361,6 +518,7 @@ def cmd_wallpaper(a):
             die(f"theme unchanged: {e}")
         st["wallpaper"] = str(p)
         save_state(st)
+        reload_gtk(st.get("mode_appearance", "dark") == "dark")   # after all GTK sync
     print("theme: applied from", "preset" if pinned else "wallpaper")
 
 
@@ -375,8 +533,9 @@ def cmd_preset(a):
             die(f"theme unchanged: {e}")
         st = load_state()
         st.update(mode="preset", preset="default" if a.name == "43pr-default" else a.name)
-        sync_appearance(st, pal, data.get("appearance"))   # light/dark GTK follows the preset
+        mode = sync_appearance(st, pal, data.get("appearance"))   # light/dark GTK follows the preset
         save_state(st)
+        reload_gtk(mode == "dark")                                # after all GTK sync
     print(f"theme: preset '{a.name}' applied")
 
 
@@ -398,7 +557,9 @@ def cmd_apply(a):
         try:
             pal = json.loads(PALETTE.read_text()) if PALETTE.exists() else preset_palette("default")
             apply_palette(merged(pal))
-            set_gtk_color_scheme(load_state().get("mode_appearance", "dark"))   # first run / install
+            mode = load_state().get("mode_appearance", "dark")
+            set_gtk_color_scheme(mode)   # first run / install
+            reload_gtk(mode == "dark")   # after all GTK sync
         except Exception as e:
             die(f"apply failed: {e}")
     print("theme: re-rendered")
@@ -413,8 +574,10 @@ def cmd_mode(a):
     set_gtk_color_scheme(a.value)             # sync GTK/libadwaita/portal color-scheme
     wp = st.get("wallpaper")
     if st.get("mode") == "wallpaper" and wp:
-        cmd_wallpaper(argparse.Namespace(path=wp))
+        cmd_wallpaper(argparse.Namespace(path=wp))   # reloads GTK itself
     else:
+        with lock():
+            reload_gtk(a.value == "dark")
         print(f"theme: mode set to {a.value} (no wallpaper active; will apply on next 'wallpaper' or 'auto')")
 
 
