@@ -1,4 +1,5 @@
 @import "colors.css";
+
 window,
 .background,
 headerbar,
@@ -22,15 +23,29 @@ treeview.view text {
 * {
     color: @gtk_fg;
 }
+
 toolbar,
 toolbar * {
     background-color: @gtk_bg;
     background-image: none;
 }
+
 menubar,
 menubar *,
 notebook,
 notebook * {
     background-color: @gtk_bg;
     background-image: none;
+}
+
+/* Original selection colors for xed text area and lists */
+textview text selection,
+textview selection,
+.view text selection,
+.view selection,
+textview text:selected,
+treeview.view:selected,
+treeview.view:selected:focus {
+    background-color: #6a6a6a;
+    color: #ffffff;
 }

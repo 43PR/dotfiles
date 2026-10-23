@@ -9,5 +9,5 @@ ShellRoot {
     PowerMenu {}
     Bar {}
     Todo {}
-    Wheel {}
+    QuickActions {}
 }

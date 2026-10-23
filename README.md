@@ -43,7 +43,7 @@ Not really. Almost everything is a keyboard shortcut, with mouse alternatives:
 
 - `Super + I` opens settings - middle-click the clock 
 
-The full list is in [Keybinds](#keybinds). You can also hover over bar elements to see what they do, and right-click the clock for bar settings.
+The full list is in [Keybinds](#keybinds). You can also hover over bar elements to see what they do
 
 ### What should I know before installing?
 
@@ -78,7 +78,7 @@ Just made some tweaks to it. Give it some love: [hyprquickpaper](https://github.
 
 ## Keybinds
 
-Right-click the clock to open bar settings. Hover over elements to see actions. To close components use Esc key or use the same keybind. 
+Middle click the clock to open settings. To close components use Esc key or use the same keybind. Hover over elements to see actions. 
 
 | Keybind                 | Action                    |
 | -----------             | ------------------------- |

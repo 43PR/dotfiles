@@ -510,7 +510,7 @@ Scope {
     // ---- always-on services (cheap) --------------------------------------
     // target stays "wheel" so existing keybinds (qs ipc call wheel toggle) keep working
     IpcHandler {
-        target: "wheel"
+        target: "qa"
         function toggle(): void { root.toggleMenu() }
         function show(): void { root.openMenu() }
         function hide(): void { root.closeMenu() }
@@ -572,7 +572,7 @@ Scope {
             color: "transparent"
             exclusionMode: ExclusionMode.Ignore
             WlrLayershell.layer: WlrLayer.Overlay
-            WlrLayershell.namespace: "wheel"
+            WlrLayershell.namespace: "qa"
             // Released while the settings window is open so that it can
             // take keyboard focus (Escape, etc.).
             WlrLayershell.keyboardFocus: (root.showing && !root.settingsOpen)
@@ -1001,7 +1001,7 @@ Scope {
             exclusionMode: ExclusionMode.Ignore
 
             WlrLayershell.layer: WlrLayer.Overlay
-            WlrLayershell.namespace: "wheel-settings"
+            WlrLayershell.namespace: "qa-settings"
             WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
 
             Rectangle {

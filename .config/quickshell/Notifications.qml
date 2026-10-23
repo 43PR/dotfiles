@@ -44,7 +44,9 @@ Scope {
 
     // an expanded group shows at most `groupLimit` entries at a time; the
     // mouse wheel (or the pager arrows) scrolls through the rest
+
     property int groupLimit: 3
+
     property var groupOffsets: ({})
     property bool animateRows: false
 
