@@ -128,52 +128,58 @@ Scope {
     // Resolves an icon for ANY window (rofi, Steam, Electron apps, XWayland
     // classes, Flatpaks, reverse-DNS app ids, absolute icon paths, ...).
     // Tries many candidates and returns the first that actually exists.
-    function iconFor(appId) {
-        const id = appId ?? "";
-        const low = id.toLowerCase();
-        const cands = [];
-        const add = c => { if (c && c !== "" && cands.indexOf(c) < 0) cands.push(c); };
+property var _iconLogged: ({})
+readonly property bool iconDebug: true
 
-        // 1) desktop entry (matches StartupWMClass, id, name, ...)
-        let entry = null;
-        try {
-            entry = DesktopEntries.heuristicLookup(id)
-                 ?? DesktopEntries.heuristicLookup(low)
-                 ?? DesktopEntries.byId(id)
-                 ?? DesktopEntries.byId(low);
-        } catch (e) { entry = null; }
-        if (entry) {
-            add(entry.icon);
-            add(entry.id);
-            add((entry.id ?? "").toLowerCase());
-        }
+function iconFor(appId) {
+    const id = appId ?? "";
+    const low = id.toLowerCase();
+    const cands = [];
+    const add = c => { if (c && c !== "" && cands.indexOf(c) < 0) cands.push(c); };
+    const log = iconDebug && !_iconLogged[id];
+    if (log) _iconLogged[id] = true;
 
-        // 2) the app id itself, in several spellings
-        add(id);
-        add(low);
-        add(low.replace(/\s+/g, "-"));
-        add(low.replace(/[._\s]+/g, "-"));
-        const parts = low.split(".");
-        if (parts.length > 1) {
-            add(parts[parts.length - 1]);          // org.gnome.Nautilus → nautilus
-            add(parts.slice(-2).join("-"));
-        }
-        const dash = low.split("-");
-        if (dash.length > 1) add(dash[0]);         // google-chrome-stable → google
-
-        // 3) first candidate that resolves wins
-        for (const c of cands) {
-            if (c.startsWith("/")) return "file://" + c;      // absolute path in .desktop
-            if (c.startsWith("file://") || c.startsWith("image://")) return c;
-            const p = Quickshell.iconPath(c, true);            // true → "" when missing
-            if (p !== "") return p;
-        }
-
-        // 4) generic fallbacks
-        return Quickshell.iconPath("application-x-executable", true)
-            || Quickshell.iconPath("application-default-icon", true)
-            || Quickshell.iconPath("image-missing");
+    let entry = null;
+    try {
+        entry = DesktopEntries.heuristicLookup(id)
+             ?? DesktopEntries.heuristicLookup(low)
+             ?? DesktopEntries.byId(id)
+             ?? DesktopEntries.byId(low);
+    } catch (e) { entry = null; if (log) console.log("[icon] lookup threw for", id, e); }
+    if (log) console.log("[icon] appId='" + id + "' entry=" + (entry ? (entry.id + " icon='" + entry.icon + "'") : "NONE")
+                         + " totalEntries=" + DesktopEntries.applications.values.length);
+    if (entry) {
+        add(entry.icon);
+        add(entry.id);
+        add((entry.id ?? "").toLowerCase());
     }
+
+    add(id);
+    add(low);
+    add(low.replace(/\s+/g, "-"));
+    add(low.replace(/[._\s]+/g, "-"));
+    const parts = low.split(".");
+    if (parts.length > 1) {
+        add(parts[parts.length - 1]);
+        add(parts.slice(-2).join("-"));
+    }
+    const dash = low.split("-");
+    if (dash.length > 1) add(dash[0]);
+
+    for (const c of cands) {
+        let r = "";
+        if (c.startsWith("/")) r = "file://" + c;
+        else if (c.startsWith("file://") || c.startsWith("image://")) r = c;
+        else r = Quickshell.iconPath(c, true);
+        if (log) console.log("[icon]   candidate '" + c + "' ->", r === "" ? "(missing)" : r);
+        if (r !== "") { if (log) console.log("[icon]   => using", r); return r; }
+    }
+
+    if (log) console.log("[icon]   => FALLBACK for", id);
+    return Quickshell.iconPath("application-x-executable", true)
+        || Quickshell.iconPath("application-default-icon", true)
+        || Quickshell.iconPath("image-missing");
+}
 
     // ───────────────────────── Clock formatting ─────────────────────────
     function clockText(d) {
@@ -993,6 +999,10 @@ Scope {
                         smooth: true
                         visible: false          // rendered through the tint effect below
                         source: root.iconFor(task.modelData.appId)
+                        onStatusChanged: if (root.iconDebug)
+                        console.log("[icon] image status", task.modelData.appId, "=>",
+                        status === Image.Ready ? "Ready" : status === Image.Loading ? "Loading"
+                        : status === Image.Error ? "ERROR" : "Null", "src:", source)
                     }
                     // Flat monochrome icon in Theme.text (accent when the window is focused)
                     MultiEffect {
