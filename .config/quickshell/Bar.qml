@@ -945,8 +945,7 @@ function iconFor(appId) {
                             onPressed: { dotTip.suppressed = true; dotTip.shown = false; }
                             onClicked: mouse => {
                                 if (mouse.button === Qt.RightButton) root.openSettings();
-                                else dot.modelData.activate();
-                            }
+                                else Hyprland.dispatch("hl.dsp.focus({ workspace = " + dot.modelData.id + " })");                            }
                         }
 
                         Tip {
