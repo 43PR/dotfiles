@@ -32,6 +32,7 @@ xdg-utils
 # --------------------------------------------------
 
 awww
+mpvpaper
 grim
 slurp
 gpu-screen-recorder
@@ -86,7 +87,6 @@ thunar-volman
 thunar-archive-plugin
 gvfs
 tumbler
-ffmpegthumbnailer
 xed
 ncdu
 zenity
@@ -107,10 +107,12 @@ papirus-folders
 nwg-look
 
 # --------------------------------------------------
-# Media
+# Media / Video Tools
 # --------------------------------------------------
 
 mpv
+ffmpeg
+ffmpegthumbnailer
 
 # --------------------------------------------------
 # System Monitoring / Hardware

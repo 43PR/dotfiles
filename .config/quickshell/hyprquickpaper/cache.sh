@@ -28,7 +28,11 @@ find "$wallpaper_path" -type f \( \
     -iname "*.jpeg" -o \
     -iname "*.png" -o \
     -iname "*.webp" -o \
-    -iname "*.gif" \
+    -iname "*.gif" -o \
+    -iname "*.mp4" -o \
+    -iname "*.mkv" -o \
+    -iname "*.webm" -o \
+    -iname "*.mov" \
 \) | while read -r img; do
 
     filename=$(basename "$img")
@@ -43,6 +47,12 @@ find "$wallpaper_path" -type f \( \
         *.gif)
             # first frame only, kept as a single-frame GIF under the same name
             convert "${img}[0]" -thumbnail x500 -strip "gif:$out" &
+            ;;
+        *.mp4|*.mkv|*.webm|*.mov)
+            # first frame as a JPEG, kept under the same name (Qt sniffs the real format)
+            # -nostdin is required or ffmpeg swallows the file list from the pipe
+            ffmpeg -nostdin -loglevel error -y -i "$img" -frames:v 1 \
+                -vf "scale=-2:500" -f image2 -c:v mjpeg -q:v 4 "$out" &
             ;;
         *)
             convert "$img" -thumbnail x500 -strip -quality 85 "$out" &

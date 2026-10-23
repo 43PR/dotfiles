@@ -70,7 +70,7 @@ PanelWindow {
         id: folderModel
         folder: "file://" + main.wallpaperPath
         showDirs: false
-        nameFilters: ["*.png", "*.jpg", "*.jpeg", "*.webp", "*.gif"]
+        nameFilters: ["*.png", "*.jpg", "*.jpeg", "*.webp", "*.gif", "*.mp4", "*.mkv", "*.webm", "*.mov"]
         sortField: FolderListModel.Name
     }
 
@@ -148,17 +148,26 @@ PanelWindow {
         readonly property real sideMargin: Math.max(0, viewportCenterX - tileWidth / 2)
         property bool ready: false
         property bool userMoved: false
+        property real lastMouseX: -1
+        property real lastMouseY: -1
 
         leftMargin: sideMargin
         rightMargin: sideMargin
 
         function clampIndex(i) { return Math.max(0, Math.min(i, count - 1)) }
-        function ensureVisibleAnimated(i) { contentX = i * step }
+        // contentX that puts tile i exactly in the middle of the viewport.
+        // Uses the real delegate position when it exists, else the margin-based formula.
+        function centerX(i) {
+            const it = itemAtIndex(i)
+            if (it) return it.x + tileWidth / 2 - width / 2
+            return i * step - sideMargin
+        }
+        function ensureVisibleAnimated(i) { contentX = centerX(i) }
 
         function centerOnStart() {
             if (userMoved || count <= 0 || configs.number_of_pictures <= 0) return
             selectedIndex = clampIndex(main.startPosition)
-            contentX = selectedIndex * step
+            contentX = centerX(selectedIndex)
             ready = true
         }
 
@@ -299,18 +308,42 @@ PanelWindow {
             MouseArea {
                 anchors.fill: parent
                 hoverEnabled: list.ready
-                onEntered: { list.userMoved = true; list.selectedIndex = index }
+                onPositionChanged: function(mouse) {
+                    const p = mapToItem(null, mouse.x, mouse.y)
+                    if (p.x === list.lastMouseX && p.y === list.lastMouseY) return
+                    list.lastMouseX = p.x
+                    list.lastMouseY = p.y
+                    list.userMoved = true
+                    list.selectedIndex = index
+                }
                 onClicked: list.activateCurrent()
                 onWheel: function(wheel) { list.flick(-wheel.angleDelta.y * 8, 0); wheel.accepted = true }
             }
         }
 
         Keys.onPressed: function(event) {
-            if (event.key === Qt.Key_Space) {
-                activateCurrent()
-            } else if (event.key === Qt.Key_W || event.key === Qt.Key_Escape) {
+            const fast = event.isAutoRepeat ? 2 : 1
+            switch (event.key) {
+            case Qt.Key_Left:
+            case Qt.Key_A:
+                userMoved = true
+                moveSelection(-1, fast)
+                break
+            case Qt.Key_Right:
+            case Qt.Key_D:
+                userMoved = true
+                moveSelection(1, fast)
+                break
+            case Qt.Key_Return:
+            case Qt.Key_Enter:
+            case Qt.Key_Space:
+                if (count > 0) activateCurrent()
+                break
+            case Qt.Key_W:
+            case Qt.Key_Escape:
                 Qt.quit()
-            } else {
+                break
+            default:
                 return
             }
             event.accepted = true
