@@ -1074,7 +1074,6 @@ Scope {
             yOffset: root.iconYOffset
             glyph: root.batIcon
             warning: root.batLow
-            active: root.batCharging
             tip: root.batTip
         }
     }

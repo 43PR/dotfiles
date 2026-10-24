@@ -164,8 +164,7 @@ Scope {
     ].concat(actions.map(function (a) {
         return { keys: a.key.toUpperCase(), desc: a.label }
     })).concat([
-        { keys: "Drag handle",            desc: "Move the menu" },
-        { keys: "Double-click handle",    desc: "Reset position" }
+        { keys: "Drag handle",            desc: "Move the menu" }
     ])
 
     function iconFile(name) {
@@ -570,10 +569,6 @@ Scope {
                                     root.dragging = false
                                     root.saveState()
                                 }
-                                onDoubleClicked: function (mouse) {
-                                    if (mouse.button === Qt.LeftButton)
-                                        root.resetPosition()
-                                }
                             }
 
                             Tip {
@@ -581,7 +576,7 @@ Scope {
                                 allowed: root.showTooltips
                                 hovered: dragArea.containsMouse && !root.dragging
                                 side: "below"
-                                text: "Drag to move · double-click to reset · right-click: settings"
+                                text: "Drag to move · right-click: settings"
                             }
                         }
 

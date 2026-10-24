@@ -823,6 +823,13 @@ Scope {
                                                 visible: parent.text === "" && !parent.activeFocus
                                             }
                                         }
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            enabled: !root.sidebarCollapsed
+                                            acceptedButtons: Qt.NoButton
+                                            hoverEnabled: true
+                                            cursorShape: Qt.IBeamCursor
+                                        }
                                     }
                                 }
                             }

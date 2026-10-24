@@ -775,7 +775,7 @@ Item {
                         Text {
                             width: page.labelWidth
                             anchors.verticalCenter: parent.verticalCenter
-                            text: "ACCENT COLOR"; color: Theme.text
+                            text: "ACCENT COLOR OPACITY"; color: Theme.text
                             font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
                         }
 

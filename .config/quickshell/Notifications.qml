@@ -992,8 +992,6 @@ Scope {
                         root.dragging = false;
                         stateTimer.restart();
                     }
-
-                    onDoubleClicked: root.resetPosition()
                 }
             }
 
