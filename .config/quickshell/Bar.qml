@@ -102,13 +102,13 @@ Scope {
     readonly property int effGap: strip ? 0 : 6
     readonly property real barRadius: strip ? 0 : cfg.radius
     readonly property color bgColor: Qt.alpha(Theme.bg, cfg.bgOpacity)
-    readonly property color borderColor: Qt.alpha(Theme.accent, 0.25)
+    readonly property color borderColor: Theme.accent
 
     function s(n) { return Math.round(n * cfg.scale); }
 
     readonly property var sz: ({
         stat: s(12), clock: s(12), marquee: s(11),
-        icon: s(16), batIcon: s(13), batText: s(12), power: s(13),
+        icon: s(16), batIcon: s(13), batText: s(12), power: s(15),
         taskIcon: s(18),
         calTime: s(30), calDate: s(12), calMonth: s(13), calArrow: s(16),
         calWeekday: s(11), calDay: s(12)
@@ -645,6 +645,7 @@ Scope {
         property color color: Theme.text
         property bool bold: false
         property real yOffset: 0
+        property real glyphScaleY: 1.0
         property int spacing: root.sizeIconGap
         property int padX: cfg.modPad
 
@@ -674,6 +675,10 @@ Scope {
                 font.family: Theme.iconFont
                 font.pixelSize: mod.glyphSize
                 renderType: Text.NativeRendering
+                transform: Scale {
+                    yScale: mod.glyphScaleY
+                    origin.y: height / 2
+                }
             }
             Text {
                 visible: mod.shown !== ""
@@ -939,7 +944,7 @@ Scope {
                             onPressed: { dotTip.suppressed = true; dotTip.shown = false; }
                             onClicked: mouse => {
                                 if (mouse.button === Qt.RightButton) root.openSettings();
-                                else Hyprland.dispatch("hl.dsp.focus({ workspace = " + dot.modelData.id + " })");           
+                                else Hyprland.dispatch("hl.dsp.focus({ workspace = " + dot.modelData.id + " })");
                             }
                         }
 
@@ -1065,6 +1070,8 @@ Scope {
         id: batteryC
         Mod {
             glyphSize: root.sz.icon
+            glyphScaleY: 1.12
+            yOffset: root.iconYOffset
             glyph: root.batIcon
             warning: root.batLow
             active: root.batCharging
