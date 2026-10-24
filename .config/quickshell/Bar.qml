@@ -102,7 +102,7 @@ Scope {
     readonly property int effGap: strip ? 0 : 6
     readonly property real barRadius: strip ? 0 : cfg.radius
     readonly property color bgColor: Qt.alpha(Theme.bg, cfg.bgOpacity)
-    readonly property color borderColor: Qt.alpha(Theme.accent, 0.25)
+    readonly property color borderColor: Theme.accent
 
     function s(n) { return Math.round(n * cfg.scale); }
 

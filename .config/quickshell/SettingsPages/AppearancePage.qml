@@ -21,6 +21,10 @@ Item {
     readonly property real tiltMax: 15
     readonly property real radiusMin: 0
     readonly property real radiusMax: 35
+    // Border opacity stops at 10% so borders can't vanish completely by accident
+    readonly property real borderOpacityMin: 0.1
+    readonly property real borderOpacityMax: 1.0
+    // Quickshell component corner-arm length range (px)
     readonly property real blurAlphaCap: Math.max(0, round2(Theme.bgAlpha - 0.05))
     readonly property real effectiveBlurAlpha: Math.min(look.blurLayerAlpha, blurAlphaCap)
 
@@ -75,8 +79,8 @@ Item {
         blurSize: 5,
         blurPasses: 1,
         blurVibrancy: 0.2,
-        blurLayers: true,        
-        blurLayerAlpha: 0.1, 
+        blurLayers: true,
+        blurLayerAlpha: 0.1,
         shadowRange: 4,
         shadowPower: 3,
         speedWindows: 5,
@@ -93,9 +97,9 @@ Item {
     readonly property bool animationsEnabled: animationMode === "on" || (animationMode === "auto" && !lowPower)
 
     readonly property var animationOptions: [
+        { id: "off",  label: "OFF" },
         { id: "auto", label: "AUTO" },
-        { id: "on",   label: "ON" },
-        { id: "off",  label: "OFF" }
+        { id: "on",   label: "ON" }
     ]
 
     readonly property var profiles: [
@@ -121,6 +125,11 @@ Item {
         { id: "master",  label: "MASTER" }
     ]
 
+    readonly property var borderStyleOptions: [
+        { id: "full",   label: "FULL" },
+        { id: "corner", label: "CORNER" }
+    ]
+
     readonly property var workspaceStyleOptions: [
         { id: "slide",         label: "SLIDE" },
         { id: "slidefade",     label: "FADE" },
@@ -141,6 +150,11 @@ Item {
     function luaValue(value, depth) {
         if (typeof value === "boolean") return value ? "true" : "false"
         if (typeof value === "number") return String(Number(value.toFixed(3)))
+        if (Array.isArray(value)) {
+            const items = []
+            for (let i = 0; i < value.length; i++) items.push(luaValue(value[i], depth + 1))
+            return "{ " + items.join(", ") + " }"
+        }
         if (typeof value === "object" && value !== null) return luaTable(value, depth)
         return "\"" + luaString(value) + "\""
     }
@@ -237,13 +251,16 @@ Item {
         applyTimer.restart()
         saveTimer.restart()
     }
+
+    // Background opacity affects the blur threshold cap; border opacity and the
+    // palette colours feed directly into the Hyprland border colours.
     Connections {
-    target: Theme
-    function onBgAlphaChanged() {
-        applyTimer.restart()
-        saveTimer.restart()
+        target: Theme
+        function onBgAlphaChanged() {
+            applyTimer.restart()
+            saveTimer.restart()
+        }
     }
-}
 
     // ------------------------------------------------------------------
     // Apply / persist
@@ -317,7 +334,7 @@ Item {
                     if (saved.look[k] !== undefined && typeof saved.look[k] === typeof n[k])
                         n[k] = saved.look[k]
                 }
-                if (["dwindle", "master"].indexOf(n.layout) === -1) n.layout = lookDefaults.layout
+                // (the old two-value layout check that reset "scrolling" to dwindle was removed)
                 if (["dwindle", "scrolling", "master"].indexOf(n.layout) === -1) n.layout = lookDefaults.layout
                 if (["slide", "slidefade", "slidevert", "slidefadevert"].indexOf(n.workspaceStyle) === -1)
                     n.workspaceStyle = lookDefaults.workspaceStyle
@@ -424,7 +441,7 @@ Item {
         Text {
             anchors.centerIn: parent
             text: sb.label
-            color: sb.current ? Theme.accent : Theme.text
+            color: sb.current ? Theme.accentSolid : Theme.text
             font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody; font.bold: true; font.letterSpacing: 1
         }
 
@@ -586,12 +603,6 @@ Item {
                         Row {
                             spacing: 10
                             GroupLabel { text: "ANIMATIONS" }
-                            Text {
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: page.animationsEnabled ? "ON" : "OFF"
-                                color: page.animationsEnabled ? Theme.accent2 : Theme.textDim
-                                font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeSmall
-                            }
                         }
 
                         OptionRow {
@@ -617,12 +628,6 @@ Item {
                         Row {
                             spacing: 10
                             GroupLabel { text: "POWER PROFILE" }
-                            Text {
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: page.profileLabel(page.currentProfile)
-                                color: Theme.accent2
-                                font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeSmall
-                            }
                         }
 
                         Row {
@@ -739,6 +744,61 @@ Item {
                     }
                 }
 
+                // ---- Borders (style + global opacity) ----
+                Card {
+                    Column {
+                        width: parent.width; spacing: 8
+
+                        Row {
+                            spacing: 10
+                            GroupLabel { text: "BORDER STYLE" }
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                visible: page.look.borderSize === 0
+                                text: "SET BORDER SIZE > 0 TO SEE IT"
+                                color: Theme.textDim
+                                font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeSmall
+                            }
+                        }
+
+                        OptionRow {
+                            options: page.borderStyleOptions
+                            currentId: Theme.hyprBorderStyle
+                            onPicked: id => Theme.setHub("hyprBorderStyle", id)
+                        }
+                    }
+
+                    // ---- global border opacity (Hyprland borders + Theme.accent) ----
+                    Row {
+                        width: parent.width; spacing: 8
+
+                        Text {
+                            width: page.labelWidth
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "BORDER OPACITY"; color: Theme.text
+                            font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
+                        }
+
+                        Slider {
+                            width: parent.width - page.labelWidth - 52 - 16
+                            anchors.verticalCenter: parent.verticalCenter
+                            label: ""; icon: ""
+                            value: page.clamp01((Theme.borderOpacity - page.borderOpacityMin) / (page.borderOpacityMax - page.borderOpacityMin))
+                            onMoved: value => Theme.borderOpacity = page.borderOpacityMin + page.clamp01(value) * (page.borderOpacityMax - page.borderOpacityMin)
+                            onCommitted: value => Theme.setHub("borderOpacity", page.round2(page.borderOpacityMin + page.clamp01(value) * (page.borderOpacityMax - page.borderOpacityMin)))
+                        }
+
+                        Text {
+                            width: 52
+                            anchors.verticalCenter: parent.verticalCenter
+                            horizontalAlignment: Text.AlignRight
+                            text: Math.round(Theme.borderOpacity * 100) + "%"
+                            color: Theme.text
+                            font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
+                        }
+                    }
+                }
+
                 // ---- Blur & Shadow ----
                 Card {
                     Column {
@@ -815,13 +875,13 @@ Item {
                     }
                 }
             }
-                        // ---------------- HUB ----------------
+            // ---------------- HUB ----------------
             Column {
                 width: parent.width; spacing: 10
                 topPadding: 6
 
                 Item {
-                    width: parent.width; 
+                    width: parent.width;
                     height: 24
                     y: -6
                     SectionTitle {
@@ -979,7 +1039,7 @@ Item {
                                         anchors.centerIn: parent
                                         text: Theme.hideSettingsIcons ? "ON" : "OFF"
                                         color: Theme.hideSettingsIcons
-                                            ? Theme.accent : Theme.text
+                                            ? Theme.accentSolid : Theme.text
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.textSizeBody
                                         font.bold: true
@@ -1034,7 +1094,7 @@ Item {
                                         anchors.centerIn: parent
                                         text: Theme.clickOutsideClose ? "ON" : "OFF"
                                         color: Theme.clickOutsideClose
-                                            ? Theme.accent : Theme.text
+                                            ? Theme.accentSolid : Theme.text
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.textSizeBody
                                         font.bold: true
