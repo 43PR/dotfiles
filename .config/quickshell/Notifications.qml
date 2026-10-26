@@ -489,6 +489,7 @@ Scope {
         imageSupported: true
 
         onNotification: n => {
+            if (n.lastGeneration) return;
             n.tracked = !root.dndBlocks(n);
             if (n.tracked) root.playSound(root.soundFor(n));
             if (n.transient) return;
@@ -742,15 +743,23 @@ Scope {
                         property bool shown: false
                         property bool leaving: false
                         property bool wasExpired: false
+                        property bool notificationClosed: false
                         property bool expanded: false
                         property bool copied: false
                         readonly property bool critical: modelData.urgency === NotificationUrgency.Critical
 
+                        readonly property bool persistent: modelData.expireTimeout === 0
+                        readonly property int lifetime: persistent ? 0 : modelData.expireTimeout > 0
+                            ? modelData.expireTimeout : (critical ? root.criticalTimeout : root.normalTimeout)
+                        function restartLifetime() {
+                            if (persistent) progAnim.stop();
+                            else if (!leaving && !notificationClosed) progAnim.restart();
+                        }
                         width: root.cardWidth
                         height: card.height
 
                         function close(expired) {
-                            if (leaving) return;
+                            if (leaving || notificationClosed) return;
                             wasExpired = expired;
                             leaving = true;
                             shown = false;
@@ -763,10 +772,9 @@ Scope {
                             interval: 220
                             onTriggered: {
                                 const n = wrapper.modelData;
+                                if (!n || wrapper.notificationClosed || !n.tracked) return;
                                 try {
                                     if (wrapper.wasExpired) n.expire(); else n.dismiss();
-                                    // belt and braces: make sure it really leaves the tracked list
-                                    if (n) n.tracked = false;
                                 } catch (e) { }
                             }
                         }
@@ -776,8 +784,10 @@ Scope {
                         // a replaced/updated notification gets a fresh lifetime
                         Connections {
                             target: wrapper.modelData
-                            function onSummaryChanged() { progAnim.restart(); }
-                            function onBodyChanged() { progAnim.restart(); }
+                            function onClosed(reason) { wrapper.notificationClosed = true; gone.stop(); progAnim.stop(); }
+                            function onSummaryChanged() { wrapper.restartLifetime(); }
+                            function onBodyChanged() { wrapper.restartLifetime(); }
+                            function onExpireTimeoutChanged() { wrapper.restartLifetime(); }
                         }
 
                         Rectangle {
@@ -822,15 +832,14 @@ Scope {
                                 width: card.width - root.px(32)
                                 color: wrapper.critical ? Theme.danger : Theme.alpha(Theme.text, 0.3)
                                 opacity: wrapper.expanded ? 0.15 : 1
+                                visible: !wrapper.persistent
 
                                 NumberAnimation on width {
                                     id: progAnim
                                     from: card.width - root.px(32)
                                     to: 0
-                                    duration: wrapper.modelData.expireTimeout > 0
-                                              ? wrapper.modelData.expireTimeout * 1000
-                                              : (wrapper.critical ? root.criticalTimeout : root.normalTimeout)
-                                    running: !wrapper.leaving
+                                    duration: wrapper.lifetime
+                                    running: !wrapper.leaving && !wrapper.persistent && !wrapper.notificationClosed
                                     paused: hh.hovered || wrapper.expanded
                                     onFinished: wrapper.close(true)
                                 }
