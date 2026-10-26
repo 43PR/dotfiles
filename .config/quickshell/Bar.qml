@@ -16,20 +16,20 @@ Scope {
     readonly property var defaults: ({
         // layout
         position: "left", style: "joined", thickness: 20, margin: 4,
-        reserveSpace: true, allScreens: true,
+        reserveSpace: true, allScreens: true, dragModules: true,
         // appearance
         scale: 1.0, bgOpacity: 0.5, border: false, radius: 16, calRadius: 15,
         // tooltips
         tooltips: true, tooltipHints: true, tipDelay: 450,
         // modules
         modPad: 20, wsDot: 10, wsGap: 8, wsScroll: true,
-        statsMode: "compact", statsWarn: 85, batLowPct: 15,
+        statsMode: "compact", statsWarn: 85, tempWarn: 85, batLowPct: 15,
         volStep: 2, volMax: 100,
         // clock / calendar
         clock24: true, clockSeconds: false, weekMonday: true,
         // module placement
-        hidden: "stats,wall,settings,tasks",
-        startMods: "stats,ws",
+        hidden: "cpu,ram,gpu,temp,wall,settings,tasks",
+        startMods: "cpu,ram,gpu,temp,ws",
         centerMods: "clock",
         endMods: "media,volume,battery,net,notif,wall,settings,power"
     })
@@ -59,6 +59,7 @@ Scope {
             property int margin: root.defaults.margin
             property bool reserveSpace: root.defaults.reserveSpace   // push windows away from the bar
             property bool allScreens: root.defaults.allScreens       // false → first screen only
+            property bool dragModules: root.defaults.dragModules     // drag modules on the bar to reorder / move them
             property real scale: root.defaults.scale
             property real bgOpacity: root.defaults.bgOpacity
             property bool border: root.defaults.border
@@ -72,7 +73,8 @@ Scope {
             property int wsGap: root.defaults.wsGap              // gap between workspace dots
             property bool wsScroll: root.defaults.wsScroll       // scroll on workspaces to switch
             property string statsMode: root.defaults.statsMode   // "default" | "compact"
-            property int statsWarn: root.defaults.statsWarn      // CPU/RAM % that turns red
+            property int statsWarn: root.defaults.statsWarn      // CPU/RAM/GPU % that turns red
+            property int tempWarn: root.defaults.tempWarn        // CPU/GPU °C that turns red
             property int batLowPct: root.defaults.batLowPct      // battery % that turns red
             property int volStep: root.defaults.volStep          // % per scroll notch
             property int volMax: root.defaults.volMax            // max volume %
@@ -86,7 +88,7 @@ Scope {
         }
     }
 
-    // Only the bar's own changes (IPC) are saved from here; BarPage saves its own.
+    // Only the bar's own changes (IPC / drag & drop) are saved from here; BarPage saves its own.
     Timer { id: saveTimer; interval: 300; onTriggered: cfgFile.writeAdapter() }
     function save() { saveTimer.restart(); }
 
@@ -237,7 +239,10 @@ Scope {
     //   g = glyph, tip = tooltip title, hint = left-click description.
     // Modules without it have a dedicated Component below (see `comps`).
     readonly property var moduleDefs: [
-        { id: "stats",    l: "CPU / RAM" },
+        { id: "cpu",      l: "CPU" },
+        { id: "ram",      l: "RAM" },
+        { id: "gpu",      l: "GPU" },
+        { id: "temp",     l: "Temperatures" },
         { id: "ws",       l: "Workspaces" },
         { id: "tasks",    l: "Open apps" },
         { id: "media",    l: "Media" },
@@ -257,10 +262,18 @@ Scope {
     readonly property var moduleIds: moduleDefs.map(d => d.id)
     readonly property var defMap: moduleDefs.reduce((m, d) => { m[d.id] = d; return m; }, {})
     readonly property var comps: ({
-        stats: statsC, ws: wsC, tasks: tasksC, media: mediaC, volume: volumeC, battery: batteryC, icon: iconC
+        cpu: cpuC, ram: ramC, gpu: gpuC, temp: tempC,
+        ws: wsC, tasks: tasksC, media: mediaC, volume: volumeC, battery: batteryC, icon: iconC
     })
 
-    function csv(str) { return str === "" ? [] : str.split(","); }
+    // The old combined "stats" module is migrated to "cpu" + "ram" in saved configs.
+    function csv(str) {
+        if (str === "") return [];
+        const out = [];
+        for (const x of str.split(","))
+        x === "stats" ? out.push("cpu", "ram") : out.push(x);
+        return out;
+    }
     function valid(id) { return moduleIds.indexOf(id) >= 0; }
 
     // enable / disable
@@ -275,7 +288,6 @@ Scope {
     function modVisible(id) {
         if (!isOn(id)) return false;
         switch (id) {
-        case "stats":   return true;   // icon-sized, fits any bar orientation
         case "media":   return Marquee.player !== null && Marquee.title !== "";
         case "battery": return battery !== null;
         default:        return true;
@@ -305,6 +317,19 @@ Scope {
         for (const k of sections) setList(k, next[k]);
     }
 
+    // Move a module to a specific position of a section (used by drag & drop).
+    // `idx` is an index into the section's list *before* the module is removed from it.
+    function moveToIndex(id, sec, idx) {
+        const next = {};
+        for (const k of sections) next[k] = listOf(k);
+        const from = next[sec].indexOf(id);
+        for (const k of sections) next[k] = next[k].filter(x => x !== id);
+        if (from >= 0 && from < idx) idx -= 1;
+        idx = Math.max(0, Math.min(idx, next[sec].length));
+        next[sec].splice(idx, 0, id);
+        for (const k of sections) setList(k, next[k]);
+    }
+
     function canShift(id, d) {
         const a = listOf(sectionOf(id)), j = a.indexOf(id) + d;
         return j >= 0 && j < a.length;
@@ -315,6 +340,16 @@ Scope {
         const sec = sectionOf(id), a = listOf(sec), i = a.indexOf(id), j = i + d;
         [a[i], a[j]] = [a[j], a[i]];
         setList(sec, a);
+    }
+
+    // Walks up from any bar element to the Slot (module container) that owns it.
+    function slotOf(item) {
+        let p = item;
+        while (p) {
+            if (p.isSlot === true) return p;
+            p = p.parent;
+        }
+        return null;
     }
 
     // ───────────────────────── State / IPC ─────────────────────────
@@ -369,6 +404,17 @@ Scope {
     property real _prevTotal: 0
     property real _prevIdle: 0
 
+    // GPU / temperatures (-1 = unavailable)
+    property int gpuUsage: 0
+    property bool gpuHasUsage: false
+    property int cpuTemp: -1
+    property int gpuTempProbe: -1       // from nvidia-smi / sysfs hwmon
+    property int gpuTempSensors: -1     // fallback from `sensors`
+    readonly property int gpuTemp: gpuTempProbe >= 0 ? gpuTempProbe : gpuTempSensors
+
+    function tempText(v) { return v >= 0 ? v + "" : "–"; }
+    function tempTip(name, v) { return v >= 0 ? name + " temperature: " + v + "°C" : name + " temperature: unavailable"; }
+
     readonly property string netGlyph: netState === "wifi" ? "\uDB81\uDDA9"
                                      : netState === "ethernet" ? "\uDB80\uDE00" : "\uDB81\uDDAA"
     readonly property string netTip: netState === "wifi" ? "Wi-Fi connected"
@@ -398,6 +444,135 @@ Scope {
             root.memPercent = Math.round(100 * used / total);
             root.memUsedG = used / 1048576;
             root.memTotalG = total / 1048576;
+        }
+    }
+
+    // ── GPU probe (vendor-agnostic, no root needed) ──
+    // Prints "<usage%> <tempC>"; a field is "-" when unavailable.
+    //   1. NVIDIA  : nvidia-smi
+    //   2. AMD     : sysfs gpu_busy_percent (largest-VRAM card wins)
+    //   3. Intel   : intel_gpu_top (only if permitted, 3s timeout)
+    //   4. Intel/other fallback: GPU clock estimate (act_freq / max_freq)
+    // Temperature: nvidia-smi, else any DRM card hwmon temp, else `sensors`.
+    readonly property string gpuProbeScript: `
+u=-; t=-
+isnum() { case "$1" in ''|*[!0-9.]*) return 1;; *) return 0;; esac; }
+
+# 1. NVIDIA
+if command -v nvidia-smi >/dev/null 2>&1; then
+  o=$(nvidia-smi --query-gpu=utilization.gpu,temperature.gpu --format=csv,noheader,nounits 2>/dev/null | head -n1)
+  if [ -n "$o" ]; then
+    a=$(echo "$o" | cut -d, -f1 | tr -d ' ')
+    b=$(echo "$o" | cut -d, -f2 | tr -d ' ')
+    isnum "$a" && u="$a"
+    isnum "$b" && t="$b"
+  fi
+fi
+
+# 2. AMD (amdgpu sysfs)
+if [ "$u" = "-" ]; then
+  best=""; bestmem=-1
+  for d in /sys/class/drm/card[0-9]*/device; do
+    [ -r "$d/gpu_busy_percent" ] || continue
+    m=$(cat "$d/mem_info_vram_total" 2>/dev/null || echo 0)
+    isnum "$m" || m=0
+    if [ "$m" -gt "$bestmem" ]; then best="$d"; bestmem="$m"; fi
+  done
+  if [ -n "$best" ]; then
+    a=$(cat "$best/gpu_busy_percent" 2>/dev/null)
+    isnum "$a" && u="$a"
+    if [ "$t" = "-" ]; then
+      for h in "$best"/hwmon/hwmon*/temp1_input; do
+        if [ -r "$h" ]; then t=$(( $(cat "$h") / 1000 )); break; fi
+      done
+    fi
+  fi
+fi
+
+# 3. Intel via intel_gpu_top (needs CAP_PERFMON / root; silently skipped otherwise)
+if [ "$u" = "-" ] && command -v intel_gpu_top >/dev/null 2>&1; then
+    v=$(timeout 4 intel_gpu_top -J -s 1000 -n 2 2>/dev/null | awk 'index($0,"Render/3D"){f=1;next} f==1 && /busy/{x=$0;gsub(/[^0-9.]/,"",x);f=2;next} f==2{if(/sema/)last=x;f=0} END{print last}')
+    isnum "$v" && u="$v"
+fi
+
+# 4. Unprivileged fallback: GPU clock as a load estimate (i915 / xe)
+if [ "$u" = "-" ]; then
+  for c in /sys/class/drm/card[0-9]*; do
+    [ -d "$c" ] || continue
+    for pair in \
+      "$c/gt/gt0/rps_act_freq_mhz:$c/gt/gt0/rps_max_freq_mhz" \
+      "$c/gt/gt0/rps_cur_freq_mhz:$c/gt/gt0/rps_max_freq_mhz" \
+      "$c/gt_act_freq_mhz:$c/gt_max_freq_mhz" \
+      "$c/gt_cur_freq_mhz:$c/gt_max_freq_mhz" \
+      "$c/device/tile0/gt0/freq0/act_freq:$c/device/tile0/gt0/freq0/max_freq"; do
+      f1=\${pair%%:*}; f2=\${pair#*:}
+      [ -r "$f1" ] && [ -r "$f2" ] || continue
+      cur=$(cat "$f1" 2>/dev/null); max=$(cat "$f2" 2>/dev/null)
+      if isnum "$cur" && isnum "$max" && [ "$max" -gt 0 ]; then
+        u=$(( cur * 100 / max )); [ "$u" -gt 100 ] && u=100
+        break 2
+      fi
+    done
+  done
+fi
+
+# Temperature fallback: any DRM card hwmon (i915 / xe / nouveau / amdgpu)
+if [ "$t" = "-" ]; then
+  for h in /sys/class/drm/card[0-9]*/device/hwmon/hwmon*/temp1_input; do
+    if [ -r "$h" ]; then
+      r=$(cat "$h" 2>/dev/null)
+      if isnum "$r"; then t=$(( r / 1000 )); break; fi
+    fi
+  done
+fi
+
+echo "$u $t"
+`
+
+    property real _gpuAvg: -1
+    function updateGpuFromProbe(out) {
+        const p = out.trim().split(/\s+/);
+        const u = parseFloat(p[0]), t = parseFloat(p[1]);
+        gpuHasUsage = !isNaN(u);
+        if (gpuHasUsage) {
+            const v = Math.max(0, Math.min(100, u));
+            _gpuAvg = _gpuAvg < 0 ? v : _gpuAvg * 0.6 + v * 0.4;
+            gpuUsage = Math.round(_gpuAvg);
+        } else {
+            _gpuAvg = -1;
+        }
+        gpuTempProbe = isNaN(t) ? -1 : Math.round(t);
+    }
+
+    // First `sensors` line starting with one of the keys (tried in priority order) → °C, or -1.
+    function tempFromSensors(lines, keys) {
+        for (const k of keys) {
+            for (const l of lines) {
+                const line = l.trim();
+                if (line.indexOf(k) !== 0) continue;
+                const m = line.match(/([+-]?\d+(?:\.\d+)?)\s*°C/);
+                if (m) return Math.round(parseFloat(m[1]));
+            }
+        }
+        return -1;
+    }
+
+    Process {
+        id: gpuProc
+        command: ["sh", "-c", root.gpuProbeScript]
+        stdout: StdioCollector { onStreamFinished: root.updateGpuFromProbe(text) }
+    }
+
+    Process {
+        // single `sensors` call serves CPU temp and the GPU temp fallback
+        id: sensorsProc
+        command: ["sensors"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const lines = text.split("\n");
+                root.cpuTemp = root.tempFromSensors(lines, ["Package id 0:", "Tctl:", "Tdie:"]);
+                root.gpuTempSensors = root.tempFromSensors(lines, ["GPU Temp:", "edge:", "junction:"]);
+            }
         }
     }
 
@@ -433,9 +608,22 @@ Scope {
         }
     }
 
+    // CPU / RAM sampling (only while one of those modules is enabled)
     Timer {
-        interval: 2000; running: root.barVisible; repeat: true; triggeredOnStart: true
+        interval: 2000; repeat: true; triggeredOnStart: true
+        running: root.barVisible && (root.isOn("cpu") || root.isOn("ram"))
         onTriggered: { statFile.reload(); memFile.reload(); }
+    }
+    // GPU usage / temps (only while the GPU or temperature module is enabled)
+    Timer {
+        interval: 2000; repeat: true; triggeredOnStart: true
+        running: root.barVisible && (root.isOn("gpu") || root.isOn("temp"))
+        onTriggered: { if (!gpuProc.running) gpuProc.running = true; }
+    }
+    Timer {
+        interval: 2000; repeat: true; triggeredOnStart: true
+        running: root.barVisible && root.isOn("temp")
+        onTriggered: { if (!sensorsProc.running) sensorsProc.running = true; }
     }
     Timer {
         interval: 10000; running: root.barVisible; repeat: true; triggeredOnStart: true
@@ -463,6 +651,7 @@ Scope {
     //   Right click  → secondary action (falls back to "Bar settings" if the module has none)
     //   Middle click → tertiary action (optional)
     //   Scroll       → adjust a value (optional)
+    //   Drag         → move the module (reorder, or drop it in another section)
     // Hints declared on a module are shown automatically in its tooltip.
     // States: hover · pressed · active (accent) · warning (danger) · disabled.
 
@@ -471,6 +660,49 @@ Scope {
         flow: root.vertical ? GridLayout.TopToBottom : GridLayout.LeftToRight
         rowSpacing: gap
         columnSpacing: gap
+    }
+
+    // MouseArea that also lets the user drag the whole module (its Slot) along the bar.
+    // A press that moves further than a small threshold along the bar axis starts a drag;
+    // the click that would normally follow the release is suppressed (see `suppressClick`).
+    // Handlers using this must check `suppressClick` in onClicked.
+    component DMouseArea: MouseArea {
+        id: dm
+        property bool suppressClick: false
+        property bool dragging: false
+        property point startScene: Qt.point(0, 0)
+        property var owner: null
+
+        onPressed: mouse => {
+            suppressClick = false;
+            dragging = false;
+            owner = root.slotOf(dm);
+            startScene = dm.mapToItem(null, mouse.x, mouse.y);
+        }
+        onPositionChanged: mouse => {
+            if (!pressed || owner === null || !owner.dragAllowed) return;
+            const sp = dm.mapToItem(null, mouse.x, mouse.y);
+            const dx = sp.x - startScene.x, dy = sp.y - startScene.y;
+            if (!dragging) {
+                if (Math.abs(root.vertical ? dy : dx) < 10) return;
+                dragging = true;
+                suppressClick = true;
+                owner.dragging = true;
+            }
+            owner.dragDx = root.vertical ? 0 : dx;
+            owner.dragDy = root.vertical ? dy : 0;
+        }
+        onReleased: mouse => {
+            if (!dragging) return;
+            dragging = false;
+            const sp = dm.mapToItem(null, mouse.x, mouse.y);
+            if (owner !== null) owner.finishDrag(sp.x, sp.y);
+        }
+        onCanceled: {
+            if (!dragging) return;
+            dragging = false;
+            if (owner !== null) owner.cancelDrag();
+        }
     }
 
     // Hover tooltip, anchored next to `target` on the side facing away from the bar edge.
@@ -604,7 +836,7 @@ Scope {
             }
         }
 
-        MouseArea {
+        DMouseArea {
             id: ma
             anchors.fill: parent
             hoverEnabled: true
@@ -612,7 +844,7 @@ Scope {
             cursorShape: it.interactive && !it.disabled ? Qt.PointingHandCursor : Qt.ArrowCursor
             onPressed: { tipper.suppressed = true; tipper.shown = false; }
             onClicked: mouse => {
-                if (it.disabled) return;
+                if (it.disabled || ma.suppressClick) return;
                 if (mouse.button === Qt.LeftButton) it.primary();
                 else if (mouse.button === Qt.MiddleButton) it.tertiary();
                 else it.secondaryAction();
@@ -694,11 +926,98 @@ Scope {
         }
     }
 
+    // Rounded stat badge (CPU / RAM / GPU / temperatures), informational only.
+    //   "compact": round badge, same size as the app icons, value only
+    //   "default": capsule with label + value ("CPU 12" / stacked on vertical bars)
+    component StatBadge: Interactive {
+        id: stat
+        property string label: ""
+        property string valueText: ""
+        readonly property bool compact: cfg.statsMode === "compact"
+        readonly property color fg: warning ? Theme.danger : Theme.text
+        readonly property int fontPx: Math.round(root.sz.taskIcon * 0.5)
+
+        Layout.alignment: Qt.AlignCenter
+        implicitWidth: root.vertical ? root.panelThick : badge.width + 8
+        implicitHeight: root.vertical ? badge.height + 8
+                                      : Math.max(root.panelThick - 2, badge.height + 6)
+        interactive: false
+
+        Rectangle {
+            id: badge
+            anchors.centerIn: parent
+            width: stat.compact ? root.sz.taskIcon
+                 : root.vertical ? root.sz.taskIcon + 6
+                 : statRow.implicitWidth + 14
+            height: stat.compact ? root.sz.taskIcon
+                  : root.vertical ? statRow.implicitHeight + 10
+                  : root.sz.taskIcon
+            radius: Math.min(width, height) / 2
+            color: Qt.alpha(stat.fg, 0.045)
+            border.width: 1
+            border.color: Qt.alpha(stat.fg, 0.18)
+
+            GridLayout {
+                id: statRow
+                anchors.centerIn: parent
+                flow: root.vertical ? GridLayout.TopToBottom : GridLayout.LeftToRight
+                rowSpacing: 0
+                columnSpacing: 4
+
+                Text {
+                    visible: !stat.compact
+                    Layout.alignment: Qt.AlignCenter
+                    text: stat.label
+                    color: Qt.alpha(stat.fg, 0.75)
+                    font.family: Theme.iconFont
+                    font.pixelSize: stat.fontPx - 1
+                    renderType: Text.NativeRendering
+                }
+                Text {
+                    Layout.alignment: Qt.AlignCenter
+                    text: stat.valueText
+                    color: stat.fg
+                    font.family: Theme.iconFont
+                    font.bold: true
+                    font.pixelSize: stat.fontPx
+                    renderType: Text.NativeRendering
+                }
+            }
+        }
+    }
+
+    // Container for one module. Also owns the drag state while the module is being dragged:
+    // the module follows the pointer visually (transform only, layout is untouched) and,
+    // on release, `droppedAt` tells the bar where it was dropped.
     component Slot: Loader {
+        id: slot
         required property string modelData
         property Component clockComp: null
+
+        readonly property bool isSlot: true
+        readonly property bool dragAllowed: cfg.dragModules && modelData !== "clock"
+        property bool dragging: false
+        property real dragDx: 0
+        property real dragDy: 0
+        signal droppedAt(real sx, real sy)
+
+        function finishDrag(sx, sy) {
+            dragging = false;
+            dragDx = 0;
+            dragDy = 0;
+            droppedAt(sx, sy);
+        }
+        function cancelDrag() {
+            dragging = false;
+            dragDx = 0;
+            dragDy = 0;
+        }
+
         visible: root.modVisible(modelData)
         Layout.alignment: Qt.AlignCenter
+        z: dragging ? 100 : 0
+        opacity: dragging ? 0.75 : 1
+        transform: Translate { x: slot.dragDx; y: slot.dragDy }
         sourceComponent: modelData === "clock" ? clockComp : (root.comps[modelData] ?? root.comps.icon)
         onLoaded: if (item.mid !== undefined) item.mid = modelData
     }
@@ -708,9 +1027,12 @@ Scope {
         id: panel
         property var model: []
         property Component clockComp: null
+        property bool dragActive: false          // a module of this panel is being dragged
         readonly property Item lane: laneItem
+        signal dropped(string modId, real sx, real sy)
 
         visible: (root.vertical ? laneItem.implicitHeight : laneItem.implicitWidth) > 0
+        z: dragActive ? 100 : 0                  // keep the dragged module above the other panels
         width: root.vertical ? root.panelThick : laneItem.implicitWidth + 4
         height: root.vertical ? laneItem.implicitHeight + 4 : root.panelThick
         radius: root.barRadius
@@ -723,7 +1045,12 @@ Scope {
             anchors.centerIn: parent
             Repeater {
                 model: panel.model
-                delegate: Slot { clockComp: panel.clockComp }
+                delegate: Slot {
+                    id: slotD
+                    clockComp: panel.clockComp
+                    onDroppedAt: (sx, sy) => panel.dropped(slotD.modelData, sx, sy)
+                    onDraggingChanged: panel.dragActive = dragging
+                }
             }
         }
     }
@@ -827,79 +1154,50 @@ Scope {
         }
     }
 
-    // CPU / RAM — rounded badges, value only (no %)
-    //   "compact": round badge, same size as the app icons, number only
-    //   "default": capsule with label + number ("CPU 12" / stacked on vertical bars)
+    // CPU usage
     Component {
-        id: statsC
+        id: cpuC
+        StatBadge {
+            label: "CPU"
+            valueText: String(root.cpuUsage)
+            warning: root.cpuUsage >= cfg.statsWarn
+            tip: "CPU usage: " + root.cpuUsage + "%"
+        }
+    }
+
+    // RAM usage
+    Component {
+        id: ramC
+        StatBadge {
+            label: "RAM"
+            valueText: String(root.memPercent)
+            warning: root.memPercent >= cfg.statsWarn
+            tip: "Memory: " + root.memUsedG.toFixed(1) + " / " + root.memTotalG.toFixed(1)
+                 + " GiB (" + root.memPercent + "%)"
+        }
+    }
+
+    // GPU usage
+    Component {
+        id: gpuC
+        StatBadge {
+            label: "GPU"
+            valueText: root.gpuHasUsage ? String(root.gpuUsage) : "–"
+            warning: root.gpuHasUsage && root.gpuUsage >= cfg.statsWarn
+            tip: root.gpuHasUsage ? "GPU usage: " + root.gpuUsage + "%" : "GPU usage: unavailable"
+        }
+    }
+
+    // CPU + GPU temperatures (two badges)
+    Component {
+        id: tempC
         Lane {
             gap: 2
-            Repeater {
-                model: ["CPU", "RAM"]
-                delegate: Interactive {
-                    id: stat
-                    required property string modelData
-                    readonly property bool isCpu: modelData === "CPU"
-                    readonly property bool compact: cfg.statsMode === "compact"
-                    readonly property int val: isCpu ? root.cpuUsage : root.memPercent
-                    readonly property color fg: warning ? Theme.danger : Theme.text
-                    readonly property int fontPx: Math.round(root.sz.taskIcon * 0.5)
-
-                    Layout.alignment: Qt.AlignCenter
-                    implicitWidth: root.vertical ? root.panelThick : badge.width + 8
-                    implicitHeight: root.vertical ? badge.height + 8
-                                                  : Math.max(root.panelThick - 2, badge.height + 6)
-
-                    interactive: false
-                    warning: val >= cfg.statsWarn
-                    tip: isCpu ? "CPU usage: " + val + "%"
-                               : "Memory: " + root.memUsedG.toFixed(1) + " / " + root.memTotalG.toFixed(1)
-                                 + " GiB (" + val + "%)"
-
-                    Rectangle {
-                        id: badge
-                        anchors.centerIn: parent
-                        // compact: circle the size of an app icon
-                        // default: capsule sized to its label + number
-                        width: stat.compact ? root.sz.taskIcon
-                             : root.vertical ? root.sz.taskIcon + 6
-                             : statRow.implicitWidth + 14
-                        height: stat.compact ? root.sz.taskIcon
-                              : root.vertical ? statRow.implicitHeight + 10
-                              : root.sz.taskIcon
-                        radius: Math.min(width, height) / 2
-                        color: Qt.alpha(stat.fg, 0.045)
-                        border.width: 1
-                        border.color: Qt.alpha(stat.fg, 0.18)
-
-                        GridLayout {
-                            id: statRow
-                            anchors.centerIn: parent
-                            flow: root.vertical ? GridLayout.TopToBottom : GridLayout.LeftToRight
-                            rowSpacing: 0
-                            columnSpacing: 4
-
-                            Text {
-                                visible: !stat.compact
-                                Layout.alignment: Qt.AlignCenter
-                                text: stat.modelData
-                                color: Qt.alpha(stat.fg, 0.75)
-                                font.family: Theme.iconFont
-                                font.pixelSize: stat.fontPx - 1
-                                renderType: Text.NativeRendering
-                            }
-                            Text {
-                                Layout.alignment: Qt.AlignCenter
-                                text: stat.val
-                                color: stat.fg
-                                font.family: Theme.iconFont
-                                font.bold: true
-                                font.pixelSize: stat.fontPx
-                                renderType: Text.NativeRendering
-                            }
-                        }
-                    }
-                }
+            StatBadge {
+                label: "TEMP"
+                valueText: root.tempText(root.cpuTemp)
+                warning: root.cpuTemp >= cfg.tempWarn
+                tip: root.tempTip("CPU", root.cpuTemp)
             }
         }
     }
@@ -935,7 +1233,7 @@ Scope {
                         Behavior on implicitWidth { NumberAnimation { duration: Theme.animMed; easing.type: Easing.OutQuad } }
                         Behavior on implicitHeight { NumberAnimation { duration: Theme.animMed; easing.type: Easing.OutQuad } }
 
-                        MouseArea {
+                        DMouseArea {
                             id: dotMa
                             anchors.fill: parent
                             hoverEnabled: true
@@ -943,6 +1241,7 @@ Scope {
                             acceptedButtons: Qt.LeftButton | Qt.RightButton
                             onPressed: { dotTip.suppressed = true; dotTip.shown = false; }
                             onClicked: mouse => {
+                                if (dotMa.suppressClick) return;
                                 if (mouse.button === Qt.RightButton) root.openSettings();
                                 else Hyprland.dispatch("hl.dsp.focus({ workspace = " + dot.modelData.id + " })");
                             }
@@ -1101,6 +1400,38 @@ Scope {
             color: "transparent"
             visible: root.barVisible
 
+            // Drag & drop: (sx, sy) is the pointer position in window coordinates at release.
+            // The section is picked from where the pointer landed relative to the clock panel
+            // (before it → start, over it → center, after it → end); the position inside that
+            // section is the slot after the last visible module whose centre lies before the pointer.
+            function dropModule(modId, sx, sy) {
+                const pt = frame.mapFromItem(null, sx, sy);
+                const pos = root.vertical ? pt.y : pt.x;
+                const c0 = root.vertical ? clockPanel.y : clockPanel.x;
+                const c1 = c0 + (root.vertical ? clockPanel.height : clockPanel.width);
+                const sec = pos < c0 ? "start" : pos > c1 ? "end" : "center";
+                const panel = sec === "start" ? startPanel : sec === "center" ? clockPanel : endPanel;
+                const list = root.listOf(sec);
+
+                const slots = {};
+                const kids = panel.lane.children;
+                for (let j = 0; j < kids.length; j++) {
+                    const ch = kids[j];
+                    if (ch.isSlot === true) slots[ch.modelData] = ch;
+                }
+
+                let idx = 0;
+                for (let i = 0; i < list.length; i++) {
+                    const sl = slots[list[i]];
+                    if (list[i] === modId || !sl || !sl.visible) continue;
+                    const c = sl.mapToItem(frame, sl.width / 2, sl.height / 2);
+                    if ((root.vertical ? c.y : c.x) < pos) idx = i + 1;
+                }
+
+                root.moveToIndex(modId, sec, idx);
+                root.save();
+            }
+
             Item {
                 id: frame
                 anchors {
@@ -1121,9 +1452,11 @@ Scope {
                 }
 
                 Panel {
+                    id: startPanel
                     model: root.startList
                     anchors.left: frame.left
                     anchors.top: frame.top
+                    onDropped: (modId, sx, sy) => bar.dropModule(modId, sx, sy)
                 }
 
                 Panel {
@@ -1134,6 +1467,7 @@ Scope {
                     anchors.verticalCenter: root.vertical ? frame.verticalCenter : undefined
                     anchors.top: root.vertical ? undefined : frame.top
                     anchors.left: root.vertical ? frame.left : undefined
+                    onDropped: (modId, sx, sy) => bar.dropModule(modId, sx, sy)
 
                     property bool calOpen: false
                     property int monthOffset: 0
@@ -1332,11 +1666,13 @@ Scope {
                 }
 
                 Panel {
+                    id: endPanel
                     model: root.endList
                     anchors.right: root.vertical ? undefined : frame.right
                     anchors.bottom: root.vertical ? frame.bottom : undefined
                     anchors.top: root.vertical ? undefined : frame.top
                     anchors.left: root.vertical ? frame.left : undefined
+                    onDropped: (modId, sx, sy) => bar.dropModule(modId, sx, sy)
                 }
             }
         }

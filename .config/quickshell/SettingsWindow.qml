@@ -603,8 +603,6 @@ Scope {
                                 if (moved) root.finishDrag()
                                 else root.dragging = false
                             }
-
-                            onDoubleClicked: root.snapCenter()
                         }
 
                         Row {

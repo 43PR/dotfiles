@@ -233,8 +233,6 @@ PanelWindow {
                     root.dragging = false
                     root.savePos()
                 }
-
-                onDoubleClicked: root.resetPos()
             }
 
             Row {

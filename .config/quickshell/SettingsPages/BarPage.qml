@@ -22,38 +22,41 @@ Item {
 
     readonly property var defaults: ({
         position: "left", style: "joined", thickness: 20, margin: 4,
-        reserveSpace: true, allScreens: true,
+        reserveSpace: true, allScreens: true, dragModules: true,
         scale: 1.0, bgOpacity: 0.5, border: false, radius: 16, calRadius: 15,
         tooltips: true, tooltipHints: true, tipDelay: 450,
         modPad: 20, wsDot: 10, wsGap: 8, wsScroll: true,
-        statsMode: "compact", statsWarn: 85, batLowPct: 15,
+        statsMode: "compact", statsWarn: 85, tempWarn: 85, batLowPct: 15,
         volStep: 2, volMax: 100,
         clock24: true, clockSeconds: false, weekMonday: true,
-        hidden: "stats,wall,settings,tasks",
-        startMods: "stats,ws",
+        hidden: "cpu,ram,gpu,temp,wall,settings,tasks",
+        startMods: "cpu,ram,gpu,temp,ws",
         centerMods: "clock",
         endMods: "media,volume,battery,net,notif,wall,settings,power"
     })
 
     readonly property var positions: ["top", "right", "bottom", "left"]
     readonly property var styles: ["floating", "joined", "strip"]
-    readonly property var sections: ["start", "center", "end"]
     readonly property var statsModes: ["default", "compact"]
 
+    // Module order / section placement is changed by dragging modules on the bar itself.
+    // This page only turns modules on and off.
     readonly property var moduleDefs: [
-        { id: "stats",    l: "CPU / RAM" },
+        { id: "cpu",      l: "CPU" },
+        { id: "ram",      l: "RAM" },
+        { id: "gpu",      l: "GPU" },
+        { id: "temp",     l: "TEMPS" },
         { id: "ws",       l: "WORKSPACES" },
         { id: "tasks",    l: "OPEN APPS" },
         { id: "media",    l: "MEDIA" },
         { id: "volume",   l: "VOLUME" },
         { id: "battery",  l: "BATTERY" },
         { id: "net",      l: "NETWORK" },
-        { id: "notif",    l: "NOTIFICATIONS" },
+        { id: "notif",    l: "NOTIFS" },
         { id: "wall",     l: "WALLPAPERS" },
         { id: "settings", l: "SETTINGS" },
         { id: "power",    l: "POWER", fixed: true }
     ]
-    readonly property var moduleIds: moduleDefs.map(d => d.id)
 
     // values changed from their defaults (reassigned on every change so bindings update)
     property var s: ({})
@@ -81,52 +84,21 @@ Item {
     readonly property bool vertical: val("position") === "left" || val("position") === "right"
     readonly property bool strip: val("style") === "strip"
 
-    // ---- module placement (mirrors the logic in Bar.qml) ----
-    function csv(str) { return str === "" ? [] : str.split(",") }
-    function valid(id) { return moduleIds.indexOf(id) >= 0 }
+    // ---- module enable / disable (mirrors the logic in Bar.qml) ----
+    // The old combined "stats" module is migrated to "cpu" + "ram".
+    function csv(str) {
+        if (str === "") return []
+        const out = []
+        for (const x of str.split(","))
+        x === "stats" ? out.push("cpu", "ram") : out.push(x)
+        return out
+    }
 
     function isOn(id) { return csv(val("hidden")).indexOf(id) < 0 }
     function setOn(id, on) {
         const h = csv(val("hidden")).filter(x => x !== id)
         if (!on) h.push(id)
         set("hidden", h.join(","))
-    }
-
-    function listOf(sec) {
-        const start = csv(val("startMods")).filter(valid)
-        let center = csv(val("centerMods")).filter(x => x === "clock" || valid(x))
-        if (center.indexOf("clock") < 0) center = ["clock"].concat(center)
-        if (sec === "start") return start
-        if (sec === "center") return center
-        const a = csv(val("endMods")).filter(valid)
-        return a.concat(moduleIds.filter(x =>
-            start.indexOf(x) < 0 && center.indexOf(x) < 0 && a.indexOf(x) < 0))
-    }
-
-    function sectionOf(id) {
-        return sections.find(k => listOf(k).indexOf(id) >= 0) ?? "end"
-    }
-
-    function moveTo(id, sec) {
-        const o = {}
-        for (const k of sections) {
-            const a = listOf(k).filter(x => x !== id)
-            if (k === sec) a.push(id)
-            o[k + "Mods"] = a.join(",")
-        }
-        setMany(o)
-    }
-
-    function canShift(id, d) {
-        const a = listOf(sectionOf(id)), j = a.indexOf(id) + d
-        return j >= 0 && j < a.length
-    }
-
-    function shiftBy(id, d) {
-        if (!canShift(id, d)) return
-        const sec = sectionOf(id), a = listOf(sec), i = a.indexOf(id), j = i + d
-        const t = a[i]; a[i] = a[j]; a[j] = t
-        set(sec + "Mods", a.join(","))
     }
 
     // ------------------------------------------------------------------
@@ -217,6 +189,9 @@ Item {
 
         Text {
             anchors.centerIn: parent
+            width: Math.min(implicitWidth, sb.width - 8)
+            horizontalAlignment: Text.AlignHCenter
+            elide: Text.ElideRight
             text: sb.label
             color: sb.current ? Theme.accent : Theme.text
             font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody; font.bold: true; font.letterSpacing: 1
@@ -370,77 +345,6 @@ Item {
         }
     }
 
-    component ModuleRow: Item {
-        id: mr
-        property var def: ({})
-
-        width: parent.width
-        height: 32
-
-        Row {
-            anchors.left: parent.left
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: 6
-
-            Text {
-                width: 100
-                height: 28
-                anchors.verticalCenter: parent.verticalCenter
-                text: mr.def.l ?? ""
-                color: Theme.textDim
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.textSizeBody
-                font.letterSpacing: 1
-                verticalAlignment: Text.AlignVCenter
-                elide: Text.ElideRight
-            }
-
-            SmallButton {
-                width: 54
-                label: page.isOn(mr.def.id) || !!mr.def.fixed ? "ON" : "OFF"
-                current: page.isOn(mr.def.id) || !!mr.def.fixed
-                buttonEnabled: !mr.def.fixed
-                onClicked: page.setOn(mr.def.id, !page.isOn(mr.def.id))
-            }
-        }
-
-        Row {
-            anchors.centerIn: parent
-            spacing: 4
-
-            Repeater {
-                model: page.sections
-                delegate: SmallButton {
-                    required property string modelData
-                    width: 64
-                    label: modelData.toUpperCase()
-                    current: modelData === page.sectionOf(mr.def.id)
-                    onClicked: page.moveTo(mr.def.id, modelData)
-                }
-            }
-        }
-
-        Row {
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: 4
-
-            SmallButton {
-                width: 32
-                label: page.vertical ? "▲" : "◀"
-                buttonEnabled: page.canShift(mr.def.id, -1)
-                onClicked: page.shiftBy(mr.def.id, -1)
-            }
-
-            SmallButton {
-                width: 32
-                label: page.vertical ? "▼" : "▶"
-                buttonEnabled: page.canShift(mr.def.id, 1)
-                onClicked: page.shiftBy(mr.def.id, 1)
-            }
-        }
-    }
-
     // ------------------------------------------------------------------
     // UI
     // ------------------------------------------------------------------
@@ -539,6 +443,10 @@ Item {
                             label: "SHOW ON ALL MONITORS"; checked: page.val("allScreens")
                             onToggled: v => page.set("allScreens", v)
                         }
+                        ToggleRow {
+                            label: "DRAG MODULES ON BAR"; checked: page.val("dragModules")
+                            onToggled: v => page.set("dragModules", v)
+                        }
                     }
                 }
             }
@@ -617,32 +525,46 @@ Item {
                     }
                 }
             }
+
             // --------------- MODULES ----------------
+            // One compact on/off button per module, four per row.
+            // Highlighted = shown on the bar. Reorder by dragging modules on the bar.
             Column {
-                width: parent.width; spacing: 4
-                topPadding: 4
-                bottomPadding: 4
+                width: parent.width; spacing: 10
+                topPadding: 6
+
                 SectionTitle { text: "MODULES" }
+
                 Card {
-                    Column {
-                        width: parent.width; spacing: 4
+                    Grid {
+                        id: modGrid
+                        width: parent.width
+                        columns: 4
+                        spacing: 6
+
                         Repeater {
                             model: page.moduleDefs
-                            delegate: ModuleRow {
+                            delegate: SmallButton {
                                 required property var modelData
-                                def: modelData
+                                width: Math.floor((modGrid.width - modGrid.spacing * 3) / 4)
+                                label: modelData.l
+                                current: page.isOn(modelData.id) || !!modelData.fixed
+                                buttonEnabled: !modelData.fixed
+                                onClicked: page.setOn(modelData.id, !page.isOn(modelData.id))
                             }
                         }
                     }
                 }
+
                 Text {
                     width: parent.width
                     wrapMode: Text.WordWrap
-                    text: "Changes apply instantly and are saved automatically."
+                    text: "Click a module to show or hide it. Drag modules on the bar to reorder them or move them between sections. Changes apply instantly and are saved automatically."
                     color: Theme.textDim
                     font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeSmall
                 }
             }
+
             // ---------------- CLOCK & CALENDAR ----------------
             Column {
                 width: parent.width; spacing: 10
@@ -706,16 +628,22 @@ Item {
                             onToggled: v => page.set("wsScroll", v)
                         }
                         BarChoice {
-                            label: "CPU / RAM STYLE"
+                            label: "CPU / RAM / GPU / TEMP STYLE"
                             options: page.statsModes
                             current: page.val("statsMode")
                             onPicked: v => page.set("statsMode", v)
                         }
                         BarSlider {
-                            label: "HIGH CPU / RAM WARNING"
+                            label: "HIGH CPU / RAM / GPU WARNING"
                             from: 50; to: 100; step: 5; unit: "%"
                             value: page.val("statsWarn")
                             onMoved: v => page.set("statsWarn", v)
+                        }
+                        BarSlider {
+                            label: "HIGH TEMPERATURE WARNING"
+                            from: 50; to: 110; step: 5; unit: " °C"
+                            value: page.val("tempWarn")
+                            onMoved: v => page.set("tempWarn", v)
                         }
                         BarSlider {
                             label: "LOW BATTERY WARNING"

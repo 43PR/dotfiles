@@ -21,11 +21,12 @@ Item {
     readonly property string customAvatar: imgDir + "/pfp_custom"
 
     // ── GPU probe (vendor-agnostic, no root needed) ───────────
+    // Kept identical to the bar's probe (Bar.qml) so both show the same value.
     // Prints "<usage%> <tempC>"; a field is "-" when unavailable.
     // Order of attempts for usage:
     //   1. NVIDIA  : nvidia-smi
     //   2. AMD     : sysfs gpu_busy_percent (largest-VRAM card wins)
-    //   3. Intel   : intel_gpu_top (only if permitted, 3s timeout)
+    //   3. Intel   : intel_gpu_top (only if permitted, 4s timeout)
     //   4. Intel/other fallback: GPU clock estimate (act_freq / max_freq),
     //      works unprivileged on i915 and xe drivers
     // Temperature: nvidia-smi, else any DRM card hwmon temp, else `sensors`.
@@ -66,8 +67,8 @@ fi
 
 # 3. Intel via intel_gpu_top (needs CAP_PERFMON / root; silently skipped otherwise)
 if [ "$u" = "-" ] && command -v intel_gpu_top >/dev/null 2>&1; then
-  v=$(timeout 3 intel_gpu_top -J -s 500 -n 2 2>/dev/null | grep -o '"busy": *[0-9.]*' | grep -o '[0-9.]*$' | sort -n | tail -n1)
-  isnum "$v" && u="$v"
+    v=$(timeout 4 intel_gpu_top -J -s 1000 -n 2 2>/dev/null | awk 'index($0,"Render/3D"){f=1;next} f==1 && /busy/{x=$0;gsub(/[^0-9.]/,"",x);f=2;next} f==2{if(/sema/)last=x;f=0} END{print last}')
+    isnum "$v" && u="$v"
 fi
 
 # 4. Unprivileged fallback: GPU clock as a load estimate (i915 / xe)
@@ -121,6 +122,7 @@ echo "$u $t"
     property real cpuUsage: 0
     property real gpuUsage: 0
     property bool gpuHasUsage: false
+    property real gpuAvg: -1               // smoothed GPU usage (same filter as the bar)
     property real memoryUsage: 0
     property var cpuHistory: []
     property var gpuHistory: []
@@ -140,13 +142,21 @@ echo "$u $t"
         page[type + "History"] = page[type + "History"].concat([value]).slice(-historyLength)
     }
 
+    // Same smoothing as the bar: exponential average (0.6 old / 0.4 new),
+    // rounded, so the page and the bar always show the same GPU percentage.
     function updateGpuFromProbe(text) {
         var p = text.trim().split(/\s+/)
         var u = parseFloat(p[0])
         var t = parseFloat(p[1])
 
         gpuHasUsage = !isNaN(u)
-        if (gpuHasUsage) updateGraph(u, "gpu")
+        if (gpuHasUsage) {
+            var v = Math.max(0, Math.min(100, u))
+            gpuAvg = gpuAvg < 0 ? v : gpuAvg * 0.6 + v * 0.4
+            updateGraph(Math.round(gpuAvg), "gpu")
+        } else {
+            gpuAvg = -1
+        }
 
         gpuTempProbe = isNaN(t) ? "—" : Math.round(t) + "°C"
     }
@@ -587,7 +597,7 @@ echo "$u $t"
                         source: avatar
                         maskEnabled: true
                         maskSource: avatarMask
-                        opacity: Theme.bg.a
+                        opacity: 0.7
                     }
 
                     // Barely-visible change button: left click = pick, right click = reset
