@@ -150,9 +150,7 @@ fi
 # Packages: split into official-repo vs AUR-only
 # --------------------------------------------------
 
-mapfile -t PACKAGES < <(
-    grep -vE '^[[:space:]]*(#|$)' "$PACKAGE_FILE"
-)
+mapfile -t PACKAGES < <(sed -E 's/[[:space:]]*#.*$//; s/^[[:space:]]+//; s/[[:space:]]+$//; /^$/d' "$PACKAGE_FILE")
 
 OFFICIAL_PACKAGES=()
 AUR_PACKAGES=()

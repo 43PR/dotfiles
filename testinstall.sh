@@ -243,7 +243,7 @@ detect_gpus() {
     grep -qi 'intel' <<<"$lines"                               && out+=(intel)
     grep -Eqi 'virtio|vmware|qxl|virtualbox|red hat' <<<"$lines"   && out+=(vm)
 
-    printf '%s\n' "${out[@]:-}" | grep -v '^$' | paste -sd, -
+    printf '%s\n' "${out[@]:-}" | awk 'NF && !s[$0]++' | paste -sd, -
 }
 
 normalize_gpus() {
@@ -257,7 +257,7 @@ normalize_gpus() {
             *) return 1 ;;
         esac
     done
-    printf '%s\n' "${cleaned[@]:-}" | grep -v '^$' | awk '!s[$0]++' | paste -sd, -
+    printf '%s\n' "${cleaned[@]:-}" | awk 'NF && !s[$0]++' | paste -sd, -
 }
 
 step "GPU selection"

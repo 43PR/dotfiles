@@ -88,7 +88,7 @@ elif ! command -v pacman >/dev/null 2>&1; then
 elif [[ ! -f "$PACKAGE_FILE" ]]; then
     warning "packages.txt not found; skipping package installation."
 else
-    mapfile -t PACKAGES < <(grep -vE '^[[:space:]]*(#|$)' "$PACKAGE_FILE")
+    mapfile -t PACKAGES < <(sed -E 's/[[:space:]]*#.*$//; s/^[[:space:]]+//; s/[[:space:]]+$//; /^$/d' "$PACKAGE_FILE")
 
     MISSING=()
     for pkg in "${PACKAGES[@]}"; do

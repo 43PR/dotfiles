@@ -173,6 +173,7 @@ otf-font-awesome
 # --------------------------------------------------
 
 python
+python-gobject
 jq
 flatpak
 curl
