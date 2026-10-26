@@ -92,3 +92,6 @@ require("rules")
 
 -- HyprMod managed settings
 require("hyprland-gui")
+
+-- Let applications follow the same XDG choice as Super+B.
+hl.env("BROWSER", "python3 " .. os.getenv("HOME") .. "/.config/hypr/scripts/default-browser.py")
