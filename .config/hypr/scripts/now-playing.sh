@@ -1,68 +1,71 @@
 #!/bin/bash
-# .config/hypr/scripts/now-playing.sh
+# ~/.config/hypr/scripts/now-playing.sh
 
-MAX_CHARS=60
-DISPLAY_CHARS=30
+export LC_ALL=C.UTF-8          # make ${var:pos:len} count characters, not bytes
 
-# Find the currently playing player
-PLAYER=""
+MAX_CHARS=60                   # max title/artist length before truncating
+DISPLAY_CHARS=30               # width of the marquee window
+STEP_MS=400                    # time per scroll step (lower = faster)
+GAP="     "                    # spacing between loops
 
-while read -r p; do
-    if [ "$(playerctl --player="$p" status 2>/dev/null)" = "Playing" ]; then
-        PLAYER="$p"
-        break
-    fi
-done < <(playerctl -l 2>/dev/null)
+ICON_PREV="󰒮"
+ICON_NEXT="󰒭"
+ICON_PLAY="󰐊"
+ICON_PAUSE="󰏤"
 
-# Nothing is playing
-[ -z "$PLAYER" ] && exit 0
+# One playerctl call for all players: instance, status, title, artist
+US=$'\x1f'
+fmt="{{playerInstance}}${US}{{status}}${US}{{title}}${US}{{artist}}"
 
-# Output requested control
+playing=() paused=()
+while IFS="$US" read -r inst st ti ar; do
+    case "$st" in
+        Playing) [ ${#playing[@]} -eq 0 ] && playing=("$inst" "$st" "$ti" "$ar") ;;
+        Paused)  [ ${#paused[@]}  -eq 0 ] && paused=("$inst" "$st" "$ti" "$ar") ;;
+    esac
+done < <(playerctl -a metadata --format "$fmt" 2>/dev/null)
+
+# Prefer a playing player, fall back to a paused one, else show nothing
+if   [ ${#playing[@]} -gt 0 ]; then sel=("${playing[@]}")
+elif [ ${#paused[@]}  -gt 0 ]; then sel=("${paused[@]}")
+else exit 0
+fi
+
+inst="${sel[0]}" status="${sel[1]}" title="${sel[2]}" artist="${sel[3]}"
+
 case "$1" in
-    previous)
-        echo "⟨"
-        exit
-        ;;
-    pause)
-        echo " Ⅱ "
-        exit
-        ;;
-    next)
-        echo "⟩"
-        exit
-        ;;
+    previous) echo "$ICON_PREV"; exit ;;
+    next)     echo "$ICON_NEXT"; exit ;;
+    player)   echo "$inst"; exit ;;
+    toggle|pause)
+        [ "$status" = "Playing" ] && echo "$ICON_PAUSE" || echo "$ICON_PLAY"
+        exit ;;
 esac
 
-title="$(playerctl --player="$PLAYER" metadata --format '{{ title }}' 2>/dev/null)"
-artist="$(playerctl --player="$PLAYER" metadata --format '{{ artist }}' 2>/dev/null)"
+# Build text (skip the separator if artist is missing)
+text="$title"
+[ -n "$artist" ] && text="$title - $artist"
 
-text="$title - $artist"
-
-# Truncate full text
+# Truncate
 if [ "${#text}" -gt "$MAX_CHARS" ]; then
     text="${text:0:$((MAX_CHARS - 1))}…"
 fi
 
-# Add spacing for marquee
-text="$text     "
-
-len=${#text}
-
-# Don't scroll if text fits
-if [ "$len" -le "$DISPLAY_CHARS" ]; then
-    echo "♪  $text"
+# Short text: no scrolling
+if [ "${#text}" -le "$DISPLAY_CHARS" ]; then
+    echo "$text"
     exit
 fi
 
-# Marquee position
-pos=$(( $(date +%s) % len ))
-
-# Get visible portion
-visible="${text:$pos:$DISPLAY_CHARS}"
-
-# Wrap around to the beginning
-if [ "${#visible}" -lt "$DISPLAY_CHARS" ]; then
-    visible="$visible${text:0:$((DISPLAY_CHARS - ${#visible}))}"
+# Paused: freeze at the start; playing: scroll by wall-clock time
+text="$text$GAP"
+len=${#text}
+pos=0
+if [ "$status" = "Playing" ]; then
+    now_ms=$(( ${EPOCHREALTIME/./} / 1000 ))
+    pos=$(( (now_ms / STEP_MS) % len ))
 fi
 
-echo "♪  $visible"
+# Doubling the string handles wrap-around without extra logic
+loop="$text$text"
+echo "${loop:$pos:$DISPLAY_CHARS}"

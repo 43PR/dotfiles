@@ -183,5 +183,4 @@ unzip
 # Hyprland Companion Apps (AUR)
 # --------------------------------------------------
 
-hyprmod
 python-gobject

@@ -50,9 +50,7 @@ Check other [Keybinds](#keybinds). You can also hover over bar elements to see w
 - Log out and back in once the installer finishes.
 - Wallpapers aren't included in the install. Download some and put them in `Pictures/Wallpapers`.
 
-### Something broke, where do I ask?
-
-Join the [Discord](https://discord.gg/HQwU9SzHj).
+### Any issues you can use the discord server, link above (click discord button).
 
 </details>
 

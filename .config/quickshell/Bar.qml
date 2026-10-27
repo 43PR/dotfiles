@@ -23,10 +23,14 @@ Scope {
         tooltips: true, tooltipHints: true, tipDelay: 450,
         // modules
         modPad: 20, wsDot: 10, wsGap: 8, wsScroll: true,
-        statsMode: "compact", statsWarn: 85, tempWarn: 85, batLowPct: 15,
+        statsPercent: false, statsScale: 1.0, statsBorder: true, statsWarn: 85, tempWarn: 85, batLowPct: 15,
         volStep: 2, volMax: 100,
         // clock / calendar
         clock24: true, clockSeconds: false, weekMonday: true,
+        // clock click binds: "calendar" | "quickactions" | "settings" | "barsettings" | "none"
+        clockPrimary: "calendar", clockSecondary: "quickactions", clockTertiary: "settings",
+        // settings button click binds: "quickactions" | "settings" | "barsettings" | "none"
+        settingsPrimary: "settings", settingsSecondary: "barsettings", settingsTertiary: "none",
         // module placement
         hidden: "cpu,ram,gpu,temp,wall,settings,tasks",
         startMods: "cpu,ram,gpu,temp,ws",
@@ -36,7 +40,6 @@ Scope {
     readonly property var positions: ["top", "right", "bottom", "left"]
     readonly property var styles: ["floating", "joined", "strip"]
     readonly property var sections: ["start", "center", "end"]
-    readonly property var statsModes: ["default", "compact"]
 
     // Live config object, edited by BarPage (the settings page).
     readonly property var config: cfg
@@ -72,7 +75,9 @@ Scope {
             property int wsDot: root.defaults.wsDot              // workspace dot size
             property int wsGap: root.defaults.wsGap              // gap between workspace dots
             property bool wsScroll: root.defaults.wsScroll       // scroll on workspaces to switch
-            property string statsMode: root.defaults.statsMode   // "default" | "compact"
+            property bool statsPercent: root.defaults.statsPercent // show the % / °C symbols on CPU / RAM / GPU / TEMP
+            property real statsScale: root.defaults.statsScale   // text scale of the CPU / RAM / GPU / TEMP badges
+            property bool statsBorder: root.defaults.statsBorder // outline around the stat badges
             property int statsWarn: root.defaults.statsWarn      // CPU/RAM/GPU % that turns red
             property int tempWarn: root.defaults.tempWarn        // CPU/GPU °C that turns red
             property int batLowPct: root.defaults.batLowPct      // battery % that turns red
@@ -81,6 +86,12 @@ Scope {
             property bool clock24: root.defaults.clock24
             property bool clockSeconds: root.defaults.clockSeconds
             property bool weekMonday: root.defaults.weekMonday   // calendar week starts on Monday
+            property string clockPrimary: root.defaults.clockPrimary     // clock left click
+            property string clockSecondary: root.defaults.clockSecondary // clock right click
+            property string clockTertiary: root.defaults.clockTertiary   // clock middle click
+            property string settingsPrimary: root.defaults.settingsPrimary     // settings button left click
+            property string settingsSecondary: root.defaults.settingsSecondary // settings button right click
+            property string settingsTertiary: root.defaults.settingsTertiary   // settings button middle click
             property string hidden: root.defaults.hidden         // comma list of disabled modules
             property string startMods: root.defaults.startMods
             property string centerMods: root.defaults.centerMods
@@ -110,7 +121,7 @@ Scope {
 
     readonly property var sz: ({
         stat: s(12), clock: s(12), marquee: s(11),
-        icon: s(16), batIcon: s(13), batText: s(12), power: s(15),
+        icon: s(16), batIcon: s(13), batText: s(12), power: s(14),
         taskIcon: s(18),
         calTime: s(30), calDate: s(12), calMonth: s(13), calArrow: s(16),
         calWeekday: s(11), calDay: s(12)
@@ -239,6 +250,7 @@ Scope {
     //   g = glyph, tip = tooltip title, hint = left-click description.
     // Modules without it have a dedicated Component below (see `comps`).
     readonly property var moduleDefs: [
+        { id: "clock",    l: "Clock" },
         { id: "cpu",      l: "CPU" },
         { id: "ram",      l: "RAM" },
         { id: "gpu",      l: "GPU" },
@@ -297,8 +309,9 @@ Scope {
     // sections
     readonly property var startList: csv(cfg.startMods).filter(valid)
     readonly property var centerList: {
-        const a = csv(cfg.centerMods).filter(x => x === "clock" || valid(x));
-        return a.indexOf("clock") >= 0 ? a : ["clock"].concat(a);
+        // The clock is a regular module now: it may live in any section (or be hidden),
+        // so the center section can be empty.
+        return csv(cfg.centerMods).filter(valid);
     }
     readonly property var endList: {
         const a = csv(cfg.endMods).filter(valid);
@@ -368,6 +381,19 @@ Scope {
     // Adjust the IPC call below if your settings app names the page differently.
     function openSettings() { run("qs ipc call settings bar"); }
 
+    // Shared click actions (clock + settings button binds)
+    // "settings" | "barsettings" | "quickactions" | "none"
+    function actionHint(a) {
+        return a === "settings" ? "Settings"
+             : a === "barsettings" ? "Bar settings"
+             : a === "quickactions" ? "Quick actions" : "";
+    }
+    function doAction(a) {
+        if (a === "settings") run("qs ipc call settings toggle");
+        else if (a === "barsettings") openSettings();
+        else if (a === "quickactions") run("qs ipc call qa toggle");
+    }
+
     IpcHandler {
         target: "bar"
         function toggle(): void { root.barVisible = !root.barVisible; }
@@ -382,9 +408,6 @@ Scope {
         }
         function setStyle(st: string): void {
             if (root.styles.indexOf(st) >= 0) { cfg.style = st; root.save(); }
-        }
-        function setStatsMode(mode: string): void {
-            if (root.statsModes.indexOf(mode) >= 0) { cfg.statsMode = mode; root.save(); }
         }
         function customize(): void { root.openSettings(); }
         function moveModule(id: string, section: string): void {
@@ -550,7 +573,7 @@ echo "$u $t"
             for (const l of lines) {
                 const line = l.trim();
                 if (line.indexOf(k) !== 0) continue;
-                const m = line.match(/([+-]?\d+(?:\.\d+)?)\s*°C/);
+                const m = line.match(/([+-]?\d+(?:\.\d+)?)\s*°/);
                 if (m) return Math.round(parseFloat(m[1]));
             }
         }
@@ -792,6 +815,7 @@ echo "$u $t"
         property bool disabled: false          // dimmed, ignores input, tooltip explains why
         property bool interactive: true        // false → informational only (no hover tint / pointer)
         property bool noTip: false             // never show a tooltip for this element
+        property bool noSecondary: false       // right click does nothing (and is not listed in the tooltip)
         signal primary()
         signal secondary()
         signal tertiary()
@@ -803,13 +827,14 @@ echo "$u $t"
             if (!cfg.tooltipHints) return "";
             const l = [];
             if (primaryHint !== "") l.push("Left click: " + primaryHint);
-            l.push("Right click: " + (secondaryHint !== "" ? secondaryHint : "Quick actions"));
+            if (!noSecondary) l.push("Right click: " + (secondaryHint !== "" ? secondaryHint : "Quick actions"));
             if (tertiaryHint !== "") l.push("Middle click: " + tertiaryHint);
             if (scrollHint !== "") l.push("Scroll: " + scrollHint);
             return l.join("\n");
         }
 
         function secondaryAction() {
+            if (noSecondary) return;
             if (secondaryHint !== "") secondary();
             else root.openSettings();
         }
@@ -927,15 +952,16 @@ echo "$u $t"
     }
 
     // Rounded stat badge (CPU / RAM / GPU / temperatures), informational only.
-    //   "compact": round badge, same size as the app icons, value only
-    //   "default": capsule with label + value ("CPU 12" / stacked on vertical bars)
+    // Capsule with label + value ("CPU 12" / stacked on vertical bars).
+    // `unit` ("%" or "°C") is appended when the "show unit symbols" option is on.
     component StatBadge: Interactive {
         id: stat
         property string label: ""
         property string valueText: ""
-        readonly property bool compact: cfg.statsMode === "compact"
+        property string unit: ""
+        readonly property string shownValue: valueText + (cfg.statsPercent ? unit : "")
         readonly property color fg: warning ? Theme.danger : Theme.text
-        readonly property int fontPx: Math.round(root.sz.taskIcon * 0.5)
+        readonly property int fontPx: Math.max(6, Math.round(root.sz.taskIcon * 0.5 * cfg.statsScale))
 
         Layout.alignment: Qt.AlignCenter
         implicitWidth: root.vertical ? root.panelThick : badge.width + 8
@@ -946,15 +972,13 @@ echo "$u $t"
         Rectangle {
             id: badge
             anchors.centerIn: parent
-            width: stat.compact ? root.sz.taskIcon
-                 : root.vertical ? root.sz.taskIcon + 6
-                 : statRow.implicitWidth + 14
-            height: stat.compact ? root.sz.taskIcon
-                  : root.vertical ? statRow.implicitHeight + 10
-                  : root.sz.taskIcon
+            width: root.vertical ? Math.max(root.sz.taskIcon + 6, statRow.implicitWidth + 8)
+                                 : statRow.implicitWidth + 14
+            height: root.vertical ? statRow.implicitHeight + 10
+                                  : Math.max(root.sz.taskIcon, statRow.implicitHeight + 6)
             radius: Math.min(width, height) / 2
             color: Qt.alpha(stat.fg, 0.045)
-            border.width: 1
+            border.width: cfg.statsBorder ? 1 : 0
             border.color: Qt.alpha(stat.fg, 0.18)
 
             GridLayout {
@@ -965,7 +989,6 @@ echo "$u $t"
                 columnSpacing: 4
 
                 Text {
-                    visible: !stat.compact
                     Layout.alignment: Qt.AlignCenter
                     text: stat.label
                     color: Qt.alpha(stat.fg, 0.75)
@@ -975,7 +998,7 @@ echo "$u $t"
                 }
                 Text {
                     Layout.alignment: Qt.AlignCenter
-                    text: stat.valueText
+                    text: stat.shownValue
                     color: stat.fg
                     font.family: Theme.iconFont
                     font.bold: true
@@ -995,7 +1018,7 @@ echo "$u $t"
         property Component clockComp: null
 
         readonly property bool isSlot: true
-        readonly property bool dragAllowed: cfg.dragModules && modelData !== "clock"
+        readonly property bool dragAllowed: cfg.dragModules
         property bool dragging: false
         property real dragDx: 0
         property real dragDy: 0
@@ -1031,7 +1054,11 @@ echo "$u $t"
         readonly property Item lane: laneItem
         signal dropped(string modId, real sx, real sy)
 
-        visible: (root.vertical ? laneItem.implicitHeight : laneItem.implicitWidth) > 0
+        // Visibility must NOT depend on the lane's implicit size: an invisible panel never
+        // re-polishes its layout, so the size would stay 0 and the panel could never come back
+        // (e.g. re-enabling the clock in an otherwise empty section).
+        readonly property bool hasVisible: model.some(id => root.modVisible(id))
+        visible: hasVisible
         z: dragActive ? 100 : 0                  // keep the dragged module above the other panels
         width: root.vertical ? root.panelThick : laneItem.implicitWidth + 4
         height: root.vertical ? laneItem.implicitHeight + 4 : root.panelThick
@@ -1120,13 +1147,23 @@ echo "$u $t"
             property var def: root.defMap[mid] ?? ({})
             readonly property bool isNet: mid === "net"
             readonly property bool isNotif: mid === "notif"
+            readonly property bool isSettings: mid === "settings"
             baseSize: mid === "power" ? root.sz.power : root.sz.icon
-            yOffset: root.iconYOffset
+            yOffset: mid === "power" ? 0 : root.iconYOffset
             text: isNet ? root.netGlyph : (def.g ?? "")
             tip: isNet ? root.netTip : mid === "notif" ? root.notifTip : (def.tip ?? "")
-            primaryHint: def.hint ?? ""
+            // The settings button has configurable click binds (see Bar page → Settings button)
+            primaryHint: isSettings ? root.actionHint(cfg.settingsPrimary) : (def.hint ?? "")
+            secondaryHint: isSettings ? root.actionHint(cfg.settingsSecondary) : ""
+            tertiaryHint: isSettings ? root.actionHint(cfg.settingsTertiary) : ""
+            noSecondary: isSettings && cfg.settingsSecondary === "none"
             warning: isNet && root.netState === "disconnected"
-            onPrimary: if (def.cmd) root.run(def.cmd)
+            onPrimary: {
+                if (isSettings) root.doAction(cfg.settingsPrimary);
+                else if (def.cmd) root.run(def.cmd);
+            }
+            onSecondary: if (isSettings) root.doAction(cfg.settingsSecondary)
+            onTertiary: if (isSettings) root.doAction(cfg.settingsTertiary)
 
             // Notification count badge (top-right of the icon)
             Rectangle {
@@ -1159,6 +1196,7 @@ echo "$u $t"
         id: cpuC
         StatBadge {
             label: "CPU"
+            unit: "%"
             valueText: String(root.cpuUsage)
             warning: root.cpuUsage >= cfg.statsWarn
             tip: "CPU usage: " + root.cpuUsage + "%"
@@ -1170,6 +1208,7 @@ echo "$u $t"
         id: ramC
         StatBadge {
             label: "RAM"
+            unit: "%"
             valueText: String(root.memPercent)
             warning: root.memPercent >= cfg.statsWarn
             tip: "Memory: " + root.memUsedG.toFixed(1) + " / " + root.memTotalG.toFixed(1)
@@ -1182,6 +1221,7 @@ echo "$u $t"
         id: gpuC
         StatBadge {
             label: "GPU"
+            unit: root.gpuHasUsage ? "%" : ""
             valueText: root.gpuHasUsage ? String(root.gpuUsage) : "–"
             warning: root.gpuHasUsage && root.gpuUsage >= cfg.statsWarn
             tip: root.gpuHasUsage ? "GPU usage: " + root.gpuUsage + "%" : "GPU usage: unavailable"
@@ -1195,6 +1235,7 @@ echo "$u $t"
             gap: 2
             StatBadge {
                 label: "TEMP"
+                unit: root.cpuTemp >= 0 ? "°" : ""
                 valueText: root.tempText(root.cpuTemp)
                 warning: root.cpuTemp >= cfg.tempWarn
                 tip: root.tempTip("CPU", root.cpuTemp)
@@ -1303,7 +1344,7 @@ echo "$u $t"
                         anchors.fill: appIcon
                         source: appIcon
                         colorization: 1.0
-                        colorizationColor: task.modelData.activated ? Theme.accent : Theme.text
+                        colorizationColor: task.modelData.activated ? Theme.accent2 : Theme.text
                         opacity: task.modelData.activated ? 1 : 0.75
                     }
                 }
@@ -1407,8 +1448,12 @@ echo "$u $t"
             function dropModule(modId, sx, sy) {
                 const pt = frame.mapFromItem(null, sx, sy);
                 const pos = root.vertical ? pt.y : pt.x;
-                const c0 = root.vertical ? clockPanel.y : clockPanel.x;
-                const c1 = c0 + (root.vertical ? clockPanel.height : clockPanel.width);
+                // The center zone is a band around the middle of the bar; it is at least
+                // 80px wide so an empty center section (clock moved away) is still a drop target.
+                const mid = (root.vertical ? frame.height : frame.width) / 2;
+                const half = Math.max((root.vertical ? clockPanel.height : clockPanel.width) / 2, 40);
+                const c0 = mid - half;
+                const c1 = mid + half;
                 const sec = pos < c0 ? "start" : pos > c1 ? "end" : "center";
                 const panel = sec === "start" ? startPanel : sec === "center" ? clockPanel : endPanel;
                 const list = root.listOf(sec);
@@ -1454,6 +1499,7 @@ echo "$u $t"
                 Panel {
                     id: startPanel
                     model: root.startList
+                    clockComp: clockC
                     anchors.left: frame.left
                     anchors.top: frame.top
                     onDropped: (modId, sx, sy) => bar.dropModule(modId, sx, sy)
@@ -1471,46 +1517,68 @@ echo "$u $t"
 
                     property bool calOpen: false
                     property int monthOffset: 0
+                    property Item clockItem: null     // the live clock module (wherever it was placed)
 
+                    // The clock is only needed while the module is enabled.
                     SystemClock {
                         id: clk
+                        enabled: root.isOn("clock")
                         precision: cfg.clockSeconds ? SystemClock.Seconds : SystemClock.Minutes
                     }
 
                     Component {
                         id: clockC
                         Mod {
+                            id: clockMod
+
+                            // "calendar" | "quickactions" | "settings" | "barsettings" | "none"
+                            function hintFor(a) {
+                                return a === "calendar" ? (clockPanel.calOpen ? "Close calendar" : "Open calendar")
+                                                        : root.actionHint(a);
+                            }
+                            function act(a) {
+                                if (a === "calendar") {
+                                    clockPanel.monthOffset = 0;
+                                    clockPanel.calOpen = !clockPanel.calOpen;
+                                } else {
+                                    root.doAction(a);
+                                }
+                            }
+
                             bold: true
                             baseSize: root.sz.clock
                             text: root.clockText(clk.date)
                             vtext: root.clockVText(clk.date)
                             active: clockPanel.calOpen
                             tip: Qt.formatDate(clk.date, "dddd, d MMMM yyyy")
-                            primaryHint: clockPanel.calOpen ? "Close calendar" : "Open calendar"
-                            secondaryHint: "Quick actions"
-                            tertiaryHint: "Settings"
-                            onPrimary: {
-                                clockPanel.monthOffset = 0;
-                                clockPanel.calOpen = !clockPanel.calOpen;
-                            }
-                            onSecondary: root.run("qs ipc call qa toggle")
-                            onTertiary: root.run("qs ipc call settings toggle")
+                            primaryHint: hintFor(cfg.clockPrimary)
+                            secondaryHint: hintFor(cfg.clockSecondary)
+                            tertiaryHint: hintFor(cfg.clockTertiary)
+                            noSecondary: secondaryHint === ""
+                            onPrimary: act(cfg.clockPrimary)
+                            onSecondary: act(cfg.clockSecondary)
+                            onTertiary: act(cfg.clockTertiary)
+
+                            onVisibleChanged: if (!visible) clockPanel.calOpen = false   // clock hidden → close calendar
+                            Component.onCompleted: clockPanel.clockItem = clockMod
+                            Component.onDestruction: if (clockPanel.clockItem === clockMod) clockPanel.clockItem = null
                         }
                     }
                     LazyLoader {
-                        active: clockPanel.calOpen
+                        active: clockPanel.calOpen && root.isOn("clock") && clockPanel.clockItem !== null
 
                         PopupWindow {
-                            readonly property point p: bar.contentItem.mapFromItem(clockPanel, 0, 0)
+                            readonly property Item ci: clockPanel.clockItem
+                            readonly property point p: bar.contentItem.mapFromItem(ci, 0, 0)
 
                             anchor.window: bar
                             anchor.rect.x: root.vertical
-                                ? (cfg.position === "left" ? p.x + clockPanel.width + 6
+                                ? (cfg.position === "left" ? p.x + ci.width + 6
                                                            : p.x - implicitWidth - 6)
-                                : p.x + (clockPanel.width - implicitWidth) / 2
+                                : p.x + (ci.width - implicitWidth) / 2
                             anchor.rect.y: root.vertical
-                                ? p.y + (clockPanel.height - implicitHeight) / 2
-                                : (cfg.position === "top" ? p.y + clockPanel.height + 4
+                                ? p.y + (ci.height - implicitHeight) / 2
+                                : (cfg.position === "top" ? p.y + ci.height + 4
                                                           : p.y - implicitHeight - 4)
                             implicitWidth: calBox.gridW + 2 * calBox.pad
                             implicitHeight: calCol.implicitHeight + 2 * calBox.pad
@@ -1668,6 +1736,7 @@ echo "$u $t"
                 Panel {
                     id: endPanel
                     model: root.endList
+                    clockComp: clockC
                     anchors.right: root.vertical ? undefined : frame.right
                     anchors.bottom: root.vertical ? frame.bottom : undefined
                     anchors.top: root.vertical ? undefined : frame.top

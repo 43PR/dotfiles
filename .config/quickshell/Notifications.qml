@@ -1452,13 +1452,6 @@ Scope {
 
                 SizeBtn { text: "−"; width: 16; font.pixelSize: 12; onClicked: win.setSize(root.menuSize - 10) }
                 SizeBtn { text: "+"; width: 16; font.pixelSize: 12; onClicked: win.setSize(root.menuSize + 10) }
-                SizeBtn {
-                    text: "↺"
-                    width: 16
-                    font.pixelSize: 12
-                    visible: root.movedFromDefault
-                    onClicked: root.resetPosition()
-                }
             }
         }
     }
