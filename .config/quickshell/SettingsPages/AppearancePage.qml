@@ -15,7 +15,7 @@ Item {
     property real labelWidth: 200
 
     // ---- Hub slider ranges (opacity stops at 20% so the window can't become invisible) ----
-    readonly property real opacityMin: 0.2
+    readonly property real opacityMin: 0
     readonly property real opacityMax: 1.0
     readonly property real tiltMin: 0
     readonly property real tiltMax: 15
@@ -297,7 +297,11 @@ Item {
     Process {
         id: hyprApply
         stdout: StdioCollector {
-            onStreamFinished: if (text.trim().length > 0 && text.trim() !== "ok") console.log("[look] hyprctl:", text.trim())
+            onStreamFinished: {
+                const t = text.trim()
+                if (t.length > 0 && t.split("\n").some(l => l.trim() !== "" && l.trim() !== "ok"))
+                    console.log("[look] hyprctl:", t)
+            }
         }
         stderr: StdioCollector {
             onStreamFinished: if (text.trim().length > 0) console.warn("[look] hyprctl error:", text.trim())

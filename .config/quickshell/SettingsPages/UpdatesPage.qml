@@ -27,16 +27,24 @@ Item {
     property int dotfilesBehind: -2
     property int dotfilesAhead: 0
 
-    // ---- update.sh options ----
-    property bool optPull: true            // git pull the dotfiles repo first
-    property bool optDryRun: false
-    property bool optSkipPackages: false
-    property bool optSkipTheme: false
-    property bool optRestartShell: false
+    // ---- Desktop updater script: "update.sh" | "update2.sh" ----
+    property string updater: "update.sh"
 
     property string statusText: ""
 
     readonly property string stateDir: Quickshell.env("HOME") + "/.config/quickshell/state"
+
+    // ---- Tooltip texts ----
+    readonly property string tipUpdateSh:
+        "update.sh (symlink model)\n"
+        + "Links files that are new in the repo, installs new packages.txt entries "
+        + "and regenerates the theme. Existing real files in ~/.config are never overwritten."
+    readonly property string tipUpdate2Sh:
+        "update2.sh (repo is source of truth)\n"
+        + "Also repairs wrong links, replaces real files in the way (backed up to ~/.config-backups) "
+        + "and removes stale links. Your personal files (fastfetch, cava, rofi config, themes...) are kept."
+    readonly property string tipRunButton:
+        ""
 
     function countLabel(n) {
         if (n === -2) return "CHECKING…"
@@ -49,7 +57,7 @@ Item {
         return Theme.textDim
     }
 
-    // Dotfiles status text. "DIVERGED" means `git pull --ff-only` would fail.
+    // Dotfiles status text. "NEW UPDATE" with local commits means `git pull --ff-only` would fail.
     readonly property string dotfilesLabel: {
         if (dotfilesBehind === -2) return "CHECKING…"
         if (dotfilesBehind === -1) return "N/A"
@@ -95,10 +103,11 @@ Item {
     readonly property string repoPath:
         "REPO=\"$(dirname \"$(dirname \"$(dirname \"$(dirname \"$(readlink -f \"$HOME/.config/43pr/bin/theme.py\")\")\")\")\")\"; "
 
-    readonly property string repoResolve:
-        repoPath
-        + "if [ ! -f \"$REPO/update.sh\" ]; then echo \"update.sh not found (resolved repo: $REPO)\"; exit 1; fi; "
-        + "cd \"$REPO\" || exit 1; "
+    function repoResolve(script) {
+        return repoPath
+            + "if [ ! -f \"$REPO/" + script + "\" ]; then echo \"" + script + " not found (resolved repo: $REPO)\"; exit 1; fi; "
+            + "cd \"$REPO\" || exit 1; "
+    }
 
     // Silent check: fetch, then print "<ahead> <behind>" for HEAD vs its upstream, or -1 on any failure.
     // GIT_TERMINAL_PROMPT=0 and timeout keep it from hanging on credentials or a dead network.
@@ -109,16 +118,50 @@ Item {
         + "GIT_TERMINAL_PROMPT=0 timeout 20 git fetch --quiet >/dev/null 2>&1 || { echo -1; exit 0; }; "
         + "git rev-list --left-right --count 'HEAD...@{u}' 2>/dev/null || echo -1"
 
+    // Pull first, then run the selected updater. update2.sh pulls on its own via --pull.
     function desktopScript() {
-        let s = repoResolve
-        if (optPull) s += "echo '--- git pull ---'; git pull --ff-only; "
-        let args = []
-        if (optDryRun)        args.push("--dry-run")
-        if (optSkipPackages)  args.push("--skip-packages")
-        if (optSkipTheme)     args.push("--skip-theme")
-        if (optRestartShell)  args.push("--restart-shell")
-        s += "./update.sh" + (args.length ? " " + args.join(" ") : "")
+        let s = repoResolve(updater)
+        if (updater === "update2.sh")
+            s += "./update2.sh --pull"
+        else
+            s += "echo '--- git pull ---'; git pull --ff-only; ./update.sh"
         return s
+    }
+
+    // ------------------------------------------------------------------
+    // Tooltip (drawn inside the page, no Popup/overlay needed)
+    // ------------------------------------------------------------------
+
+    property Item tipTarget: null
+    property string tipPending: ""
+    property string tipText: ""
+    property bool tipShown: false
+    property real tipAnchorX: 0
+    property real tipAnchorTop: 0
+    property real tipAnchorBottom: 0
+
+    function showTip(item, text) {
+        tipTarget = item
+        tipPending = text
+        tipTimer.restart()
+    }
+    function hideTip() {
+        tipTimer.stop()
+        tipShown = false
+    }
+
+    Timer {
+        id: tipTimer
+        interval: 450
+        onTriggered: {
+            if (!page.tipTarget || page.tipPending.length === 0) return
+            const top = page.tipTarget.mapToItem(page, 0, 0)
+            page.tipAnchorX = top.x
+            page.tipAnchorTop = top.y
+            page.tipAnchorBottom = top.y + page.tipTarget.height
+            page.tipText = page.tipPending
+            page.tipShown = true
+        }
     }
 
     // ------------------------------------------------------------------
@@ -208,7 +251,7 @@ Item {
     Timer { id: refreshTimer; interval: 500; onTriggered: page.refresh() }
 
     // ------------------------------------------------------------------
-    // Persist update.sh options
+    // Persist selected updater
     // ------------------------------------------------------------------
 
     FileView {
@@ -225,20 +268,14 @@ Item {
     function loadSettings() {
         try {
             const s = JSON.parse(settingsFile.text())
-            if (typeof s.pull === "boolean")          optPull = s.pull
-            if (typeof s.dryRun === "boolean")        optDryRun = s.dryRun
-            if (typeof s.skipPackages === "boolean")  optSkipPackages = s.skipPackages
-            if (typeof s.skipTheme === "boolean")     optSkipTheme = s.skipTheme
-            if (typeof s.restartShell === "boolean")  optRestartShell = s.restartShell
+            if (s.updater === "update.sh" || s.updater === "update2.sh")
+                updater = s.updater
         } catch (error) {}
     }
 
-    function setOpt(key, value) {
-        if (key === "pull")              optPull = value
-        else if (key === "dryRun")       optDryRun = value
-        else if (key === "skipPackages") optSkipPackages = value
-        else if (key === "skipTheme")    optSkipTheme = value
-        else if (key === "restartShell") optRestartShell = value
+    function setUpdater(name) {
+        if (updater === name) return
+        updater = name
         saveTimer.restart()
     }
 
@@ -247,13 +284,7 @@ Item {
         interval: 300
         onTriggered: {
             try {
-                settingsFile.setText(JSON.stringify({
-                    pull: page.optPull,
-                    dryRun: page.optDryRun,
-                    skipPackages: page.optSkipPackages,
-                    skipTheme: page.optSkipTheme,
-                    restartShell: page.optRestartShell
-                }, null, 2))
+                settingsFile.setText(JSON.stringify({ updater: page.updater }, null, 2))
             } catch (error) {}
         }
     }
@@ -288,6 +319,7 @@ Item {
     component SmallButton: Rectangle {
         id: sb
         property string label: ""
+        property string tip: ""
         property bool current: false
         property bool buttonEnabled: true
         signal clicked()
@@ -309,31 +341,9 @@ Item {
             anchors.fill: parent; hoverEnabled: true
             enabled: sb.buttonEnabled
             cursorShape: Qt.PointingHandCursor
-            onClicked: sb.clicked()
-        }
-    }
-
-    component ToggleRow: Item {
-        id: tg
-        property string label: ""
-        property bool checked: false
-        signal toggled(bool v)
-
-        width: parent.width; height: 28
-
-        Text {
-            anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
-            text: tg.label
-            color: Theme.textDim
-            font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody; font.letterSpacing: 1
-        }
-
-        SmallButton {
-            anchors.right: parent.right
-            width: 72
-            label: tg.checked ? "ON" : "OFF"
-            current: tg.checked
-            onClicked: tg.toggled(!tg.checked)
+            onEntered: if (sb.tip.length > 0) page.showTip(sb, sb.tip)
+            onExited: page.hideTip()
+            onClicked: { page.hideTip(); sb.clicked() }
         }
     }
 
@@ -401,6 +411,7 @@ Item {
         contentHeight: content.implicitHeight
         clip: true
         boundsBehavior: Flickable.StopAtBounds
+        onMovingChanged: if (moving) page.hideTip()
 
         ScrollBar.vertical: ScrollBar {
             id: scrollBar
@@ -488,6 +499,8 @@ Item {
                     }
                 }
             }
+
+            // ---------------- DESKTOP ----------------
             Column {
                 width: parent.width; spacing: 10
                 topPadding: 6
@@ -534,50 +547,38 @@ Item {
                     Column {
                         width: parent.width; spacing: 8
 
-                        GroupLabel { text: "UPDATE.SH OPTIONS" }
+                        GroupLabel { text: "UPDATER" }
 
-                        ToggleRow {
-                            label: "GIT PULL FIRST"; checked: page.optPull
-                            onToggled: v => page.setOpt("pull", v)
-                        }
-                        ToggleRow {
-                            label: "DRY RUN"; checked: page.optDryRun
-                            onToggled: v => page.setOpt("dryRun", v)
-                        }
-                        ToggleRow {
-                            label: "SKIP PACKAGES"; checked: page.optSkipPackages
-                            onToggled: v => page.setOpt("skipPackages", v)
-                        }
-                        ToggleRow {
-                            label: "SKIP THEME"; checked: page.optSkipTheme
-                            onToggled: v => page.setOpt("skipTheme", v)
-                        }
-                        ToggleRow {
-                            label: "RESTART QUICKSHELL"; checked: page.optRestartShell
-                            onToggled: v => page.setOpt("restartShell", v)
+                        Row {
+                            id: updaterRow
+                            width: parent.width
+                            spacing: 8
+
+                            SmallButton {
+                                width: (updaterRow.width - updaterRow.spacing) / 2
+                                label: "UPDATE.SH"
+                                tip: page.tipUpdateSh
+                                current: page.updater === "update.sh"
+                                onClicked: page.setUpdater("update.sh")
+                            }
+
+                            SmallButton {
+                                width: (updaterRow.width - updaterRow.spacing) / 2
+                                label: "UPDATE2.SH"
+                                tip: page.tipUpdate2Sh
+                                current: page.updater === "update2.sh"
+                                onClicked: page.setUpdater("update2.sh")
+                            }
                         }
                     }
 
-                    Column {
-                        width: parent.width; spacing: 8
-
-                        SmallButton {
-                            width: parent.width
-                            current: page.dotfilesAttention && !page.optDryRun
-                            label: page.optDryRun
-                                ? "RUN UPDATE.SH (DRY RUN)"
-                                : (page.dotfilesBehind > 0 ? "UPDATE DESKTOP (" + page.dotfilesBehind + ")" : "UPDATE DESKTOP")
-                            buttonEnabled: !runner.running
-                            onClicked: page.run("Desktop setup update", page.desktopScript())
-                        }
-
-                        Text {
-                            width: parent.width
-                            wrapMode: Text.WordWrap
-                            text: "Links new dotfiles, installs new packages.txt entries and regenerates the theme."
-                            color: Theme.textDim
-                            font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeSmall
-                        }
+                    SmallButton {
+                        width: parent.width
+                        tip: page.tipRunButton
+                        current: page.dotfilesAttention
+                        label: page.dotfilesBehind > 0 ? "UPDATE DESKTOP (" + page.dotfilesBehind + ")" : "UPDATE DESKTOP"
+                        buttonEnabled: !runner.running
+                        onClicked: page.run("Desktop setup update", page.desktopScript())
                     }
                 }
 
@@ -588,6 +589,33 @@ Item {
                     font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeSmall; font.letterSpacing: 1
                 }
             }
+        }
+    }
+
+    // Shared tooltip, above everything else
+    Rectangle {
+        id: tooltip
+        z: 100
+        visible: page.tipShown
+        width: Math.min(300, page.width - 8)
+        height: tipLabel.implicitHeight + 16
+        x: Math.max(4, Math.min(page.tipAnchorX, page.width - width - 4))
+        y: (page.tipAnchorBottom + 6 + height <= page.height)
+            ? page.tipAnchorBottom + 6
+            : Math.max(4, page.tipAnchorTop - 6 - height)
+        radius: Theme.radius
+        color: Theme.bg
+        border.width: 1
+        border.color: Theme.accent
+
+        Text {
+            id: tipLabel
+            x: 10; y: 8
+            width: parent.width - 20
+            wrapMode: Text.WordWrap
+            text: page.tipText
+            color: Theme.text
+            font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeSmall
         }
     }
 

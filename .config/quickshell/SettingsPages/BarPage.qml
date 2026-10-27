@@ -559,7 +559,7 @@ Item {
                 Text {
                     width: parent.width
                     wrapMode: Text.WordWrap
-                    text: "Click a module to show or hide it. Drag modules on the bar to reorder them or move them between sections. Changes apply instantly and are saved automatically."
+                    text: "Drag modules on the bar to reorder them."
                     color: Theme.textDim
                     font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeSmall
                 }

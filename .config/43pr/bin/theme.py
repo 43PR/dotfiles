@@ -363,7 +363,7 @@ def generate_icons(pal, dark):
                 if "/" not in target and target.startswith("folder-blue"):
                     os.symlink(target, out / f.name)
                     written += 1
-            elif f.name in {p.name for p in sources if p.parent == d}:
+            elif f in sources:
                 (out / f.name).write_text(HEX6.sub(recolor, sources[f]))
                 written += 1
         dirs.append(rel)
@@ -396,7 +396,7 @@ def reload_gtk(dark=None):
     if theme:
         cmd.append(theme)
     try:
-        subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, timeout=15)
+        subprocess.run(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
     except Exception as e:
         warn(f"gtk reload failed: {e}")
 
