@@ -1,6 +1,6 @@
 <div align="center">
 
-<img width="2171" height="724" alt="43pr_dotfiles_combined" src="https://github.com/user-attachments/assets/bb6cc352-9bb5-4400-aefd-382086c223c7" />
+<img width="2171" height="724" alt="43pr_dotfiles_combined" src="assets/banner.png" />
 
 <p align="center">
 <img src="https://img.shields.io/badge/HYPRLAND-0.56.2-667A82?style=flat&labelColor=101418" height="20" alt="Hyprland">
@@ -13,7 +13,7 @@
 
 </div>
 
-<img width="1920" height="1080" alt="1793227457" src="https://github.com/user-attachments/assets/af9638cb-ddd1-451d-8a0e-e484374240b3" />
+<img width="1920" height="1080" alt="1793227457" src="assets/desktop.png" />
 
 <p align="center">
   <sub>
