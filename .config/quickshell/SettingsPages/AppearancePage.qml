@@ -35,6 +35,8 @@ Item {
     property string animationMode: "auto"     // "auto" | "on" | "off"
     property int lowBatteryPercent: 20
     property string effectsLevel: "moderate"   // "off" | "moderate" | "high"
+    // When false, opacity.sh leaves the Quickshell components alone (read by the script)
+    property bool qsOpacityFollow: true
     property string lastLua: ""
 
     // Battery + power profile come from UPower / power-profiles-daemon over D-Bus
@@ -329,6 +331,7 @@ Item {
             const saved = JSON.parse(settingsFile.text())
             if (["auto", "on", "off"].indexOf(saved.animations) !== -1) animationMode = saved.animations
             if (["off", "moderate", "high"].indexOf(saved.effects) !== -1) effectsLevel = saved.effects
+            if (typeof saved.qsOpacityFollow === "boolean") qsOpacityFollow = saved.qsOpacityFollow
 
             if (saved.look && typeof saved.look === "object") {
                 const n = Object.assign({}, lookDefaults)
@@ -361,6 +364,11 @@ Item {
         applyTimer.restart()
     }
 
+    function setQsOpacityFollow(v) {
+        qsOpacityFollow = v
+        saveTimer.restart()
+    }
+
     function setLook(key, value) {
         const n = Object.assign({}, look)
         n[key] = value
@@ -383,6 +391,7 @@ Item {
         const json = JSON.stringify({
             animations: animationMode,
             effects: effectsLevel,
+            qsOpacityFollow: qsOpacityFollow,
             look: look
         }, null, 2)
         if (json !== lastSavedJson) {
@@ -827,6 +836,11 @@ Item {
                 Card {
                     Column {
                         width: parent.width; spacing: 6
+                        // ---- opacity.sh also controls Quickshell opacity ----
+                        ToggleRow {
+                            label: "SYNC OPACITY SCRIPT"; checked: page.qsOpacityFollow
+                            onToggled: v => page.setQsOpacityFollow(v)
+                        }
                         ToggleRow {
                             label: "BLUR PANELS"; checked: page.look.blurLayers
                             onToggled: v => page.setLook("blurLayers", v)
