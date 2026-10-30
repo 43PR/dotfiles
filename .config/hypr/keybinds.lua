@@ -103,7 +103,7 @@ end
 
 terminal_key      = normalize_key(terminal_key)
 launcher_key      = normalize_key(launcher_key)
-qa_key         = normalize_key(qa_key)
+qa_key            = normalize_key(qa_key)
 files_key         = normalize_key(files_key)
 browser_key       = normalize_key(browser_key)
 close_key         = normalize_key(close_key)
@@ -124,6 +124,8 @@ float_key         = normalize_key(float_key)
 record_key        = normalize_key(record_key)
 shot_key          = normalize_key(shot_key)
 shot_area_key     = normalize_key(shot_area_key)
+
+
 
 -- A single bad key string must not take the rest of the config down with it.
 local function bind(keys, ...)
@@ -161,6 +163,26 @@ bind(mainMod .. " + " .. clipboard_key, hl.dsp.exec_cmd("pgrep -x rofi >/dev/nul
 
 bind(shot_key, hl.dsp.exec_cmd("sh -c 'file=" .. home .. "/Pictures/$(date +%s).png; grim \"$file\"; wl-copy < \"$file\"; qs ipc call screenshot notify \"$file\"'"))
 bind(shot_area_key, hl.dsp.exec_cmd(home .. "/.config/hypr/scripts/screenshot-area.sh"))
+
+-- Custom binds created in Settings > Keybinds (state/custom_binds.lua).
+-- Keys are stored as full chords (SUPER only if it was held), so mainMod is not prepended.
+do
+    local f = home .. "/.config/quickshell/state/custom_binds.lua"
+    local fh = io.open(f, "r")
+    if fh then
+        fh:close()
+        local ok, custom = pcall(dofile, f)
+        if not ok then
+            print("state/custom_binds.lua failed: " .. tostring(custom))
+        elseif type(custom) == "table" then
+            for _, b in ipairs(custom) do
+                if b.key and b.cmd then
+                    bind(normalize_key(b.key), hl.dsp.exec_cmd(b.cmd))
+                end
+            end
+        end
+    end
+end
 
 bind(mainMod .. " + " .. layout_key, hl.dsp.exec_cmd("hyprctl switchxkblayout current next"))
 
@@ -232,10 +254,10 @@ bind(mainMod .. " + SHIFT + J", hl.dsp.window.move({ direction = "down" }))
 bind(mainMod .. " + SHIFT + K", hl.dsp.window.move({ direction = "up" }))
 bind(mainMod .. " + SHIFT + L", hl.dsp.window.move({ direction = "right" }))
 
-bind(mainMod .. " + CTRL + H", hl.dsp.window.resize({ x = -40, y = 0 }), { repeating = true })
-bind(mainMod .. " + CTRL + L", hl.dsp.window.resize({ x = 40, y = 0 }), { repeating = true })
-bind(mainMod .. " + CTRL + K", hl.dsp.window.resize({ x = 0, y = -40 }), { repeating = true })
-bind(mainMod .. " + CTRL + J", hl.dsp.window.resize({ x = 0, y = 40 }), { repeating = true })
+bind(mainMod .. " + CTRL + H", hl.dsp.window.resize({ x = -40, y = 0, relative = true }), { repeating = true })
+bind(mainMod .. " + CTRL + L", hl.dsp.window.resize({ x = 40, y = 0, relative = true }), { repeating = true })
+bind(mainMod .. " + CTRL + K", hl.dsp.window.resize({ x = 0, y = -40, relative = true }), { repeating = true })
+bind(mainMod .. " + CTRL + J", hl.dsp.window.resize({ x = 0, y = 40, relative = true }), { repeating = true })
 
 bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+"), { locked = true, repeating = true })
 bind("XF86AudioLowerVolume", hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"), { locked = true, repeating = true })

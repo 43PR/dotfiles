@@ -100,7 +100,7 @@ QtObject {
             try {
                 const s = JSON.parse(text())
                 if (typeof s.tiltStrength === "number") root.tiltStrength = Math.max(0, Math.min(15, s.tiltStrength))
-                if (typeof s.bgAlpha === "number") root.bgAlpha = Math.max(0.2, Math.min(1, s.bgAlpha))
+                if (typeof s.bgAlpha === "number") root.bgAlpha = Math.max(0, Math.min(1, s.bgAlpha))
                 if (typeof s.radius === "number") root.radius = Math.round(Math.max(0, Math.min(50, s.radius)))
                 if (typeof s.borderOpacity === "number") root.borderOpacity = Math.max(0.1, Math.min(1, s.borderOpacity))
                 if (s.hyprBorderStyle === "full" || s.hyprBorderStyle === "corner") root.hyprBorderStyle = s.hyprBorderStyle
@@ -124,7 +124,7 @@ QtObject {
     property IpcHandler ipc: IpcHandler {
         target: "theme"
         function setBgAlpha(value: real): void {
-            root.setHub("bgAlpha", Math.max(0.2, Math.min(1, value)))
+            root.setHub("bgAlpha", Math.max(0, Math.min(1, value)))
         }
         function setBorderStyle(style: string): void {
             if (style === "full" || style === "corner") root.setHub("hyprBorderStyle", style)
@@ -199,7 +199,10 @@ QtObject {
         interval: 150
         onTriggered: root.applyBorders()
     }
-
+    property Timer settleTimer: Timer {
+        interval: 1000
+        onTriggered: root.applyBorders()
+    }
     property Process mkStateDir: Process {
         command: ["mkdir", "-p", root.stateDir]
         running: true
@@ -236,6 +239,7 @@ QtObject {
                 console.warn("Theme.qml: malformed quickshell-theme.json: " + e)
             }
             root.borderTimer.restart()
+            root.settleTimer.restart()   // <-- added
         }
     }
 }

@@ -75,7 +75,7 @@ Scope {
         { name: "System", icon: "󰒓", page: "SystemPage" },
         { name: "Audio", icon: "󰕾", page: "AudioPage" },
         { name: "Display", icon: "󰍹", page: "DisplayPage" },
-        { name: "Configs", icon: "󰧮",  page: "ConfigsPage" },
+        { name: "Keybinds", icon: "󰧮",  page: "KeybindsPage" },
         { name: "Appearance", icon: "󰏘", page: "AppearancePage" },
         { name: "Themes", icon: "󰉼",  page: "ThemesPage" },
         { name: "Bar", icon: "󰖔",  page: "BarPage" },

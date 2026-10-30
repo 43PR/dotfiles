@@ -1,4 +1,4 @@
-// .config/quickshell/SettingsPages/ConfigsPage.qml
+// .config/quickshell/SettingsPages/KeybindsPage.qml
 import QtQuick
 import QtQuick.Controls
 import Quickshell
@@ -44,7 +44,7 @@ Item {
         { id: "files",         label: "FILE MANAGER",                def: "E" },
         { id: "browser",       label: "BROWSER",                     def: "B" },
         { id: "settings",      label: "SETTINGS",                    def: "I" },
-        { id: "wheel",         label: "QUICK ACTIONS",               def: "S" },
+        { id: "qa",            label: "QUICK ACTIONS",               def: "S" },
         { id: "close",         label: "CLOSE ACTIVE WINDOW",         def: "Q" },
         { id: "fullscreen",    label: "FULLSCREEN",                  def: "F" },
         { id: "float",         label: "FLOATING WINDOW",             def: "Space" },
@@ -78,8 +78,34 @@ Item {
     property string captureHint: ""
     property string bindQuery: ""
 
+    // Custom (user-created) binds, saved to state/custom_binds.json and
+    // state/custom_binds.lua (the Lua file is what Hyprland reads)
+    property var customBinds: []
+    property bool formOpen: false
+    property bool helpOpen: true
+    property string formId: ""      // "" = creating, otherwise editing that id
+    property string formName: ""
+    property string formCmd: ""
+    property string formKey: ""
+    readonly property string formCaptureId: "__form__"
+    readonly property string customPath: home + "/.config/quickshell/state/custom_binds.json"
+    readonly property string customLuaPath: home + "/.config/quickshell/state/custom_binds.lua"
+    readonly property bool formValid: formName.trim() !== "" && formCmd.trim() !== "" && formKey !== ""
+
+    function isCustom(id) { return customBinds.some(c => c.id === id) }
+
+    // Custom binds and the new-bind form store the full chord (SUPER is only
+    // included when it was held), exactly like the screenshot binds.
     function isNoSuper(id) {
-        return bindDefs.find(d => d.id === id)?.noSuper === true
+        return id === formCaptureId || isCustom(id)
+            || bindDefs.find(d => d.id === id)?.noSuper === true
+    }
+
+    function labelOf(id) {
+        if (id === formCaptureId) return formName.trim() || "NEW KEYBIND"
+        return bindDefs.find(d => d.id === id)?.label
+            || customBinds.find(c => c.id === id)?.label
+            || ""
     }
 
     function chordOf(d) {
@@ -88,13 +114,39 @@ Item {
         return "SUPER + " + prettyKey(d.id)
     }
 
+    readonly property var allBinds: {
+        const custom = customBinds.map(c => ({
+            id: c.id,
+            label: c.label.toUpperCase(),
+            cmd: c.cmd,
+            noSuper: true,
+            custom: true
+        }))
+        return bindDefs.concat(custom).concat(fixedBinds)
+    }
+
     readonly property var shownBinds: {
         const q = bindQuery.trim().toLowerCase()
-        const all = bindDefs.concat(fixedBinds)
-        if (!q) return all
-        return all.filter(d =>
+        if (!q) return allBinds
+        return allBinds.filter(d =>
             d.label.toLowerCase().indexOf(q) >= 0 ||
+            (d.cmd || "").toLowerCase().indexOf(q) >= 0 ||
             chordOf(d).toLowerCase().indexOf(q) >= 0)
+    }
+
+    // The chord as stored/compared (no prettifying)
+    function rawChord(d) {
+        if (d.chord) return d.chord
+        if (d.noSuper) return keyOf(d.id)
+        return "SUPER + " + keyOf(d.id)
+    }
+
+    // Label of another bind that already uses the key typed in the form
+    readonly property string formConflict: {
+        if (!formKey) return ""
+        const k = formKey.toLowerCase()
+        const hit = allBinds.find(d => d.id !== formId && rawChord(d).toLowerCase() === k)
+        return hit ? hit.label : ""
     }
 
     function isBrowser(b) { return browsers.some(x => x.bin === b) }
@@ -107,6 +159,9 @@ Item {
     }
 
     function keyOf(id) {
+        if (id === formCaptureId) return formKey
+        const c = customBinds.find(x => x.id === id)
+        if (c) return c.key
         return bindKeys[id] || bindDefs.find(d => d.id === id)?.def || "?"
     }
 
@@ -153,7 +208,11 @@ Item {
         if (k === Qt.Key_Up) return "Up"
         if (k === Qt.Key_Down) return "Down"
         if (k === Qt.Key_QuoteLeft || k === Qt.Key_AsciiTilde) return "GRAVE"
-        if (k >= Qt.Key_F1 && k <= Qt.Key_F12) return "F" + (k - Qt.Key_F1 + 1)
+        if (k === Qt.Key_Print || k === Qt.Key_SysReq) return "Print"
+        if (k === Qt.Key_Pause) return "Pause"
+        if (k === Qt.Key_ScrollLock) return "Scroll_Lock"
+        if (k === Qt.Key_Menu) return "Menu"
+        if (k >= Qt.Key_F1 && k <= Qt.Key_F24) return "F" + (k - Qt.Key_F1 + 1)
         if (k >= Qt.Key_A && k <= Qt.Key_Z) return String.fromCharCode(k)
         if (k >= Qt.Key_0 && k <= Qt.Key_9) return String.fromCharCode(k)
         const named = {
@@ -180,10 +239,12 @@ Item {
     function releaseToWindow() {
         keyGrabber.focus = false
         bindSearch.focus = false
+        formNameField.focus = false
+        formCmdField.focus = false
         searchFocusReleased()
     }
     function captureKey(event) {
-        if (bindSearch.activeFocus) return
+        if (bindSearch.activeFocus || formNameField.activeFocus || formCmdField.activeFocus) return
         if (!editingId || event.isAutoRepeat) return
         if (event.key === Qt.Key_Escape) {
             editingId = ""
@@ -218,6 +279,26 @@ Item {
     function setKey(id, raw) {
         const key = cleanKey(raw, isNoSuper(id))
         if (!id || !key) return
+
+        // New-bind form: only remember the key, nothing is saved yet
+        if (id === formCaptureId) {
+            formKey = key
+            editingId = ""
+            captureHint = ""
+            releaseToWindow()
+            return
+        }
+
+        // Existing custom bind: rebind and save
+        if (isCustom(id)) {
+            customBinds = customBinds.map(c => c.id === id ? Object.assign({}, c, { key: key }) : c)
+            editingId = ""
+            captureHint = ""
+            saveCustom()
+            releaseToWindow()
+            return
+        }
+
         const next = Object.assign({}, bindKeys)
         next[id] = key
         bindKeys = next
@@ -247,12 +328,100 @@ Item {
     }
 
     function saveBinds() {
-        let body = "-- Generated by Quickshell (Settings > Configs). Do not edit by hand.\n"
+        let body = "-- Generated by Quickshell (Settings > Keybinds). Do not edit by hand.\n"
         for (const d of bindDefs)
             body += luaName(d.id) + " = \"" + keyOf(d.id) + "\"\n"
         bindWriter.scriptBody = body
         bindWriter.running = false
         bindWriter.running = true
+    }
+
+    // ---- custom binds -------------------------------------------------
+
+    function luaStr(v) {
+        return "\"" + String(v)
+            .replace(/\\/g, "\\\\")
+            .replace(/"/g, "\\\"")
+            .replace(/\r?\n/g, "\\n") + "\""
+    }
+
+    function parseCustom(t) {
+        if (!t || !t.trim()) return
+        try {
+            const arr = JSON.parse(t)
+            if (!Array.isArray(arr)) return
+            customBinds = arr
+                .filter(c => c && c.id && c.label && c.cmd && c.key)
+                .map(c => ({
+                    id: String(c.id),
+                    label: String(c.label),
+                    cmd: String(c.cmd),
+                    key: String(c.key)
+                }))
+        } catch (e) {
+            console.warn("KeybindsPage: bad custom_binds.json: " + e)
+        }
+    }
+
+    function saveCustom() {
+        let lua = "-- Generated by Quickshell (Settings > Keybinds). Do not edit by hand.\n"
+        lua += "return {\n"
+        for (const c of customBinds)
+            lua += "    { key = " + luaStr(c.key)
+                 + ", cmd = " + luaStr(c.cmd)
+                 + ", label = " + luaStr(c.label) + " },\n"
+        lua += "}\n"
+        customWriter.jsonBody = JSON.stringify(customBinds, null, 2) + "\n"
+        customWriter.luaBody = lua
+        customWriter.running = false
+        customWriter.running = true
+    }
+
+    function openForm(id) {
+        const c = id ? customBinds.find(x => x.id === id) : null
+        editingId = ""
+        captureHint = ""
+        formId = c ? c.id : ""
+        formKey = c ? c.key : ""
+        formNameField.text = c ? c.label : ""
+        formCmdField.text = c ? c.cmd : ""
+        formOpen = true
+        formNameField.forceActiveFocus()
+    }
+
+    function closeForm() {
+        formOpen = false
+        formId = ""
+        formKey = ""
+        formNameField.text = ""
+        formCmdField.text = ""
+        if (editingId === formCaptureId) editingId = ""
+        captureHint = ""
+        releaseToWindow()
+    }
+
+    function submitForm() {
+        if (!formValid) return
+        const entry = {
+            id: formId || ("c" + Date.now()),
+            label: formName.trim(),
+            cmd: formCmd.trim(),
+            key: formKey
+        }
+        const next = customBinds.slice()
+        const i = next.findIndex(c => c.id === entry.id)
+        if (i >= 0) next[i] = entry
+        else next.push(entry)
+        customBinds = next
+        closeForm()
+        saveCustom()
+    }
+
+    function deleteCustom(id) {
+        if (editingId === id) editingId = ""
+        if (formId === id) closeForm()
+        customBinds = customBinds.filter(c => c.id !== id)
+        saveCustom()
     }
 
     function refreshBrowser() {
@@ -281,18 +450,11 @@ Item {
         property string desktop: ""
         command: ["env", "-u", "BROWSER", "xdg-settings", "set", "default-web-browser", desktop]
         onExited: code => {
-            if (code !== 0) console.warn("ConfigsPage: XDG browser update failed (" + code + ")")
+            if (code !== 0) console.warn("KeybindsPage: XDG browser update failed (" + code + ")")
             page.refreshBrowser()
         }
     }
     onVisibleChanged: if (visible) refreshBrowser()
-
-    function editConfig(path) {
-        Quickshell.execDetached([
-            "xed",
-            path.replace(/^~/, Quickshell.env("HOME"))
-        ])
-    }
 
     Component.onCompleted: { initBindKeys(); refreshBrowser(); }
 
@@ -326,7 +488,36 @@ Item {
         ]
         onExited: code => {
             if (code !== 0)
-                console.warn("ConfigsPage: bind save/reload failed (" + code + ")")
+                console.warn("KeybindsPage: bind save/reload failed (" + code + ")")
+        }
+    }
+
+    FileView {
+        id: customFile
+        path: page.customPath
+        printErrors: false
+        onLoaded: page.parseCustom(text())
+    }
+
+    // Writes custom_binds.json (for this page) and custom_binds.lua (for
+    // Hyprland), then reloads Hyprland.
+    Process {
+        id: customWriter
+        property string jsonBody: ""
+        property string luaBody: ""
+        command: [
+            "sh", "-c",
+            "mkdir -p -- \"$1\" && printf '%s' \"$2\" > \"$3\" && printf '%s' \"$4\" > \"$5\" && hyprctl reload",
+            "customwrite",
+            page.home + "/.config/quickshell/state",
+            jsonBody,
+            page.customPath,
+            luaBody,
+            page.customLuaPath
+        ]
+        onExited: code => {
+            if (code !== 0)
+                console.warn("KeybindsPage: custom bind save/reload failed (" + code + ")")
         }
     }
 
@@ -353,12 +544,22 @@ Item {
         font.letterSpacing: 2
     }
 
-    component GroupLabel: Text {
+    component InputField: TextField {
+        id: fld
+        height: 34
+        placeholderTextColor: Theme.textDim
         color: Theme.text
         font.family: Theme.fontFamily
         font.pixelSize: Theme.textSizeGroup
         font.bold: true
         font.letterSpacing: 1
+        selectByMouse: true
+        background: Rectangle {
+            radius: Theme.radius
+            color: "#00000000"
+            border.width: 1
+            border.color: fld.activeFocus ? Theme.accent : Theme.border
+        }
     }
 
     component Card: Rectangle {
@@ -411,6 +612,64 @@ Item {
         }
     }
 
+    component TinyButton: Rectangle {
+        id: tiny
+        property string label: ""
+        signal clicked()
+
+        height: 18
+        width: tinyText.implicitWidth + 12
+        radius: Theme.radius
+        color: tinyMouse.containsMouse ? Theme.alpha(Theme.accent, 0.10) : "#00000000"
+        border.width: 1
+        border.color: tinyMouse.containsMouse ? Theme.accent : Theme.border
+
+        Text {
+            id: tinyText
+            anchors.centerIn: parent
+            text: tiny.label
+            color: tinyMouse.containsMouse ? Theme.accent : Theme.textDim
+            font.family: Theme.fontFamily
+            font.pixelSize: Math.max(8, Theme.textSizeSmall - 2)
+            font.bold: true
+            font.letterSpacing: 1
+        }
+
+        MouseArea {
+            id: tinyMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: tiny.clicked()
+        }
+    }
+
+    component HelpText: Text {
+        width: parent.width
+        wrapMode: Text.WordWrap
+        color: Theme.textDim
+        font.family: Theme.fontFamily
+        font.pixelSize: Theme.textSizeSmall
+    }
+    component CodeBlock: Rectangle {
+        property alias text: codeText.text
+        width: parent.width
+        height: codeText.implicitHeight + 16
+        radius: Theme.radius
+        color: Theme.alpha(Theme.accent, 0.06)
+        border.width: 1
+        border.color: Theme.border
+        Text {
+            id: codeText
+            x: 8; y: 8
+            width: parent.width - 16
+            wrapMode: Text.WrapAnywhere
+            color: Theme.text
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.textSizeSmall
+        }
+    }
+
     component BindRow: Rectangle {
         id: row
         required property string bindId
@@ -418,6 +677,7 @@ Item {
         // Non-empty for fixed (hardcoded) binds: shown as-is, not editable
         property string fixedChord: ""
         property bool noSuper: false
+        property bool custom: false
         readonly property bool fixed: fixedChord !== ""
 
         width: parent.width
@@ -437,7 +697,8 @@ Item {
         Column {
             anchors.fill: parent
             anchors.leftMargin: 10
-            anchors.rightMargin: 10
+            anchors.rightMargin: fixedTag.visible ? fixedTag.width + 20
+                                 : (customTools.visible ? customTools.width + 20 : 10)
             anchors.topMargin: 5
             anchors.bottomMargin: 5
             spacing: 2
@@ -478,69 +739,44 @@ Item {
             cursorShape: row.fixed ? Qt.ArrowCursor : Qt.PointingHandCursor
             onClicked: if (!row.fixed) page.beginEdit(row.bindId)
         }
-    }
 
-    component ConfigButton: Rectangle {
-        required property string label
-        required property string path
-
-        width: parent.width
-        height: 42
-        radius: Theme.radius
-        color: "#00000000"
-        border.width: 1
-        border.color: Theme.border
-
-        Text {
-            anchors.left: parent.left
-            anchors.leftMargin: 14
-            anchors.verticalCenter: parent.verticalCenter
-            text: label
-            color: Theme.textDim
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.textSizeGroup
-            font.bold: true
-            font.letterSpacing: 2
-        }
-
-        Row {
+        // Small tag on binds that cannot be edited
+        Rectangle {
+            id: fixedTag
+            visible: row.fixed
             anchors.right: parent.right
-            anchors.rightMargin: 14
+            anchors.rightMargin: 10
             anchors.verticalCenter: parent.verticalCenter
-            spacing: 8
+            height: 18
+            width: fixedTagText.implicitWidth + 12
+            radius: Theme.radius
+            color: "#00000000"
+            border.width: 1
+            border.color: Theme.border
 
             Text {
-                text: ""
-                color: Theme.textDim
-                font.family: Theme.iconFont
-                font.pixelSize: Theme.textSizeGroup
-                anchors.verticalCenter: parent.verticalCenter
-            }
-
-            Text {
-                text: "EDIT " + path.split("/").pop().toUpperCase()
+                id: fixedTagText
+                anchors.centerIn: parent
+                text: "FIXED"
                 color: Theme.textDim
                 font.family: Theme.fontFamily
-                font.pixelSize: Theme.textSizeGroup
+                font.pixelSize: Math.max(8, Theme.textSizeSmall - 2)
                 font.bold: true
                 font.letterSpacing: 1
-                anchors.verticalCenter: parent.verticalCenter
             }
         }
 
-        MouseArea {
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onEntered: {
-                parent.color = Theme.alpha(Theme.accent, 0.08)
-                parent.border.color = Theme.accent
-            }
-            onExited: {
-                parent.color = "#00000000"
-                parent.border.color = Theme.border
-            }
-            onClicked: page.editConfig(path)
+        // Edit / delete for user-created binds
+        Row {
+            id: customTools
+            visible: row.custom
+            anchors.right: parent.right
+            anchors.rightMargin: 10
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 4
+
+            TinyButton { label: "EDIT"; onClicked: page.openForm(row.bindId) }
+            TinyButton { label: "\u00d7"; onClicked: page.deleteCustom(row.bindId) }
         }
     }
 
@@ -571,7 +807,7 @@ Item {
             spacing: 14
 
             Text {
-                text: "CONFIGS"
+                text: "KEYBINDS"
                 color: Theme.text
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.textSizeTitle
@@ -585,42 +821,139 @@ Item {
                 spacing: 10
                 topPadding: 6
 
-                SectionTitle { text: "KEYBINDS" }
-
                 Card {
                     Column {
                         width: parent.width
                         spacing: 8
 
-                        TextField {
-                            id: bindSearch
+                        Row {
                             width: parent.width
-                            height: 34
-                            placeholderText: "SEARCH"
-                            placeholderTextColor: Theme.textDim
-                            color: Theme.text
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.textSizeGroup
-                            font.bold: true
-                            font.letterSpacing: 1
-                            selectByMouse: true
-                            onTextChanged: page.bindQuery = text
-                            Keys.onEscapePressed: function(event) {
-                                if (text !== "") {
-                                    page.bindQuery = ""
-                                    text = ""
-                                    event.accepted = true
-                                } else {
-                                    focus = false
-                                    page.closeRequested()
+                            spacing: 8
+
+                            InputField {
+                                id: bindSearch
+                                width: parent.width - newBtn.width - parent.spacing
+                                placeholderText: "SEARCH"
+                                onTextChanged: page.bindQuery = text
+                                Keys.onEscapePressed: function(event) {
+                                    if (text !== "") {
+                                        page.bindQuery = ""
+                                        text = ""
+                                        event.accepted = true
+                                    } else {
+                                        focus = false
+                                        page.closeRequested()
+                                    }
                                 }
                             }
-                            background: Rectangle {
-                                radius: Theme.radius
-                                color: "#00000000"
-                                border.width: 1
-                                border.color: bindSearch.activeFocus ? Theme.accent : Theme.border
+
+                            ChoiceButton {
+                                id: newBtn
+                                width: 150
+                                label: "+ NEW KEYBIND"
+                                current: page.formOpen && page.formId === ""
+                                onClicked: (page.formOpen && page.formId === "")
+                                           ? page.closeForm() : page.openForm("")
                             }
+                        }
+
+                        // New / edit custom keybind form
+                        Column {
+                            width: parent.width
+                            spacing: 8
+                            visible: page.formOpen
+
+                            Rectangle { width: parent.width; height: 1; color: Theme.border }
+
+                            Text {
+                                text: page.formId !== "" ? "EDIT KEYBIND" : "NEW KEYBIND"
+                                color: Theme.text
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.textSizeGroup
+                                font.bold: true
+                                font.letterSpacing: 1
+                            }
+
+                            InputField {
+                                id: formNameField
+                                width: parent.width
+                                placeholderText: "NAME (e.g. SCREENSHOT TOOL)"
+                                onTextChanged: page.formName = text
+                                Keys.onReturnPressed: formCmdField.forceActiveFocus()
+                                Keys.onEscapePressed: page.closeForm()
+                            }
+
+                            InputField {
+                                id: formCmdField
+                                width: parent.width
+                                placeholderText: "COMMAND (e.g. firefox --private-window)"
+                                onTextChanged: page.formCmd = text
+                                Keys.onReturnPressed: page.submitForm()
+                                Keys.onEscapePressed: page.closeForm()
+                            }
+
+                            ChoiceButton {
+                                width: parent.width
+                                label: page.editingId === page.formCaptureId
+                                       ? "PRESS A KEY"
+                                       : (page.formKey !== ""
+                                          ? "KEY: " + page.prettyKey(page.formCaptureId).toUpperCase()
+                                          : "SET KEY")
+                                current: page.editingId === page.formCaptureId
+                                onClicked: page.beginEdit(page.formCaptureId)
+                            }
+
+                            Text {
+                                visible: page.editingId === page.formCaptureId
+                                width: parent.width
+                                wrapMode: Text.WordWrap
+                                text: "Press the combo now. SUPER is NOT added automatically; "
+                                      + "hold it if you want it. Escape cancels."
+                                color: Theme.accent
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.textSizeSmall
+                                font.bold: true
+                            }
+
+                            Text {
+                                visible: page.captureHint !== "" && page.editingId === page.formCaptureId
+                                width: parent.width
+                                wrapMode: Text.WordWrap
+                                text: page.captureHint
+                                color: Theme.textDim
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.textSizeSmall
+                            }
+
+                            Text {
+                                visible: page.formConflict !== ""
+                                width: parent.width
+                                wrapMode: Text.WordWrap
+                                text: "This key is already used by " + page.formConflict + "."
+                                color: Theme.textDim
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.textSizeSmall
+                            }
+
+                            Row {
+                                width: parent.width
+                                spacing: 8
+
+                                ChoiceButton {
+                                    width: (parent.width - parent.spacing) / 2
+                                    label: page.formId !== "" ? "SAVE" : "ADD KEYBIND"
+                                    current: page.formValid
+                                    opacity: page.formValid ? 1 : 0.4
+                                    onClicked: page.submitForm()
+                                }
+                                ChoiceButton {
+                                    width: (parent.width - parent.spacing) / 2
+                                    label: "CANCEL"
+                                    onClicked: page.closeForm()
+                                }
+                            }
+
+                            Rectangle { width: parent.width; height: 1; color: Theme.border }
                         }
 
                         Grid {
@@ -638,6 +971,7 @@ Item {
                                     label: modelData.label
                                     fixedChord: modelData.chord || ""
                                     noSuper: modelData.noSuper === true
+                                    custom: modelData.custom === true
                                 }
                             }
                         }
@@ -656,7 +990,7 @@ Item {
                         Column {
                             width: parent.width
                             spacing: 6
-                            visible: page.editingId !== ""
+                            visible: page.editingId !== "" && page.editingId !== page.formCaptureId
 
                             Rectangle { width: parent.width; height: 1; color: Theme.border }
 
@@ -664,7 +998,7 @@ Item {
                                 width: parent.width
                                 wrapMode: Text.WordWrap
                                 text: "Listening for "
-                                      + (page.bindDefs.find(d => d.id === page.editingId)?.label || "")
+                                      + page.labelOf(page.editingId)
                                       + ". Press the combo now. "
                                       + (page.isNoSuper(page.editingId)
                                          ? "SUPER is NOT added for this bind; hold it if you want it. "
@@ -718,66 +1052,85 @@ Item {
                     }
                 }
             }
-            Column {
-                width: parent.width
-                spacing: 10
-                topPadding: 6
-
-                SectionTitle { text: "HYPRLAND" }
-
-                Card {
-                    Column {
-                        width: parent.width
-                        spacing: page.sectionSpacing
-
-                        GroupLabel { text: "CONFIG FILES" }
-
-                        ConfigButton {
-                            label: "PROGRAMS - AUTOSTART - INPUT"
-                            path: "~/.config/hypr/hyprland.lua"
-                        }
-                        ConfigButton {
-                            label: "MONITORS - WORKSPACES"
-                            path: "~/.config/hypr/monitors.lua"
-                        }
-                        ConfigButton {
-                            label: "LOOK AND FEEL"
-                            path: "~/.config/hypr/look.lua"
-                        }
-                        ConfigButton {
-                            label: "KEYBINDS"
-                            path: "~/.config/hypr/keybinds.lua"
-                        }
-                        ConfigButton {
-                            label: "RULES"
-                            path: "~/.config/hypr/rules.lua"
-                        }
-                        ConfigButton {
-                            label: "LOCK SCREEN"
-                            path: "~/.config/hypr/hyprlock.conf"
-                        }
-                    }
-                }
-            }
 
             Column {
                 width: parent.width
                 spacing: 10
                 topPadding: 6
-                bottomPadding: 6
 
-                SectionTitle { text: "ROFI" }
+                SectionTitle { text: "HELP" }
 
                 Card {
                     Column {
                         width: parent.width
-                        spacing: page.sectionSpacing
+                        spacing: 10
 
-                        GroupLabel { text: "CONFIG FILES" }
+                        Row {
+                            width: parent.width
+                            Text {
+                                width: parent.width - helpToggle.width
+                                height: helpToggle.height
+                                verticalAlignment: Text.AlignVCenter
+                                text: "NEW KEYBINDS"
+                                color: Theme.text
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.textSizeGroup
+                                font.bold: true
+                                font.letterSpacing: 1
+                            }
+                            TinyButton {
+                                id: helpToggle
+                                label: page.helpOpen ? "HIDE" : "SHOW"
+                                onClicked: page.helpOpen = !page.helpOpen
+                            }
+                        }
 
-                        ConfigButton {
-                            label: "CONFIG"
-                            path: "~/.config/rofi/config.rasi"
+                        Column {
+                            width: parent.width
+                            spacing: 10
+                            visible: page.helpOpen
+
+                            Rectangle { width: parent.width; height: 1; color: Theme.border }
+
+                            HelpText { text: "COMMAND EXAMPLES"; color: Theme.text; font.bold: true }
+                            CodeBlock {
+                                text: "kitty\n"
+                                    + "firefox --private-window\n"
+                                    + "sh -c 'grim -g \"$(slurp)\" - | wl-copy'"
+                            }
+                            HelpText {
+                                text: "Wrap commands that use pipes, quotes or $(...) in sh -c '...'."
+                            }
+
+                            HelpText { text: "KEY FORMAT"; color: Theme.text; font.bold: true }
+                            CodeBlock {
+                                text: "SUPER + SHIFT + Return\n"
+                                    + "CTRL + ALT + Delete"
+                            }
+
+                            HelpText { text: "ADDING KEYBINDS MANUALLY"; color: Theme.text; font.bold: true }
+                            HelpText {
+                                text: "Built-in binds: edit ~/.config/quickshell/state/binds.lua, one line per bind "
+                                      + "(no SUPER, it is prepended by keybinds.lua):"
+                            }
+                            CodeBlock { text: "kb_terminal = \"T\"\nkb_theme = \"period\"" }
+                            HelpText {
+                                text: "Custom binds: keep two files in sync in the same folder. "
+                                      + "custom_binds.json is read by this page; custom_binds.lua is read by Hyprland."
+                            }
+                            CodeBlock {
+                                text: "// custom_binds.json\n"
+                                    + "[{ \"id\": \"c1\", \"label\": \"Private browser\",\n"
+                                    + "   \"cmd\": \"firefox --private-window\", \"key\": \"SUPER + P\" }]\n\n"
+                                    + "-- custom_binds.lua\n"
+                                    + "return {\n"
+                                    + "    { key = \"SUPER + P\", cmd = \"firefox --private-window\", label = \"Private browser\" },\n"
+                                    + "}"
+                            }
+                            HelpText {
+                                text: "Then run hyprctl reload. Saving from this page regenerates both files, "
+                                      + "so manual edits to the Lua files alone will be overwritten."
+                            }
                         }
                     }
                 }
