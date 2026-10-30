@@ -492,8 +492,8 @@ Scope {
                 Rectangle {
                     id: panel
                     width: root.cardWidth
-                    // panelCol top margin (6) + bottom padding (6)
-                    height: panelCol.height + root.px(12)
+                    // no padding: the content touches the panel's edges
+                    height: panelCol.height
                     radius: root.px(20)
                     color: "transparent"
 
@@ -506,9 +506,8 @@ Scope {
                     visible: opacity > 0
 
                     // ---- space accounting for the notes list ----------------
-                    // Height of everything except the list (list visible: 2 gaps).
-                    readonly property real chromeH: root.px(12) + header.height + inputBox.height
-                                                    + panelCol.spacing * 2
+                    // Height of everything except the list (list visible: 1 gap).
+                    readonly property real chromeH: inputBox.height + panelCol.spacing
                     // Vertical room left below the panel's top edge for the list.
                     readonly property real listAvail: root.winH - root.topGap - root.offsetY - chromeH
                     // The list hides itself when there isn't room for a row.
@@ -548,69 +547,10 @@ Scope {
                         anchors.top: parent.top
                         anchors.left: parent.left
                         anchors.right: parent.right
-                        anchors.topMargin: root.px(6)
-                        anchors.leftMargin: root.px(14)
-                        anchors.rightMargin: root.px(14)
+                        anchors.topMargin: 0
+                        anchors.leftMargin: 0
+                        anchors.rightMargin: 0
                         spacing: root.px(10)
-
-                        Item {
-                            id: header
-                            width: parent.width
-                            height: root.px(38)
-
-                            Rectangle {
-                                anchors.centerIn: parent
-                                width: root.px(36)
-                                height: root.px(4)
-                                radius: root.px(2)
-                                color: Theme.bg
-                                opacity: (dragArea.containsMouse || root.dragging) ? 1 : 0.1
-                                Behavior on opacity { NumberAnimation { duration: 150 } }
-                            }
-
-                            MouseArea {
-                                id: dragArea
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                acceptedButtons: Qt.LeftButton
-                                cursorShape: root.dragging ? Qt.ClosedHandCursor : Qt.OpenHandCursor
-
-                                property real pressX: 0
-                                property real pressY: 0
-                                property real startX: 0
-                                property real startY: 0
-
-                                onPressed: function (mouse) {
-                                    var p = dragArea.mapToItem(menuRoot, mouse.x, mouse.y)
-                                    pressX = p.x
-                                    pressY = p.y
-                                    startX = root.offsetX
-                                    startY = root.offsetY
-                                    root.dragging = true
-                                }
-
-                                onPositionChanged: function (mouse) {
-                                    if (!root.dragging) return
-                                    var p = dragArea.mapToItem(menuRoot, mouse.x, mouse.y)
-                                    root.setPosition(startX + (p.x - pressX), startY + (p.y - pressY))
-                                }
-
-                                onReleased: {
-                                    if (!root.dragging) return
-                                    root.dragging = false
-                                    saveTimer.restart()
-                                }
-
-                                onCanceled: {
-                                    if (!root.dragging) return
-                                    root.dragging = false
-                                    saveTimer.restart()
-                                }
-
-                                onDoubleClicked: root.resetPosition()
-                            }
-
-                        }
 
                         Rectangle {
                             id: inputBox
@@ -1111,17 +1051,64 @@ Scope {
                         }
                     }
 
+                    // drag strip: invisible, runs along the whole top edge of the panel.
+                    // Double-click resets position and scale, as before.
+                    MouseArea {
+                        id: dragArea
+                        anchors.top: parent.top
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        height: root.px(10)
+                        z: 50
+                        acceptedButtons: Qt.LeftButton
+                        cursorShape: root.dragging ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+
+                        property real pressX: 0
+                        property real pressY: 0
+                        property real startX: 0
+                        property real startY: 0
+
+                        onPressed: function (mouse) {
+                            var p = dragArea.mapToItem(menuRoot, mouse.x, mouse.y)
+                            pressX = p.x
+                            pressY = p.y
+                            startX = root.offsetX
+                            startY = root.offsetY
+                            root.dragging = true
+                        }
+
+                        onPositionChanged: function (mouse) {
+                            if (!root.dragging) return
+                            var p = dragArea.mapToItem(menuRoot, mouse.x, mouse.y)
+                            root.setPosition(startX + (p.x - pressX), startY + (p.y - pressY))
+                        }
+
+                        onReleased: {
+                            if (!root.dragging) return
+                            root.dragging = false
+                            saveTimer.restart()
+                        }
+
+                        onCanceled: {
+                            if (!root.dragging) return
+                            root.dragging = false
+                            saveTimer.restart()
+                        }
+
+                        onDoubleClicked: root.resetPosition()
+                    }
+
                     // Topmost overlay for wheel shortcuts:
                     //   Ctrl  + scroll -> text size only
                     //   Shift + scroll -> component scale
                     // Plain scroll passes through so the list scrolls normally.
-                    // Starts below the header so the drag handle keeps its hover/cursor.
+                    // Starts below the drag strip so the strip keeps its cursor.
                     MouseArea {
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.bottom: parent.bottom
                         anchors.top: parent.top
-                        anchors.topMargin: panelCol.anchors.topMargin + header.height + panelCol.spacing
+                        anchors.topMargin: dragArea.height
                         z: 100
                         acceptedButtons: Qt.NoButton   // never steals clicks
                         onWheel: function (wheel) {

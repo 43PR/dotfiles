@@ -22,7 +22,7 @@ Scope {
     // ---- constants / specs -----------------------------------------------
     readonly property int topGap: 30
     readonly property int keepVisible: 40
-    readonly property int toolsHeight: 22
+    readonly property int toolsHeight: 28
 
     readonly property var numSpec: ({
         mediaScale:    { min: 50,  max: 120,   def: 70,   step: 5,   unit: "%" },
@@ -710,7 +710,7 @@ Scope {
                     }
                 }
 
-                // ---- tools bar under the card: hint text + pin + settings ----
+                // ---- tools bar under the card: hint text + pin ----
                 Item {
                     id: tools
                     width: win.activeCard.width
@@ -743,37 +743,26 @@ Scope {
                             : "RMB for settings · Drag to move · double-click resets"
                     }
 
+                    // Larger pin button: bigger hit area + glyph, hover highlight,
+                    // always reasonably visible (was a tiny 18px, 30% opacity button).
                     FooterButton {
                         id: pinButton
                         visible: root.showMedia
-                        anchors.right: settingsButton.left
-                        anchors.rightMargin: 8
+                        anchors.right: parent.right
+                        anchors.rightMargin: 6
                         anchors.verticalCenter: parent.verticalCenter
-                        width: 18; height: 18
-                        color: "transparent"
+                        width: 26; height: 26
+                        radius: 8
+                        color: root.pinned ? Theme.alpha(Theme.accent, 0.18)
+                             : hovered ? Theme.alpha(Theme.text, 0.12)
+                             : "transparent"
                         label: "\uDB81\uDC03"
-                        fontSize: 13
+                        fontSize: 17
                         active: root.pinned
-                        opacity: (hovered || root.pinned) ? 1 : 0.3
+                        opacity: (hovered || root.pinned) ? 1 : 0.55
                         onClicked: root.togglePinned()
                         onHoveredChanged: root.hoverTip = hovered
                             ? (root.pinned ? "Unpin (allow auto-hide)" : "Pin open (disable auto-hide)") : ""
-                    }
-
-                    FooterButton {
-                        id: settingsButton
-                        visible: root.showMedia
-                        anchors.right: parent.right
-                        anchors.rightMargin: 8
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 18; height: 18
-                        color: "transparent"
-                        label: "󰒓"
-                        fontSize: 13
-                        active: root.settingsOpen
-                        opacity: (hovered || root.settingsOpen) ? 1 : 0.3
-                        onClicked: root.toggleSettings()
-                        onHoveredChanged: root.hoverTip = hovered ? "Settings" : ""
                     }
                 }
             }
@@ -1014,6 +1003,7 @@ Scope {
         width: 16; height: 16; radius: 6
         color: Theme.bg
         Behavior on opacity { NumberAnimation { duration: 120 } }
+        Behavior on color { ColorAnimation { duration: 120 } }
 
         Text {
             anchors.centerIn: parent
@@ -1024,7 +1014,14 @@ Scope {
             color: fb.active ? Theme.accent : (fb.hovered ? Theme.text : Theme.textDim)
         }
 
-        MouseArea { id: fbArea; anchors.fill: parent; hoverEnabled: true; onClicked: fb.clicked() }
+        MouseArea {
+            id: fbArea
+            anchors.fill: parent
+            anchors.margins: -4          // slightly larger click target than the visible button
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: fb.clicked()
+        }
     }
 
     component GlyphButton: Text {

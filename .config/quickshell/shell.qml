@@ -1,4 +1,5 @@
 import Quickshell
+import "colorpicker"
 
 ShellRoot {
     VolumeOsd {}
@@ -10,4 +11,5 @@ ShellRoot {
     Bar {}
     Todo {}
     QuickActions {}
+    ColorPicker {}
 }

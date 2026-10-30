@@ -42,10 +42,10 @@ Item {
         { id: "terminal",      label: "TERMINAL",                    def: "T" },
         { id: "launcher",      label: "LAUNCHER",                    def: "D" },
         { id: "files",         label: "FILE MANAGER",                def: "E" },
-        { id: "browser",       label: "BROWSER",                     def: "B" },
-        { id: "settings",      label: "SETTINGS",                    def: "I" },
-        { id: "qa",            label: "QUICK ACTIONS",               def: "S" },
         { id: "close",         label: "CLOSE ACTIVE WINDOW",         def: "Q" },
+        { id: "settings",      label: "SETTINGS",                    def: "I" },
+        { id: "browser",       label: "BROWSER",                     def: "B" },
+        { id: "qa",            label: "QUICK ACTIONS",               def: "S" },
         { id: "fullscreen",    label: "FULLSCREEN",                  def: "F" },
         { id: "float",         label: "FLOATING WINDOW",             def: "Space" },
         { id: "lock",          label: "LOCK SCREEN",                 def: "Tab" },
@@ -776,7 +776,7 @@ Item {
             spacing: 4
 
             TinyButton { label: "EDIT"; onClicked: page.openForm(row.bindId) }
-            TinyButton { label: "\u00d7"; onClicked: page.deleteCustom(row.bindId) }
+            TinyButton { label: "DELETE"; onClicked: page.deleteCustom(row.bindId) }
         }
     }
 

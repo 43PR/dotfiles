@@ -19,6 +19,12 @@ hl.window_rule({
     opacity = "1.0 override",
 })
 
+hl.layer_rule({
+    match = { namespace = "quickshell" },
+    blur = true,
+    ignore_alpha = 0.01,
+})
+
 --hl.window_rule({
 --    name = "brave",
 --    match = { class = "^brave-browser$" },

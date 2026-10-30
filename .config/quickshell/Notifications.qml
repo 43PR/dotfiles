@@ -685,7 +685,7 @@ Scope {
             // DISPLAYED (effX/effY); the saved offsets are never rewritten by them.
             readonly property real limMaxX: root.sideGap - root.edgeGap
             readonly property real limMinX: Math.min(limMaxX, root.cardWidth + root.sideGap + root.edgeGap - win.width)
-            readonly property real limMinY: root.edgeGap + root.px(14) - root.topGap
+            readonly property real limMinY: root.edgeGap - root.topGap
             readonly property real limMaxY: Math.max(limMinY, win.height - panel.height - root.edgeGap - root.topGap)
             readonly property bool sized: win.width > 0 && win.height > 0
             readonly property real effX: sized ? Math.max(limMinX, Math.min(limMaxX, root.offsetX)) : root.offsetX
@@ -945,28 +945,32 @@ Scope {
             }
 
             // ======================= PANEL =====================================
-            Item {
-                id: dragHandle
-                visible: panel.visible
-                opacity: panel.opacity
-                height: root.px(14)
-                anchors { bottom: panel.top; left: panel.left; right: panel.right }
-
-                Rectangle {
-                    anchors.centerIn: parent
-                    width: root.px(36)
-                    height: root.px(4)
-                    radius: height / 2
-                    color: Theme.text
-                    opacity: (dragArea.containsMouse || root.dragging) ? 0.35 : 0.1
-                    Behavior on opacity { NumberAnimation { duration: 150 } }
+            Rectangle {
+                id: panel
+                width: root.cardWidth
+                height: panelCol.height + root.px(28)
+                radius: root.px(20)
+                color: Theme.bg
+                anchors {
+                    top: parent.top
+                    topMargin: root.topGap + win.effY
+                    right: parent.right
+                    rightMargin: root.sideGap - win.effX
                 }
+                opacity: win.reveal ? 1 : 0
+                visible: opacity > 0
 
+                Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.InOutQuad } }
+
+                MouseArea { anchors.fill: parent }
+
+                // drag strip: invisible, runs along the whole top edge of the panel
+                // (same height as the panel's top padding, so it never covers the header)
                 MouseArea {
                     id: dragArea
-                    anchors.fill: parent
+                    anchors { top: parent.top; left: parent.left; right: parent.right }
+                    height: root.px(14)
                     enabled: root.panelOpen
-                    hoverEnabled: true
                     acceptedButtons: Qt.LeftButton
                     cursorShape: root.dragging ? Qt.ClosedHandCursor : Qt.OpenHandCursor
 
@@ -1002,26 +1006,6 @@ Scope {
                         stateTimer.restart();
                     }
                 }
-            }
-
-            Rectangle {
-                id: panel
-                width: root.cardWidth
-                height: panelCol.height + root.px(28)
-                radius: root.px(20)
-                color: Theme.bg
-                anchors {
-                    top: parent.top
-                    topMargin: root.topGap + win.effY
-                    right: parent.right
-                    rightMargin: root.sideGap - win.effX
-                }
-                opacity: win.reveal ? 1 : 0
-                visible: opacity > 0
-
-                Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.InOutQuad } }
-
-                MouseArea { anchors.fill: parent }
 
                 Column {
                     id: panelCol
@@ -1450,8 +1434,8 @@ Scope {
                 Behavior on opacity { NumberAnimation { duration: 150 } }
                 HoverHandler { id: sizeHover }
 
-                SizeBtn { text: "−"; width: 16; font.pixelSize: 12; onClicked: win.setSize(root.menuSize - 10) }
-                SizeBtn { text: "+"; width: 16; font.pixelSize: 12; onClicked: win.setSize(root.menuSize + 10) }
+                SizeBtn { text: "−"; width: 16; font.pixelSize: 12; onClicked: win.setSize(root.menuSize - 5) }
+                SizeBtn { text: "+"; width: 16; font.pixelSize: 12; onClicked: win.setSize(root.menuSize + 5) }
             }
         }
     }

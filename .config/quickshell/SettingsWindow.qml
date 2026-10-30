@@ -49,6 +49,7 @@ Scope {
             resizing = false
             sidebarResizing = false
             searchQuery = ""
+            focusTarget = "page"
             unmountTimer.restart()
         }
     }
@@ -101,8 +102,35 @@ Scope {
         return out
     }
 
-    function nextPage() { selectedIndex = (selectedIndex + 1) % navItems.length }
-    function prevPage() { selectedIndex = (selectedIndex - 1 + navItems.length) % navItems.length }
+    // Tab order: collapse button -> search box -> System -> ... -> Updates -> (wraps to collapse)
+    property string focusTarget: "page"      // "collapse" | "search" | "page"
+
+    function nextPage() {
+        if (focusTarget === "collapse") {
+            if (sidebarCollapsed) { focusTarget = "page"; selectedIndex = 0 }   // search is hidden
+            else focusTarget = "search"
+        } else if (focusTarget === "search") {
+            focusTarget = "page"
+            selectedIndex = 0
+        } else if (selectedIndex < navItems.length - 1) {
+            selectedIndex++
+        } else {
+            focusTarget = "collapse"
+        }
+    }
+
+    function prevPage() {
+        if (focusTarget === "search") {
+            focusTarget = "collapse"
+        } else if (focusTarget === "collapse") {
+            focusTarget = "page"
+            selectedIndex = navItems.length - 1
+        } else if (selectedIndex > 0) {
+            selectedIndex--
+        } else {
+            focusTarget = sidebarCollapsed ? "collapse" : "search"
+        }
+    }
 
     // ---- card geometry (persisted snap state) ----------------------------
     property real cardMargin: 40
@@ -380,7 +408,7 @@ Scope {
             // outside it passes through to the windows underneath.
             // The card's rect is bound explicitly (rather than via `item: card`) so the input
             // region always follows drags, resizes and snaps, with a little padding so the
-            // drag tab and snap buttons at the very top edge are never clipped.
+            // drag strip and snap buttons at the very top edge are never clipped.
             mask: Region {
                 readonly property real pad: 16
                 readonly property bool cardOnly: root.showing && !Theme.clickOutsideClose
@@ -420,6 +448,21 @@ Scope {
                 onActivated: win.focusSearch()
             }
 
+            // Tab stops: move real keyboard focus to match root.focusTarget
+            Connections {
+                target: root
+                function onFocusTargetChanged() {
+                    if (root.focusTarget === "search") {
+                        if (!searchInput.activeFocus) {
+                            searchInput.forceActiveFocus()
+                            searchInput.selectAll()
+                        }
+                    } else if (searchInput.activeFocus) {
+                        backdrop.forceActiveFocus()
+                    }
+                }
+            }
+
             Rectangle {
                 id: backdrop
                 anchors.fill: parent
@@ -434,6 +477,11 @@ Scope {
                         event.accepted = true
                     } else if (event.key === Qt.Key_Tab) {
                         root.nextPage()
+                        event.accepted = true
+                    } else if (root.focusTarget === "collapse" &&
+                               (event.key === Qt.Key_Return || event.key === Qt.Key_Enter ||
+                                event.key === Qt.Key_Space)) {
+                        root.toggleSidebar()
                         event.accepted = true
                     }
                 }
@@ -505,7 +553,57 @@ Scope {
                     border.color: Theme.accent
                     border.width: 1
 
-                    // drag handle + snap buttons
+                    // drag strip: invisible, runs along the whole top edge of the card
+                    MouseArea {
+                        id: dragArea
+                        anchors {
+                            top: parent.top
+                            left: parent.left
+                            right: parent.right
+                        }
+                        height: 16
+                        acceptedButtons: Qt.LeftButton
+                        cursorShape: root.dragging ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+
+                        property real pressX: 0
+                        property real pressY: 0
+                        property real startX: 0
+                        property real startY: 0
+                        property bool moved: false
+
+                        onPressed: function (mouse) {
+                            var p = dragArea.mapToItem(backdrop, mouse.x, mouse.y)
+                            pressX = p.x
+                            pressY = p.y
+                            startX = root.cardX
+                            startY = root.cardY
+                            moved = false
+                            root.dragging = true
+                        }
+
+                        onPositionChanged: function (mouse) {
+                            if (!root.dragging) return
+                            var p = dragArea.mapToItem(backdrop, mouse.x, mouse.y)
+                            moved = true
+                            root.cardX = root.clampX(startX + (p.x - pressX))
+                            root.cardY = root.clampY(startY + (p.y - pressY))
+                        }
+
+                        onReleased: {
+                            if (!root.dragging) return
+                            if (moved) root.finishDrag()
+                            else root.dragging = false
+                        }
+
+                        onCanceled: {
+                            if (!root.dragging) return
+                            if (moved) root.finishDrag()
+                            else root.dragging = false
+                        }
+                    }
+
+                    // snap buttons on the original tab (tab is visual only now;
+                    // dragging is handled by the full-width strip above)
                     Item {
                         id: positionHandle
                         width: 100
@@ -558,50 +656,6 @@ Scope {
                                     radiusX: tabPath.fx; radiusY: tabPath.fy
                                     direction: PathArc.Clockwise
                                 }
-                            }
-                        }
-
-                        MouseArea {
-                            id: dragArea
-                            anchors.fill: parent
-                            anchors.bottomMargin: -6
-                            acceptedButtons: Qt.LeftButton
-                            cursorShape: root.dragging ? Qt.ClosedHandCursor : Qt.OpenHandCursor
-
-                            property real pressX: 0
-                            property real pressY: 0
-                            property real startX: 0
-                            property real startY: 0
-                            property bool moved: false
-
-                            onPressed: function (mouse) {
-                                var p = dragArea.mapToItem(backdrop, mouse.x, mouse.y)
-                                pressX = p.x
-                                pressY = p.y
-                                startX = root.cardX
-                                startY = root.cardY
-                                moved = false
-                                root.dragging = true
-                            }
-
-                            onPositionChanged: function (mouse) {
-                                if (!root.dragging) return
-                                var p = dragArea.mapToItem(backdrop, mouse.x, mouse.y)
-                                moved = true
-                                root.cardX = root.clampX(startX + (p.x - pressX))
-                                root.cardY = root.clampY(startY + (p.y - pressY))
-                            }
-
-                            onReleased: {
-                                if (!root.dragging) return
-                                if (moved) root.finishDrag()
-                                else root.dragging = false
-                            }
-
-                            onCanceled: {
-                                if (!root.dragging) return
-                                if (moved) root.finishDrag()
-                                else root.dragging = false
                             }
                         }
 
@@ -673,13 +727,17 @@ Scope {
                                         width: 26
                                         height: 26
                                         radius: Theme.radius
-                                        color: collapseMouse.containsMouse
+                                        readonly property bool kbFocus: root.focusTarget === "collapse"
+
+                                        color: (collapseMouse.containsMouse || kbFocus)
                                             ? Theme.alpha(Theme.text, 0.08)
                                             : "transparent"
                                         border.width: 1
-                                        border.color: collapseMouse.containsMouse
-                                            ? Theme.alpha(Theme.text, 0.18)
-                                            : "transparent"
+                                        border.color: kbFocus
+                                            ? Theme.accent
+                                            : collapseMouse.containsMouse
+                                                ? Theme.alpha(Theme.text, 0.18)
+                                                : "transparent"
 
                                         Behavior on color {
                                             ColorAnimation { duration: Theme.animFast }
@@ -701,7 +759,7 @@ Scope {
                                                 radius: 3
                                                 color: "transparent"
                                                 border.width: 1.4
-                                                border.color: collapseMouse.containsMouse
+                                                border.color: (collapseMouse.containsMouse || collapseButton.kbFocus)
                                                     ? Theme.accent
                                                     : Theme.textDim
                                             }
@@ -713,7 +771,7 @@ Scope {
                                                 width: 1.3
                                                 height: parent.height - 3
                                                 radius: 1
-                                                color: collapseMouse.containsMouse
+                                                color: (collapseMouse.containsMouse || collapseButton.kbFocus)
                                                     ? Theme.accent
                                                     : Theme.textDim
 
@@ -787,6 +845,26 @@ Scope {
                                             selectByMouse: true
 
                                             onTextChanged: root.searchQuery = text
+
+                                            // Tab / Shift+Tab keep working while typing in the search box
+                                            Keys.onPressed: function (event) {
+                                                if (event.key === Qt.Key_Backtab ||
+                                                    (event.key === Qt.Key_Tab && (event.modifiers & Qt.ShiftModifier))) {
+                                                    root.prevPage()
+                                                    event.accepted = true
+                                                } else if (event.key === Qt.Key_Tab) {
+                                                    root.nextPage()
+                                                    event.accepted = true
+                                                }
+                                            }
+
+                                            // clicking into the box makes it the current tab stop
+                                            onActiveFocusChanged: {
+                                                if (activeFocus)
+                                                    root.focusTarget = "search"
+                                                else if (root.focusTarget === "search")
+                                                    root.focusTarget = "page"
+                                            }
 
                                             // Enter jumps to the first match
                                             onAccepted: {

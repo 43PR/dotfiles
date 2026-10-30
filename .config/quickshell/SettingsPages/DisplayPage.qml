@@ -432,6 +432,34 @@ Item {
         return snapScale(mon.width, mon.height, Math.max(scaleMin, Math.min(scaleMax, requested)))
     }
 
+    // Every scale Hyprland accepts for this mode, inside the slider range.
+    function validScales(w, h) {
+        const limit = gcd(w, h) * 120
+        const list = []
+        for (let n = Math.ceil(scaleMin * 120); n <= Math.floor(scaleMax * 120); n++)
+            if (limit % n === 0) list.push(n / 120)
+        return list
+    }
+
+    // Slider click -> nearest accepted scale. If that is the scale already applied,
+    // step to the neighbouring accepted one in the direction of the click, so a click always moves.
+    function pickScale(mon, requested) {
+        const list = validScales(mon.width, mon.height)
+        if (list.length === 0) return validScale(mon, requested)
+        let best = 0
+        for (let i = 1; i < list.length; i++)
+            if (Math.abs(list[i] - requested) < Math.abs(list[best] - requested)) best = i
+        if (Math.abs(list[best] - mon.scale) < 1e-6 && Math.abs(requested - mon.scale) > 1e-6) {
+            const next = best + (requested > mon.scale ? 1 : -1)
+            if (next >= 0 && next < list.length) best = next
+        }
+        return list[best]
+    }
+
+    function scaleToSlider(scale) {
+        return Math.max(0, Math.min(1, (scale - scaleMin) / (scaleMax - scaleMin)))
+    }
+
     // Any other path: snap against the dimensions of the mode that will actually be applied.
     function scaleForMode(mode, mon, scale) {
         const m = String(mode).match(/^(\d+)x(\d+)/)
@@ -696,11 +724,19 @@ Item {
                                 }
 
                                 Slider {
+                                    id: scaleSlider
                                     width: parent.width - 36 - 44 - 16
                                     anchors.verticalCenter: parent.verticalCenter
                                     icon: "\uf00e"
-                                    value: Math.max(0, Math.min(1, (card.modelData.scale - page.scaleMin) / (page.scaleMax - page.scaleMin)))
-                                    onCommitted: value => page.setScale(card.modelData, page.scaleMin + value * (page.scaleMax - page.scaleMin))
+                                    value: page.scaleToSlider(card.modelData.scale)
+                                    onCommitted: v => {
+                                        const target = page.pickScale(card.modelData,
+                                            page.scaleMin + v * (page.scaleMax - page.scaleMin))
+                                        page.setScale(card.modelData, target)
+                                        // Interaction can break the binding above; restore it so the handle
+                                        // jumps to the accepted scale instead of staying where you clicked.
+                                        scaleSlider.value = Qt.binding(() => page.scaleToSlider(card.modelData.scale))
+                                    }
                                 }
 
                                 Text {

@@ -22,7 +22,7 @@
 </p>
 
 <details>
-<summary><b>✧ What is this?</b></summary>
+<summary><b>✧ What is this? Requirements?</b></summary>
 
 <br>
 
@@ -35,22 +35,17 @@ This setup aims to keep things simple, fast and practical, and easy to make your
 - **Arch-based distro:** Arch, CachyOS, EndeavourOS, Manjaro, etc.
 - **A mostly clean install.** Replaced configs are backed up automatically.
 
-> New to Linux? I recommend [CachyOS](https://youtu.be/eo9MejbzWto). Skip the configuration part of the video, just run the install command after installing the system.
+> New to Linux? I recommend watching this [CachyOS Tutorial](https://www.youtube.com/watch?v=rJcrb7vxoCo). 
 
 **Need help?** Join the Discord (button above).
 
-### Is it hard to use?
+### Hardware
 
-Not really. Almost everything is a keyboard shortcut, with mouse alternatives.
+- RAM: 4 GB minimum, 8 GB recommended.
+- GPU: Intel, AMD or NVIDIA with compatible wayland drivers.
+- Display: Will look much better in FHD or higher.
 
-| Action | Keyboard | Mouse |
-|---|---|---|
-| Open quick actions | `Super + S` | Right-click the clock |
-| Open settings | `Super + I` | Middle-click the clock |
-
-It includes options to change binds/shortcuts.
-
-See all [Keybinds](#keybinds), or hover over bar elements to see what they do.
+As reference I made this project with a i5 6th dell laptop with integrated graphics so it should be really smooth in other potatoes too.
 
 </details>
 

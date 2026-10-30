@@ -17,7 +17,7 @@ PanelWindow {
     property real skewFactor: 0
     property real baseSpacing: 0
     property real edgeSpacing: 80
-    property int startPosition: 4
+    property int startPosition: 7
     property bool shadowEnabled: true
     property color shadowColor: "#000000"
     property real shadowOpacity: 0.4
@@ -148,6 +148,7 @@ PanelWindow {
         readonly property real sideMargin: Math.max(0, viewportCenterX - tileWidth / 2)
         property bool ready: false
         property bool userMoved: false
+        property bool jumping: false
         property real lastMouseX: -1
         property real lastMouseY: -1
 
@@ -175,11 +176,19 @@ PanelWindow {
             Quickshell.execDetached(["bash", Quickshell.shellPath("commands.sh"), folderModel.get(selectedIndex, "filePath")])
             Qt.quit()
         }
-
         function moveSelection(delta, speedMultiplier) {
+            if (count <= 0) return
+            const next = (selectedIndex + delta + count) % count
+            const wrapped = Math.abs(next - selectedIndex) > 1
             anim.velocity = main.speed * speedMultiplier
-            selectedIndex = clampIndex(selectedIndex + delta)
-            ensureVisibleAnimated(selectedIndex)
+            selectedIndex = next
+            if (wrapped) {
+                jumping = true
+                contentX = centerX(next)
+                jumping = false
+            } else {
+                ensureVisibleAnimated(next)
+            }
         }
 
         onCountChanged: centerOnStart()
@@ -190,9 +199,8 @@ PanelWindow {
             target: configs
             function onNumber_of_picturesChanged() { list.centerOnStart() }
         }
-
         Behavior on contentX {
-            enabled: list.ready
+            enabled: list.ready && !list.jumping
             SmoothedAnimation { id: anim; property real velocity: main.speed; duration: main.animDuration }
         }
 
@@ -256,7 +264,8 @@ PanelWindow {
                 Image {
                     id: img
                     anchors.fill: parent
-                    opacity: 0.95
+                    opacity: delegateItem.active ? 1.0 : 0.8
+                    Behavior on opacity { NumberAnimation { duration: 150 } }
                     fillMode: Image.PreserveAspectCrop
                     asynchronous: true
                     cache: false
@@ -290,7 +299,7 @@ PanelWindow {
                     asynchronous: true
                     cache: false
                     smooth: true
-                    opacity: 0.95
+                    opacity: 1.0
                     transform: Shear { xFactor: main.skewFactor }
                 }
 

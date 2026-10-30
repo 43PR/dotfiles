@@ -1148,7 +1148,7 @@ echo "$u $t"
             readonly property bool isNet: mid === "net"
             readonly property bool isNotif: mid === "notif"
             readonly property bool isSettings: mid === "settings"
-            baseSize: mid === "power" ? root.sz.power : root.sz.icon
+            baseSize: mid === "power" ? root.sz.power - 1 : root.sz.icon
             yOffset: mid === "power" ? 0 : root.iconYOffset
             text: isNet ? root.netGlyph : (def.g ?? "")
             tip: isNet ? root.netTip : mid === "notif" ? root.notifTip : (def.tip ?? "")
@@ -1387,6 +1387,7 @@ echo "$u $t"
             readonly property bool muted: ready ? sink.audio.muted : false
 
             glyphSize: root.sz.icon
+            yOffset: root.iconYOffset + 0.25
             glyph: muted || vol <= 0 ? "\uDB81\uDF5F" : "\uDB81\uDD7E"
             warning: muted
             disabled: !ready

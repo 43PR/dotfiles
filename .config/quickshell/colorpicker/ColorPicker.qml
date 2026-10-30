@@ -2,9 +2,12 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
+import ".."
 import "ColorUtil.js" as CU
 
-ShellRoot {
+// Runs inside the main shell (uses the single quickshell/Theme.qml).
+// Trigger with:  qs ipc call colorpicker start   (or toggle)
+Scope {
     id: root
 
     // ───────── Configuration ─────────
@@ -27,14 +30,6 @@ ShellRoot {
     readonly property var history: hist.items
 
     // ───────── Triggers ─────────
-    // Start picking as soon as the process launches (the keybind runs `qs -n -p ...`).
-    // The short delay lets Hyprland IPC connect so focusedMonitor is known.
-    Timer {
-        interval: 100
-        running: true
-        onTriggered: root.start()
-    }
-
     GlobalShortcut {
         appid: "colorpicker"
         name: "pick"
@@ -68,10 +63,10 @@ ShellRoot {
         capture.running = true;
     }
 
-    // Close the picker and exit the process (nothing stays in the background)
-    function stop() { mode = "idle"; Qt.quit(); }
+    // Close the picker (the shell keeps running)
+    function stop() { mode = "idle"; }
 
-    // Restart a pick without exiting the process
+    // Restart a pick
     function again() { mode = "idle"; start(); }
 
     function copyText(t) { Quickshell.execDetached(["wl-copy", t]); }
@@ -106,11 +101,8 @@ ShellRoot {
         var s = screenByName(curScreen);
         var nx = Math.max(0, Math.min(s.width - 1, Math.floor(mx) + dx));
         var ny = Math.max(0, Math.min(s.height - 1, Math.floor(my) + dy));
-        // update our own position so the loupe/sampler follow immediately,
-        // and repeated presses accumulate
         mx = nx;
         my = ny;
-        // also move the real cursor so it stays under the loupe
         Quickshell.execDetached(["hyprctl", "dispatch",
             "hl.dsp.cursor.move({ x = " + Math.round(s.x + nx) + ", y = " + Math.round(s.y + ny) + " })"]);
     }
@@ -143,12 +135,12 @@ ShellRoot {
 
     Variants {
         model: Quickshell.screens
-        PickerOverlay {
+        ColorPickerOverlay {
             required property var modelData
             screen: modelData
             ctl: root
         }
     }
 
-    EditorWindow { ctl: root }
+    ColorPickerEditor { ctl: root }
 }
