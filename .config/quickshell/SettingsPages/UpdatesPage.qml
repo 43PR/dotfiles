@@ -23,7 +23,8 @@ Item {
 
     // ---- Dotfiles repo status vs upstream ----
     // dotfilesBehind: -2 = checking, -1 = unavailable, otherwise commits upstream has that HEAD lacks.
-    // dotfilesAhead: local commits not on upstream (> 0 together with behind means diverged).
+    // dotfilesAhead: local commits not on upstream (> 0 together with behind means diverged;
+    // the updaters reconcile that automatically).
     property int dotfilesBehind: -2
     property int dotfilesAhead: 0
 
@@ -36,13 +37,14 @@ Item {
 
     // ---- Tooltip texts ----
     readonly property string tipUpdateSh:
-        "update.sh (symlink model)\n"
-        + "Links files that are new in the repo, installs new packages.txt entries "
-        + "and regenerates the theme. Existing real files in ~/.config are never overwritten."
+        "update.sh (keeps my changes)\n"
+        + "Pulls upstream automatically, keeping your local edits (your side wins conflicts). "
+        + "Never overwrites customized files in ~/.config, and lists any it kept."
     readonly property string tipUpdate2Sh:
         "update2.sh (repo is source of truth)\n"
-        + "Also repairs wrong links, replaces real files in the way (backed up to ~/.config-backups) "
-        + "and removes stale links. Your personal files (fastfetch, cava, rofi config, themes...) are kept."
+        + "Pulls upstream automatically. If your local repo diverged, your work is saved to a backup branch/stash "
+        + "and upstream wins. Replaces real files in the way (backed up to ~/.config-backups). "
+        + "Personal files (fastfetch, cava, rofi config, themes...) are kept."
     readonly property string tipRunButton:
         ""
 
@@ -57,7 +59,8 @@ Item {
         return Theme.textDim
     }
 
-    // Dotfiles status text. "NEW UPDATE" with local commits means `git pull --ff-only` would fail.
+    // Dotfiles status text. "NEW UPDATE" with local commits means the history diverged;
+    // the updater's --pull reconciles that automatically.
     readonly property string dotfilesLabel: {
         if (dotfilesBehind === -2) return "CHECKING…"
         if (dotfilesBehind === -1) return "N/A"
@@ -118,14 +121,11 @@ Item {
         + "GIT_TERMINAL_PROMPT=0 timeout 20 git fetch --quiet >/dev/null 2>&1 || { echo -1; exit 0; }; "
         + "git rev-list --left-right --count 'HEAD...@{u}' 2>/dev/null || echo -1"
 
-    // Pull first, then run the selected updater. update2.sh pulls on its own via --pull.
+    // Both updaters pull on their own via --pull and reconcile a diverged repo
+    // automatically (update.sh: your changes win; update2.sh: upstream wins,
+    // your work is saved to a backup branch/stash).
     function desktopScript() {
-        let s = repoResolve(updater)
-        if (updater === "update2.sh")
-            s += "./update2.sh --pull"
-        else
-            s += "echo '--- git pull ---'; git pull --ff-only; ./update.sh"
-        return s
+        return repoResolve(updater) + "./" + updater + " --pull"
     }
 
     // ------------------------------------------------------------------
@@ -538,7 +538,7 @@ Item {
                             width: parent.width
                             wrapMode: Text.WordWrap
                             text: page.dotfilesBehind + " behind, " + page.dotfilesAhead
-                                  + " ahead of upstream. A fast-forward pull will fail; rebase or merge manually."
+                                  + " ahead of upstream. The updater will reconcile this automatically."
                             color: Theme.textDim
                             font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeSmall
                         }

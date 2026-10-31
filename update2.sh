@@ -24,7 +24,8 @@ set -uo pipefail
 # Usage:
 #   ./update2.sh                  normal update
 #   ./update2.sh --dry-run        show what would change, write nothing
-#   ./update2.sh --pull           git pull --ff-only the repo first
+#   ./update2.sh --pull           bring the repo to upstream first (automatic;
+#                                 diverged local work is backed up, upstream wins)
 #   ./update2.sh --skip-packages
 #   ./update2.sh --skip-theme
 #   ./update2.sh --restart-shell  restart Quickshell afterwards
@@ -64,6 +65,12 @@ GENERATED_FILES=(
     "rofi/colors.rasi"
     "quickshell/Theme.qml"
 )
+
+# Args to pass along when the script re-runs itself after pulling.
+REST_ARGS=()
+for arg in "$@"; do
+    [[ "$arg" == "--pull" ]] || REST_ARGS+=("$arg")
+done
 
 DRY_RUN=0
 PULL=0
@@ -128,15 +135,55 @@ backup() {   # backup <path> <subpath>
 # Pull
 # --------------------------------------------------
 
+# Brings the repo to upstream without ever stopping to ask. Fast-forwards when
+# possible; if history diverged or local edits are in the way, the repo wins:
+#   - local commits are kept on a backup/pre-update-* branch
+#   - uncommitted edits are kept in `git stash list`
+#   - then the branch is reset to upstream
+sync_repo_upstream_wins() {
+    local g=(git -C "$REPO_DIR") stamp ahead behind
+    stamp="$(date '+%Y%m%d-%H%M%S')"
+
+    "${g[@]}" fetch --quiet || { error "git fetch failed (network?)."; return 1; }
+    if ! "${g[@]}" rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then
+        warning "No upstream branch configured; skipping pull."
+        return 0
+    fi
+
+    read -r ahead behind < <("${g[@]}" rev-list --left-right --count 'HEAD...@{u}')
+    if [[ "$behind" -eq 0 ]]; then
+        info "Repository already up to date."
+        return 0
+    fi
+
+    if "${g[@]}" pull --ff-only --quiet 2>/dev/null; then
+        return 0
+    fi
+
+    warning "Local repo state conflicts with upstream; saving it and taking upstream."
+    if [[ "$ahead" -gt 0 ]]; then
+        "${g[@]}" branch "backup/pre-update-$stamp" HEAD >/dev/null 2>&1 \
+            && info "Local commits saved to branch backup/pre-update-$stamp"
+    fi
+    if [[ -n "$("${g[@]}" status --porcelain)" ]]; then
+        "${g[@]}" stash push -u -m "update2.sh auto-stash $stamp" >/dev/null \
+            && info "Uncommitted edits saved in 'git stash list'"
+    fi
+    "${g[@]}" reset --hard '@{u}' >/dev/null || { error "git reset failed."; return 1; }
+    return 0
+}
+
+
 if [[ "$PULL" -eq 1 ]]; then
     if [[ "$DRY_RUN" -eq 1 ]]; then
         info "Would run: git pull --ff-only"
     elif git -C "$REPO_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
         info "Pulling latest changes..."
-        if git -C "$REPO_DIR" pull --ff-only; then
+        if sync_repo_upstream_wins; then
             success "Repository up to date."
+            # The pull may have changed this script; re-run the fresh copy.
+            exec bash "${BASH_SOURCE[0]}" "${REST_ARGS[@]}"
         else
-            error "git pull failed (local changes or diverged history). Fix that and re-run."
             exit 1
         fi
     else

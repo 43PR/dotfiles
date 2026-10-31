@@ -75,6 +75,7 @@ kitty
 zsh
 zsh-autosuggestions
 zsh-syntax-highlighting
+zsh-autocomplete
 starship
 eza
 
