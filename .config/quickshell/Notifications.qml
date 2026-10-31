@@ -33,8 +33,8 @@ Scope {
     readonly property string home: Quickshell.env("HOME")
 
     // toast lifetimes (ms) when the app gives no timeout
-    readonly property int normalTimeout: 6000
-    readonly property int criticalTimeout: 20000
+    readonly property int normalTimeout: 3000
+    readonly property int criticalTimeout: 6000
 
     // grouping state (collapsed groups are persisted, expanded entries are not)
     property var collapsedApps: ({})
@@ -49,12 +49,14 @@ Scope {
 
     property var groupOffsets: ({})
     property bool animateRows: false
+    property int scrollDir: 1   // +1 = scrolling to older entries, -1 = to newer
 
     // Do Not Disturb normally lets critical notifications through. Many chat
     // apps (Discord and its clients) mark everything critical, so these apps
     // are muted by DND regardless of urgency. Lowercase substrings of appName.
     property var dndMuteCritical: ["discord", "vesktop", "webcord", "armcord"]
-    Timer { id: animTimer; interval: 400; onTriggered: root.animateRows = false }
+    // must outlast the whole scroll transition (stagger + longest animation)
+    Timer { id: animTimer; interval: 800; onTriggered: root.animateRows = false }
 
     // extra glyphs (Nerd Font / Material Design Icons, written as surrogate pairs)
     readonly property string icDown: "\uDB80\uDD40"
@@ -79,15 +81,25 @@ Scope {
         }
     }
 
-    // must outlast the longest fade (toast 200ms / panel 200ms)
+    // must outlast the longest animation (toast 380ms / panel 340ms)
     Timer {
         id: unmountTimer
-        interval: 260
+        interval: 440
         onTriggered: root.mounted = false
     }
 
+    // true only for a moment after the panel opens: rows created in that window
+    // play the staggered entry; rows created later (scrolling, rebuilds) don't
+    property bool opening: false
+    Timer { id: openingTimer; interval: 700; onTriggered: root.opening = false }
+
     onPanelOpenChanged: {
+        if (panelOpen) {
+            opening = true;
+            openingTimer.restart();
+        }
         if (!panelOpen) {
+            opening = false;
             dragging = false;
             // closing mid-drag never delivers a release event; persist anyway
             if (stateReady) stateTimer.restart();
@@ -246,6 +258,7 @@ Scope {
             return true;
         }
 
+        scrollDir = delta > 0 ? 1 : -1;
         animateRows = true;
         animTimer.restart();
 
@@ -746,6 +759,8 @@ Scope {
                         property bool notificationClosed: false
                         property bool expanded: false
                         property bool copied: false
+                        // invisible countdown: drives the toast lifetime (no UI)
+                        property real lifeLeft: 1
                         readonly property bool critical: modelData.urgency === NotificationUrgency.Critical
 
                         readonly property bool persistent: modelData.expireTimeout === 0
@@ -769,7 +784,7 @@ Scope {
 
                         Timer {
                             id: gone
-                            interval: 220
+                            interval: 400
                             onTriggered: {
                                 const n = wrapper.modelData;
                                 if (!n || wrapper.notificationClosed || !n.tracked) return;
@@ -780,6 +795,21 @@ Scope {
                         }
 
                         Timer { id: copiedTimer; interval: 900; onTriggered: wrapper.copied = false }
+
+                        // The toast's lifetime. Nothing is drawn: this just counts
+                        // down, pauses while the card is hovered or expanded, and
+                        // closes the toast when it runs out.
+                        NumberAnimation {
+                            id: progAnim
+                            target: wrapper
+                            property: "lifeLeft"
+                            from: 1
+                            to: 0
+                            duration: wrapper.lifetime
+                            running: !wrapper.leaving && !wrapper.persistent && !wrapper.notificationClosed
+                            paused: hh.hovered || wrapper.expanded
+                            onFinished: wrapper.close(true)
+                        }
 
                         // a replaced/updated notification gets a fresh lifetime
                         Connections {
@@ -800,7 +830,12 @@ Scope {
                             border.color: Theme.danger
                             opacity: wrapper.shown ? 1 : 0
 
-                            Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.InOutQuad } }
+                            // slides in from the right edge of the screen (and
+                            // back out the same way) while fading
+                            x: wrapper.shown ? 0 : root.cardWidth + root.sideGap
+
+                            Behavior on x { NumberAnimation { duration: 380; easing.type: Easing.OutCubic } }
+                            Behavior on opacity { NumberAnimation { duration: 320; easing.type: Easing.InOutQuad } }
 
                             HoverHandler { id: hh }
 
@@ -816,32 +851,6 @@ Scope {
                                     } else {
                                         wrapper.close(false);
                                     }
-                                }
-                            }
-
-                            // lifetime bar. It IS the timer: it pauses while the
-                            // card is hovered or expanded, and closes the toast
-                            // when it runs out.
-                            Rectangle {
-                                id: bar
-                                x: root.px(16)
-                                anchors.bottom: parent.bottom
-                                anchors.bottomMargin: root.px(5)
-                                height: 2
-                                radius: 1
-                                width: card.width - root.px(32)
-                                color: wrapper.critical ? Theme.danger : Theme.alpha(Theme.text, 0.3)
-                                opacity: wrapper.expanded ? 0.15 : 1
-                                visible: !wrapper.persistent
-
-                                NumberAnimation on width {
-                                    id: progAnim
-                                    from: card.width - root.px(32)
-                                    to: 0
-                                    duration: wrapper.lifetime
-                                    running: !wrapper.leaving && !wrapper.persistent && !wrapper.notificationClosed
-                                    paused: hh.hovered || wrapper.expanded
-                                    onFinished: wrapper.close(true)
                                 }
                             }
 
@@ -945,22 +954,44 @@ Scope {
             }
 
             // ======================= PANEL =====================================
-            Rectangle {
-                id: panel
+            // Clipping window: it opens from the top downward (and closes back
+            // up) revealing the panel without squashing it. The panel inside
+            // always keeps its full size.
+            Item {
+                id: panelClip
                 width: root.cardWidth
-                height: panelCol.height + root.px(28)
-                radius: root.px(20)
-                color: Theme.bg
+                height: panel.height * grow
+                clip: true
+                visible: panel.opacity > 0
                 anchors {
                     top: parent.top
                     topMargin: root.topGap + win.effY
                     right: parent.right
                     rightMargin: root.sideGap - win.effX
                 }
-                opacity: win.reveal ? 1 : 0
-                visible: opacity > 0
 
-                Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.InOutQuad } }
+                property real grow: win.reveal ? 1 : 0
+                Behavior on grow {
+                    NumberAnimation {
+                        duration: win.reveal ? 240 : 200
+                        easing.type: win.reveal ? Easing.OutCubic : Easing.InOutCubic
+                    }
+                }
+
+            Rectangle {
+                id: panel
+                width: root.cardWidth
+                height: panelCol.height + root.px(28)
+                radius: root.px(20)
+                color: Theme.bg
+                opacity: win.reveal ? 1 : 0
+
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: win.reveal ? 150 : 170
+                        easing.type: Easing.InOutQuad
+                    }
+                }
 
                 MouseArea { anchors.fill: parent }
 
@@ -1089,30 +1120,40 @@ Scope {
                         // keep the scroll position when the grouped model is rebuilt
                         property real keepY: 0
 
-        // Smooth scrolling inside a group: the leaving row fades out, the
-        // entering row fades in, everything else glides into place. Only
-        // active during a scroll so normal rebuilds don't flash.
-        add: root.animateRows ? addTrans : null
-        remove: root.animateRows ? removeTrans : null
-        displaced: root.animateRows ? displacedTrans : null
-        Transition {
-            id: addTrans
-            ParallelAnimation {
-                NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 220; easing.type: Easing.OutCubic }
-                NumberAnimation { property: "scale"; from: 0.94; to: 1; duration: 220; easing.type: Easing.OutCubic }
-            }
-        }
-        Transition {
-            id: removeTrans
-            ParallelAnimation {
-                NumberAnimation { property: "opacity"; to: 0; duration: 160; easing.type: Easing.InCubic }
-                NumberAnimation { property: "scale"; to: 0.94; duration: 160; easing.type: Easing.InCubic }
-            }
-        }
-        Transition {
-            id: displacedTrans
-            NumberAnimation { properties: "y"; duration: 220; easing.type: Easing.OutCubic }
-        }
+                        // Smooth scrolling inside a group, with a clear direction:
+                        // the leaving row slips away first (up when scrolling to
+                        // older entries, down when scrolling to newer ones), then
+                        // the entering row slides in from the opposite side after a
+                        // short pause, while the rest glide into place. Only active
+                        // during a scroll so normal rebuilds don't flash.
+                        add: root.animateRows ? addTrans : null
+                        remove: root.animateRows ? removeTrans : null
+                        displaced: root.animateRows ? displacedTrans : null
+                        Transition {
+                            id: addTrans
+                            SequentialAnimation {
+                                // keep the new row invisible during the pause
+                                // (otherwise it would flash at full opacity first)
+                                PropertyAction { property: "opacity"; value: 0 }
+                                PropertyAction { property: "scale"; value: 0.92 }
+                                PauseAnimation { duration: 180 }
+                                ParallelAnimation {
+                                    NumberAnimation { property: "opacity"; to: 1; duration: 340; easing.type: Easing.OutCubic }
+                                    NumberAnimation { property: "scale"; to: 1; duration: 340; easing.type: Easing.OutCubic }
+                                }
+                            }
+                        }
+                        Transition {
+                            id: removeTrans
+                            ParallelAnimation {
+                                NumberAnimation { property: "opacity"; to: 0; duration: 220; easing.type: Easing.InCubic }
+                                NumberAnimation { property: "scale"; to: 0.92; duration: 220; easing.type: Easing.InCubic }
+                            }
+                        }
+                        Transition {
+                            id: displacedTrans
+                            NumberAnimation { properties: "y"; duration: 340; easing.type: Easing.OutCubic }
+                        }
                         Connections {
                             target: root
                             function onRowsAboutToRebuild() { list.keepY = list.contentY; }
@@ -1149,6 +1190,30 @@ Scope {
                             height: pad + (isHeader ? headerBox.height : (isPager ? pagerBox.height : itemBox.height))
 
                             Timer { id: copiedTimer; interval: 900; onTriggered: rowItem.copied = false }
+
+                            // ---------- staggered entry (when the panel opens) ----------
+                            property real enter: 1
+                            transform: Translate { y: (1 - rowItem.enter) * root.px(14) }
+
+                            function playEnter() {
+                                enterAnim.stop();
+                                rowItem.enter = 0;
+                                rowItem.opacity = 0;
+                                enterDelay.interval = 90 + Math.min(rowItem.index, 8) * 45;
+                                enterDelay.restart();
+                            }
+                            Component.onCompleted: { if (root.opening) rowItem.playEnter(); }
+
+                            Timer { id: enterDelay; onTriggered: enterAnim.start() }
+                            ParallelAnimation {
+                                id: enterAnim
+                                NumberAnimation { target: rowItem; property: "enter"; from: 0; to: 1; duration: 320; easing.type: Easing.OutCubic }
+                                NumberAnimation { target: rowItem; property: "opacity"; from: 0; to: 1; duration: 280; easing.type: Easing.OutCubic }
+                            }
+                            Connections {
+                                target: root
+                                function onPanelOpenChanged() { if (root.panelOpen) rowItem.playEnter(); }
+                            }
 
                             // ---------- group header ----------
                             Rectangle {
@@ -1235,14 +1300,6 @@ Scope {
                                 x: root.px(6)
                                 width: parent.width - root.px(6)
                                 height: root.px(22)
-
-                                Lbl {
-                                    anchors { left: parent.left; leftMargin: root.px(10); verticalCenter: parent.verticalCenter }
-                                    ui: root.ui
-                                    sz: 9
-                                    color: Theme.textDim
-                                    text: rowItem.summary + "  ·  scroll for more"
-                                }
                                 Row {
                                     anchors { right: parent.right; rightMargin: root.px(6); verticalCenter: parent.verticalCenter }
                                     spacing: root.px(4)
@@ -1276,6 +1333,14 @@ Scope {
                                 height: Math.max(root.px(52), textCol.implicitHeight + root.px(20))
                                 radius: root.px(12)
                                 color: Theme.alpha(Theme.text, rowItem.copied ? 0.2 : 0.06)
+
+                                // expand / collapse glides instead of jumping; content is
+                                // clipped only while the height is animating so tooltips
+                                // can still overflow the card the rest of the time
+                                clip: heightAnim.running
+                                Behavior on height {
+                                    NumberAnimation { id: heightAnim; duration: 220; easing.type: Easing.OutCubic }
+                                }
 
                                 // wheel scrolls through the group's entries; at either
                                 // end the event is passed on so the whole list scrolls
@@ -1421,10 +1486,11 @@ Scope {
                     }
                 }
             }
+            }
 
             Row {
                 id: sizeRow
-                anchors { top: panel.bottom; topMargin: 6; left: panel.left }
+                anchors { top: panelClip.top; topMargin: panel.height + 6; left: panelClip.left }
                 spacing: 2
                 width: root.panelOpen ? implicitWidth : 0
                 height: root.panelOpen ? implicitHeight : 0

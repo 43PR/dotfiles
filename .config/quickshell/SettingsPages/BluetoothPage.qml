@@ -136,6 +136,9 @@ Item {
         setDiscovering(false)
         dev.trusted = true
         setStatus("Connecting to " + name + "...")
+        setDiscovering(false)
+        delete BluetoothState.reconnectBackoff[dev.address]   // manual attempt resets auto-retry
+        dev.trusted = true
         dev.connect()
     }
 

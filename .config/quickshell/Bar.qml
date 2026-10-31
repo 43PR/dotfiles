@@ -1520,6 +1520,24 @@ echo "$u $t"
                     property int monthOffset: 0
                     property Item clockItem: null     // the live clock module (wherever it was placed)
 
+                    // The popup window stays mounted for a moment after the calendar is
+                    // closed so the close animation can play (same idea as the
+                    // notification panel). Must outlast the longest calendar animation.
+                    property bool calMounted: false
+                    Timer {
+                        id: calUnmountTimer
+                        interval: 260
+                        onTriggered: clockPanel.calMounted = false
+                    }
+                    onCalOpenChanged: {
+                        if (calOpen) {
+                            calUnmountTimer.stop();
+                            calMounted = true;
+                        } else {
+                            calUnmountTimer.restart();
+                        }
+                    }
+
                     // The clock is only needed while the module is enabled.
                     SystemClock {
                         id: clk
@@ -1566,11 +1584,21 @@ echo "$u $t"
                         }
                     }
                     LazyLoader {
-                        active: clockPanel.calOpen && root.isOn("clock") && clockPanel.clockItem !== null
+                        active: clockPanel.calMounted && root.isOn("clock") && clockPanel.clockItem !== null
 
                         PopupWindow {
+                            id: calWin
                             readonly property Item ci: clockPanel.clockItem
                             readonly property point p: bar.contentItem.mapFromItem(ci, 0, 0)
+
+                            // The window can be created with the calendar already open; bind
+                            // `reveal` one tick later so the open animation still plays.
+                            property bool reveal: false
+                            Component.onCompleted: {
+                                Qt.callLater(function () {
+                                    calWin.reveal = Qt.binding(function () { return clockPanel.calOpen; });
+                                });
+                            }
 
                             anchor.window: bar
                             anchor.rect.x: root.vertical
@@ -1593,6 +1621,35 @@ echo "$u $t"
                                 color: root.bgColor
                                 border.width: cfg.border ? 1 : 0
                                 border.color: root.borderColor
+
+                                // Grows out of the edge facing the bar (and shrinks back into
+                                // it on close), so it works for every bar position:
+                                //   top    → from the top edge, centered
+                                //   bottom → from the bottom edge, centered
+                                //   left   → from the left edge, centered
+                                //   right  → from the right edge, centered
+                                property real grow: calWin.reveal ? 1 : 0.3
+                                Behavior on grow {
+                                    NumberAnimation {
+                                        duration: calWin.reveal ? 220 : 140
+                                        easing.type: Easing.OutCubic
+                                    }
+                                }
+                                opacity: calWin.reveal ? 1 : 0
+                                Behavior on opacity {
+                                    NumberAnimation {
+                                        duration: calWin.reveal ? 180 : 120
+                                        easing.type: Easing.InOutQuad
+                                    }
+                                }
+                                transform: Scale {
+                                    origin.x: root.vertical ? (cfg.position === "left" ? 0 : calBox.width)
+                                                            : calBox.width / 2
+                                    origin.y: root.vertical ? calBox.height / 2
+                                                            : (cfg.position === "top" ? 0 : calBox.height)
+                                    xScale: calBox.grow
+                                    yScale: calBox.grow
+                                }
 
                                 readonly property int firstDay: cfg.weekMonday ? 1 : 0
                                 readonly property int cellW: 36

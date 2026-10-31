@@ -27,6 +27,32 @@ PanelWindow {
     property string wallpaperPath: configs.wallpaper_path.replace("$HOME", Quickshell.env("HOME"))
     property string cachePath: configs.cache_path.replace("$HOME", Quickshell.env("HOME"))
 
+    // ---- Launch animation -------------------------------------------------
+    // intro: 0 -> 1 drives the scale-up and rise (ease-out).
+    // fade:  0 -> 1 drives opacity on its own gentler curve so it stays visible.
+    property int introDuration: 300
+    property real introScale: 0.94      // starting scale of the carousel
+    property real introRise: 24         // starting vertical offset (px @1080p)
+    property real intro: 0
+    property real fade: 0
+
+    NumberAnimation on intro {
+        from: 0
+        to: 1
+        duration: main.introDuration
+        easing.type: Easing.OutCubic
+        running: true
+    }
+
+    NumberAnimation on fade {
+        from: 0
+        to: 1
+        duration: main.introDuration
+        easing.type: Easing.InOutQuad
+        running: true
+    }
+    // -----------------------------------------------------------------------
+
     property bool showEmpty: false
     readonly property bool looksEmpty: wallpaperPath !== ""
                                        && folderModel.status === FolderListModel.Ready
@@ -93,6 +119,7 @@ PanelWindow {
         spacing: 10 * main.ui
         z: 2
         visible: main.showEmpty
+        opacity: main.fade
 
         Text {
             text: "No wallpapers found"
@@ -135,6 +162,12 @@ PanelWindow {
         clip: true
         cacheBuffer: 400 * main.ui
         boundsBehavior: Flickable.StopAtBounds
+
+        // Launch animation: fade + subtle scale-up + small rise
+        opacity: main.fade
+        scale: main.introScale + (1 - main.introScale) * main.intro
+        transformOrigin: Item.Center
+        transform: Translate { y: (1 - main.intro) * main.introRise * main.ui }
 
         property int selectedIndex: main.startPosition
 
@@ -286,7 +319,7 @@ PanelWindow {
                         if (status === Image.Error) { alt.text = "Caching"; retryTimer.start() }
                     }
                 }
-                AnimatedImage {                        
+                AnimatedImage {
                     id: gifImage
                     anchors.fill: parent
                     z: 5

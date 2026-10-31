@@ -503,11 +503,11 @@ Scope {
 
                 cacheContent: true
                 prewarm: win.sized && !win.revealBound
-                fadeDuration: 150
-                popDuration: 170
-                tiltDuration: 220
+                fadeDuration: 260       
+                popDuration: 340        
+                tiltDuration: 380       
                 popEasing: Easing.OutCubic
-                closedScale: 0.93
+                closedScale: 0.7 
 
                 Behavior on x {
                     enabled: !root.dragging && !root.resizing && win.reveal
