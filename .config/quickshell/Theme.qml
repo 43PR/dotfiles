@@ -9,6 +9,7 @@ QtObject {
 
     property int radius: 10
     property real tiltStrength: 7
+    property real settingsScale: 1.0
     readonly property string fontFamily: "JetBrains Mono"
     property string iconFont: "JetBrainsMono Nerd Font"
     readonly property int animFast: 120
@@ -57,7 +58,7 @@ QtObject {
     property bool hideSettingsIcons: false
     property bool clickOutsideClose: true
 
-    readonly property var hubKeys: ["tiltStrength", "bgAlpha", "radius", "hideSettingsIcons", "clickOutsideClose", "borderOpacity", "hyprBorderStyle"]
+    readonly property var hubKeys: ["tiltStrength", "settingsScale", "bgAlpha", "radius", "hideSettingsIcons", "clickOutsideClose", "borderOpacity", "hyprBorderStyle"]
 
     function setHub(key, value) {
         if (hubKeys.indexOf(key) < 0) return
@@ -67,6 +68,7 @@ QtObject {
 
     function resetHub() {
         tiltStrength = 7
+        settingsScale = 1.0
         bgAlpha = 0.7
         radius = 10
         borderOpacity = 1.0
@@ -79,6 +81,7 @@ QtObject {
     function saveHub() {
         hubFile.setText(JSON.stringify({
             tiltStrength: tiltStrength,
+            settingsScale: settingsScale,
             bgAlpha: bgAlpha,
             radius: radius,
             borderOpacity: borderOpacity,
@@ -100,6 +103,7 @@ QtObject {
             try {
                 const s = JSON.parse(text())
                 if (typeof s.tiltStrength === "number") root.tiltStrength = Math.max(0, Math.min(15, s.tiltStrength))
+                if (typeof s.settingsScale === "number") root.settingsScale = Math.max(0.6, Math.min(1.2, s.settingsScale))
                 if (typeof s.bgAlpha === "number") root.bgAlpha = Math.max(0, Math.min(1, s.bgAlpha))
                 if (typeof s.radius === "number") root.radius = Math.round(Math.max(0, Math.min(50, s.radius)))
                 if (typeof s.borderOpacity === "number") root.borderOpacity = Math.max(0.1, Math.min(1, s.borderOpacity))
@@ -121,6 +125,7 @@ QtObject {
     // `qs ipc call theme setBgAlpha 0.8` updates every component that uses Theme.bg, live,
     // and saves the value to hub.json (so the Hub page slider stays in sync).
     // `qs ipc call theme setBorderOpacity 0.6` does the same for border opacity.
+    // `qs ipc call theme setSettingsScale 0.8` scales the settings window.
     property IpcHandler ipc: IpcHandler {
         target: "theme"
         function setBgAlpha(value: real): void {
@@ -131,6 +136,9 @@ QtObject {
         }
         function setBorderOpacity(value: real): void {
             root.setHub("borderOpacity", Math.max(0.1, Math.min(1, value)))
+        }
+        function setSettingsScale(value: real): void {
+            root.setHub("settingsScale", Math.max(0.6, Math.min(1.2, value)))
         }
     }
 

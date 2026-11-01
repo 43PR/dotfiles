@@ -18,7 +18,7 @@ Scope {
         position: "left", style: "joined", thickness: 20, margin: 4,
         reserveSpace: true, allScreens: true, dragModules: true,
         // appearance
-        scale: 1.0, bgOpacity: 0.5, border: false, radius: 16, calRadius: 15,
+        scale: 1.0, barScale: 1.0, bgOpacity: 0.5, border: false, radius: 16, calRadius: 15, calScale: 1.0,
         // tooltips
         tooltips: true, tooltipHints: true, tipDelay: 450,
         // modules
@@ -63,11 +63,13 @@ Scope {
             property bool reserveSpace: root.defaults.reserveSpace   // push windows away from the bar
             property bool allScreens: root.defaults.allScreens       // false → first screen only
             property bool dragModules: root.defaults.dragModules     // drag modules on the bar to reorder / move them
-            property real scale: root.defaults.scale
+            property real scale: root.defaults.scale                 // text scale
+            property real barScale: root.defaults.barScale           // whole-bar scale (thickness, margins, padding, dots, text)
             property real bgOpacity: root.defaults.bgOpacity
             property bool border: root.defaults.border
             property int radius: root.defaults.radius            // bar corner radius
             property int calRadius: root.defaults.calRadius      // calendar popup corner radius
+            property real calScale: root.defaults.calScale       // calendar popup scale
             property bool tooltips: root.defaults.tooltips
             property bool tooltipHints: root.defaults.tooltipHints // show "Left click: ..." lines in tooltips
             property int tipDelay: root.defaults.tipDelay        // ms before a tooltip appears
@@ -110,23 +112,29 @@ Scope {
     readonly property bool vertical: cfg.position === "left" || cfg.position === "right"
     readonly property bool joined: cfg.style !== "floating"
     readonly property bool strip: cfg.style === "strip"
-    readonly property int panelThick: vertical ? cfg.thickness + 12 : cfg.thickness
-    readonly property int effEdge: strip ? 0 : cfg.margin
-    readonly property int effGap: strip ? 0 : 6
+    readonly property real bs: cfg.barScale
+    readonly property int panelThick: Math.round((vertical ? cfg.thickness + 12 : cfg.thickness) * bs)
+    readonly property int effEdge: strip ? 0 : Math.round(cfg.margin * bs)
+    readonly property int effGap: strip ? 0 : Math.round(6 * bs)
+    readonly property int modPadPx: Math.round(cfg.modPad * bs)
+    readonly property int wsDotPx: Math.max(3, Math.round(cfg.wsDot * bs))
+    readonly property int wsGapPx: Math.round(cfg.wsGap * bs)
     readonly property real barRadius: strip ? 0 : cfg.radius
     readonly property color bgColor: Qt.alpha(Theme.bg, cfg.bgOpacity)
     readonly property color borderColor: Theme.accent
 
-    function s(n) { return Math.round(n * cfg.scale); }
+    function s(n) { return Math.round(n * cfg.scale * cfg.barScale); }
+    function cs(n) { return Math.round(n * cfg.scale * cfg.calScale); }   // calendar text sizes
+    function cl(n) { return Math.round(n * cfg.calScale); }               // calendar layout sizes
 
     readonly property var sz: ({
         stat: s(12), clock: s(12), marquee: s(11),
         icon: s(16), batIcon: s(13), batText: s(12), power: s(14),
         taskIcon: s(18),
-        calTime: s(30), calDate: s(12), calMonth: s(13), calArrow: s(16),
-        calWeekday: s(11), calDay: s(12)
+        calTime: cs(30), calDate: cs(12), calMonth: cs(13), calArrow: cs(16),
+        calWeekday: cs(11), calDay: cs(12)
     })
-    readonly property int sizeIconGap: 12
+    readonly property int sizeIconGap: Math.round(12 * bs)
     readonly property int iconYOffset: 1
 
     // margin for one side of the bar frame
@@ -904,7 +912,7 @@ echo "$u $t"
         property real yOffset: 0
         property real glyphScaleY: 1.0
         property int spacing: root.sizeIconGap
-        property int padX: cfg.modPad
+        property int padX: root.modPadPx
 
         readonly property color fg: warning ? Theme.danger : active ? Theme.accent : color
         readonly property string shown: root.vertical ? vtext : text
@@ -1092,8 +1100,8 @@ echo "$u $t"
         id: ar
         property string glyph: ""
         signal clicked()
-        width: 28
-        height: 26
+        width: root.cl(28)
+        height: root.cl(26)
         Text {
             anchors.centerIn: parent
             text: ar.glyph
@@ -1252,7 +1260,7 @@ echo "$u $t"
             Lane {
                 id: wsLane
                 anchors.centerIn: parent
-                gap: cfg.wsGap
+                gap: root.wsGapPx
 
                 Repeater {
                     model: Hyprland.workspaces
@@ -1261,11 +1269,11 @@ echo "$u $t"
                         required property var modelData
                         visible: modelData.id > 0
                         Layout.alignment: Qt.AlignCenter
-                        implicitWidth: root.vertical ? cfg.wsDot
-                                     : (modelData.focused ? Math.round(cfg.wsDot * 3.2) : cfg.wsDot)
-                        implicitHeight: root.vertical ? (modelData.focused ? Math.round(cfg.wsDot * 2.4) : cfg.wsDot)
-                                                      : cfg.wsDot
-                        radius: cfg.wsDot / 2
+                        implicitWidth: root.vertical ? root.wsDotPx
+                                     : (modelData.focused ? Math.round(root.wsDotPx * 3.2) : root.wsDotPx)
+                        implicitHeight: root.vertical ? (modelData.focused ? Math.round(root.wsDotPx * 2.4) : root.wsDotPx)
+                                                      : root.wsDotPx
+                        radius: root.wsDotPx / 2
                         color: modelData.urgent ? Theme.danger
                              : modelData.focused ? Qt.alpha(Theme.accent, 0.2)
                              : dotMa.containsMouse ? Theme.accent2
@@ -1652,9 +1660,9 @@ echo "$u $t"
                                 }
 
                                 readonly property int firstDay: cfg.weekMonday ? 1 : 0
-                                readonly property int cellW: 36
-                                readonly property int cellH: 30
-                                readonly property int pad: 16
+                                readonly property int cellW: root.cl(36)
+                                readonly property int cellH: root.cl(30)
+                                readonly property int pad: root.cl(16)
                                 readonly property int gridW: cellW * 7
 
                                 readonly property date now: clk.date
@@ -1681,7 +1689,7 @@ echo "$u $t"
                                 Column {
                                     id: calCol
                                     anchors.centerIn: parent
-                                    spacing: 12
+                                    spacing: root.cl(12)
 
                                     Column {
                                         spacing: 2
@@ -1704,7 +1712,7 @@ echo "$u $t"
 
                                     Item {
                                         width: calBox.gridW
-                                        height: 26
+                                        height: root.cl(26)
 
                                         Arrow {
                                             anchors.left: parent.left

@@ -409,15 +409,18 @@ Scope {
             // The card's rect is bound explicitly (rather than via `item: card`) so the input
             // region always follows drags, resizes and snaps, with a little padding so the
             // drag strip and snap buttons at the very top edge are never clipped.
+            // The visible card is scaled around its center by Theme.settingsScale, so the
+            // region is shrunk/grown the same way.
             mask: Region {
                 readonly property real pad: 16
                 readonly property bool cardOnly: root.showing && !Theme.clickOutsideClose
+                readonly property real s: Theme.settingsScale
 
                 item: root.showing && Theme.clickOutsideClose ? backdrop : null
-                x: Math.round(root.cardX) - pad
-                y: Math.round(root.cardY) - pad
-                width: cardOnly ? Math.round(root.cardWidth) + pad * 2 : 0
-                height: cardOnly ? Math.round(root.cardHeight) + pad * 2 : 0
+                x: Math.round(root.cardX + root.cardWidth * (1 - s) / 2) - pad
+                y: Math.round(root.cardY + root.cardHeight * (1 - s) / 2) - pad
+                width: cardOnly ? Math.round(root.cardWidth * s) + pad * 2 : 0
+                height: cardOnly ? Math.round(root.cardHeight * s) + pad * 2 : 0
             }
 
             function syncSize() {
@@ -541,17 +544,25 @@ Scope {
                     }
                 }
 
-                MouseArea {
-                    anchors.fill: parent
-                    onClicked: {}
-                }
-
                 Rectangle {
                     anchors.fill: parent
                     color: Theme.bg
                     radius: Theme.radius
                     border.color: Theme.accent
                     border.width: 1
+
+                    // Window scale (Appearance > Hub > Window Scale). Visual only: the card's
+                    // logical size, saved state, drag clamping and resize limits are unchanged.
+                    scale: Theme.settingsScale
+                    transformOrigin: Item.Center
+
+                    // swallows clicks on the card so they don't reach the backdrop's
+                    // click-outside-to-close (inside the scaled rect so the empty margin
+                    // around a shrunken card still counts as "outside")
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: {}
+                    }
 
                     // drag strip: invisible, runs along the whole top edge of the card
                     MouseArea {

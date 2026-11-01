@@ -25,10 +25,16 @@ Scope {
     property bool dragging: false
     property real offsetX: 0
     property real offsetY: 0
-    property int menuSize: 100
+    property int menuSize: 100        // COMPONENT scale (%): panel, spacing, text
+    property int textSize: 100        // TEXT size (%): fonts only, on top of the component scale
     readonly property real ui: menuSize / 100
+    readonly property real tx: textSize / 100
     readonly property int cardWidth: Math.round(baseWidth * ui)
     readonly property bool movedFromDefault: offsetX !== 0 || offsetY !== 0
+
+    // wheel accumulators so touchpads / smooth wheels step once per notch
+    property real wheelAccText: 0
+    property real wheelAccScale: 0
 
     readonly property string home: Quickshell.env("HOME")
 
@@ -111,6 +117,44 @@ Scope {
     function imgSrc(p) { return !p ? "" : (p.startsWith("/") ? "file://" + p : p); }
     function canExpand(body) { return body.length > 70 || body.indexOf("\n") >= 0; }
     function groupKey(app) { return app && app !== "" ? app : "Other"; }
+
+    // component scale
+    function setSize(v) {
+        root.menuSize = Math.max(60, Math.min(200, Math.round(v)));
+        stateTimer.restart();
+    }
+
+    // text size
+    function setTextSize(v) {
+        root.textSize = Math.max(60, Math.min(200, Math.round(v)));
+        stateTimer.restart();
+    }
+
+    // Ctrl + wheel -> text size. One 5% step per 120 units of angleDelta (one wheel notch)
+    function wheelText(delta) {
+        root.wheelAccText += delta;
+        while (root.wheelAccText >= 120) {
+            root.wheelAccText -= 120;
+            root.setTextSize(root.textSize + 5);
+        }
+        while (root.wheelAccText <= -120) {
+            root.wheelAccText += 120;
+            root.setTextSize(root.textSize - 5);
+        }
+    }
+
+    // Shift + wheel -> component scale
+    function wheelScale(delta) {
+        root.wheelAccScale += delta;
+        while (root.wheelAccScale >= 120) {
+            root.wheelAccScale -= 120;
+            root.setSize(root.menuSize + 5);
+        }
+        while (root.wheelAccScale <= -120) {
+            root.wheelAccScale += 120;
+            root.setSize(root.menuSize - 5);
+        }
+    }
 
     function guessKind(app, summary) {
         const s = ((app || "") + " " + (summary || "")).toLowerCase();
@@ -409,6 +453,7 @@ Scope {
                 if (typeof s.dnd === "boolean") root.dnd = s.dnd;
                 if (typeof s.soundEnabled === "boolean") root.soundEnabled = s.soundEnabled;
                 if (typeof s.menuSize === "number") root.menuSize = Math.max(60, Math.min(200, Math.round(s.menuSize)));
+                if (typeof s.textSize === "number") root.textSize = Math.max(60, Math.min(200, Math.round(s.textSize)));
                 if (typeof s.offsetX === "number") root.offsetX = s.offsetX;
                 if (typeof s.offsetY === "number") root.offsetY = s.offsetY;
                 if (Array.isArray(s.collapsed)) {
@@ -445,6 +490,7 @@ Scope {
                 dnd: root.dnd,
                 soundEnabled: root.soundEnabled,
                 menuSize: root.menuSize,
+                textSize: root.textSize,
                 offsetX: root.offsetX,
                 offsetY: root.offsetY,
                 collapsed: coll
@@ -574,10 +620,11 @@ Scope {
     }
 
     // ---- reusable pieces ------------------------------------------------------
+    // text follows the component scale AND the text size
     component Lbl: Text {
         property real ui: 1
         property real sz: 10
-        font.pixelSize: Math.round(sz * ui)
+        font.pixelSize: Math.round(sz * ui * root.tx)
         color: Theme.text
         elide: Text.ElideRight
     }
@@ -663,16 +710,6 @@ Scope {
         }
     }
 
-    component SizeBtn: Text {
-        id: sb
-        signal clicked()
-        height: 16
-        verticalAlignment: Text.AlignVCenter
-        horizontalAlignment: Text.AlignHCenter
-        color: Theme.text
-        MouseArea { anchors.fill: parent; onClicked: sb.clicked() }
-    }
-
     // ---- the window: only exists while mounted --------------------------------
     LazyLoader {
         active: root.mounted
@@ -703,11 +740,6 @@ Scope {
             readonly property bool sized: win.width > 0 && win.height > 0
             readonly property real effX: sized ? Math.max(limMinX, Math.min(limMaxX, root.offsetX)) : root.offsetX
             readonly property real effY: sized ? Math.max(limMinY, Math.min(limMaxY, root.offsetY)) : root.offsetY
-
-            function setSize(v) {
-                root.menuSize = Math.max(60, Math.min(200, v));
-                stateTimer.restart();
-            }
 
             // Only called while the user is dragging (window is fully sized then).
             function setPosition(x, y) {
@@ -1455,7 +1487,7 @@ Scope {
                                         color: Theme.text
                                         selectionColor: Theme.alpha(Theme.text, 0.3)
                                         selectedTextColor: Theme.text
-                                        font.pixelSize: root.px(10)
+                                        font.pixelSize: Math.round(10 * root.ui * root.tx)
                                         Keys.onEscapePressed: root.panelOpen = false
                                         onSelectedTextChanged: selTimer.restart()
 
@@ -1485,23 +1517,35 @@ Scope {
                         }
                     }
                 }
+
+                // Topmost overlay for wheel shortcuts (same as todo.qml):
+                //   Ctrl  + scroll -> text size only
+                //   Shift + scroll -> component scale
+                // Plain scroll passes through so the list scrolls normally.
+                // Starts below the drag strip so the strip keeps its cursor.
+                MouseArea {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    anchors.top: parent.top
+                    anchors.topMargin: dragArea.height
+                    z: 100
+                    enabled: root.panelOpen
+                    acceptedButtons: Qt.NoButton   // never steals clicks
+                    onWheel: function (wheel) {
+                        var dy = wheel.angleDelta.y !== 0 ? wheel.angleDelta.y : wheel.angleDelta.x;
+                        if (wheel.modifiers & Qt.ControlModifier) {
+                            root.wheelText(dy);
+                            wheel.accepted = true;
+                        } else if (wheel.modifiers & Qt.ShiftModifier) {
+                            root.wheelScale(dy);
+                            wheel.accepted = true;
+                        } else {
+                            wheel.accepted = false;
+                        }
+                    }
+                }
             }
-            }
-
-            Row {
-                id: sizeRow
-                anchors { top: panelClip.top; topMargin: panel.height + 6; left: panelClip.left }
-                spacing: 2
-                width: root.panelOpen ? implicitWidth : 0
-                height: root.panelOpen ? implicitHeight : 0
-                visible: root.panelOpen
-                opacity: sizeHover.hovered ? 0.9 : 0.18
-
-                Behavior on opacity { NumberAnimation { duration: 150 } }
-                HoverHandler { id: sizeHover }
-
-                SizeBtn { text: "−"; width: 16; font.pixelSize: 12; onClicked: win.setSize(root.menuSize - 5) }
-                SizeBtn { text: "+"; width: 16; font.pixelSize: 12; onClicked: win.setSize(root.menuSize + 5) }
             }
         }
     }

@@ -23,7 +23,7 @@ Item {
     readonly property var defaults: ({
         position: "left", style: "joined", thickness: 20, margin: 4,
         reserveSpace: true, allScreens: true, dragModules: true,
-        scale: 1.0, bgOpacity: 0.5, border: false, radius: 16, calRadius: 15,
+        scale: 1.0, barScale: 1.0, bgOpacity: 0.5, border: false, radius: 16, calRadius: 15, calScale: 1.0,
         tooltips: true, tooltipHints: true, tipDelay: 450,
         modPad: 20, wsDot: 10, wsGap: 8, wsScroll: true,
         statsPercent: false, statsScale: 1.0, statsBorder: true, statsWarn: 85, tempWarn: 85, batLowPct: 15,
@@ -435,6 +435,12 @@ Item {
                             onMoved: v => page.set("thickness", v)
                         }
                         BarSlider {
+                            label: "BAR SCALE"
+                            from: 0.6; to: 1.5; step: 0.05; unit: "×"; decimals: 2
+                            value: page.val("barScale")
+                            onMoved: v => page.set("barScale", v)
+                        }
+                        BarSlider {
                             label: "EDGE MARGIN"
                             enabled: !page.strip
                             from: 0; to: 16; step: 1; unit: " px"
@@ -486,6 +492,12 @@ Item {
                             from: 0; to: 32; step: 1; unit: " px"
                             value: page.val("calRadius")
                             onMoved: v => page.set("calRadius", v)
+                        }
+                        BarSlider {
+                            label: "CALENDAR SCALE"
+                            from: 0.6; to: 1.5; step: 0.05; unit: "×"; decimals: 2
+                            value: page.val("calScale")
+                            onMoved: v => page.set("calScale", v)
                         }
                         BarSlider {
                             label: "TEXT SCALE"

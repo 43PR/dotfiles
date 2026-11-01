@@ -19,6 +19,8 @@ Item {
     readonly property real opacityMax: 1.0
     readonly property real tiltMin: 0
     readonly property real tiltMax: 15
+    readonly property real scaleMin: 0.6
+    readonly property real scaleMax: 1.2
     readonly property real radiusMin: 0
     readonly property real radiusMax: 35
     // Border opacity stops at 10% so borders can't vanish completely by accident
@@ -836,7 +838,10 @@ Item {
                 Card {
                     Column {
                         width: parent.width; spacing: 6
-                        // ---- opacity.sh also controls Quickshell opacity ----
+                        ToggleRow {
+                            label: "CLOSE ON OUTSIDE CLICK"; checked: Theme.clickOutsideClose
+                            onToggled: v => Theme.setHub("clickOutsideClose", v)
+                        }
                         ToggleRow {
                             label: "SYNC OPACITY SCRIPT"; checked: page.qsOpacityFollow
                             onToggled: v => page.setQsOpacityFollow(v)
@@ -940,69 +945,39 @@ Item {
                             }
                         }
 
-                        // ---- click outside closes ----
+                        // ---- window scale ----
                         Row {
-                            width: parent.width
-                            spacing: 16
-                            // Close on outside click
-                            Row {
-                                height: 28
-                                spacing: 8
+                            width: parent.width; spacing: 8
 
-                                Text {
-                                    width: 176
-                                    height: 28
-                                    verticalAlignment: Text.AlignVCenter
-                                    text: "CLOSE ON OUTSIDE CLICK"
-                                    color: Theme.text
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.textSizeBody
-                                }
+                            Text {
+                                width: page.labelWidth
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "WINDOW SCALE"; color: Theme.text
+                                font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
+                            }
 
-                                Rectangle {
-                                    width: 64
-                                    height: 28
-                                    radius: Theme.radius
+                            Slider {
+                                width: parent.width - page.labelWidth - 52 - 16
+                                anchors.verticalCenter: parent.verticalCenter
+                                label: ""; icon: ""
+                                value: page.clamp01((Theme.settingsScale - page.scaleMin) / (page.scaleMax - page.scaleMin))
+                                onMoved: value => Theme.settingsScale = page.round2(page.scaleMin + page.clamp01(value) * (page.scaleMax - page.scaleMin))
+                                onCommitted: value => Theme.setHub("settingsScale", page.round2(page.scaleMin + page.clamp01(value) * (page.scaleMax - page.scaleMin)))
+                            }
 
-                                    color: Theme.clickOutsideClose
-                                        ? Theme.alpha(Theme.accent, 0.10)
-                                        : (outsideMouse.containsMouse
-                                           ? Theme.alpha(Theme.accent, 0.08)
-                                           : "#00000000")
-
-                                    border.width: 1
-                                    border.color: Theme.clickOutsideClose
-                                        || outsideMouse.containsMouse
-                                        ? Theme.accent : Theme.border
-
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: Theme.clickOutsideClose ? "ON" : "OFF"
-                                        color: Theme.clickOutsideClose
-                                            ? Theme.accentSolid : Theme.text
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.textSizeBody
-                                        font.bold: true
-                                        font.letterSpacing: 1
-                                    }
-
-                                    MouseArea {
-                                        id: outsideMouse
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: Theme.setHub(
-                                            "clickOutsideClose",
-                                            !Theme.clickOutsideClose
-                                        )
-                                    }
-                                }
+                            Text {
+                                width: 52
+                                anchors.verticalCenter: parent.verticalCenter
+                                horizontalAlignment: Text.AlignRight
+                                text: Math.round(Theme.settingsScale * 100) + "%"
+                                color: Theme.text
+                                font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
                             }
                         }
                     }
                 }
             }
-                // ---- Blur & Shadow ----
+            // ---- Blur & Shadow ----
                 Card {
                     Column {
                         width: parent.width; spacing: 8

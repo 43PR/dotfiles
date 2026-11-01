@@ -22,11 +22,13 @@ PanelWindow {
     property int posRight: defaultRight
     property bool dragging: false
     property bool animatePos: false   // only true briefly during reset
-    property bool ready: false
+    property bool ready: false        // true once the saved state has been loaded
 
     // 0 = shown, 1 = hidden (animated)
     property real shift: hidden ? 1 : 0
     Behavior on shift {
+        // no slide animation while the saved state is being restored at startup
+        enabled: root.ready
         NumberAnimation { duration: 260; easing.type: Easing.InOutCubic }
     }
 
@@ -80,9 +82,10 @@ PanelWindow {
         posRight = Math.round(Math.max(0, Math.min(maxRight, right)))
     }
 
-    function savePos() {
+    // persists position AND hidden state in the same JSON file
+    function saveState() {
         if (!ready) return
-        store.setText(JSON.stringify({ top: posTop, right: posRight }))
+        store.setText(JSON.stringify({ top: posTop, right: posRight, hidden: hidden }))
     }
 
     function resetPos() {
@@ -90,7 +93,7 @@ PanelWindow {
         animOff.restart()
         posTop = defaultTop
         posRight = defaultRight
-        savePos()
+        saveState()
     }
 
     Timer {
@@ -99,11 +102,14 @@ PanelWindow {
         onTriggered: root.animatePos = false
     }
 
+    // `hidden` is intentionally NOT reset when a recording starts:
+    // it is restored from disk and remembered between recordings/launches.
     onRecordingChanged: {
         elapsed = 0
         paused = false
-        hidden = false
     }
+
+    onHiddenChanged: saveState()
 
     // ---- persistence ----
     FileView {
@@ -116,8 +122,10 @@ PanelWindow {
                 const d = JSON.parse(store.text())
                 if (typeof d.top === "number" && typeof d.right === "number")
                     root.setPosition(d.top, d.right)
+                if (typeof d.hidden === "boolean")
+                    root.hidden = d.hidden
             } catch (e) {
-                console.warn("recorder-osd: could not read saved position:", e)
+                console.warn("recorder-osd: could not read saved state:", e)
             }
             root.ready = true
         }
@@ -225,13 +233,13 @@ PanelWindow {
                 onReleased: {
                     if (!root.dragging) return
                     root.dragging = false
-                    root.savePos()
+                    root.saveState()
                 }
 
                 onCanceled: {
                     if (!root.dragging) return
                     root.dragging = false
-                    root.savePos()
+                    root.saveState()
                 }
             }
 
