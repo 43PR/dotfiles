@@ -33,9 +33,9 @@ hl.on("hyprland.start", function()
     -- existe en este sistema.
 
     -- awww-daemon wrapped: awww 0.12.x aborta (pipe de un cliente mid-write)
-    hl.exec_cmd("awww-resilient.sh")
+    hl.exec_cmd(os.getenv("HOME") .. "/.config/hypr/scripts/awww-resilient.sh")
     hl.exec_cmd("~/.config/hypr/scripts/wallpaper-restore.sh")
-    hl.exec_cmd("sleep 2 && QSG_RENDER_LOOP=basic QS_ICON_THEME=Papirus qs")
+    hl.exec_cmd("sleep 2 && QS_ICON_THEME=Papirus qs")
 end)
 
 ---- ENVIRONMENT VARIABLES ----
@@ -43,6 +43,10 @@ end)
 hl.env("XCURSOR_SIZE", "14")
 hl.env("QT_QPA_PLATFORM", "wayland")
 hl.env("MOZ_ENABLE_WAYLAND", "1")
+
+-- Intel Gen7 (crocus) defaults to an EGL config without alpha, so quickshell
+-- layer surfaces composite opaque black. Software rendering restores alpha.
+hl.env("QT_QUICK_BACKEND", "software")
 
 ---- INPUT ----
 
