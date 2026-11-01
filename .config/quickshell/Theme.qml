@@ -31,6 +31,25 @@ QtObject {
     // ---- Hyprland window border style ----
     property string hyprBorderStyle: "full"   // "full" | "corner"
 
+    // ---- Background picture (rendered by BackgroundImage.qml) ----
+    // All values are persisted to state/hub.json together with the other hub settings.
+    property bool bgImageEnabled: false
+    property string bgImagePath: ""           // absolute path or file:// URL
+    property real bgImageOpacity: 1.0         // 0..1, overall picture opacity
+    property real bgImageBlur: 0.0            // 0..1, 0 = sharp (blur pass is skipped entirely)
+    property real bgImageFadeTop: 1.0         // 0..1, picture opacity at the top edge
+    property real bgImageFadeBottom: 0.0      // 0..1, picture opacity at the bottom edge
+
+    // file:// URL for the Image element ("" when no usable path is set).
+    readonly property string bgImageSource: {
+        const p = bgImagePath.trim()
+        if (p === "") return ""
+        if (p.indexOf("file://") === 0) return p
+        if (p.charAt(0) !== "/") return ""
+        return "file://" + encodeURI(p).replace(/#/g, "%23")
+    }
+    readonly property bool bgImageActive: bgImageEnabled && bgImageSource !== ""
+
     property color _bgBase: palette.bg || '#000000'
     property color bg: alpha(_bgBase, bgAlpha)
     property real imageOpacity: palette.imageOpacity !== undefined ? Math.max(0, Math.min(1, Number(palette.imageOpacity))) : 0.8
@@ -58,7 +77,12 @@ QtObject {
     property bool hideSettingsIcons: false
     property bool clickOutsideClose: true
 
-    readonly property var hubKeys: ["tiltStrength", "settingsScale", "bgAlpha", "radius", "hideSettingsIcons", "clickOutsideClose", "borderOpacity", "hyprBorderStyle"]
+    readonly property var hubKeys: [
+        "tiltStrength", "settingsScale", "bgAlpha", "radius", "hideSettingsIcons",
+        "clickOutsideClose", "borderOpacity", "hyprBorderStyle",
+        "bgImageEnabled", "bgImagePath", "bgImageOpacity", "bgImageBlur",
+        "bgImageFadeTop", "bgImageFadeBottom"
+    ]
 
     function setHub(key, value) {
         if (hubKeys.indexOf(key) < 0) return
@@ -75,6 +99,12 @@ QtObject {
         hyprBorderStyle = "full"
         hideSettingsIcons = false
         clickOutsideClose = true
+        // The picture path is kept on purpose; only the look is reset.
+        bgImageEnabled = false
+        bgImageOpacity = 1.0
+        bgImageBlur = 0.0
+        bgImageFadeTop = 1.0
+        bgImageFadeBottom = 0.0
         hubSaveTimer.restart()
     }
 
@@ -87,8 +117,23 @@ QtObject {
             borderOpacity: borderOpacity,
             hyprBorderStyle: hyprBorderStyle,
             hideSettingsIcons: hideSettingsIcons,
-            clickOutsideClose: clickOutsideClose
+            clickOutsideClose: clickOutsideClose,
+            bgImageEnabled: bgImageEnabled,
+            bgImagePath: bgImagePath,
+            bgImageOpacity: bgImageOpacity,
+            bgImageBlur: bgImageBlur,
+            bgImageFadeTop: bgImageFadeTop,
+            bgImageFadeBottom: bgImageFadeBottom
         }, null, 2))
+    }
+
+    // Keeps the background picture decoded in memory so panels show it instantly.
+    // Same source + sourceSize as BackgroundImage.qml => shared pixmap cache entry.
+    property Image bgImagePreload: Image {
+        source: root.bgImageActive ? root.bgImageSource : ""
+        asynchronous: true
+        cache: true
+        sourceSize.width: 1920
     }
 
     property Timer hubSaveTimer: Timer {
@@ -102,6 +147,7 @@ QtObject {
         onLoaded: {
             try {
                 const s = JSON.parse(text())
+                const clamp01 = v => Math.max(0, Math.min(1, v))
                 if (typeof s.tiltStrength === "number") root.tiltStrength = Math.max(0, Math.min(15, s.tiltStrength))
                 if (typeof s.settingsScale === "number") root.settingsScale = Math.max(0.6, Math.min(1.2, s.settingsScale))
                 if (typeof s.bgAlpha === "number") root.bgAlpha = Math.max(0, Math.min(1, s.bgAlpha))
@@ -110,6 +156,12 @@ QtObject {
                 if (s.hyprBorderStyle === "full" || s.hyprBorderStyle === "corner") root.hyprBorderStyle = s.hyprBorderStyle
                 if (typeof s.hideSettingsIcons === "boolean") root.hideSettingsIcons = s.hideSettingsIcons
                 if (typeof s.clickOutsideClose === "boolean") root.clickOutsideClose = s.clickOutsideClose
+                if (typeof s.bgImageEnabled === "boolean") root.bgImageEnabled = s.bgImageEnabled
+                if (typeof s.bgImagePath === "string") root.bgImagePath = s.bgImagePath
+                if (typeof s.bgImageOpacity === "number") root.bgImageOpacity = clamp01(s.bgImageOpacity)
+                if (typeof s.bgImageBlur === "number") root.bgImageBlur = clamp01(s.bgImageBlur)
+                if (typeof s.bgImageFadeTop === "number") root.bgImageFadeTop = clamp01(s.bgImageFadeTop)
+                if (typeof s.bgImageFadeBottom === "number") root.bgImageFadeBottom = clamp01(s.bgImageFadeBottom)
             } catch (e) {
                 console.warn("Theme.qml: malformed hub.json: " + e)
             }
@@ -126,6 +178,8 @@ QtObject {
     // and saves the value to hub.json (so the Hub page slider stays in sync).
     // `qs ipc call theme setBorderOpacity 0.6` does the same for border opacity.
     // `qs ipc call theme setSettingsScale 0.8` scales the settings window.
+    // `qs ipc call theme setBgImage /path/to/pic.jpg` sets the picture and turns it on.
+    // `qs ipc call theme setBgImageEnabled false` turns the picture off.
     property IpcHandler ipc: IpcHandler {
         target: "theme"
         function setBgAlpha(value: real): void {
@@ -139,6 +193,13 @@ QtObject {
         }
         function setSettingsScale(value: real): void {
             root.setHub("settingsScale", Math.max(0.6, Math.min(1.2, value)))
+        }
+        function setBgImage(path: string): void {
+            root.setHub("bgImagePath", path)
+            root.setHub("bgImageEnabled", path.trim() !== "")
+        }
+        function setBgImageEnabled(on: bool): void {
+            root.setHub("bgImageEnabled", on)
         }
     }
 

@@ -226,16 +226,24 @@ Scope {
     }
 
     // ───────────────────────── Battery ─────────────────────────
+    // ── TEST MODE ──
+    property bool batTest: false
+    property int batTestPct: 60
+    property bool batTestCharging: false
+
     readonly property var battery: UPower.devices.values.find(d => d.isLaptopBattery)
         ?? (UPower.displayDevice && UPower.displayDevice.isPresent
             && UPower.displayDevice.type === UPowerDeviceType.Battery
             ? UPower.displayDevice : null)
-    readonly property int batPct: battery ? Math.round(battery.percentage * 100) : 0
-    readonly property bool batCharging: battery !== null
-        && (battery.state === UPowerDeviceState.Charging
-            || battery.state === UPowerDeviceState.PendingCharge
-            || battery.state === UPowerDeviceState.FullyCharged)
-    readonly property bool batLow: battery !== null && !batCharging && batPct <= cfg.batLowPct
+    readonly property bool hasBattery: batTest || battery !== null
+    readonly property int batPct: batTest ? batTestPct
+                                          : battery ? Math.round(battery.percentage * 100) : 0
+    readonly property bool batCharging: batTest ? batTestCharging
+        : battery !== null
+          && (battery.state === UPowerDeviceState.Charging
+              || battery.state === UPowerDeviceState.PendingCharge
+              || battery.state === UPowerDeviceState.FullyCharged)
+    readonly property bool batLow: hasBattery && !batCharging && batPct <= cfg.batLowPct
     readonly property var batIcons: ["\uf244", "\uf243", "\uf242", "\uf241", "\uf240"]
     readonly property string batIcon: batIcons[batPct >= 90 ? 4 : batPct >= 65 ? 3 : batPct >= 40 ? 2 : batPct >= 15 ? 1 : 0]
 
@@ -245,6 +253,8 @@ Scope {
     }
 
     readonly property string batTip: {
+        if (batTest)
+            return "Battery " + batPct + "% · " + (batCharging ? "charging" : "on battery") + " · test mode";
         if (battery === null) return "";
         const t = batCharging ? battery.timeToFull : battery.timeToEmpty;
         const st = battery.state === UPowerDeviceState.FullyCharged ? "fully charged"
@@ -309,7 +319,7 @@ Scope {
         if (!isOn(id)) return false;
         switch (id) {
         case "media":   return Marquee.player !== null && Marquee.title !== "";
-        case "battery": return battery !== null;
+        case "battery": return hasBattery;
         default:        return true;
         }
     }
@@ -424,6 +434,11 @@ Scope {
         function shiftModule(id: string, delta: int): void {
             if (root.valid(id)) { root.shiftBy(id, delta); root.save(); }
         }
+
+        // Battery test mode (not saved to the config file)
+        function batteryTest(on: bool): void { root.batTest = on; }
+        function batteryLevel(pct: int): void { root.batTestPct = Math.max(0, Math.min(100, pct)); }
+        function batteryCharging(on: bool): void { root.batTestCharging = on; }
     }
 
     // ───────────────────────── System stats ─────────────────────────
@@ -910,6 +925,7 @@ echo "$u $t"
         property color color: Theme.text
         property bool bold: false
         property real yOffset: 0
+        property real xOffset: 0         // horizontal nudge (negative → left), applies to vertical and horizontal bars
         property real glyphScaleY: 1.0
         property int spacing: root.sizeIconGap
         property int padX: root.modPadPx
@@ -927,6 +943,7 @@ echo "$u $t"
             id: content
             anchors.centerIn: parent
             anchors.verticalCenterOffset: root.vertical ? 0 : mod.yOffset
+            anchors.horizontalCenterOffset: mod.xOffset
             flow: root.vertical ? GridLayout.TopToBottom : GridLayout.LeftToRight
             rowSpacing: 2
             columnSpacing: mod.spacing
@@ -1421,6 +1438,10 @@ echo "$u $t"
             glyphSize: root.sz.icon
             glyphScaleY: 1.12
             yOffset: root.iconYOffset
+            // Nudge the battery glyph left. Increase a number for a bigger shift.
+            //   vertical bars   → 3
+            //   horizontal bars → 2
+            xOffset: -Math.round((root.vertical ? 2 : 3) * root.bs)
             glyph: root.batIcon
             warning: root.batLow
             tip: root.batTip

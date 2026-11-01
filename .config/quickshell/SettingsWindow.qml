@@ -366,7 +366,7 @@ Scope {
             property int warmFrames: 0
 
             readonly property bool pageReady: pageLoader.status === Loader.Ready
-            readonly property bool canReveal: sized && (pageReady || warm)
+            readonly property bool canReveal: sized && (pageReady || warm) && (bgPic.ready || warm)
 
             function bindReveal() {
                 if (revealBound)
@@ -550,15 +550,14 @@ Scope {
                     radius: Theme.radius
                     border.color: Theme.accent
                     border.width: 1
-
-                    // Window scale (Appearance > Hub > Window Scale). Visual only: the card's
-                    // logical size, saved state, drag clamping and resize limits are unchanged.
                     scale: Theme.settingsScale
                     transformOrigin: Item.Center
-
-                    // swallows clicks on the card so they don't reach the backdrop's
-                    // click-outside-to-close (inside the scaled rect so the empty margin
-                    // around a shrunken card still counts as "outside")
+                    BackgroundImage {       
+                        id: bgPic
+                        anchors.fill: parent
+                        anchors.margins: 1
+                        radius: Math.max(0, Theme.radius - 1)
+                    }
                     MouseArea {
                         anchors.fill: parent
                         onClicked: {}

@@ -312,6 +312,43 @@ Item {
         }
     }
 
+    // ---- Background picture: file chooser (zenity or kdialog, whichever is installed) ----
+    Process {
+        id: pickProc
+        command: ["sh", "-c",
+            "if command -v zenity >/dev/null 2>&1; then "
+            + "zenity --file-selection --title='Choose background picture' "
+            + "--file-filter='Images | *.png *.jpg *.jpeg *.webp *.bmp *.gif' 2>/dev/null; "
+            + "elif command -v kdialog >/dev/null 2>&1; then "
+            + "kdialog --getopenfilename \"$HOME\" 'image/*' 2>/dev/null; "
+            + "else echo 'no file chooser found (install zenity or kdialog), or type the path' >&2; fi"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const p = page.cleanPath(text)
+                if (p !== "") {
+                    Theme.setHub("bgImagePath", p)
+                    Theme.setHub("bgImageEnabled", true)
+                }
+            }
+        }
+        stderr: StdioCollector {
+            onStreamFinished: if (text.trim().length > 0) console.warn("[hub] picture chooser:", text.trim())
+        }
+    }
+
+    function pickImage() {
+        if (!pickProc.running) pickProc.running = true
+    }
+
+    // Accepts a typed/pasted path: trims whitespace and surrounding quotes,
+    // turns file:// URLs into plain paths, expands a leading ~.
+    function cleanPath(raw) {
+        let p = String(raw).trim().replace(/^["']|["']$/g, "")
+        if (p.indexOf("file://") === 0) p = decodeURIComponent(p.substring(7))
+        if (p === "~" || p.indexOf("~/") === 0) p = Quickshell.env("HOME") + p.substring(1)
+        return p
+    }
+
     function markReady() {
         if (settingsReady) return
         settingsReady = true
@@ -562,6 +599,43 @@ Item {
             label: tg.checked ? "ON" : "OFF"
             current: tg.checked
             onClicked: tg.toggled(!tg.checked)
+        }
+    }
+
+    // Percent slider (0..1) used by the BACKGROUND IMAGE card.
+    // moved = live preview while dragging, committed = release (persist).
+    component PctSlider: Row {
+        id: ps
+        property string label: ""
+        property real value: 0
+        signal moved(real v)
+        signal committed(real v)
+
+        width: parent.width; spacing: 8
+
+        Text {
+            width: page.labelWidth
+            anchors.verticalCenter: parent.verticalCenter
+            text: ps.label; color: Theme.text
+            font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
+        }
+
+        Slider {
+            width: parent.width - page.labelWidth - 52 - 16
+            anchors.verticalCenter: parent.verticalCenter
+            label: ""; icon: ""
+            value: ps.value
+            onMoved: value => ps.moved(page.clamp01(value))
+            onCommitted: value => ps.committed(page.round2(page.clamp01(value)))
+        }
+
+        Text {
+            width: 52
+            anchors.verticalCenter: parent.verticalCenter
+            horizontalAlignment: Text.AlignRight
+            text: Math.round(ps.value * 100) + "%"
+            color: Theme.text
+            font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
         }
     }
 
@@ -973,6 +1047,90 @@ Item {
                                 color: Theme.text
                                 font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
                             }
+                        }
+                    }
+                }
+
+                // ---- Background picture ----
+                Card {
+                    Column {
+                        width: parent.width; spacing: 8
+
+                        Row {
+                            spacing: 10
+                            GroupLabel { text: "BACKGROUND IMAGE" }
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "LOWER BACKGROUND OPACITY TO SEE IT"
+                                color: Theme.textDim
+                                font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeSmall
+                            }
+                        }
+
+                        ToggleRow {
+                            label: "USE PICTURE"; checked: Theme.bgImageEnabled
+                            onToggled: v => Theme.setHub("bgImageEnabled", v)
+                        }
+
+                        Row {
+                            width: parent.width; spacing: 8
+
+                            Rectangle {
+                                width: parent.width - parent.spacing - browseBtn.width
+                                height: 28; radius: Theme.radius
+                                color: "#00000000"; clip: true
+                                border.width: 1
+                                border.color: pathInput.activeFocus ? Theme.accent : Theme.border
+
+                                TextInput {
+                                    id: pathInput
+                                    anchors.fill: parent; anchors.leftMargin: 8; anchors.rightMargin: 8
+                                    verticalAlignment: TextInput.AlignVCenter
+                                    clip: true; selectByMouse: true
+                                    text: Theme.bgImagePath
+                                    color: Theme.text
+                                    selectionColor: Theme.accent
+                                    font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
+                                    onEditingFinished: Theme.setHub("bgImagePath", page.cleanPath(text))
+                                }
+
+                                Text {
+                                    anchors.fill: parent; anchors.leftMargin: 8
+                                    verticalAlignment: Text.AlignVCenter
+                                    visible: pathInput.text === "" && !pathInput.activeFocus
+                                    text: "/path/to/picture.jpg"
+                                    color: Theme.textFaint
+                                    font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
+                                }
+                            }
+
+                            SmallButton {
+                                id: browseBtn
+                                width: 90
+                                label: "BROWSE"
+                                onClicked: page.pickImage()
+                            }
+                        }
+
+                        PctSlider {
+                            label: "IMAGE OPACITY"; value: Theme.bgImageOpacity
+                            onMoved: v => Theme.bgImageOpacity = v
+                            onCommitted: v => Theme.setHub("bgImageOpacity", v)
+                        }
+                        PctSlider {
+                            label: "IMAGE BLUR"; value: Theme.bgImageBlur
+                            onMoved: v => Theme.bgImageBlur = v
+                            onCommitted: v => Theme.setHub("bgImageBlur", v)
+                        }
+                        PctSlider {
+                            label: "FADE: TOP OPACITY"; value: Theme.bgImageFadeTop
+                            onMoved: v => Theme.bgImageFadeTop = v
+                            onCommitted: v => Theme.setHub("bgImageFadeTop", v)
+                        }
+                        PctSlider {
+                            label: "FADE: BOTTOM OPACITY"; value: Theme.bgImageFadeBottom
+                            onMoved: v => Theme.bgImageFadeBottom = v
+                            onCommitted: v => Theme.setHub("bgImageFadeBottom", v)
                         }
                     }
                 }
