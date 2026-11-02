@@ -1,12 +1,5 @@
 -- monitors.lua
 -- https://wiki.hypr.land/Configuring/Monitors/
-
----- MONITOR NAME CONSTANTS ----
--- These are referenced below but only normally defined by Quickshell
--- (Settings > Display) via state/display.lua. Without them they are nil
--- globals and the config breaks. Real names: `hyprctl monitors`.
-MONITOR1 = MONITOR1 or "LVDS-1"    -- MacBook internal panel
-MONITOR2 = MONITOR2 or "HDMI-A-1"  -- external
 -- Find your monitor names with:
 --   hyprctl monitors
 
