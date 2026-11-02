@@ -3,7 +3,7 @@
 <img width="2171" height="724" alt="43pr_dotfiles_combined" src="assets/banner.png" />
 
 <p align="center">
-<img src="https://img.shields.io/badge/HYPRLAND-0.56.2-667A82?style=flat&labelColor=101418" height="20" alt="Hyprland">
+<img src="https://img.shields.io/badge/HYPRLAND-0.57-667A82?style=flat&labelColor=101418" height="20" alt="Hyprland">
 <a href="https://discord.gg/j32UAE4WFP"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Finvites%2Fj32UAE4WFP%3Fwith_counts%3Dtrue&query=%24.approximate_member_count&style=flat&logo=discord&logoColor=ffffff&label=DISCORD&labelColor=101418&color=7289a8" height="20" alt="Discord"></a>
 <a href="https://www.youtube.com/@43PR2"><img src="https://img.shields.io/badge/YOUTUBE-SUBSCRIBE-b05a63?style=flat&logo=youtube&logoColor=ffffff&labelColor=101418" height="20" alt="YouTube"></a>
 <a href="https://ko-fi.com/43pr"><img src="https://img.shields.io/badge/SUPPORT-KOFI?style=flat&logo=ko-fi&logoColor=ffffff&label=KO--FI&labelColor=101418&color=9a6570" height="20" alt="Ko-Fi"></a>

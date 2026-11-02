@@ -936,9 +936,8 @@ echo "$u $t"
 
         Layout.alignment: Qt.AlignCenter
         implicitWidth: root.vertical ? root.panelThick : content.implicitWidth + padX
-        implicitHeight: root.vertical ? Math.max(20, content.implicitHeight + 8)
+        implicitHeight: root.vertical ? Math.max(20, content.implicitHeight + Math.round(padX * 0.4))
                                       : Math.max(root.panelThick - 2, content.implicitHeight)
-
         GridLayout {
             id: content
             anchors.centerIn: parent
@@ -1175,6 +1174,7 @@ echo "$u $t"
             readonly property bool isSettings: mid === "settings"
             baseSize: mid === "power" ? root.sz.power - 1 : root.sz.icon
             yOffset: mid === "power" ? 0 : root.iconYOffset
+            xOffset: !root.vertical ? 0 : isNet ? -2 : (mid === "power" || isSettings) ? -1 : 0
             text: isNet ? root.netGlyph : (def.g ?? "")
             tip: isNet ? root.netTip : mid === "notif" ? root.notifTip : (def.tip ?? "")
             // The settings button has configurable click binds (see Bar page → Settings button)
@@ -1413,6 +1413,7 @@ echo "$u $t"
 
             glyphSize: root.sz.icon
             yOffset: root.iconYOffset + 0.25
+            xOffset: root.vertical ? -1 : 0
             glyph: muted || vol <= 0 ? "\uDB81\uDF5F" : "\uDB81\uDD7E"
             warning: muted
             disabled: !ready

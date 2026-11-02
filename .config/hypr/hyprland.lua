@@ -28,11 +28,9 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("nm-applet")
     hl.exec_cmd("wl-paste --type text --watch cliphist store")
     hl.exec_cmd("wl-paste --type image --watch cliphist store")
-    hl.exec_cmd("/usr/lib/polkit-kde-authentication-agent-1")
-
     hl.exec_cmd("awww-daemon")
     hl.exec_cmd("~/.config/hypr/scripts/wallpaper-restore.sh")
-    hl.exec_cmd("sleep 2 && QSG_RENDER_LOOP=basic QS_ICON_THEME=Papirus qs")
+    hl.exec_cmd("sleep 1 && QSG_RENDER_LOOP=basic QS_ICON_THEME=Papirus qs")
 end)
 
 ---- ENVIRONMENT VARIABLES ----
