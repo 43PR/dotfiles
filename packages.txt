@@ -16,7 +16,6 @@ quickshell
 rofi
 polkit
 qt6-wayland
-qt6-5compat
 
 # --------------------------------------------------
 # Desktop Portals / X11 Compatibility / User Dirs
