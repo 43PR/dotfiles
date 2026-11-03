@@ -9,6 +9,11 @@ Item {
 
     property var monitors: []
     property var savedState: ({})
+    // Name of the monitor the user picked as MAIN. Stored separately from the layout, so
+    // changing it never moves a monitor and moving a monitor never un-sets it.
+    property string mainName: ""
+    // Raw hyprctl JSON of the last refresh; an unchanged refresh skips rebuilding every delegate.
+    property string lastMonitorsJson: ""
     property real marginLeft: 0
     property real marginRight: 10
     property real marginTop: 0
@@ -18,6 +23,16 @@ Item {
     property real scaleMax: 3.0
     readonly property string stateDir: Quickshell.env("HOME") + "/.config/quickshell/state"
     readonly property var activeMonitors: monitors.filter(m => !m.disabled)
+
+    // The monitor shown as MAIN: the saved choice if it is still active, otherwise the
+    // monitor at 0x0 (the old behaviour), otherwise the first active one.
+    readonly property string effectiveMainName: {
+        const act = activeMonitors
+        if (act.length === 0) return ""
+        if (mainName !== "" && act.some(m => m.name === mainName)) return mainName
+        const origin = act.find(m => m.x === 0 && m.y === 0)
+        return origin ? origin.name : act[0].name
+    }
 
     Process {
         id: stateDirProcess
@@ -41,6 +56,7 @@ Item {
             if (saved && typeof saved.monitors === "object" && saved.monitors !== null) {
                 savedState = saved.monitors
             }
+            if (saved && typeof saved.main === "string") mainName = saved.main
         } catch (error) {}
 
         // Rewrite stale scales (e.g. an old rounded 1.06) that would trigger "Invalid scale".
@@ -84,7 +100,7 @@ Item {
         interval: 300
         onTriggered: {
             try {
-                displayFile.setText(JSON.stringify({ monitors: page.savedState }, null, 2))
+                displayFile.setText(JSON.stringify({ monitors: page.savedState, main: page.mainName }, null, 2))
                 displayLua.setText(page.luaFileText())
             } catch (error) {}
         }
@@ -114,6 +130,7 @@ Item {
     function resetToConfig() {
         stateSaveTimer.stop()
         savedState = ({})
+        mainName = ""
         pReset.command = [
             "sh", "-c",
             "rm -f '" + page.stateDir + "/display.json' '" + page.stateDir + "/display.lua'; hyprctl reload"
@@ -140,7 +157,7 @@ Item {
     }
 
     function isMain(mon) {
-        return !mon.disabled && page.activeMonitors.length > 0 && mon.x === 0 && mon.y === 0
+        return !mon.disabled && mon.name === page.effectiveMainName
     }
 
     // Logs hyprctl output so failed rules are visible in the quickshell terminal,
@@ -157,6 +174,12 @@ Item {
             refreshTimer.restart()
             lateRefreshTimer.restart()
         }
+    }
+
+    function runShell(cmds) {
+        if (cmds.length === 0) return
+        pShell.command = ["sh", "-c", cmds.join("; ")]
+        pShell.running = true
     }
 
     // Hyprland applies each rule immediately, so any intermediate step that lands a monitor
@@ -177,6 +200,8 @@ Item {
     function logicalWidth(mon) { return logicalWidthFor(mon, mon.transform || 0) }
     function logicalHeight(mon) { return logicalHeightFor(mon, mon.transform || 0) }
 
+    // Lays the given monitors out left to right starting at 0x0. Only used when the monitor
+    // at the origin is disabled, so the remaining ones close the gap.
     function layoutCommands(ordered) {
         const cmds = []
 
@@ -204,12 +229,15 @@ Item {
         return cmds
     }
 
+    // MAIN is a preference, not a position: the layout is left exactly as the user arranged it.
+    // (The old code moved the monitor to 0x0 and pushed the others to its right, which is why
+    // the HDMI monitor jumped to the left; and since MAIN was derived from x/y == 0, moving it
+    // anywhere else made MAIN disappear.)
     function setMainMonitor(main) {
         if (!main || !main.name || main.disabled) return
-        const others = page.activeMonitors.filter(m => m.name !== main.name).sort((a, b) => a.x - b.x)
-        const cmds = layoutCommands([main].concat(others))
-        pShell.command = ["sh", "-c", cmds.join("; ")]
-        pShell.running = true
+        mainName = main.name
+        stateSaveTimer.restart()
+        runShell(["hyprctl dispatch focusmonitor '" + main.name + "'"])
     }
 
     // Which side of `ref` the monitor `mon` currently touches ("" when none).
@@ -280,8 +308,7 @@ Item {
             const m = l.mon
             cmds.push("hyprctl eval '" + monitorLua(m, { mode: monitorMode(m), position: l.x + "x" + l.y, scale: fixedScale(m) }) + "'")
         }
-        pShell.command = ["sh", "-c", cmds.join("; ")]
-        pShell.running = true
+        runShell(cmds)
     }
 
     // Rotate a monitor. Rotating changes its footprint, so monitors to its right or below
@@ -335,8 +362,7 @@ Item {
                 mode: monitorMode(l.mon), position: l.x + "x" + l.y,
                 scale: fixedScale(l.mon), transform: l.transform }) + "'")
         }
-        pShell.command = ["sh", "-c", cmds.join("; ")]
-        pShell.running = true
+        runShell(cmds)
     }
 
     function setMonitorEnabled(mon, enabled) {
@@ -353,16 +379,24 @@ Item {
             cmds.push("hyprctl eval '" + monitorLua(mon, { mode: mode, position: "auto", scale: scale, transform: transform, disabled: false }) + "'")
         } else {
             if (page.activeMonitors.length <= 1) return
-            const wasMain = isMain(mon)
+            const atOrigin = mon.x === 0 && mon.y === 0
+            const wasMain = page.effectiveMainName === mon.name
+            const rest = page.activeMonitors.filter(m => m.name !== mon.name).sort((a, b) => a.x - b.x)
             rememberMonitor(mon, { mode: monitorMode(mon), scale: fixedScale(mon), disabled: true })
             cmds.push("hyprctl eval '" + monitorLua(mon, { disabled: true }) + "'")
-            if (wasMain) {
-                const rest = page.activeMonitors.filter(m => m.name !== mon.name).sort((a, b) => a.x - b.x)
+            // The disabled monitor can no longer be MAIN; hand it to the first remaining one.
+            if (wasMain && rest.length > 0) {
+                mainName = rest[0].name
+                stateSaveTimer.restart()
+            }
+            // Only close the gap when the origin monitor disappears, as before.
+            if (atOrigin) {
                 cmds = cmds.concat(layoutCommands(rest))
+            } else if (wasMain && rest.length > 0) {
+                cmds.push("hyprctl dispatch focusmonitor '" + rest[0].name + "'")
             }
         }
-        pShell.command = ["sh", "-c", cmds.join("; ")]
-        pShell.running = true
+        runShell(cmds)
     }
 
     Process {
@@ -371,9 +405,14 @@ Item {
         running: true
         stdout: StdioCollector {
             onStreamFinished: {
+                // Same output as last time: keep the existing model so the UI is not rebuilt.
+                if (text === page.lastMonitorsJson) return
                 try {
-                    page.monitors = JSON.parse(text)
+                    const parsed = JSON.parse(text)
+                    page.lastMonitorsJson = text
+                    page.monitors = parsed
                 } catch (error) {
+                    page.lastMonitorsJson = ""
                     page.monitors = []
                 }
             }
@@ -477,6 +516,8 @@ Item {
         if (idx !== -1) {
             const updated = page.monitors.slice()
             updated[idx] = Object.assign({}, updated[idx], { scale: applied })
+            // The model now differs from the last hyprctl output, so the next refresh must apply.
+            page.lastMonitorsJson = ""
             page.monitors = updated
         }
 

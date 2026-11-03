@@ -7,7 +7,7 @@ Item {
     id: page
     property var drives: []
     property var filesystems: []
-    property var cleanupInfo: ({yay:0, pacman:0, journal:0, trash:0, flatpak:0, cliphist:0, thumbs:0})
+    property var cleanupInfo: ({yay:0, pacman:0, pacman1:0, pacmanrm:0, journal:0, trash:0, flatpak:0, cliphist:0, thumbs:0})
     property var sdaUsageData: null
     property real marginLeft: 0
     property real marginRight: 10
@@ -16,8 +16,15 @@ Item {
     property string pendingAction: ""
     property string pendingTitle: ""
     property string pendingMessage: ""
+    property string pendingKey: ""
 
-    readonly property var cleanupDefaults: ({yay:0, pacman:0, journal:0, trash:0, flatpak:0, cliphist:0, thumbs:0})
+    // Result tracking for cleanup buttons
+    property string runningKey: ""          // key of the cleanup currently running / being measured
+    property real beforeValue: 0            // that key's size (or count) before the command ran
+    property int lastExitCode: 0
+    property var cleanupResults: ({})       // key -> { kind: "ok" | "none" | "fail", text: "..." }
+
+    readonly property var cleanupDefaults: ({yay:0, pacman:0, pacman1:0, pacmanrm:0, journal:0, trash:0, flatpak:0, cliphist:0, thumbs:0})
     readonly property var sizeUnits: ({
         B:1, K:1024, KB:1024, KIB:1024,
         M:1048576, MB:1048576, MIB:1048576,
@@ -87,9 +94,54 @@ Item {
         return used > 0 ? {used: used} : null
     }
 
-    function runCommand(c) { commandProcess.command = ["sh", "-c", c]; commandProcess.running = true }
+    // k is the cleanup key, used to measure what the command changed
+    function runCommand(c, k) {
+        runningKey = k || ""
+        beforeValue = k ? (cleanupInfo[k] || 0) : 0
+        lastExitCode = 0
+        commandProcess.command = ["sh", "-c", c]
+        commandProcess.running = true
+    }
+
     function refreshAll() { pDrives.running = pStorage.running = pCleanup.running = true }
-    function confirmAction(t, m, c) { pendingTitle = t; pendingMessage = m; pendingAction = c; confirmPopup.visible = true }
+
+    function confirmAction(t, m, c, k) {
+        if (commandProcess.running) return
+        pendingTitle = t; pendingMessage = m; pendingAction = c; pendingKey = k || ""
+        confirmPopup.visible = true
+    }
+
+    function setResult(key, kind, text) {
+        var next = {}
+        for (var k in cleanupResults) next[k] = cleanupResults[k]
+        next[key] = { kind: kind, text: text }
+        cleanupResults = next
+    }
+
+    // Called once the post-command cleanup measurement has finished
+    function finishCleanup() {
+        var key = runningKey
+        if (!key) return
+        var before = beforeValue
+        var after = cleanupInfo[key] || 0
+        var code = lastExitCode
+
+        if (code !== 0) {
+            if (code === 126 || code === 127)
+                setResult(key, "fail", "CANCELLED OR NOT AUTHORIZED")
+            else
+                setResult(key, "fail", "FAILED (EXIT " + code + ")")
+        } else if (before <= 0) {
+            setResult(key, "none", "ALREADY CLEAN - NOTHING TO REMOVE")
+        } else if (before - after > 0) {
+            setResult(key, "ok", key === "cliphist"
+                ? "REMOVED " + formatCount(before - after)
+                : "FREED " + formatBytes(before - after))
+        } else {
+            setResult(key, "none", "NO CHANGE")
+        }
+        runningKey = ""
+    }
 
     Process {
         id: pDrives
@@ -116,13 +168,18 @@ Item {
         stderr: StdioCollector {}
     }
 
+    // PACMAN / PACMAN1 / PACMANRM report what each button WOULD free (paccache dry run),
+    // not the total cache size, so "0 B" means the button has nothing to do.
     Process {
         id: pCleanup
         command: [
             "sh", "-c",
             "p() { printf '%s %s\\n' \"$1\" \"${2:-0}\"; }; " +
+            "pc() { paccache -d \"$@\" 2>/dev/null | grep -oE 'disk space saved: [0-9.]+ ?[KMGT]i?B' | grep -oE '[0-9.]+ ?[KMGT]i?B' | tail -1 | tr -d ' '; }; " +
             "p YAY \"$(du -sb \"$HOME/.cache/yay\" 2>/dev/null | awk '{print $1}')\"; " +
-            "p PACMAN \"$(du -sb /var/cache/pacman/pkg 2>/dev/null | awk '{print $1}')\"; " +
+            "p PACMAN \"$(pc -k3)\"; " +
+            "p PACMAN1 \"$(pc -k1)\"; " +
+            "p PACMANRM \"$(pc -u -k0)\"; " +
             "p JOURNAL \"$(journalctl --disk-usage 2>/dev/null | grep -oE '[0-9.]+ ?[BKMGT]' | tail -1 | tr -d ' ')\"; " +
             "p TRASH \"$(du -sb \"$HOME/.local/share/Trash\" 2>/dev/null | awk '{print $1}')\"; " +
             "p FLATPAK \"$(flatpak uninstall --unused --assumeno 2>/dev/null | grep -oE '[0-9.]+ ?(kB|MB|GB|TB)' | tail -1 | tr -d ' ')\"; " +
@@ -131,7 +188,7 @@ Item {
         ]
         stdout: StdioCollector {
             onStreamFinished: {
-                var info = {yay: 0, pacman: 0, journal: 0, trash: 0, flatpak: 0, cliphist: 0, thumbs: 0}
+                var info = {yay: 0, pacman: 0, pacman1: 0, pacmanrm: 0, journal: 0, trash: 0, flatpak: 0, cliphist: 0, thumbs: 0}
                 var lines = text.trim().split("\n")
                 for (var i = 0; i < lines.length; ++i) {
                     var p = lines[i].trim().split(/\s+/)
@@ -139,6 +196,7 @@ Item {
                     if (p.length > 1 && info[k] !== undefined) info[k] = page.parseSize(p.slice(1).join(" "))
                 }
                 page.cleanupInfo = info
+                page.finishCleanup()
             }
         }
         stderr: StdioCollector {}
@@ -147,14 +205,20 @@ Item {
     Process {
         id: commandProcess
         stdout: StdioCollector {}
-        stderr: StdioCollector {}
-        onRunningChanged: { if (!running) page.refreshAll() }
+        stderr: StdioCollector {
+            onStreamFinished: if (text.trim()) console.warn("[storage] cleanup stderr:", text.trim())
+        }
+        onExited: (exitCode, exitStatus) => {
+            page.lastExitCode = exitCode
+            if (exitCode !== 0) console.warn("[storage] cleanup exited with code", exitCode)
+            page.refreshAll()
+        }
     }
 
     Rectangle {
         id: confirmPopup
         visible: false; anchors.centerIn: parent; z: 100
-        width: Math.min(parent.width - 30, 420); 
+        width: Math.min(parent.width - 30, 420);
         height: 220; radius: Theme.radius
         color: Theme.bg; border.width: 1; border.color: Theme.accent
 
@@ -177,13 +241,22 @@ Item {
                 }
                 ToolButton {
                     width: (parent.width - 8) / 2; label: "CONFIRM"; accent: true
-                    onClicked: { confirmPopup.visible = false; page.runCommand(page.pendingAction) }
+                    onClicked: { confirmPopup.visible = false; page.runCommand(page.pendingAction, page.pendingKey) }
                 }
             }
         }
     }
 
-    Timer { interval: 10000; running: true; repeat: true; onTriggered: page.refreshAll() }
+    // Cheap stats (df / lsblk) every 10s
+    Timer {
+        interval: 10000; running: true; repeat: true
+        onTriggered: { pDrives.running = true; pStorage.running = true }
+    }
+    // Expensive stats (du, paccache dry runs, flatpak, cliphist) every 60s, never while a cleanup is running
+    Timer {
+        interval: 60000; running: true; repeat: true
+        onTriggered: if (!commandProcess.running && page.runningKey === "") pCleanup.running = true
+    }
     Component.onCompleted: page.refreshAll()
 
     Column {
@@ -371,9 +444,19 @@ Item {
                                 command: "rm -rf -- \"$HOME/.cache/yay/\"*"
                             },
                             {
-                                key: "pacman", label: "PACMAN CACHE", action: "CLEAN", title: "CLEAN PACMAN CACHE?",
-                                message: "This removes old cached package versions while keeping the 3 most recent versions by default.\n\nCommand: pkexec paccache -r",
+                                key: "pacman", label: "PACMAN CACHE", action: "KEEP 3", title: "CLEAN PACMAN CACHE?",
+                                message: "This removes old cached package versions while keeping the 3 most recent versions of each package.\n\nCommand: pkexec paccache -r",
                                 command: "pkexec paccache -r"
+                            },
+                            {
+                                key: "pacman1", label: "PACMAN CACHE", action: "KEEP 1", title: "KEEP ONLY 1 VERSION?",
+                                message: "This removes all cached versions of installed packages except the most recent one. You will not be able to downgrade a package from the cache.\n\nCommand: pkexec paccache -rk1",
+                                command: "pkexec paccache -rk1"
+                            },
+                            {
+                                key: "pacmanrm", label: "PACMAN UNINSTALLED", action: "REMOVE", title: "REMOVE UNINSTALLED PACKAGES?",
+                                message: "This removes every cached version of packages that are no longer installed.\n\nCommand: pkexec paccache -ruk0",
+                                command: "pkexec paccache -ruk0"
                             },
                             {
                                 key: "journal", label: "JOURNAL", action: "7 DAYS", title: "VACUUM JOURNAL?",
@@ -389,16 +472,22 @@ Item {
 
                         delegate: CleanupButton {
                             required property var modelData
+                            readonly property bool busy: page.runningKey === modelData.key
+                            readonly property var res: page.cleanupResults[modelData.key]
+
                             width: list.width
                             label: modelData.label
                             value: modelData.key === "cliphist" ? page.formatCount(page.cleanupInfo.cliphist) : page.formatBytes(page.cleanupInfo[modelData.key])
                             actionText: modelData.action
+                            resultText: busy ? (commandProcess.running ? "WORKING..." : "MEASURING...") : (res ? res.text : "")
+                            resultKind: busy ? "busy" : (res ? res.kind : "")
                             onClicked: page.confirmAction(
                                 modelData.title,
                                 modelData.message === "CACHE_PLACEHOLDER"
                                     ? page.formatBytes(page.cleanupInfo.yay) + " currently in ~/.cache/yay"
                                     : modelData.message,
-                                modelData.command
+                                modelData.command,
+                                modelData.key
                             )
                         }
                     }
@@ -433,10 +522,14 @@ Item {
         required property string label
         required property string value
         required property string actionText
+        property string resultText: ""
+        property string resultKind: ""      // "ok" | "none" | "fail" | "busy" | ""
         signal clicked()
 
+        readonly property bool hasResult: resultText !== ""
+
         width: parent.width
-        height: 42
+        height: hasResult ? 58 : 42
         radius: Theme.radius
         color: "#00000000"
         border.width: 1
@@ -446,6 +539,7 @@ Item {
             anchors.left: parent.left
             anchors.leftMargin: 14
             anchors.verticalCenter: parent.verticalCenter
+            anchors.verticalCenterOffset: cleanupRoot.hasResult ? -9 : 0
             text: cleanupRoot.label
             color: Theme.textDim
             font.family: Theme.fontFamily
@@ -458,6 +552,7 @@ Item {
             anchors.right: parent.right
             anchors.rightMargin: 14
             anchors.verticalCenter: parent.verticalCenter
+            anchors.verticalCenterOffset: cleanupRoot.hasResult ? -9 : 0
             spacing: 8
 
             Text {
@@ -477,6 +572,22 @@ Item {
                 font.letterSpacing: 1
                 anchors.verticalCenter: parent.verticalCenter
             }
+        }
+
+        Text {
+            visible: cleanupRoot.hasResult
+            anchors.left: parent.left
+            anchors.leftMargin: 14
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 9
+            text: cleanupRoot.resultText
+            color: cleanupRoot.resultKind === "ok" ? Theme.accent
+                 : cleanupRoot.resultKind === "fail" ? Theme.danger
+                 : Theme.textDim
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.textSizeBody
+            font.bold: true
+            font.letterSpacing: 1
         }
 
         MouseArea {

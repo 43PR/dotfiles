@@ -403,24 +403,55 @@ Scope {
             WlrLayershell.namespace: "settings"
             WlrLayershell.keyboardFocus: root.showing ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
-            // Input region: the whole screen only when click-outside-to-close is on (the backdrop
-            // has to catch those clicks). Otherwise only the card takes input and every click
-            // outside it passes through to the windows underneath.
-            // The card's rect is bound explicitly (rather than via `item: card`) so the input
-            // region always follows drags, resizes and snaps, with a little padding so the
-            // drag strip and snap buttons at the very top edge are never clipped.
-            // The visible card is scaled around its center by Theme.settingsScale, so the
-            // region is shrunk/grown the same way.
-            mask: Region {
+            // ---- Input region (FIX for "settings window stops detecting the mouse") ----
+            //
+            // Previously the Region toggled between three shapes (whole backdrop via `item`,
+            // a card rect built from int x/y/width/height bindings, and an empty 0x0 rect),
+            // and the card rect could briefly have a negative size while winW was still 0.
+            // Quickshell's Region docs state it does not always update automatically and
+            // that changed() may need to be emitted manually, so a missed update left the
+            // surface with a stale/empty input region, and since clickOutsideClose and
+            // settingsScale are restored from hub.json, it came back on every start.
+            //
+            // Now the region is always driven by a real Item (item overrides x/y/width/height),
+            // sizes can never be negative, and changed() is emitted whenever an input changes.
+            //
+            //  - hidden / closing                       -> item null  (empty: clicks pass through)
+            //  - showing + clickOutsideClose on         -> whole backdrop takes input
+            //  - showing + clickOutsideClose off        -> only the padded, scaled card takes input
+            //
+            // cardMask is a plain Item: it paints nothing and takes no input, it only supplies
+            // geometry. The card is scaled around its centre by Theme.settingsScale, so the
+            // rect is shrunk/grown the same way, with padding so the drag strip and snap
+            // buttons at the very top edge are never clipped.
+            Item {
+                id: cardMask
                 readonly property real pad: 16
-                readonly property bool cardOnly: root.showing && !Theme.clickOutsideClose
                 readonly property real s: Theme.settingsScale
-
-                item: root.showing && Theme.clickOutsideClose ? backdrop : null
                 x: Math.round(root.cardX + root.cardWidth * (1 - s) / 2) - pad
                 y: Math.round(root.cardY + root.cardHeight * (1 - s) / 2) - pad
-                width: cardOnly ? Math.round(root.cardWidth * s) + pad * 2 : 0
-                height: cardOnly ? Math.round(root.cardHeight * s) + pad * 2 : 0
+                width: Math.max(0, Math.round(root.cardWidth * s) + pad * 2)
+                height: Math.max(0, Math.round(root.cardHeight * s) + pad * 2)
+            }
+
+            mask: Region {
+                id: inputMask
+                item: !root.showing ? null
+                    : (Theme.clickOutsideClose ? backdrop : cardMask)
+            }
+
+            // Nudge the region once bindings have settled (see note above).
+            Connections {
+                target: root
+                function onShowingChanged() { Qt.callLater(function () { inputMask.changed() }) }
+                function onWinWChanged()    { Qt.callLater(function () { inputMask.changed() }) }
+                function onWinHChanged()    { Qt.callLater(function () { inputMask.changed() }) }
+            }
+
+            Connections {
+                target: Theme
+                function onClickOutsideCloseChanged() { Qt.callLater(function () { inputMask.changed() }) }
+                function onSettingsScaleChanged()     { Qt.callLater(function () { inputMask.changed() }) }
             }
 
             function syncSize() {
