@@ -23,18 +23,21 @@ Item {
     readonly property var defaults: ({
         position: "left", style: "joined", thickness: 20, margin: 4,
         reserveSpace: true, allScreens: true, dragModules: true,
-        scale: 1.0, barScale: 1.0, bgOpacity: 0.5, border: false, radius: 16, calRadius: 15, calScale: 1.0,
-        tooltips: true, tooltipHints: true, tipDelay: 450,
-        modPad: 20, wsDot: 10, wsGap: 8, wsScroll: true,
-        statsPercent: false, statsScale: 1.0, statsBorder: true, statsWarn: 85, tempWarn: 85, batLowPct: 15,
+        scale: 1.0, barScale: 0.9, bgOpacity: 0.35, border: false, radius: 16, calRadius: 15, calScale: 0.9,
+        tooltips: true, tooltipHints: false, tooltipBorder: false, tipDelay: 450,
+        modPad: 18, wsDot: 16, wsGap: 8, wsScroll: true, wsNumbers: true,
+        tasksScale: 0.85, tasksGap: 2, tasksColor: "normal",
+        statsPercent: false, statsScale: 1.1, statsBorder: false, statsRadius: 24, statsGap: 1, statsWarn: 85, tempWarn: 85, batLowPct: 15,
         volStep: 2, volMax: 100,
-        clock24: true, clockSeconds: false, weekMonday: true,
-        clockPrimary: "calendar", clockSecondary: "quickactions", clockTertiary: "settings",
+        clock24: true, clockSeconds: false, clockPadHour: true, clockDate: true, clockDay: false, clockCase: "normal", weekMonday: true,
+        clockPrimary: "calendar", clockSecondary: "settings", clockTertiary: "quickactions",
         settingsPrimary: "settings", settingsSecondary: "barsettings", settingsTertiary: "none",
-        hidden: "cpu,ram,gpu,temp,wall,settings,tasks",
-        startMods: "cpu,ram,gpu,temp,ws",
+        hidden: "wall,settings,ram",
+        startMods: "notif,cpu,ram,gpu,temp",
+        midLeftMods: "ws",
         centerMods: "clock",
-        endMods: "media,volume,battery,net,notif,wall,settings,power"
+        midRightMods: "tasks",
+        endMods: "media,battery,wall,settings,volume,net,power"
     })
 
     readonly property var positions: ["top", "right", "bottom", "left"]
@@ -42,6 +45,8 @@ Item {
     readonly property var clockActions: ["calendar", "quickactions", "settings", "barsettings", "none"]
     readonly property var settingsActions: ["settings", "barsettings", "quickactions", "none"]
     readonly property var actionLabels: ({ quickactions: "QUICK ACTIONS", barsettings: "BAR SETTINGS" })
+    readonly property var caseOptions: ["normal", "upper", "lower"]
+    readonly property var caseLabels: ({ normal: "NORMAL", upper: "UPPERCASE", lower: "LOWERCASE" })
 
     // Module order / section placement is changed by dragging modules on the bar itself.
     // This page only turns modules on and off.
@@ -106,6 +111,9 @@ Item {
         set("hidden", h.join(","))
     }
 
+    // any of the CPU / RAM / GPU / TEMPS badges is shown
+    readonly property bool statsOn: isOn("cpu") || isOn("ram") || isOn("gpu") || isOn("temp")
+
     // ------------------------------------------------------------------
     // Persistence
     // ------------------------------------------------------------------
@@ -151,6 +159,26 @@ Item {
     Timer { id: selfTimer; interval: 600; onTriggered: page.selfWrite = false }
 
     // ------------------------------------------------------------------
+    // Quick jump (section chips at the top of the page)
+    // ------------------------------------------------------------------
+
+    NumberAnimation {
+        id: jumpAnim
+        target: flick
+        property: "contentY"
+        duration: 220
+        easing.type: Easing.OutCubic
+    }
+
+    function jumpTo(item) {
+        if (!item) return
+        jumpAnim.stop()
+        jumpAnim.from = flick.contentY
+        jumpAnim.to = Math.max(0, Math.min(item.y, flick.contentHeight - flick.height))
+        jumpAnim.start()
+    }
+
+    // ------------------------------------------------------------------
     // Reusable inline components
     // ------------------------------------------------------------------
 
@@ -160,8 +188,22 @@ Item {
     }
 
     component GroupLabel: Text {
-        color: Theme.text
+        color: Theme.accent2
         font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeGroup; font.bold: true; font.letterSpacing: 1
+    }
+
+    // small grey explanation under a section title
+    component Note: Text {
+        width: parent.width
+        wrapMode: Text.WordWrap
+        color: Theme.textDim
+        font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeSmall
+    }
+
+    component Divider: Rectangle {
+        width: parent.width; height: 1
+        color: Theme.border
+        opacity: 0.5
     }
 
     component Card: Rectangle {
@@ -209,6 +251,24 @@ Item {
             cursorShape: Qt.PointingHandCursor
             onClicked: sb.clicked()
         }
+    }
+
+    // Section chip: sized to its text, scrolls the page to `target`.
+    component NavChip: SmallButton {
+        property Item target: null
+        width: Math.ceil(navMetrics.advanceWidth) + 24
+        height: 24
+
+        TextMetrics {
+            id: navMetrics
+            text: label
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.textSizeBody
+            font.bold: true
+            font.letterSpacing: 1
+        }
+
+        onClicked: page.jumpTo(target)
     }
 
     component ToggleRow: Item {
@@ -353,6 +413,11 @@ Item {
 
     // ------------------------------------------------------------------
     // UI
+    //
+    // Sections, most used first:
+    //   Layout · Appearance · Modules · Clock & Date · Calendar · Workspaces
+    //   System stats · Battery & Volume · Tooltips · Click actions
+    // Options that belong to a module are dimmed while that module is off.
     // ------------------------------------------------------------------
 
     Flickable {
@@ -383,34 +448,51 @@ Item {
             width: flick.width
             spacing: 14
 
-            Text {
-                text: "BAR"; color: Theme.text
-                font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeTitle; font.letterSpacing: 3
+            // ---------------- TITLE + RESET ----------------
+            Item {
+                width: parent.width; height: 28
+
+                Text {
+                    anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
+                    text: "BAR"; color: Theme.text
+                    font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeTitle; font.letterSpacing: 3
+                }
+
+                SmallButton {
+                    anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                    width: 110; height: 24
+                    label: "RESET ALL"
+                    buttonEnabled: page.modified
+                    onClicked: page.resetAll()
+                }
             }
 
             Rectangle { width: parent.width; height: 1; color: Theme.border }
 
+            // ---------------- QUICK JUMP ----------------
+            Flow {
+                width: parent.width
+                spacing: 6
+                NavChip { label: "LOOK";       target: secLook }
+                NavChip { label: "MODULES";    target: secModules }
+                NavChip { label: "CLOCK";      target: secClock }
+                NavChip { label: "CALENDAR";   target: secCalendar }
+                NavChip { label: "WORKSPACES"; target: secWorkspaces }
+                NavChip { label: "OPEN APPS";  target: secTasks }
+                NavChip { label: "STATS";      target: secStats }
+                NavChip { label: "BATT & VOL"; target: secBattVol }
+                NavChip { label: "TOOLTIPS";   target: secTooltips }
+                NavChip { label: "ACTIONS";    target: secActions }
+            }
+
             // ---------------- LAYOUT ----------------
+            // Where the bar sits, how big it is and how modules are spaced.
             Column {
+                id: secLayout
                 width: parent.width; spacing: 10
                 topPadding: 6
 
-                Item {
-                    width: parent.width; height: 24
-
-                    SectionTitle {
-                        anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
-                        text: "LAYOUT"
-                    }
-
-                    SmallButton {
-                        anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-                        width: 110; height: 24
-                        label: "RESET ALL"
-                        buttonEnabled: page.modified
-                        onClicked: page.resetAll()
-                    }
-                }
+                SectionTitle { text: "LAYOUT" }
 
                 Card {
                     Column {
@@ -447,6 +529,13 @@ Item {
                             value: page.val("margin")
                             onMoved: v => page.set("margin", v)
                         }
+                        BarSlider {
+                            label: "MODULE PADDING"
+                            from: 0; to: 40; step: 2; unit: " px"
+                            value: page.val("modPad")
+                            onMoved: v => page.set("modPad", v)
+                        }
+                        Divider {}
                         ToggleRow {
                             label: "RESERVE SCREEN SPACE"; checked: page.val("reserveSpace")
                             onToggled: v => page.set("reserveSpace", v)
@@ -463,8 +552,10 @@ Item {
                 }
             }
 
-            // ---------------- APPEARANCE ----------------
+            // ---------------- LOOK ----------------
+            // Colors, shape and text size of the bar itself.
             Column {
+                id: secLook
                 width: parent.width; spacing: 10
                 topPadding: 6
 
@@ -488,18 +579,6 @@ Item {
                             onMoved: v => page.set("radius", v)
                         }
                         BarSlider {
-                            label: "CALENDAR RADIUS"
-                            from: 0; to: 32; step: 1; unit: " px"
-                            value: page.val("calRadius")
-                            onMoved: v => page.set("calRadius", v)
-                        }
-                        BarSlider {
-                            label: "CALENDAR SCALE"
-                            from: 0.6; to: 1.5; step: 0.05; unit: "×"; decimals: 2
-                            value: page.val("calScale")
-                            onMoved: v => page.set("calScale", v)
-                        }
-                        BarSlider {
                             label: "TEXT SCALE"
                             from: 0.8; to: 1.5; step: 0.05; unit: "×"; decimals: 2
                             value: page.val("scale")
@@ -513,41 +592,11 @@ Item {
                 }
             }
 
-            // ---------------- TOOLTIPS ----------------
-            Column {
-                width: parent.width; spacing: 10
-                topPadding: 6
-
-                SectionTitle { text: "TOOLTIPS" }
-
-                Card {
-                    Column {
-                        width: parent.width; spacing: 10
-
-                        ToggleRow {
-                            label: "SHOW TOOLTIPS"; checked: page.val("tooltips")
-                            onToggled: v => page.set("tooltips", v)
-                        }
-                        ToggleRow {
-                            label: "HINTS IN TOOLTIPS"; checked: page.val("tooltipHints")
-                            enabled: page.val("tooltips")
-                            onToggled: v => page.set("tooltipHints", v)
-                        }
-                        BarSlider {
-                            label: "TOOLTIP DELAY"
-                            enabled: page.val("tooltips")
-                            from: 0; to: 1500; step: 50; unit: " ms"
-                            value: page.val("tipDelay")
-                            onMoved: v => page.set("tipDelay", v)
-                        }
-                    }
-                }
-            }
-
             // --------------- MODULES ----------------
             // One compact on/off button per module, four per row.
             // Highlighted = shown on the bar. Reorder by dragging modules on the bar.
             Column {
+                id: secModules
                 width: parent.width; spacing: 10
                 topPadding: 6
 
@@ -574,52 +623,143 @@ Item {
                     }
                 }
 
-                Text {
-                    width: parent.width
-                    wrapMode: Text.WordWrap
-                    text: "Drag modules on the bar to reorder them."
-                    color: Theme.textDim
-                    font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeSmall
-                }
+                Note { text: "Highlighted modules are shown on the bar. Drag modules on the bar to reorder them or move them between the five zones (start, left-middle, center, right-middle, end). Each module's options are in the sections below." }
             }
-            // ---------------- MODULE APPEARANCE ----------------
+
+            // ---------------- CLOCK & DATE ----------------
             Column {
+                id: secClock
                 width: parent.width; spacing: 10
                 topPadding: 6
 
-                SectionTitle { text: "MODULE APPEARANCE" }
+                SectionTitle { text: "CLOCK & DATE" }
+
+                Note {
+                    visible: !page.isOn("clock")
+                    text: "Turn on the CLOCK module to use these options."
+                }
 
                 Card {
+                    enabled: page.isOn("clock")
+
                     Column {
                         width: parent.width; spacing: 10
+
+                        GroupLabel { text: "TIME" }
                         ToggleRow {
-                            label: "SHOW % / ° SYMBOLS"; checked: page.val("statsPercent")
-                            onToggled: v => page.set("statsPercent", v)
+                            label: "24-HOUR CLOCK"; checked: page.val("clock24")
+                            onToggled: v => page.set("clock24", v)
                         }
                         ToggleRow {
-                            label: "STATS BORDER"; checked: page.val("statsBorder")
-                            onToggled: v => page.set("statsBorder", v)
+                            label: "SHOW SECONDS"; checked: page.val("clockSeconds")
+                            onToggled: v => page.set("clockSeconds", v)
+                        }
+                        ToggleRow {
+                            label: "LEADING ZERO (02:20)"; checked: page.val("clockPadHour")
+                            onToggled: v => page.set("clockPadHour", v)
+                        }
+
+                        Divider {}
+
+                        GroupLabel { text: "DATE" }
+                        ToggleRow {
+                            label: "SHOW DATE (TUE, 03/11)"; checked: page.val("clockDate")
+                            onToggled: v => page.set("clockDate", v)
+                        }
+                        ToggleRow {
+                            label: "SHOW DAY (MON / TUE)"; checked: page.val("clockDay")
+                            enabled: page.val("clockDate")
+                            onToggled: v => page.set("clockDay", v)
+                        }
+
+                        Divider {}
+
+                        GroupLabel { text: "LETTERS" }
+                        BarChoice {
+                            label: "DAY & AM/PM CASE"
+                            // only matters while the weekday or the AM/PM suffix is visible
+                            enabled: (page.val("clockDate") && page.val("clockDay")) || !page.val("clock24")
+                            options: page.caseOptions; labels: page.caseLabels; btnWidth: 100
+                            current: page.val("clockCase")
+                            onPicked: v => page.set("clockCase", v)
+                        }
+                    }
+                }
+            }
+
+            // ---------------- CALENDAR ----------------
+            // The popup that opens from the clock.
+            Column {
+                id: secCalendar
+                width: parent.width; spacing: 10
+                topPadding: 6
+
+                SectionTitle { text: "CALENDAR" }
+
+                Note {
+                    visible: !page.isOn("clock")
+                    text: "Turn on the CLOCK module to use these options."
+                }
+
+                Card {
+                    enabled: page.isOn("clock")
+
+                    Column {
+                        width: parent.width; spacing: 10
+
+                        BarChoice {
+                            label: "WEEK STARTS ON"
+                            options: ["monday", "sunday"]
+                            current: page.val("weekMonday") ? "monday" : "sunday"
+                            onPicked: v => page.set("weekMonday", v === "monday")
                         }
                         BarSlider {
-                            label: "STATS TEXT SCALE"
-                            from: 0.7; to: 1.6; step: 0.05; unit: "×"; decimals: 2
-                            value: page.val("statsScale")
-                            onMoved: v => page.set("statsScale", v)
+                            label: "CALENDAR SCALE"
+                            from: 0.6; to: 1.5; step: 0.05; unit: "×"; decimals: 2
+                            value: page.val("calScale")
+                            onMoved: v => page.set("calScale", v)
                         }
                         BarSlider {
-                            label: "MODULE PADDING"
-                            from: 0; to: 40; step: 2; unit: " px"
-                            value: page.val("modPad")
-                            onMoved: v => page.set("modPad", v)
+                            label: "CALENDAR RADIUS"
+                            from: 0; to: 32; step: 1; unit: " px"
+                            value: page.val("calRadius")
+                            onMoved: v => page.set("calRadius", v)
+                        }
+                    }
+                }
+            }
+
+            // ---------------- WORKSPACES ----------------
+            Column {
+                id: secWorkspaces
+                width: parent.width; spacing: 10
+                topPadding: 6
+
+                SectionTitle { text: "WORKSPACES" }
+
+                Note {
+                    visible: !page.isOn("ws")
+                    text: "Turn on the WORKSPACES module to use these options."
+                }
+
+                Card {
+                    enabled: page.isOn("ws")
+
+                    Column {
+                        width: parent.width; spacing: 10
+
+                        ToggleRow {
+                            label: "SHOW WORKSPACE NUMBERS"; checked: page.val("wsNumbers")
+                            onToggled: v => page.set("wsNumbers", v)
                         }
                         BarSlider {
-                            label: "WORKSPACE DOT SIZE"
-                            from: 6; to: 18; step: 1; unit: " px"
+                            label: "DOT SIZE"
+                            from: 6; to: 30; step: 1; unit: " px"
                             value: page.val("wsDot")
                             onMoved: v => page.set("wsDot", v)
                         }
                         BarSlider {
-                            label: "WORKSPACE DOT SPACING"
+                            label: "DOT SPACING"
                             from: 0; to: 20; step: 1; unit: " px"
                             value: page.val("wsGap")
                             onMoved: v => page.set("wsGap", v)
@@ -628,6 +768,105 @@ Item {
                             label: "SCROLL TO SWITCH WORKSPACE"; checked: page.val("wsScroll")
                             onToggled: v => page.set("wsScroll", v)
                         }*/
+                    }
+                }
+            }
+
+            // ---------------- OPEN APPS ----------------
+            // Icon size, spacing and tint of the open-apps module.
+            Column {
+                id: secTasks
+                width: parent.width; spacing: 10
+                topPadding: 6
+
+                SectionTitle { text: "OPEN APPS" }
+
+                Note {
+                    visible: !page.isOn("tasks")
+                    text: "Turn on the OPEN APPS module to use these options."
+                }
+
+                Card {
+                    enabled: page.isOn("tasks")
+
+                    Column {
+                        width: parent.width; spacing: 10
+
+                        BarSlider {
+                            label: "ICON SCALE"
+                            from: 0.5; to: 1.5; step: 0.05; unit: "×"; decimals: 2
+                            value: page.val("tasksScale")
+                            onMoved: v => page.set("tasksScale", v)
+                        }
+                        BarSlider {
+                            label: "ICON SPACING"
+                            from: 0; to: 16; step: 1; unit: " px"
+                            value: page.val("tasksGap")
+                            onMoved: v => page.set("tasksGap", v)
+                        }
+                        BarChoice {
+                            label: "ICON COLOR"
+                            options: ["normal", "accent"]
+                            current: page.val("tasksColor")
+                            onPicked: v => page.set("tasksColor", v)
+                        }
+                    }
+                }
+
+                Note { text: "NORMAL keeps each app's own icon colours. ACCENT draws flat single-colour icons that follow the theme (the focused window is highlighted). Icons are never larger than the bar; raise THICKNESS in LAYOUT for bigger icons." }
+            }
+
+            // ---------------- SYSTEM STATS ----------------
+            // CPU / RAM / GPU / TEMP badges.
+            Column {
+                id: secStats
+                width: parent.width; spacing: 10
+                topPadding: 6
+
+                SectionTitle { text: "SYSTEM STATS" }
+
+                Note {
+                    visible: !page.statsOn
+                    text: "Turn on CPU, RAM, GPU or TEMPS in MODULES to use these options."
+                }
+
+                Card {
+                    enabled: page.statsOn
+
+                    Column {
+                        width: parent.width; spacing: 10
+
+                        GroupLabel { text: "BADGE STYLE" }
+                        ToggleRow {
+                            label: "SHOW % / ° SYMBOLS"; checked: page.val("statsPercent")
+                            onToggled: v => page.set("statsPercent", v)
+                        }
+                        ToggleRow {
+                            label: "BADGE BORDER"; checked: page.val("statsBorder")
+                            onToggled: v => page.set("statsBorder", v)
+                        }
+                        BarSlider {
+                            label: "BADGE TEXT SCALE"
+                            from: 0.9; to: 1.1; step: 0.1; unit: "×"; decimals: 2
+                            value: page.val("statsScale")
+                            onMoved: v => page.set("statsScale", v)
+                        }
+                        BarSlider {
+                            label: "BADGE CORNER RADIUS"
+                            from: 0; to: 24; step: 1; unit: " px"
+                            value: page.val("statsRadius")
+                            onMoved: v => page.set("statsRadius", v)
+                        }
+                        BarSlider {
+                            label: "BADGE SPACING"
+                            from: 0; to: 24; step: 1; unit: " px"
+                            value: page.val("statsGap")
+                            onMoved: v => page.set("statsGap", v)
+                        }
+
+                        Divider {}
+
+                        GroupLabel { text: "WARNING THRESHOLDS" }
                         BarSlider {
                             label: "HIGH CPU / RAM / GPU WARNING"
                             from: 50; to: 100; step: 5; unit: "%"
@@ -640,20 +879,44 @@ Item {
                             value: page.val("tempWarn")
                             onMoved: v => page.set("tempWarn", v)
                         }
+                    }
+                }
+            }
+
+            // ---------------- BATTERY & VOLUME ----------------
+            Column {
+                id: secBattVol
+                width: parent.width; spacing: 10
+                topPadding: 6
+
+                SectionTitle { text: "BATTERY & VOLUME" }
+
+                Card {
+                    Column {
+                        width: parent.width; spacing: 10
+
+                        GroupLabel { text: "BATTERY" }
                         BarSlider {
                             label: "LOW BATTERY WARNING"
+                            enabled: page.isOn("battery")
                             from: 5; to: 50; step: 5; unit: "%"
                             value: page.val("batLowPct")
                             onMoved: v => page.set("batLowPct", v)
                         }
+
+                        Divider {}
+
+                        GroupLabel { text: "VOLUME" }
                         BarSlider {
-                            label: "VOLUME SCROLL STEP"
+                            label: "SCROLL STEP"
+                            enabled: page.isOn("volume")
                             from: 1; to: 10; step: 1; unit: "%"
                             value: page.val("volStep")
                             onMoved: v => page.set("volStep", v)
                         }
                         BarSlider {
                             label: "MAXIMUM VOLUME"
+                            enabled: page.isOn("volume")
                             from: 100; to: 150; step: 5; unit: "%"
                             value: page.val("volMax")
                             onMoved: v => page.set("volMax", v)
@@ -661,78 +924,100 @@ Item {
                     }
                 }
             }
-            // ---------------- CLOCK & CALENDAR ----------------
+
+            // ---------------- TOOLTIPS ----------------
             Column {
+                id: secTooltips
                 width: parent.width; spacing: 10
                 topPadding: 6
 
-                SectionTitle { text: "CLOCK & CALENDAR" }
+                SectionTitle { text: "TOOLTIPS" }
 
                 Card {
                     Column {
                         width: parent.width; spacing: 10
 
                         ToggleRow {
-                            label: "24-HOUR CLOCK"; checked: page.val("clock24")
-                            onToggled: v => page.set("clock24", v)
+                            label: "SHOW TOOLTIPS"; checked: page.val("tooltips")
+                            onToggled: v => page.set("tooltips", v)
                         }
                         ToggleRow {
-                            label: "SHOW SECONDS"; checked: page.val("clockSeconds")
-                            onToggled: v => page.set("clockSeconds", v)
+                            label: "HINTS IN TOOLTIPS"; checked: page.val("tooltipHints")
+                            enabled: page.val("tooltips")
+                            onToggled: v => page.set("tooltipHints", v)
                         }
-                        BarChoice {
-                            label: "WEEK STARTS ON"
-                            options: ["monday", "sunday"]
-                            current: page.val("weekMonday") ? "monday" : "sunday"
-                            onPicked: v => page.set("weekMonday", v === "monday")
+                        ToggleRow {
+                            label: "TOOLTIP BORDER"; checked: page.val("tooltipBorder")
+                            enabled: page.val("tooltips")
+                            onToggled: v => page.set("tooltipBorder", v)
                         }
-                        BarChoice {
-                            label: "CLOCK LEFT CLICK"
-                            options: page.clockActions; labels: page.actionLabels; btnWidth: 110
-                            current: page.val("clockPrimary")
-                            onPicked: v => page.set("clockPrimary", v)
-                        }
-                        BarChoice {
-                            label: "CLOCK RIGHT CLICK"
-                            options: page.clockActions; labels: page.actionLabels; btnWidth: 110
-                            current: page.val("clockSecondary")
-                            onPicked: v => page.set("clockSecondary", v)
-                        }
-                        BarChoice {
-                            label: "CLOCK MIDDLE CLICK"
-                            options: page.clockActions; labels: page.actionLabels; btnWidth: 110
-                            current: page.val("clockTertiary")
-                            onPicked: v => page.set("clockTertiary", v)
+                        BarSlider {
+                            label: "TOOLTIP DELAY"
+                            enabled: page.val("tooltips")
+                            from: 0; to: 1500; step: 50; unit: " ms"
+                            value: page.val("tipDelay")
+                            onMoved: v => page.set("tipDelay", v)
                         }
                     }
                 }
             }
 
-            // ---------------- SETTINGS BUTTON ----------------
+            // ---------------- CLICK ACTIONS ----------------
+            // What a click on the clock / settings button does.
             Column {
+                id: secActions
                 width: parent.width; spacing: 10
                 topPadding: 6
 
-                SectionTitle { text: "SETTINGS BUTTON" }
+                SectionTitle { text: "CLICK ACTIONS" }
 
                 Card {
                     Column {
                         width: parent.width; spacing: 10
 
+                        GroupLabel { text: "CLOCK" }
                         BarChoice {
-                            label: "SETTINGS LEFT CLICK"
+                            label: "LEFT CLICK"
+                            enabled: page.isOn("clock")
+                            options: page.clockActions; labels: page.actionLabels; btnWidth: 110
+                            current: page.val("clockPrimary")
+                            onPicked: v => page.set("clockPrimary", v)
+                        }
+                        BarChoice {
+                            label: "RIGHT CLICK"
+                            enabled: page.isOn("clock")
+                            options: page.clockActions; labels: page.actionLabels; btnWidth: 110
+                            current: page.val("clockSecondary")
+                            onPicked: v => page.set("clockSecondary", v)
+                        }
+                        BarChoice {
+                            label: "MIDDLE CLICK"
+                            enabled: page.isOn("clock")
+                            options: page.clockActions; labels: page.actionLabels; btnWidth: 110
+                            current: page.val("clockTertiary")
+                            onPicked: v => page.set("clockTertiary", v)
+                        }
+
+                        Divider {}
+
+                        GroupLabel { text: "SETTINGS BUTTON" }
+                        BarChoice {
+                            label: "LEFT CLICK"
+                            enabled: page.isOn("settings")
                             options: page.settingsActions; labels: page.actionLabels; btnWidth: 110
                             current: page.val("settingsPrimary")
                             onPicked: v => page.set("settingsPrimary", v)
                         }
                         BarChoice {
-                            label: "SETTINGS RIGHT CLICK"
+                            label: "RIGHT CLICK"
+                            enabled: page.isOn("settings")
                             options: page.settingsActions; labels: page.actionLabels; btnWidth: 110
                             current: page.val("settingsSecondary")
                             onPicked: v => page.set("settingsSecondary", v)
                         }
                         BarChoice {
-                            label: "SETTINGS MIDDLE CLICK"
+                            label: "MIDDLE CLICK"
+                            enabled: page.isOn("settings")
                             options: page.settingsActions; labels: page.actionLabels; btnWidth: 110
                             current: page.val("settingsTertiary")
                             onPicked: v => page.set("settingsTertiary", v)

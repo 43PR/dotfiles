@@ -19,11 +19,11 @@ PanelWindow {
     property real edgeSpacing: 80
     property int startPosition: 7
     property bool shadowEnabled: true
-    property color shadowColor: "#000000"
+    property color shadowColor: '#000000'
     property real shadowOpacity: 0.4
-    property real shadowBlur: 0.45
-    property real shadowX: 6
-    property real shadowY: 6
+    property real shadowBlur: 0
+    property real shadowX: 4
+    property real shadowY: 4
     property string wallpaperPath: configs.wallpaper_path.replace("$HOME", Quickshell.env("HOME"))
     property string cachePath: configs.cache_path.replace("$HOME", Quickshell.env("HOME"))
 

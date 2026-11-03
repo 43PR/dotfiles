@@ -18,28 +18,34 @@ Scope {
         position: "left", style: "joined", thickness: 20, margin: 4,
         reserveSpace: true, allScreens: true, dragModules: true,
         // appearance
-        scale: 1.0, barScale: 1.0, bgOpacity: 0.5, border: false, radius: 16, calRadius: 15, calScale: 1.0,
+        scale: 1.0, barScale: 0.9, bgOpacity: 0.35, border: false, radius: 16, calRadius: 15, calScale: 0.9,
         // tooltips
-        tooltips: true, tooltipHints: true, tipDelay: 450,
+        tooltips: true, tooltipHints: false, tooltipBorder: false, tipDelay: 450,
         // modules
-        modPad: 20, wsDot: 10, wsGap: 8, wsScroll: true,
-        statsPercent: false, statsScale: 1.0, statsBorder: true, statsWarn: 85, tempWarn: 85, batLowPct: 15,
+        modPad: 18, wsDot: 16, wsGap: 8, wsScroll: true, wsNumbers: true,
+        tasksScale: 0.85, tasksGap: 2, tasksColor: "normal",
+        statsPercent: false, statsScale: 1.1, statsBorder: false, statsRadius: 24, statsGap: 1, statsWarn: 85, tempWarn: 85, batLowPct: 15,
         volStep: 2, volMax: 100,
         // clock / calendar
-        clock24: true, clockSeconds: false, weekMonday: true,
+        clock24: true, clockSeconds: false, clockPadHour: true, clockDate: true, clockDay: false, clockCase: "normal", weekMonday: true,
         // clock click binds: "calendar" | "quickactions" | "settings" | "barsettings" | "none"
-        clockPrimary: "calendar", clockSecondary: "quickactions", clockTertiary: "settings",
+        clockPrimary: "calendar", clockSecondary: "settings", clockTertiary: "quickactions",
         // settings button click binds: "quickactions" | "settings" | "barsettings" | "none"
         settingsPrimary: "settings", settingsSecondary: "barsettings", settingsTertiary: "none",
         // module placement
-        hidden: "cpu,ram,gpu,temp,wall,settings,tasks",
-        startMods: "cpu,ram,gpu,temp,ws",
+        hidden: "wall,settings,ram",
+        startMods: "notif,cpu,ram,gpu,temp",
+        midLeftMods: "ws",
         centerMods: "clock",
-        endMods: "media,volume,battery,net,notif,wall,settings,power"
+        midRightMods: "tasks",
+        endMods: "media,battery,wall,settings,volume,net,power"
     })
     readonly property var positions: ["top", "right", "bottom", "left"]
     readonly property var styles: ["floating", "joined", "strip"]
-    readonly property var sections: ["start", "center", "end"]
+    // Five zones along the bar: start · midLeft · center · midRight · end
+    //   midLeft  is centered between the start zone and the center zone
+    //   midRight is centered between the center zone and the end zone
+    readonly property var sections: ["start", "midLeft", "center", "midRight", "end"]
 
     // Live config object, edited by BarPage (the settings page).
     readonly property var config: cfg
@@ -72,14 +78,21 @@ Scope {
             property real calScale: root.defaults.calScale       // calendar popup scale
             property bool tooltips: root.defaults.tooltips
             property bool tooltipHints: root.defaults.tooltipHints // show "Left click: ..." lines in tooltips
+            property bool tooltipBorder: root.defaults.tooltipBorder // outline around tooltips
             property int tipDelay: root.defaults.tipDelay        // ms before a tooltip appears
             property int modPad: root.defaults.modPad            // horizontal padding of text modules
             property int wsDot: root.defaults.wsDot              // workspace dot size
             property int wsGap: root.defaults.wsGap              // gap between workspace dots
             property bool wsScroll: root.defaults.wsScroll       // scroll on workspaces to switch
+            property bool wsNumbers: root.defaults.wsNumbers     // show the workspace number inside each dot
+            property real tasksScale: root.defaults.tasksScale   // open-apps icon scale
+            property int tasksGap: root.defaults.tasksGap        // space between open-apps icons
+            property string tasksColor: root.defaults.tasksColor // open-apps icon tint: "normal" | "accent"
             property bool statsPercent: root.defaults.statsPercent // show the % / °C symbols on CPU / RAM / GPU / TEMP
             property real statsScale: root.defaults.statsScale   // text scale of the CPU / RAM / GPU / TEMP badges
             property bool statsBorder: root.defaults.statsBorder // outline around the stat badges
+            property int statsRadius: root.defaults.statsRadius  // badge corner radius (24 = full pill)
+            property int statsGap: root.defaults.statsGap        // space between neighbouring stat badges
             property int statsWarn: root.defaults.statsWarn      // CPU/RAM/GPU % that turns red
             property int tempWarn: root.defaults.tempWarn        // CPU/GPU °C that turns red
             property int batLowPct: root.defaults.batLowPct      // battery % that turns red
@@ -87,6 +100,10 @@ Scope {
             property int volMax: root.defaults.volMax            // max volume %
             property bool clock24: root.defaults.clock24
             property bool clockSeconds: root.defaults.clockSeconds
+            property bool clockPadHour: root.defaults.clockPadHour // leading zero on the hour: 02:20 vs 2:20
+            property bool clockDate: root.defaults.clockDate     // minimal date next to the clock, e.g. "Thu, 29/10"
+            property bool clockDay: root.defaults.clockDay       // weekday (Mon/Tue) in front of the date
+            property string clockCase: root.defaults.clockCase   // day name + AM/PM letters: "normal" | "upper" | "lower"
             property bool weekMonday: root.defaults.weekMonday   // calendar week starts on Monday
             property string clockPrimary: root.defaults.clockPrimary     // clock left click
             property string clockSecondary: root.defaults.clockSecondary // clock right click
@@ -96,7 +113,9 @@ Scope {
             property string settingsTertiary: root.defaults.settingsTertiary   // settings button middle click
             property string hidden: root.defaults.hidden         // comma list of disabled modules
             property string startMods: root.defaults.startMods
+            property string midLeftMods: root.defaults.midLeftMods
             property string centerMods: root.defaults.centerMods
+            property string midRightMods: root.defaults.midRightMods
             property string endMods: root.defaults.endMods
         }
     }
@@ -119,6 +138,8 @@ Scope {
     readonly property int modPadPx: Math.round(cfg.modPad * bs)
     readonly property int wsDotPx: Math.max(3, Math.round(cfg.wsDot * bs))
     readonly property int wsGapPx: Math.round(cfg.wsGap * bs)
+    // the dot size slider drives the box in both modes; with numbers on, the digit scales with it
+    readonly property int wsBoxPx: wsDotPx
     readonly property real barRadius: strip ? 0 : cfg.radius
     readonly property color bgColor: Qt.alpha(Theme.bg, cfg.bgOpacity)
     readonly property color borderColor: Theme.accent
@@ -136,6 +157,10 @@ Scope {
     })
     readonly property int sizeIconGap: Math.round(12 * bs)
     readonly property int iconYOffset: 1
+
+    // Open-apps icon size: the base size times the user's scale, never larger than the bar itself.
+    readonly property int taskIconPx: Math.max(8, Math.min(Math.round(sz.taskIcon * cfg.tasksScale), panelThick - 2))
+    readonly property int taskGapPx: Math.round(cfg.tasksGap * bs)
 
     // margin for one side of the bar frame
     function edgeMargin(side) {
@@ -196,33 +221,61 @@ Scope {
             || Quickshell.iconPath("image-missing");
     }
 
+    // Short, friendly app name for the open-apps tooltip (desktop entry name, else the app id).
+    function appName(appId) {
+        const id = appId ?? "";
+        let entry = null;
+        try {
+            entry = DesktopEntries.heuristicLookup(id) ?? DesktopEntries.heuristicLookup(id.toLowerCase());
+        } catch (e) { entry = null; }
+        return entry && entry.name ? entry.name : id;
+    }
+
     // ───────────────────────── Clock formatting ─────────────────────────
+    function pad2(n) { return String(n).padStart(2, "0"); }
+
+    // hour with or without a leading zero (02:20 / 2:20), 24h or 12h
+    function hourText(d) {
+        const h = cfg.clock24 ? d.getHours() : (d.getHours() % 12 || 12);
+        return cfg.clockPadHour ? pad2(h) : String(h);
+    }
+    // AM/PM: "normal" and "lower" → pm / am, "upper" → PM / AM
+    function ampmText(d) {
+        const v = d.getHours() >= 12 ? "PM" : "AM";
+        return cfg.clockCase === "upper" ? v : v.toLowerCase();
+    }
+    // short weekday: normal → Tue, upper → TUE, lower → tue
+    function dayText(d) {
+        const v = Qt.formatDate(d, "ddd");
+        return cfg.clockCase === "upper" ? v.toUpperCase()
+             : cfg.clockCase === "lower" ? v.toLowerCase() : v;
+    }
+
     function clockText(d) {
-        const h24 = d.getHours();
-        const h12 = h24 % 12 || 12;
-        const mm = String(d.getMinutes()).padStart(2, "0");
-        const ss = String(d.getSeconds()).padStart(2, "0");
-        if (cfg.clock24)
-            return (cfg.clockSeconds
-                ? String(h24).padStart(2, "0") + ":" + mm + ":" + ss
-                : String(h24).padStart(2, "0") + ":" + mm);
-        const suffix = h24 >= 12 ? "PM" : "AM";
-        return cfg.clockSeconds
-            ? h12 + ":" + mm + ":" + ss + " " + suffix
-            : h12 + ":" + mm + " " + suffix;
+        let t = hourText(d) + ":" + pad2(d.getMinutes());
+        if (cfg.clockSeconds) t += ":" + pad2(d.getSeconds());
+        return cfg.clock24 ? t : t + " " + ampmText(d);
     }
     function clockVText(d) {
-        const h24 = d.getHours();
-        const h = cfg.clock24
-            ? String(h24).padStart(2, "0")
-            : String(h24 % 12 || 12);
-        const mm = String(d.getMinutes()).padStart(2, "0");
-        const parts = [h, mm];
-        if (cfg.clockSeconds)
-            parts.push(String(d.getSeconds()).padStart(2, "0"));
-        if (!cfg.clock24)
-            parts.push(h24 >= 12 ? "PM" : "AM");
+        const parts = [hourText(d), pad2(d.getMinutes())];
+        if (cfg.clockSeconds) parts.push(pad2(d.getSeconds()));
+        if (!cfg.clock24) parts.push(ampmText(d));
         return parts.join("\n");
+    }
+
+    // Date goes to the right of / below the time and starts with a dot.
+    // The calendar popup keeps using clockText() (no date).
+    function clockBarText(d) {
+        const t = clockText(d);
+        if (!cfg.clockDate) return t;
+        return t + "  \u2022  " + (cfg.clockDay ? dayText(d) + ", " : "") + Qt.formatDate(d, "dd/MM");
+    }
+    // Vertical: dot, weekday, day and month each on their own line (no "/").
+    function clockBarVText(d) {
+        const t = clockVText(d);
+        if (!cfg.clockDate) return t;
+        return t + "\n\u2022\n" + (cfg.clockDay ? dayText(d) + "\n" : "")
+                 + Qt.formatDate(d, "dd") + "\n" + Qt.formatDate(d, "MM");
     }
 
     // ───────────────────────── Battery ─────────────────────────
@@ -326,18 +379,28 @@ Scope {
 
     // sections
     readonly property var startList: csv(cfg.startMods).filter(valid)
+    readonly property var midLeftList: csv(cfg.midLeftMods).filter(valid)
     readonly property var centerList: {
         // The clock is a regular module now: it may live in any section (or be hidden),
         // so the center section can be empty.
         return csv(cfg.centerMods).filter(valid);
     }
+    readonly property var midRightList: csv(cfg.midRightMods).filter(valid)
     readonly property var endList: {
+        // Modules that are not placed anywhere (e.g. newly added ones) fall back to the end section.
         const a = csv(cfg.endMods).filter(valid);
         return a.concat(moduleIds.filter(x =>
-            startList.indexOf(x) < 0 && centerList.indexOf(x) < 0 && a.indexOf(x) < 0));
+            startList.indexOf(x) < 0 && midLeftList.indexOf(x) < 0 && centerList.indexOf(x) < 0
+            && midRightList.indexOf(x) < 0 && a.indexOf(x) < 0));
     }
 
-    function listOf(sec) { return (sec === "start" ? startList : sec === "center" ? centerList : endList).slice(); }
+    function listOf(sec) {
+        return (sec === "start" ? startList
+              : sec === "midLeft" ? midLeftList
+              : sec === "center" ? centerList
+              : sec === "midRight" ? midRightList : endList).slice();
+    }
+    // config keys: startMods · midLeftMods · centerMods · midRightMods · endMods
     function setList(sec, a) { cfg[sec + "Mods"] = a.join(","); }
     function sectionOf(id) { return sections.find(k => listOf(k).indexOf(id) >= 0) ?? "end"; }
 
@@ -428,6 +491,7 @@ Scope {
             if (root.styles.indexOf(st) >= 0) { cfg.style = st; root.save(); }
         }
         function customize(): void { root.openSettings(); }
+        // section: start | midLeft | center | midRight | end
         function moveModule(id: string, section: string): void {
             if (root.valid(id) && root.sections.indexOf(section) >= 0) { root.moveTo(id, section); root.save(); }
         }
@@ -796,7 +860,7 @@ echo "$u $t"
                     anchors.fill: parent
                     radius: Math.min(cfg.radius, height / 2)
                     color: root.bgColor
-                    border.width: 1
+                    border.width: cfg.tooltipBorder ? 1 : 0
                     border.color: root.borderColor
 
                     Column {
@@ -839,6 +903,7 @@ echo "$u $t"
         property bool interactive: true        // false → informational only (no hover tint / pointer)
         property bool noTip: false             // never show a tooltip for this element
         property bool noSecondary: false       // right click does nothing (and is not listed in the tooltip)
+        property bool noHints: false           // never list click / scroll hints in the tooltip (title only)
         signal primary()
         signal secondary()
         signal tertiary()
@@ -847,7 +912,7 @@ echo "$u $t"
         readonly property bool hovered: ma.containsMouse && !disabled
         readonly property string hintText: {
             if (disabled) return disabledReason;
-            if (!cfg.tooltipHints) return "";
+            if (!cfg.tooltipHints || noHints) return "";
             const l = [];
             if (primaryHint !== "") l.push("Left click: " + primaryHint);
             if (!noSecondary) l.push("Right click: " + (secondaryHint !== "" ? secondaryHint : "Quick actions"));
@@ -985,22 +1050,55 @@ echo "$u $t"
         property string unit: ""
         readonly property string shownValue: valueText + (cfg.statsPercent ? unit : "")
         readonly property color fg: warning ? Theme.danger : Theme.text
-        readonly property int fontPx: Math.max(6, Math.round(root.sz.taskIcon * 0.5 * cfg.statsScale))
+
+        // ── Never outgrow the bar ──
+        // `maxCross` is the room across the bar (height on horizontal bars, width on vertical
+        // ones), minus the bar border when it is on. The badge, its border and its tint layer are
+        // kept inside it, and the text shrinks (down to 6px) when the text scale or a thin bar
+        // would otherwise make the badge bigger than the bar background.
+        readonly property int maxCross: Math.max(8, root.panelThick - (cfg.border ? 2 : 0))
+        readonly property int crossPad: root.vertical ? 8 : 6
+        readonly property int wantedPx: Math.max(6, Math.round(root.sz.taskIcon * 0.5 * cfg.statsScale))
+        // worst-case value ("100" / "100%") so the font does not jump while the numbers change
+        readonly property string sampleValue: "100" + (cfg.statsPercent ? "%" : "")
+        readonly property real contentCross: root.vertical
+            ? Math.max(mLabel.width, mValue.width)
+            : Math.max(mLabel.height, mValue.height)
+        readonly property int fontPx: contentCross + crossPad > maxCross
+            ? Math.max(6, Math.floor(wantedPx * (maxCross - crossPad) / contentCross))
+            : wantedPx
+
+        // measured at the wanted size (not the final one) so there is no binding loop
+        TextMetrics {
+            id: mLabel
+            text: stat.label
+            font.family: Theme.iconFont
+            font.pixelSize: stat.wantedPx - 1
+        }
+        TextMetrics {
+            id: mValue
+            text: stat.sampleValue
+            font.family: Theme.iconFont
+            font.bold: true
+            font.pixelSize: stat.wantedPx
+        }
 
         Layout.alignment: Qt.AlignCenter
-        implicitWidth: root.vertical ? root.panelThick : badge.width + 8
-        implicitHeight: root.vertical ? badge.height + 8
-                                      : Math.max(root.panelThick - 2, badge.height + 6)
+        implicitWidth: root.vertical ? root.panelThick : badge.width + cfg.statsGap
+        // the item (and its warning tint) stays inside the bar thickness
+        implicitHeight: root.vertical ? badge.height + cfg.statsGap
+                                      : Math.min(root.panelThick, Math.max(root.panelThick - 2, badge.height + 6))
         interactive: false
 
         Rectangle {
             id: badge
             anchors.centerIn: parent
-            width: root.vertical ? Math.max(root.sz.taskIcon + 6, statRow.implicitWidth + 8)
+            width: root.vertical ? Math.min(stat.maxCross, Math.max(root.sz.taskIcon + 6, statRow.implicitWidth + 8))
                                  : statRow.implicitWidth + 14
             height: root.vertical ? statRow.implicitHeight + 10
-                                  : Math.max(root.sz.taskIcon, statRow.implicitHeight + 6)
-            radius: Math.min(width, height) / 2
+                                  : Math.min(stat.maxCross, Math.max(root.sz.taskIcon, statRow.implicitHeight + 6))
+            clip: true                       // last resort: text can never paint outside the badge
+            radius: Math.min(cfg.statsRadius, Math.min(width, height) / 2)   // clamped: large values give the pill shape
             color: Qt.alpha(stat.fg, 0.045)
             border.width: cfg.statsBorder ? 1 : 0
             border.color: Qt.alpha(stat.fg, 0.18)
@@ -1069,7 +1167,7 @@ echo "$u $t"
         onLoaded: if (item.mid !== undefined) item.mid = modelData
     }
 
-    // One of the three bar sections: a rounded panel holding a Lane of Slots
+    // One of the five bar sections: a rounded panel holding a Lane of Slots
     component Panel: Rectangle {
         id: panel
         property var model: []
@@ -1173,7 +1271,7 @@ echo "$u $t"
             readonly property bool isNotif: mid === "notif"
             readonly property bool isSettings: mid === "settings"
             baseSize: mid === "power" ? root.sz.power - 1 : root.sz.icon
-            yOffset: mid === "power" ? 0 : root.iconYOffset
+            yOffset: mid === "power" ? 0 : isNotif && !root.vertical ? root.iconYOffset - 0.5 : root.iconYOffset
             xOffset: !root.vertical ? 0 : isNet ? -2 : (mid === "power" || isSettings) ? -1 : 0
             text: isNet ? root.netGlyph : (def.g ?? "")
             tip: isNet ? root.netTip : mid === "notif" ? root.notifTip : (def.tip ?? "")
@@ -1286,11 +1384,11 @@ echo "$u $t"
                         required property var modelData
                         visible: modelData.id > 0
                         Layout.alignment: Qt.AlignCenter
-                        implicitWidth: root.vertical ? root.wsDotPx
-                                     : (modelData.focused ? Math.round(root.wsDotPx * 3.2) : root.wsDotPx)
-                        implicitHeight: root.vertical ? (modelData.focused ? Math.round(root.wsDotPx * 2.4) : root.wsDotPx)
-                                                      : root.wsDotPx
-                        radius: root.wsDotPx / 2
+                        implicitWidth: root.vertical ? root.wsBoxPx
+                                     : (modelData.focused && !cfg.wsNumbers ? Math.round(root.wsBoxPx * 3.2) : root.wsBoxPx)
+                        implicitHeight: root.vertical ? (modelData.focused && !cfg.wsNumbers ? Math.round(root.wsBoxPx * 2.4) : root.wsBoxPx)
+                                                      : root.wsBoxPx
+                        radius: root.wsBoxPx / 2
                         color: modelData.urgent ? Theme.danger
                              : modelData.focused ? Qt.alpha(Theme.accent, 0.2)
                              : dotMa.containsMouse ? Theme.accent2
@@ -1298,6 +1396,20 @@ echo "$u $t"
 
                         Behavior on implicitWidth { NumberAnimation { duration: Theme.animMed; easing.type: Easing.OutQuad } }
                         Behavior on implicitHeight { NumberAnimation { duration: Theme.animMed; easing.type: Easing.OutQuad } }
+
+                        // workspace number (only instantiated while the option is on)
+                        Loader {
+                            anchors.centerIn: parent
+                            active: cfg.wsNumbers
+                            sourceComponent: Text {
+                                text: dot.modelData.id
+                                color: dot.modelData.focused ? Theme.accent : Theme.text
+                                font.family: Theme.iconFont
+                                font.pixelSize: Math.round(root.wsBoxPx * 0.62)
+                                font.bold: dot.modelData.focused
+                                renderType: Text.NativeRendering
+                            }
+                        }
 
                         DMouseArea {
                             id: dotMa
@@ -1333,22 +1445,25 @@ echo "$u $t"
         }
     }
 
-    // Open apps — icons resolved by root.iconFor() so every app gets one
+    // Open apps — icons resolved by root.iconFor() so every app gets one.
+    // Options (Bar page → Open apps): icon scale, spacing, normal / accent colour.
     Component {
         id: tasksC
         Lane {
-            gap: 2
+            gap: root.taskGapPx
             Repeater {
                 model: ToplevelManager.toplevels
                 delegate: Interactive {
                     id: task
                     required property var modelData
                     Layout.alignment: Qt.AlignCenter
-                    implicitWidth: root.vertical ? root.panelThick : root.sz.taskIcon + 10
-                    implicitHeight: root.vertical ? root.sz.taskIcon + 10
-                                                  : Math.max(root.panelThick - 2, root.sz.taskIcon + 6)
+                    implicitWidth: root.vertical ? root.panelThick : root.taskIconPx + 10
+                    implicitHeight: root.vertical ? root.taskIconPx + 10
+                                                  : Math.max(root.panelThick - 2, root.taskIconPx + 6)
                     active: modelData.activated
-                    tip: modelData.title !== "" ? modelData.title : modelData.appId
+                    // minimal tooltip: just the app name, no hint lines
+                    tip: root.appName(modelData.appId)
+                    noHints: true
                     primaryHint: "Focus window"
                     tertiaryHint: "Close window"
                     onPrimary: modelData.activate()
@@ -1356,19 +1471,20 @@ echo "$u $t"
                     Image {
                         id: appIcon
                         anchors.centerIn: parent
-                        width: root.sz.taskIcon
-                        height: root.sz.taskIcon
+                        width: root.taskIconPx
+                        height: root.taskIconPx
                         sourceSize: Qt.size(width, height)
                         asynchronous: true
                         smooth: true
                         visible: false          // rendered through the tint effect below
                         source: root.iconFor(task.modelData.appId)
                     }
-                    // Flat monochrome icon in Theme.text (accent when the window is focused)
+                    // "normal": the app's own icon colours.
+                    // "accent": flat monochrome icon in Theme.text (accent2 when the window is focused).
                     MultiEffect {
                         anchors.fill: appIcon
                         source: appIcon
-                        colorization: 1.0
+                        colorization: cfg.tasksColor === "accent" ? 1.0 : 0.0
                         colorizationColor: task.modelData.activated ? Theme.accent2 : Theme.text
                         opacity: task.modelData.activated ? 1 : 0.75
                     }
@@ -1473,20 +1589,44 @@ echo "$u $t"
             visible: root.barVisible
 
             // Drag & drop: (sx, sy) is the pointer position in window coordinates at release.
-            // The section is picked from where the pointer landed relative to the clock panel
-            // (before it → start, over it → center, after it → end); the position inside that
+            // Section: if the pointer landed on a visible panel, that panel's section wins.
+            // Otherwise the nearest of the five zones (start · midLeft · center · midRight · end)
+            // is used, so empty zones are still valid drop targets. The position inside the
             // section is the slot after the last visible module whose centre lies before the pointer.
             function dropModule(modId, sx, sy) {
                 const pt = frame.mapFromItem(null, sx, sy);
                 const pos = root.vertical ? pt.y : pt.x;
-                // The center zone is a band around the middle of the bar; it is at least
-                // 80px wide so an empty center section (clock moved away) is still a drop target.
-                const mid = (root.vertical ? frame.height : frame.width) / 2;
-                const half = Math.max((root.vertical ? clockPanel.height : clockPanel.width) / 2, 40);
-                const c0 = mid - half;
-                const c1 = mid + half;
-                const sec = pos < c0 ? "start" : pos > c1 ? "end" : "center";
-                const panel = sec === "start" ? startPanel : sec === "center" ? clockPanel : endPanel;
+                const panels = {
+                    start: startPanel, midLeft: midLeftPanel, center: clockPanel,
+                    midRight: midRightPanel, end: endPanel
+                };
+
+                let sec = null;
+                for (const k of root.sections) {
+                    const p = panels[k];
+                    if (!p.visible) continue;
+                    const a = root.vertical ? p.y : p.x;
+                    const b = a + (root.vertical ? p.height : p.width);
+                    if (pos >= a && pos <= b) { sec = k; break; }
+                }
+
+                if (sec === null) {
+                    const mid = frame.axisLen / 2;
+                    const targets = {
+                        start: startPanel.visible ? (frame.startBeg + frame.startEnd) / 2 : 0,
+                        midLeft: frame.midLeftC,
+                        center: mid,
+                        midRight: frame.midRightC,
+                        end: endPanel.visible ? (frame.endBeg + frame.endFin) / 2 : frame.axisLen
+                    };
+                    let best = Infinity;
+                    for (const k of root.sections) {
+                        const d = Math.abs(pos - targets[k]);
+                        if (d < best) { best = d; sec = k; }
+                    }
+                }
+
+                const panel = panels[sec];
                 const list = root.listOf(sec);
 
                 const slots = {};
@@ -1518,6 +1658,25 @@ echo "$u $t"
                     rightMargin: root.edgeMargin("right")
                 }
 
+                // ── Geometry along the bar axis (x on horizontal bars, y on vertical ones) ──
+                // The two middle zones sit centered in the gap between their neighbours:
+                //   midLeft  → between the end of the start panel and the start of the center panel
+                //   midRight → between the end of the center panel and the start of the end panel
+                // Hidden (empty) neighbours fall back to the bar's start / middle / end.
+                readonly property real axisLen: root.vertical ? height : width
+                readonly property real startBeg: root.vertical ? startPanel.y : startPanel.x
+                readonly property real startEnd: startPanel.visible
+                    ? (root.vertical ? startPanel.y + startPanel.height : startPanel.x + startPanel.width) : 0
+                readonly property real centerBeg: clockPanel.visible
+                    ? (root.vertical ? clockPanel.y : clockPanel.x) : axisLen / 2
+                readonly property real centerFin: clockPanel.visible
+                    ? (root.vertical ? clockPanel.y + clockPanel.height : clockPanel.x + clockPanel.width) : axisLen / 2
+                readonly property real endBeg: endPanel.visible
+                    ? (root.vertical ? endPanel.y : endPanel.x) : axisLen
+                readonly property real endFin: root.vertical ? endPanel.y + endPanel.height : endPanel.x + endPanel.width
+                readonly property real midLeftC: (startEnd + centerBeg) / 2
+                readonly property real midRightC: (centerFin + endBeg) / 2
+
                 Rectangle {
                     visible: root.joined
                     anchors.fill: parent
@@ -1527,6 +1686,7 @@ echo "$u $t"
                     border.color: root.borderColor
                 }
 
+                // 1 · start
                 Panel {
                     id: startPanel
                     model: root.startList
@@ -1536,6 +1696,19 @@ echo "$u $t"
                     onDropped: (modId, sx, sy) => bar.dropModule(modId, sx, sy)
                 }
 
+                // 2 · between start and center
+                Panel {
+                    id: midLeftPanel
+                    model: root.midLeftList
+                    clockComp: clockC
+                    x: root.vertical ? 0
+                                     : Math.max(0, Math.min(frame.axisLen - width, frame.midLeftC - width / 2))
+                    y: root.vertical ? Math.max(0, Math.min(frame.axisLen - height, frame.midLeftC - height / 2))
+                                     : 0
+                    onDropped: (modId, sx, sy) => bar.dropModule(modId, sx, sy)
+                }
+
+                // 3 · center (also hosts the clock logic + calendar popup, wherever the clock is placed)
                 Panel {
                     id: clockPanel
                     model: root.centerList
@@ -1596,8 +1769,8 @@ echo "$u $t"
 
                             bold: true
                             baseSize: root.sz.clock
-                            text: root.clockText(clk.date)
-                            vtext: root.clockVText(clk.date)
+                            text: root.clockBarText(clk.date)
+                            vtext: root.clockBarVText(clk.date)
                             active: clockPanel.calOpen
                             tip: Qt.formatDate(clk.date, "dddd, d MMMM yyyy")
                             primaryHint: hintFor(cfg.clockPrimary)
@@ -1821,6 +1994,19 @@ echo "$u $t"
                     }
                 }
 
+                // 4 · between center and end
+                Panel {
+                    id: midRightPanel
+                    model: root.midRightList
+                    clockComp: clockC
+                    x: root.vertical ? 0
+                                     : Math.max(0, Math.min(frame.axisLen - width, frame.midRightC - width / 2))
+                    y: root.vertical ? Math.max(0, Math.min(frame.axisLen - height, frame.midRightC - height / 2))
+                                     : 0
+                    onDropped: (modId, sx, sy) => bar.dropModule(modId, sx, sy)
+                }
+
+                // 5 · end
                 Panel {
                     id: endPanel
                     model: root.endList
