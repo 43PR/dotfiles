@@ -125,7 +125,7 @@ Item {
     // automatically (update.sh: your changes win; update2.sh: upstream wins,
     // your work is saved to a backup branch/stash).
     function desktopScript() {
-        return repoResolve(updater) + "./" + updater + " --pull"
+        return repoResolve(updater) + "bash ./" + updater + " --pull"
     }
 
     // ------------------------------------------------------------------

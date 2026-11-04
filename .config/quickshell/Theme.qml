@@ -75,11 +75,10 @@ QtObject {
 
     // ---- Hub appearance settings (persisted to state/hub.json) ----
     property bool hideSettingsIcons: false
-    property bool clickOutsideClose: true
 
     readonly property var hubKeys: [
         "tiltStrength", "settingsScale", "bgAlpha", "radius", "hideSettingsIcons",
-        "clickOutsideClose", "borderOpacity", "hyprBorderStyle",
+        "borderOpacity", "hyprBorderStyle",
         "bgImageEnabled", "bgImagePath", "bgImageOpacity", "bgImageBlur",
         "bgImageFadeTop", "bgImageFadeBottom"
     ]
@@ -98,7 +97,6 @@ QtObject {
         borderOpacity = 1.0
         hyprBorderStyle = "full"
         hideSettingsIcons = false
-        clickOutsideClose = true
         // The picture path is kept on purpose; only the look is reset.
         bgImageEnabled = false
         bgImageOpacity = 1.0
@@ -117,7 +115,6 @@ QtObject {
             borderOpacity: borderOpacity,
             hyprBorderStyle: hyprBorderStyle,
             hideSettingsIcons: hideSettingsIcons,
-            clickOutsideClose: clickOutsideClose,
             bgImageEnabled: bgImageEnabled,
             bgImagePath: bgImagePath,
             bgImageOpacity: bgImageOpacity,
@@ -155,7 +152,6 @@ QtObject {
                 if (typeof s.borderOpacity === "number") root.borderOpacity = Math.max(0.1, Math.min(1, s.borderOpacity))
                 if (s.hyprBorderStyle === "full" || s.hyprBorderStyle === "corner") root.hyprBorderStyle = s.hyprBorderStyle
                 if (typeof s.hideSettingsIcons === "boolean") root.hideSettingsIcons = s.hideSettingsIcons
-                if (typeof s.clickOutsideClose === "boolean") root.clickOutsideClose = s.clickOutsideClose
                 if (typeof s.bgImageEnabled === "boolean") root.bgImageEnabled = s.bgImageEnabled
                 if (typeof s.bgImagePath === "string") root.bgImagePath = s.bgImagePath
                 if (typeof s.bgImageOpacity === "number") root.bgImageOpacity = clamp01(s.bgImageOpacity)

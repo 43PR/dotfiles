@@ -28,7 +28,7 @@
 
 A full customizable Linux desktop: bar, system settings and menus to customize your desktop. Built on **Hyprland** (window manager) and **Quickshell** (what the bar and menus are made with). 
 
-This setup aims to keep things simple, fast and practical, and easy to make your own without editing config files.
+This setup aims to keep things simple, fast, practical, and easy to make your own without editing config files.
 
 ### Requirements
 

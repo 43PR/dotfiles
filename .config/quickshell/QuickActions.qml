@@ -123,7 +123,9 @@ Scope {
     // ---- quick-action state -----------------------------------------------
     property string iconFont: "Symbols Nerd Font"
     property bool wifiOn: false
-    property bool nightOn: false
+    property bool nightOn: false           // desired / displayed night light state
+    property bool nightWasOn: false        // what was last actually applied
+    property int nightRetries: 0           // restart attempts if gammastep isn't running
     property bool dndOn: false
     property real brightness: 0.6          // 0..1, synced from brightnessctl
     readonly property bool btOn: Bluetooth.defaultAdapter ? Bluetooth.defaultAdapter.enabled : false
@@ -192,11 +194,11 @@ Scope {
     function iconFor(name) {
         switch (name) {
         case "area":   return "\uf125"
-        case "wifi":   return wifiOn ? "\udb81\udda9" : "\udb81\uddaa"   // 󰖩 / 󰖪
-        case "bt":     return btOn ? "\udb80\udcaf" : "\udb80\udcb2"      // 󰂯 / 󰂲
-        case "night":  return "\uf186"                                    //  moon
-        case "dnd":    return dndOn ? "\udb80\udc9b" : "\udb80\udc9a"    // 󰂛 / 󰂚
-        case "bright": return "\uf185"                                    //  sun
+        case "wifi":   return wifiOn ? "\udb81\udda9" : "\udb81\uddaa"
+        case "bt":     return btOn ? "\udb80\udcaf" : "\udb80\udcb2"
+        case "night":  return "\uf186"                                    // moon
+        case "dnd":    return dndOn ? "\udb80\udc9b" : "\udb80\udc9a"
+        case "bright": return "\uf185"                                    // sun
         }
         return ""
     }
@@ -206,6 +208,17 @@ Scope {
         if (a.adjustTemp) return (root.nightOn ? "ON " : "OFF ") + root.nightTemp + "K"
         if (a.toggle) return root.isOn(a.name) ? "ON" : "OFF"
         return ""
+    }
+
+    // 0..1 fill of the selection border for brightness / night light rows
+    function progressFor(a) {
+        if (a.adjust)
+            return Math.max(0, Math.min(1, root.brightness))
+        if (a.adjustTemp) {
+            var s = root.numSpec.nightTemp
+            return Math.max(0, Math.min(1, (root.nightTemp - s.min) / (s.max - s.min)))
+        }
+        return 0
     }
 
     function clamp(v, lo, hi) {
@@ -221,10 +234,30 @@ Scope {
         }
     }
 
+    // Ignored while a night-light change is pending or still settling, so a
+    // check that races with the apply script can't flip the state back.
+    // If night light is supposed to be ON (saved state after a reboot/logout,
+    // or gammastep died) but nothing is running, start it again instead of
+    // silently switching the toggle off. Gives up after a few attempts.
     Process {
         id: nightCheck
         command: ["pgrep", "-x", "gammastep"]
-        onExited: function (code) { root.nightOn = (code === 0) }
+        onExited: function (code) {
+            if (nightApplyTimer.running || nightSettleTimer.running)
+                return
+            if (code === 0) {
+                root.nightOn = true
+                root.nightWasOn = true
+                root.nightRetries = 0
+            } else if (root.nightOn && root.nightRetries < 5) {
+                root.nightRetries++
+                root.nightWasOn = false
+                root.applyNight()
+            } else {
+                root.nightOn = false
+                root.nightWasOn = false
+            }
+        }
     }
 
     Process {
@@ -249,18 +282,20 @@ Scope {
         }
     }
 
-    function refreshStates() {
+    function refreshStates(withNight) {
         wifiCheck.running = true
-        nightCheck.running = true
         dndCheck.running = true
         brightCheck.running = true
+        if (withNight && !nightApplyTimer.running && !nightSettleTimer.running)
+            nightCheck.running = true
     }
 
-    // re-sync with reality shortly after a toggle
+    // re-sync with reality shortly after a toggle (night light is excluded:
+    // it is driven by the serialized apply below, not by polling)
     Timer {
         id: recheckTimer
         interval: 700
-        onTriggered: root.refreshStates()
+        onTriggered: root.refreshStates(false)
     }
 
     // ---- brightness (throttled so dragging doesn't spawn a process per px)
@@ -292,21 +327,105 @@ Scope {
         return a !== undefined && a.adjustTemp === true
     }
 
-    // ---- night light temperature (throttled; re-applied live if it's on) --
+    // ---- night light restore at login ---------------------------------------
+    // Right after login the compositor may not be fully ready, and gammastep can
+    // be alive without actually having applied anything (so "is it running?"
+    // is not good enough). On the first start of a session we therefore force a
+    // clean (re)apply twice, a few seconds apart. A marker in XDG_RUNTIME_DIR
+    // (wiped on logout/reboot) tells a fresh login from a plain shell reload,
+    // where gammastep is left alone.
+    Process {
+        id: sessionProbe
+        command: ["sh", "-c",
+            "m=\"${XDG_RUNTIME_DIR:-/tmp}/qa-night-restored\"; "
+            + "if [ -e \"$m\" ]; then echo reload; else : > \"$m\"; echo fresh; fi"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (text.trim() === "fresh" && root.nightOn) {
+                    bootApplyTimer.count = 0
+                    bootApplyTimer.start()
+                } else {
+                    nightCheck.running = true
+                }
+            }
+        }
+    }
+
+    Timer {
+        id: bootApplyTimer
+        interval: 2500
+        repeat: true
+        property int count: 0
+        onTriggered: {
+            count++
+            if (!root.nightOn || count > 2) {
+                stop()
+                return
+            }
+            root.nightWasOn = false
+            root.nightRetries = 0
+            root.applyNight()
+            if (count >= 2)
+                stop()
+        }
+    }
+
+    // ---- night light (gammastep) -------------------------------------------
+    // Rapid toggling used to start a new gammastep while the old one was still
+    // shutting down; on Wayland only one gamma client may hold the output, so
+    // the new one failed silently and the feature looked dead.
+    //
+    // Now:
+    //  1. changes are debounced (nightApplyTimer) so only the final desired
+    //     state is applied,
+    //  2. the apply script runs under flock so two scripts never overlap,
+    //  3. it kills gammastep, WAITS until it is really gone (and releases the
+    //     gamma control), and only then starts a fresh one,
+    //  4. state polling is suppressed while this is in flight.
+    readonly property string nightScript:
+        "exec 9>/tmp/qa-gammastep.lock; flock 9; "
+        + "pkill -x gammastep; "
+        + "i=0; while pgrep -x gammastep >/dev/null && [ $i -lt 40 ]; do sleep 0.05; i=$((i+1)); done; "
+        + "pkill -9 -x gammastep 2>/dev/null; "
+        + "sleep 0.15; "
+        + "[ \"$1\" = off ] && exit 0; "
+        + "setsid -f gammastep -O \"$1\" 9>&- >/dev/null 2>&1"
+
+    function applyNight() {
+        // nothing to do if it is off and was already off (e.g. only the
+        // temperature slider moved)
+        if (!root.nightOn && !root.nightWasOn)
+            return
+        Quickshell.execDetached({
+            command: ["sh", "-c", root.nightScript, "sh",
+                      root.nightOn ? String(root.nightTemp) : "off"]
+        })
+        root.nightWasOn = root.nightOn
+        nightSettleTimer.restart()
+    }
+
     Timer {
         id: nightApplyTimer
         interval: 150
         onTriggered: {
-            if (root.nightOn)
-                Quickshell.execDetached({ command: ["sh", "-c",
-                    "pkill -x gammastep; sleep 0.15; exec gammastep -O " + root.nightTemp] })
+            root.applyNight()
             root.saveState()
         }
+    }
+
+    // keeps nightCheck from overriding the state while the script is running
+    Timer {
+        id: nightSettleTimer
+        interval: 1500
+        // verify that gammastep really came up (also covers early boot,
+        // when the compositor may not be ready for the first attempt)
+        onTriggered: if (root.nightOn) nightCheck.running = true
     }
 
     function setNightTemp(k) {
         var s = root.numSpec.nightTemp
         root.nightTemp = root.clamp(k, s.min, s.max)
+        root.nightRetries = 0
         nightApplyTimer.restart()
     }
 
@@ -355,11 +474,11 @@ Scope {
             toggleBluetooth()
             break
         case "night":
-            if (root.nightOn)
-                Quickshell.execDetached({ command: ["pkill", "-x", "gammastep"] })
-            else
-                Quickshell.execDetached({ command: ["gammastep", "-O", String(root.nightTemp)] })
+            bootApplyTimer.stop()
             root.nightOn = !root.nightOn
+            root.nightRetries = 0
+            nightSettleTimer.restart()
+            nightApplyTimer.restart()
             break
         case "dnd":
             Quickshell.execDetached({ command: ["qs", "ipc", "call", "notifications", "dnd"] })
@@ -405,7 +524,7 @@ Scope {
         currentIndex = 0
         settingsOpen = false
         dragging = false
-        refreshStates()
+        refreshStates(true)
         showing = true   // onShowingChanged mounts the window
     }
 
@@ -442,6 +561,9 @@ Scope {
         var s = numSpec[key]
         root[key] = clamp(v, s.min, s.max)
         reclamp()
+        // the night light temperature slider should apply live while on
+        if (key === "nightTemp")
+            nightApplyTimer.restart()
     }
 
     function toggleSetting(key) {
@@ -477,10 +599,11 @@ Scope {
         root.currentIndex = 0
         reclamp()
         saveState()
+        nightApplyTimer.restart()
     }
 
     function saveState() {
-        var s = { hidden: root.hiddenNames }
+        var s = { hidden: root.hiddenNames, night: root.nightOn }
         posKeys.forEach(function (k) { s[k] = root[k] })
         numKeys.forEach(function (k) { s[k] = root[k] })
         boolKeys.forEach(function (k) { s[k] = root[k] })
@@ -551,6 +674,15 @@ Scope {
                     if (typeof s[k] === "boolean")
                         root[k] = s[k]
                 })
+
+                // restore night light after reboot / logout / shell restart
+                if (typeof s.night === "boolean") {
+                    root.nightOn = s.night
+                    root.nightWasOn = false
+                    root.nightRetries = 0
+                    // fresh login -> forced apply; shell reload -> just verify
+                    sessionProbe.running = true
+                }
             } catch (e) {
                 console.warn("quickactions: could not read saved state:", e)
             }
@@ -813,6 +945,8 @@ Scope {
                                     readonly property bool scrollable: isAdjust || isTemp
                                     readonly property bool active: modelData.toggle === true && root.isOn(modelData.name)
                                     readonly property int count: root.visibleActions.length
+                                    // 0..1 fill used by the progress border (brightness / night light)
+                                    readonly property real progress: root.progressFor(modelData)
                                     readonly property bool stateShown: root.showState && !root.horizontal
                                         && (modelData.toggle === true || isAdjust)
                                     // right-hand space reserved for state text + key badge
@@ -828,7 +962,9 @@ Scope {
                                     color: entryArea.pressed || entryArea.containsMouse || entry.focused
                                         ? root.itemHoverColor
                                         : root.itemColor
-                                    border.width: entry.focused ? root.borderWidth : 0
+                                    // Scrollable rows (brightness / night light) draw their
+                                    // border as a progress indicator instead (see below).
+                                    border.width: (entry.focused && !entry.scrollable) ? root.borderWidth : 0
                                     border.color: Theme.accent
                                     Behavior on color { ColorAnimation { duration: 120 } }
 
@@ -906,6 +1042,30 @@ Scope {
                                         }
                                     }
 
+                                    // Progress border: the normal Rectangle border, revealed
+                                    // from the left by a clipping item whose width follows the
+                                    // value. 100% = the full normal border, 50% = left half,
+                                    // 0% = nothing. Drawn by the same renderer as every other
+                                    // border, so it stays perfectly sharp at any scale.
+                                    Item {
+                                        visible: entry.scrollable && entry.focused
+                                            && root.borderWidth > 0 && entry.progress > 0
+                                        x: 0
+                                        y: 0
+                                        width: Math.round(entry.width * entry.progress)
+                                        height: entry.height
+                                        clip: true
+
+                                        Rectangle {
+                                            width: entry.width
+                                            height: entry.height
+                                            radius: entry.radius
+                                            color: "transparent"
+                                            border.width: root.borderWidth
+                                            border.color: Theme.accent
+                                        }
+                                    }
+
                                     MouseArea {
                                         id: entryArea
                                         anchors.fill: parent
@@ -961,7 +1121,7 @@ Scope {
                                 id: footBtn
                                 anchors.right: parent.right
                                 anchors.verticalCenter: parent.verticalCenter
-                                label: "󰒓"
+                                label: "\udb81\udc93"
                                 fontSize: 12
                                 active: root.settingsOpen
                                 opacity: (hovered || root.settingsOpen) ? 1 : 0.1
@@ -1129,7 +1289,7 @@ Scope {
                         QaSliderRow { host: root; key: "itemRadius"; label: "Item roundness" }
                         QaSliderRow { host: root; key: "iconSize"; label: "Icon size"; enabled: root.showIcons }
                         QaSliderRow { host: root; key: "labelSize"; label: "Label size"; enabled: root.showLabels }
-                        QaSliderRow { host: root; key: "borderWidth"; label: "Selection border" }
+                        QaSliderRow { host: root; key: "borderWidth"; label: "Selection border"; tip: "Also the thickness of the brightness / night light progress border" }
 
                         QaSectionHeader { text: "Opacity" }
                         QaSliderRow { host: root; key: "panelOpacity"; label: "Panel background" }

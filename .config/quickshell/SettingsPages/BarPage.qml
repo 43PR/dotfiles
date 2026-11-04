@@ -27,13 +27,14 @@ Item {
         tooltips: true, tooltipHints: false, tooltipBorder: false, tipDelay: 450,
         modPad: 18, wsDot: 16, wsGap: 8, wsScroll: true, wsNumbers: true,
         tasksScale: 0.85, tasksGap: 2, tasksColor: "normal",
-        statsPercent: false, statsScale: 1.1, statsBorder: false, statsRadius: 24, statsGap: 1, statsWarn: 85, tempWarn: 85, batLowPct: 15,
-        volStep: 2, volMax: 100,
+        statsPercent: false, statsScale: 0.95, statsBorder: false, statsRadius: 24, statsGap: 1, statsWarn: 85, tempWarn: 85, batLowPct: 15,
+        batNumber: false, batPercent: false,
+        volStep: 2, volMax: 100, volNumber: false, volPercent: false,
         clock24: true, clockSeconds: false, clockPadHour: true, clockDate: true, clockDay: false, clockCase: "normal", weekMonday: true,
         clockPrimary: "calendar", clockSecondary: "settings", clockTertiary: "quickactions",
         settingsPrimary: "settings", settingsSecondary: "barsettings", settingsTertiary: "none",
         hidden: "wall,settings,ram",
-        startMods: "notif,cpu,ram,gpu,temp",
+        startMods: "notif,cpu,ram,gpu,cputemp,gputemp",
         midLeftMods: "ws",
         centerMods: "clock",
         midRightMods: "tasks",
@@ -55,7 +56,8 @@ Item {
         { id: "cpu",      l: "CPU" },
         { id: "ram",      l: "RAM" },
         { id: "gpu",      l: "GPU" },
-        { id: "temp",     l: "TEMPS" },
+        { id: "cputemp",  l: "CPU TEMP" },
+        { id: "gputemp",  l: "GPU TEMP" },
         { id: "ws",       l: "WORKSPACES" },
         { id: "tasks",    l: "OPEN APPS" },
         { id: "media",    l: "MEDIA" },
@@ -100,7 +102,9 @@ Item {
         if (str === "") return []
         const out = []
         for (const x of str.split(","))
-        x === "stats" ? out.push("cpu", "ram") : out.push(x)
+            x === "stats" ? out.push("cpu", "ram")
+          : x === "temp"  ? out.push("cputemp", "gputemp")
+          : out.push(x)
         return out
     }
 
@@ -112,7 +116,7 @@ Item {
     }
 
     // any of the CPU / RAM / GPU / TEMPS badges is shown
-    readonly property bool statsOn: isOn("cpu") || isOn("ram") || isOn("gpu") || isOn("temp")
+    readonly property bool statsOn: isOn("cpu") || isOn("ram") || isOn("gpu") || isOn("cputemp") || isOn("gputemp")
 
     // ------------------------------------------------------------------
     // Persistence
@@ -622,8 +626,6 @@ Item {
                         }
                     }
                 }
-
-                Note { text: "Highlighted modules are shown on the bar. Drag modules on the bar to reorder them or move them between the five zones (start, left-middle, center, right-middle, end). Each module's options are in the sections below." }
             }
 
             // ---------------- CLOCK & DATE ----------------
@@ -812,8 +814,6 @@ Item {
                         }
                     }
                 }
-
-                Note { text: "NORMAL keeps each app's own icon colours. ACCENT draws flat single-colour icons that follow the theme (the focused window is highlighted). Icons are never larger than the bar; raise THICKNESS in LAYOUT for bigger icons." }
             }
 
             // ---------------- SYSTEM STATS ----------------
@@ -827,7 +827,7 @@ Item {
 
                 Note {
                     visible: !page.statsOn
-                    text: "Turn on CPU, RAM, GPU or TEMPS in MODULES to use these options."
+                    text: "Turn on CPU, RAM, GPU, CPU TEMP or GPU TEMP in MODULES to use these options."
                 }
 
                 Card {
@@ -838,7 +838,7 @@ Item {
 
                         GroupLabel { text: "BADGE STYLE" }
                         ToggleRow {
-                            label: "SHOW % / ° SYMBOLS"; checked: page.val("statsPercent")
+                            label: "SHOW % / °C SYMBOLS"; checked: page.val("statsPercent")
                             onToggled: v => page.set("statsPercent", v)
                         }
                         ToggleRow {
@@ -847,7 +847,7 @@ Item {
                         }
                         BarSlider {
                             label: "BADGE TEXT SCALE"
-                            from: 0.9; to: 1.1; step: 0.1; unit: "×"; decimals: 2
+                            from: 0.5; to: 2.0; step: 0.05; unit: "×"; decimals: 2
                             value: page.val("statsScale")
                             onMoved: v => page.set("statsScale", v)
                         }
@@ -896,6 +896,16 @@ Item {
                         width: parent.width; spacing: 10
 
                         GroupLabel { text: "BATTERY" }
+                        ToggleRow {
+                            label: "SHOW NUMBER"; checked: page.val("batNumber")
+                            enabled: page.isOn("battery")
+                            onToggled: v => page.set("batNumber", v)
+                        }
+                        ToggleRow {
+                            label: "SHOW % SYMBOL"; checked: page.val("batPercent")
+                            enabled: page.isOn("battery") && page.val("batNumber")
+                            onToggled: v => page.set("batPercent", v)
+                        }
                         BarSlider {
                             label: "LOW BATTERY WARNING"
                             enabled: page.isOn("battery")
@@ -907,6 +917,16 @@ Item {
                         Divider {}
 
                         GroupLabel { text: "VOLUME" }
+                        ToggleRow {
+                            label: "SHOW NUMBER"; checked: page.val("volNumber")
+                            enabled: page.isOn("volume")
+                            onToggled: v => page.set("volNumber", v)
+                        }
+                        ToggleRow {
+                            label: "SHOW % SYMBOL"; checked: page.val("volPercent")
+                            enabled: page.isOn("volume") && page.val("volNumber")
+                            onToggled: v => page.set("volPercent", v)
+                        }
                         BarSlider {
                             label: "SCROLL STEP"
                             enabled: page.isOn("volume")

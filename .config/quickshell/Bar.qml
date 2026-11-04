@@ -24,8 +24,9 @@ Scope {
         // modules
         modPad: 18, wsDot: 16, wsGap: 8, wsScroll: true, wsNumbers: true,
         tasksScale: 0.85, tasksGap: 2, tasksColor: "normal",
-        statsPercent: false, statsScale: 1.1, statsBorder: false, statsRadius: 24, statsGap: 1, statsWarn: 85, tempWarn: 85, batLowPct: 15,
-        volStep: 2, volMax: 100,
+        statsPercent: false, statsScale: 0.95, statsBorder: false, statsRadius: 24, statsGap: 1, statsWarn: 85, tempWarn: 85, batLowPct: 15,
+        batNumber: false, batPercent: false,
+        volStep: 2, volMax: 100, volNumber: false, volPercent: false,
         // clock / calendar
         clock24: true, clockSeconds: false, clockPadHour: true, clockDate: true, clockDay: false, clockCase: "normal", weekMonday: true,
         // clock click binds: "calendar" | "quickactions" | "settings" | "barsettings" | "none"
@@ -34,7 +35,7 @@ Scope {
         settingsPrimary: "settings", settingsSecondary: "barsettings", settingsTertiary: "none",
         // module placement
         hidden: "wall,settings,ram",
-        startMods: "notif,cpu,ram,gpu,temp",
+        startMods: "notif,cpu,ram,gpu,cputemp,gputemp",
         midLeftMods: "ws",
         centerMods: "clock",
         midRightMods: "tasks",
@@ -96,8 +97,12 @@ Scope {
             property int statsWarn: root.defaults.statsWarn      // CPU/RAM/GPU % that turns red
             property int tempWarn: root.defaults.tempWarn        // CPU/GPU °C that turns red
             property int batLowPct: root.defaults.batLowPct      // battery % that turns red
+            property bool batNumber: root.defaults.batNumber     // show the battery percentage next to the icon
+            property bool batPercent: root.defaults.batPercent   // add the % symbol to the battery number
             property int volStep: root.defaults.volStep          // % per scroll notch
             property int volMax: root.defaults.volMax            // max volume %
+            property bool volNumber: root.defaults.volNumber     // show the volume level next to the icon
+            property bool volPercent: root.defaults.volPercent   // add the % symbol to the volume number
             property bool clock24: root.defaults.clock24
             property bool clockSeconds: root.defaults.clockSeconds
             property bool clockPadHour: root.defaults.clockPadHour // leading zero on the hour: 02:20 vs 2:20
@@ -150,7 +155,7 @@ Scope {
 
     readonly property var sz: ({
         stat: s(12), clock: s(12), marquee: s(11),
-        icon: s(16), batIcon: s(13), batText: s(12), power: s(14),
+        icon: s(16), batIcon: s(13), batText: s(12), power: s(16),
         taskIcon: s(18),
         calTime: cs(30), calDate: cs(12), calMonth: cs(13), calArrow: cs(16),
         calWeekday: cs(11), calDay: cs(12)
@@ -297,8 +302,6 @@ Scope {
               || battery.state === UPowerDeviceState.PendingCharge
               || battery.state === UPowerDeviceState.FullyCharged)
     readonly property bool batLow: hasBattery && !batCharging && batPct <= cfg.batLowPct
-    readonly property var batIcons: ["\uf244", "\uf243", "\uf242", "\uf241", "\uf240"]
-    readonly property string batIcon: batIcons[batPct >= 90 ? 4 : batPct >= 65 ? 3 : batPct >= 40 ? 2 : batPct >= 15 ? 1 : 0]
 
     function fmtTime(sec) {
         const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
@@ -325,7 +328,8 @@ Scope {
         { id: "cpu",      l: "CPU" },
         { id: "ram",      l: "RAM" },
         { id: "gpu",      l: "GPU" },
-        { id: "temp",     l: "Temperatures" },
+        { id: "cputemp",  l: "CPU temperature" },
+        { id: "gputemp",  l: "GPU temperature" },
         { id: "ws",       l: "Workspaces" },
         { id: "tasks",    l: "Open apps" },
         { id: "media",    l: "Media" },
@@ -345,16 +349,18 @@ Scope {
     readonly property var moduleIds: moduleDefs.map(d => d.id)
     readonly property var defMap: moduleDefs.reduce((m, d) => { m[d.id] = d; return m; }, {})
     readonly property var comps: ({
-        cpu: cpuC, ram: ramC, gpu: gpuC, temp: tempC,
+        cpu: cpuC, ram: ramC, gpu: gpuC, cputemp: cpuTempC, gputemp: gpuTempC,
         ws: wsC, tasks: tasksC, media: mediaC, volume: volumeC, battery: batteryC, icon: iconC
     })
 
-    // The old combined "stats" module is migrated to "cpu" + "ram" in saved configs.
+    // Old combined modules are migrated in saved configs: "stats" → "cpu" + "ram", "temp" → "cputemp" + "gputemp".
     function csv(str) {
         if (str === "") return [];
         const out = [];
         for (const x of str.split(","))
-        x === "stats" ? out.push("cpu", "ram") : out.push(x);
+            x === "stats" ? out.push("cpu", "ram")
+          : x === "temp"  ? out.push("cputemp", "gputemp")
+          : out.push(x);
         return out;
     }
     function valid(id) { return moduleIds.indexOf(id) >= 0; }
@@ -517,13 +523,18 @@ Scope {
     // GPU / temperatures (-1 = unavailable)
     property int gpuUsage: 0
     property bool gpuHasUsage: false
-    property int cpuTemp: -1
+    property int cpuTempSensors: -1    // from `sensors`
+    property int cpuTempProbe: -1       // from sysfs hwmon / thermal zones (works without lm_sensors)
+    readonly property int cpuTemp: cpuTempSensors >= 0 ? cpuTempSensors : cpuTempProbe
     property int gpuTempProbe: -1       // from nvidia-smi / sysfs hwmon
     property int gpuTempSensors: -1     // fallback from `sensors`
+    // GPUs without a sensor of their own (e.g. Intel iGPUs) stay at -1 → shown as "–".
     readonly property int gpuTemp: gpuTempProbe >= 0 ? gpuTempProbe : gpuTempSensors
 
     function tempText(v) { return v >= 0 ? v + "" : "–"; }
-    function tempTip(name, v) { return v >= 0 ? name + " temperature: " + v + "°C" : name + " temperature: unavailable"; }
+    function tempTip(name, v) {
+        return v >= 0 ? name + " temperature: " + v + "°C" : name + " temperature: no sensor detected";
+    }
 
     readonly property string netGlyph: netState === "wifi" ? "\uDB81\uDDA9"
                                      : netState === "ethernet" ? "\uDB80\uDE00" : "\uDB81\uDDAA"
@@ -636,7 +647,29 @@ if [ "$t" = "-" ]; then
   done
 fi
 
-echo "$u $t"
+# CPU temperature straight from sysfs (works even without lm_sensors)
+c=-
+for h in /sys/class/hwmon/hwmon*; do
+  n=$(cat "$h/name" 2>/dev/null)
+  case "$n" in
+    coretemp|k10temp|zenpower|cpu_thermal)
+      r=$(cat "$h/temp1_input" 2>/dev/null)
+      if isnum "$r"; then c=$(( r / 1000 )); break; fi
+      ;;
+  esac
+done
+if [ "$c" = "-" ]; then
+  for z in /sys/class/thermal/thermal_zone*; do
+    case "$(cat "$z/type" 2>/dev/null)" in
+      x86_pkg_temp|cpu*|soc*)
+        r=$(cat "$z/temp" 2>/dev/null)
+        if isnum "$r"; then c=$(( r / 1000 )); break; fi
+        ;;
+    esac
+  done
+fi
+
+echo "$u $t $c"
 `
 
     property real _gpuAvg: -1
@@ -652,6 +685,8 @@ echo "$u $t"
             _gpuAvg = -1;
         }
         gpuTempProbe = isNaN(t) ? -1 : Math.round(t);
+        const c = parseFloat(p[2]);
+        cpuTempProbe = isNaN(c) ? -1 : Math.round(c);
     }
 
     // First `sensors` line starting with one of the keys (tried in priority order) → °C, or -1.
@@ -680,15 +715,36 @@ echo "$u $t"
         stdout: StdioCollector {
             onStreamFinished: {
                 const lines = text.split("\n");
-                root.cpuTemp = root.tempFromSensors(lines, ["Package id 0:", "Tctl:", "Tdie:"]);
-                root.gpuTempSensors = root.tempFromSensors(lines, ["GPU Temp:", "edge:", "junction:"]);
+                root.cpuTempSensors = root.tempFromSensors(lines, ["Package id 0:", "Tctl:", "Tdie:"]);
+                root.gpuTempSensors = root.tempFromSensors(lines, ["GPU Temp:", "GPU core:", "edge:", "junction:"]);
             }
         }
     }
 
     // Notification count: the notifications panel persists its history here
     property int notifCount: 0
-    readonly property string notifTip: notifCount > 0 ? "Notifications: " + notifCount : "No notifications"
+    readonly property string notifTip: (notifCount > 0 ? "Notifications: " + notifCount : "No notifications")
+                                       + (notifDnd ? " · Do Not Disturb" : "")
+
+    // Do Not Disturb: owned by the notifications panel, which persists it in its state file.
+    // The bar only reads it (to show the state) and toggles it over IPC (right click on the bell).
+    property bool notifDnd: false
+    FileView {
+        id: notifStateFile
+        path: Quickshell.env("HOME") + "/.config/quickshell/state/notifications-state.json"
+        printErrors: false
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: {
+            try { root.notifDnd = JSON.parse(text()).dnd === true; }
+            catch (e) { root.notifDnd = false; }
+        }
+        onLoadFailed: root.notifDnd = false
+    }
+    function toggleDnd() {
+        notifDnd = !notifDnd;                       // instant feedback; the state file confirms it
+        run("qs ipc call notifications dnd");
+    }
 
     FileView {
         id: notifFile
@@ -727,12 +783,12 @@ echo "$u $t"
     // GPU usage / temps (only while the GPU or temperature module is enabled)
     Timer {
         interval: 2000; repeat: true; triggeredOnStart: true
-        running: root.barVisible && (root.isOn("gpu") || root.isOn("temp"))
+        running: root.barVisible && (root.isOn("gpu") || root.isOn("cputemp") || root.isOn("gputemp"))
         onTriggered: { if (!gpuProc.running) gpuProc.running = true; }
     }
     Timer {
         interval: 2000; repeat: true; triggeredOnStart: true
-        running: root.barVisible && root.isOn("temp")
+        running: root.barVisible && (root.isOn("cputemp") || root.isOn("gputemp"))
         onTriggered: { if (!sensorsProc.running) sensorsProc.running = true; }
     }
     Timer {
@@ -930,23 +986,17 @@ echo "$u $t"
         opacity: disabled ? 0.4 : 1
         Behavior on opacity { NumberAnimation { duration: 120 } }
 
-        // state layer: pressed > active > warning, with a hover overlay
+        // state layer: pressed / active / warning only — hover background always transparent
         Rectangle {
             anchors.fill: parent
             anchors.margins: 1
+            anchors.verticalCenterOffset: 3
             radius: Theme.radius
             color: ma.pressed && it.interactive && !it.disabled ? Qt.alpha(Theme.accent, 0.35)
                  : it.active ? Qt.alpha(Theme.accent, 0.22)
                  : it.warning ? Qt.alpha(Theme.danger, 0.16)
-                 : Qt.alpha(Theme.text, 0)
+                 : "transparent"
             Behavior on color { ColorAnimation { duration: 100 } }
-
-            Rectangle {
-                anchors.fill: parent
-                radius: parent.radius
-                color: it.hovered && it.interactive ? Qt.alpha(Theme.text, 0.1) : Qt.alpha(Theme.text, 0)
-                Behavior on color { ColorAnimation { duration: 100 } }
-            }
         }
 
         DMouseArea {
@@ -985,13 +1035,14 @@ echo "$u $t"
         property string vtext: text
         property string glyph: ""
         property string vglyph: glyph
+        property Component iconComp: null   // optional custom-drawn icon (e.g. the battery), shown before the glyph
         property real glyphSize: 16
         property real baseSize: 11
         property color color: Theme.text
         property bool bold: false
         property real yOffset: 0
-        property real xOffset: 0         // horizontal nudge (negative → left), applies to vertical and horizontal bars
-        property real glyphScaleY: 1.0
+        property real xOffset: 0         // horizontal nudge (negative → left)
+        property real textLift: 0        // moves the text up by this many px (layout size unchanged)
         property int spacing: root.sizeIconGap
         property int padX: root.modPadPx
 
@@ -1012,6 +1063,12 @@ echo "$u $t"
             rowSpacing: 2
             columnSpacing: mod.spacing
 
+            Loader {
+                active: mod.iconComp !== null
+                visible: active
+                Layout.alignment: Qt.AlignCenter
+                sourceComponent: mod.iconComp
+            }
             Text {
                 visible: mod.shownGlyph !== ""
                 Layout.alignment: Qt.AlignCenter
@@ -1021,10 +1078,6 @@ echo "$u $t"
                 font.family: Theme.iconFont
                 font.pixelSize: mod.glyphSize
                 renderType: Text.NativeRendering
-                transform: Scale {
-                    yScale: mod.glyphScaleY
-                    origin.y: height / 2
-                }
             }
             Text {
                 visible: mod.shown !== ""
@@ -1036,100 +1089,106 @@ echo "$u $t"
                 font.bold: mod.bold
                 font.pixelSize: mod.baseSize
                 renderType: Text.NativeRendering
+                transform: Translate { y: -mod.textLift }
             }
         }
     }
 
-    // Rounded stat badge (CPU / RAM / GPU / temperatures), informational only.
-    // Capsule with label + value ("CPU 12" / stacked on vertical bars).
-    // `unit` ("%" or "°C") is appended when the "show unit symbols" option is on.
-    component StatBadge: Interactive {
-        id: stat
-        property string label: ""
-        property string valueText: ""
-        property string unit: ""
-        readonly property string shownValue: valueText + (cfg.statsPercent ? unit : "")
-        readonly property color fg: warning ? Theme.danger : Theme.text
+// Rounded stat badge (CPU / RAM / GPU / temperatures), informational only.
+// Capsule with label + value ("CPU 12" / stacked on vertical bars).
+// `unit` ("%" or "°C") is appended when the "show unit symbols" option is on.
+component StatBadge: Interactive {
+    id: stat
+    anchors.verticalCenterOffset: 1
+    property string label: ""
+    property string valueText: ""
+    property string unit: ""
+    readonly property string shownLabel: label
+    readonly property string shownValue: valueText + (cfg.statsPercent ? unit : "")
+    readonly property color fg: warning ? Theme.danger : Theme.text
 
-        // ── Never outgrow the bar ──
-        // `maxCross` is the room across the bar (height on horizontal bars, width on vertical
-        // ones), minus the bar border when it is on. The badge, its border and its tint layer are
-        // kept inside it, and the text shrinks (down to 6px) when the text scale or a thin bar
-        // would otherwise make the badge bigger than the bar background.
-        readonly property int maxCross: Math.max(8, root.panelThick - (cfg.border ? 2 : 0))
-        readonly property int crossPad: root.vertical ? 8 : 6
-        readonly property int wantedPx: Math.max(6, Math.round(root.sz.taskIcon * 0.5 * cfg.statsScale))
-        // worst-case value ("100" / "100%") so the font does not jump while the numbers change
-        readonly property string sampleValue: "100" + (cfg.statsPercent ? "%" : "")
-        readonly property real contentCross: root.vertical
-            ? Math.max(mLabel.width, mValue.width)
-            : Math.max(mLabel.height, mValue.height)
-        readonly property int fontPx: contentCross + crossPad > maxCross
-            ? Math.max(6, Math.floor(wantedPx * (maxCross - crossPad) / contentCross))
-            : wantedPx
+    // ── Never outgrow the bar ──
+    // Badge follows the text size and is always clamped to maxCross.
+    // statsScale never changes the bar thickness.
+    // Base ≈ 10px at scale/barScale 1.0; statsScale 1.0 is a comfortable default.
+    readonly property int maxCross: Math.max(8, root.panelThick - (cfg.border ? 2 : 0))
+    readonly property int crossPad: root.vertical ? 8 : 6
+    readonly property int wantedPx: Math.max(4, Math.round(10 * cfg.statsScale * cfg.scale * cfg.barScale))
+    readonly property int labelWantedPx: Math.max(4, wantedPx - 1)
+    // worst-case value ("100" / "100%") so the font does not jump while the numbers change
+    readonly property string sampleValue: "100" + (cfg.statsPercent ? "%" : "")
+    readonly property real contentCross: root.vertical
+        ? Math.max(mLabel.width, mValue.width)
+        : Math.max(mLabel.height, mValue.height)
+    // shrink text only when the wanted size would exceed the bar
+    readonly property int fontPx: contentCross + crossPad > maxCross
+        ? Math.max(4, Math.floor(wantedPx * (maxCross - crossPad) / contentCross))
+        : wantedPx
 
-        // measured at the wanted size (not the final one) so there is no binding loop
-        TextMetrics {
-            id: mLabel
-            text: stat.label
-            font.family: Theme.iconFont
-            font.pixelSize: stat.wantedPx - 1
-        }
-        TextMetrics {
-            id: mValue
-            text: stat.sampleValue
-            font.family: Theme.iconFont
-            font.bold: true
-            font.pixelSize: stat.wantedPx
-        }
+    TextMetrics {
+        id: mLabel
+        text: stat.shownLabel
+        font.family: Theme.iconFont
+        font.pixelSize: stat.labelWantedPx
+    }
+    TextMetrics {
+        id: mValue
+        text: stat.sampleValue
+        font.family: Theme.iconFont
+        font.bold: true
+        font.pixelSize: stat.wantedPx
+    }
 
-        Layout.alignment: Qt.AlignCenter
-        implicitWidth: root.vertical ? root.panelThick : badge.width + cfg.statsGap
-        // the item (and its warning tint) stays inside the bar thickness
-        implicitHeight: root.vertical ? badge.height + cfg.statsGap
-                                      : Math.min(root.panelThick, Math.max(root.panelThick - 2, badge.height + 6))
-        interactive: false
+    Layout.alignment: Qt.AlignCenter
+    implicitWidth: root.vertical ? root.panelThick : badge.width + cfg.statsGap
+    // stay inside the bar thickness; never expand it
+    implicitHeight: root.vertical ? badge.height + cfg.statsGap
+                                  : Math.min(root.panelThick, Math.max(root.panelThick - 2, badge.height + 4))
+    interactive: false
 
-        Rectangle {
-            id: badge
+    Rectangle {
+        id: badge
+        anchors.centerIn: parent
+        // size follows the text (with padding); always clamped to the bar cross-section
+        width: root.vertical
+               ? Math.min(stat.maxCross, statRow.implicitWidth + 8)
+               : statRow.implicitWidth + 12
+        height: root.vertical
+                ? statRow.implicitHeight + 8
+                : Math.min(stat.maxCross, statRow.implicitHeight + 4)
+        clip: true
+        radius: Math.min(cfg.statsRadius, Math.min(width, height) / 2)
+        color: "transparent"
+        border.width: cfg.statsBorder ? 1 : 0
+        border.color: Qt.alpha(stat.fg, 0.18)
+
+        GridLayout {
+            id: statRow
             anchors.centerIn: parent
-            width: root.vertical ? Math.min(stat.maxCross, Math.max(root.sz.taskIcon + 6, statRow.implicitWidth + 8))
-                                 : statRow.implicitWidth + 14
-            height: root.vertical ? statRow.implicitHeight + 10
-                                  : Math.min(stat.maxCross, Math.max(root.sz.taskIcon, statRow.implicitHeight + 6))
-            clip: true                       // last resort: text can never paint outside the badge
-            radius: Math.min(cfg.statsRadius, Math.min(width, height) / 2)   // clamped: large values give the pill shape
-            color: Qt.alpha(stat.fg, 0.045)
-            border.width: cfg.statsBorder ? 1 : 0
-            border.color: Qt.alpha(stat.fg, 0.18)
+            flow: root.vertical ? GridLayout.TopToBottom : GridLayout.LeftToRight
+            rowSpacing: 0
+            columnSpacing: 3
 
-            GridLayout {
-                id: statRow
-                anchors.centerIn: parent
-                flow: root.vertical ? GridLayout.TopToBottom : GridLayout.LeftToRight
-                rowSpacing: 0
-                columnSpacing: 4
-
-                Text {
-                    Layout.alignment: Qt.AlignCenter
-                    text: stat.label
-                    color: Qt.alpha(stat.fg, 0.75)
-                    font.family: Theme.iconFont
-                    font.pixelSize: stat.fontPx - 1
-                    renderType: Text.NativeRendering
-                }
-                Text {
-                    Layout.alignment: Qt.AlignCenter
-                    text: stat.shownValue
-                    color: stat.fg
-                    font.family: Theme.iconFont
-                    font.bold: true
-                    font.pixelSize: stat.fontPx
-                    renderType: Text.NativeRendering
-                }
+            Text {
+                Layout.alignment: Qt.AlignCenter
+                text: stat.shownLabel
+                color: Qt.alpha(stat.fg, 0.75)
+                font.family: Theme.iconFont
+                font.pixelSize: Math.max(4, stat.fontPx - 1)
+                renderType: Text.NativeRendering
+            }
+            Text {
+                Layout.alignment: Qt.AlignCenter
+                text: stat.shownValue
+                color: stat.fg
+                font.family: Theme.iconFont
+                font.bold: true
+                font.pixelSize: stat.fontPx
+                renderType: Text.NativeRendering
             }
         }
     }
+}
 
     // Container for one module. Also owns the drag state while the module is being dragged:
     // the module follows the pointer visually (transform only, layout is untouched) and,
@@ -1270,14 +1329,18 @@ echo "$u $t"
             readonly property bool isNet: mid === "net"
             readonly property bool isNotif: mid === "notif"
             readonly property bool isSettings: mid === "settings"
-            baseSize: mid === "power" ? root.sz.power - 1 : root.sz.icon
-            yOffset: mid === "power" ? 0 : isNotif && !root.vertical ? root.iconYOffset - 0.5 : root.iconYOffset
+            // icons 2px smaller; power nudged down so it lines up with volume/battery text
+            baseSize: mid === "power" ? root.sz.power - 3 : root.sz.icon - 2
+            yOffset: mid === "power" ? root.iconYOffset 
+                   : isNotif && !root.vertical ? root.iconYOffset - 0.5
+                   : root.iconYOffset
             xOffset: !root.vertical ? 0 : isNet ? -2 : (mid === "power" || isSettings) ? -1 : 0
-            text: isNet ? root.netGlyph : (def.g ?? "")
+            text: isNet ? root.netGlyph : (isNotif && root.notifDnd ? "\uDB80\uDC9B" : (def.g ?? ""))
             tip: isNet ? root.netTip : mid === "notif" ? root.notifTip : (def.tip ?? "")
             // The settings button has configurable click binds (see Bar page → Settings button)
             primaryHint: isSettings ? root.actionHint(cfg.settingsPrimary) : (def.hint ?? "")
-            secondaryHint: isSettings ? root.actionHint(cfg.settingsSecondary) : ""
+            secondaryHint: isSettings ? root.actionHint(cfg.settingsSecondary)
+                         : isNotif ? (root.notifDnd ? "Turn off Do Not Disturb" : "Turn on Do Not Disturb") : ""
             tertiaryHint: isSettings ? root.actionHint(cfg.settingsTertiary) : ""
             noSecondary: isSettings && cfg.settingsSecondary === "none"
             warning: isNet && root.netState === "disconnected"
@@ -1285,7 +1348,10 @@ echo "$u $t"
                 if (isSettings) root.doAction(cfg.settingsPrimary);
                 else if (def.cmd) root.run(def.cmd);
             }
-            onSecondary: if (isSettings) root.doAction(cfg.settingsSecondary)
+            onSecondary: {
+                if (isSettings) root.doAction(cfg.settingsSecondary);
+                else if (isNotif) root.toggleDnd();
+            }
             onTertiary: if (isSettings) root.doAction(cfg.settingsTertiary)
 
             // Notification count badge (top-right of the icon)
@@ -1351,18 +1417,27 @@ echo "$u $t"
         }
     }
 
-    // CPU + GPU temperatures (two badges)
+    // CPU temperature. The unit is "°C" when the symbols option is on.
     Component {
-        id: tempC
-        Lane {
-            gap: 2
-            StatBadge {
-                label: "TEMP"
-                unit: root.cpuTemp >= 0 ? "°" : ""
-                valueText: root.tempText(root.cpuTemp)
-                warning: root.cpuTemp >= cfg.tempWarn
-                tip: root.tempTip("CPU", root.cpuTemp)
-            }
+        id: cpuTempC
+        StatBadge {
+            label: "TEMP"
+            unit: root.cpuTemp >= 0 ? "°C" : ""
+            valueText: root.tempText(root.cpuTemp)
+            warning: root.cpuTemp >= cfg.tempWarn
+            tip: root.tempTip("CPU", root.cpuTemp)
+        }
+    }
+
+    // GPU temperature ("–" + "no sensor detected" when the GPU has no sensor, e.g. Intel iGPUs).
+    Component {
+        id: gpuTempC
+        StatBadge {
+            label: "GPU T"
+            unit: root.gpuTemp >= 0 ? "°C" : ""
+            valueText: root.tempText(root.gpuTemp)
+            warning: root.gpuTemp >= cfg.tempWarn
+            tip: root.tempTip("GPU", root.gpuTemp)
         }
     }
 
@@ -1527,10 +1602,18 @@ echo "$u $t"
             readonly property real vol: ready ? sink.audio.volume : 0
             readonly property bool muted: ready ? sink.audio.muted : false
 
-            glyphSize: root.sz.icon
+            glyphSize: root.sz.icon - 2
+            baseSize: root.sz.batText
+            spacing: Math.round(4 * root.bs)
             yOffset: root.iconYOffset + 0.25
+            textLift: 1
             xOffset: root.vertical ? -1 : 0
-            glyph: muted || vol <= 0 ? "\uDB81\uDF5F" : "\uDB81\uDD7E"
+            // muted / silent → speaker with a slash (nf-md-volume_off); otherwise nf-md-volume_high
+            glyph: muted || vol <= 0 ? "\uDB81\uDD81" : "\uDB81\uDD7E"
+            // optional level next to the icon (+ "%" when the symbol option is on)
+            text: cfg.volNumber && ready
+                  ? String(muted ? 0 : Math.round(vol * 100)) + (cfg.volPercent ? "%" : "")
+                  : ""
             warning: muted
             disabled: !ready
             disabledReason: "No audio output available"
@@ -1549,19 +1632,83 @@ echo "$u $t"
         }
     }
 
+    // Battery: a drawn battery with a fill bar inside that follows the charge level.
+    // The icon item is as tall as the volume glyph, so the optional percentage text
+    // sits on exactly the same line as the volume text (same yOffset / textLift too).
     Component {
         id: batteryC
         Mod {
-            glyphSize: root.sz.icon
-            glyphScaleY: 1.12
-            yOffset: root.iconYOffset
-            // Nudge the battery glyph left. Increase a number for a bigger shift.
-            //   vertical bars   → 3
-            //   horizontal bars → 2
-            xOffset: -Math.round((root.vertical ? 2 : 3) * root.bs)
-            glyph: root.batIcon
+            id: bat
+            glyphSize: root.sz.icon - 2
+            baseSize: root.sz.batText
+            spacing: Math.round(4 * root.bs)
+            yOffset: root.iconYOffset + 0.25
+            textLift: 1
+            xOffset: root.vertical ? 0 : 0
+            glyph: ""
+            // optional percentage next to the icon (+ "%" when the symbol option is on)
+            text: cfg.batNumber ? String(root.batPct) + (cfg.batPercent ? "%" : "") : ""
             warning: root.batLow
             tip: root.batTip
+
+            iconComp: Component {
+                Item {
+                    id: ico
+                    transform: Scale {
+                        xScale: root.vertical ? 0.9 : 1.0
+                        yScale: 1.0
+                        origin.x: ico.width / 2
+                        origin.y: ico.height / 2
+                    }
+                    readonly property int bodyW: Math.round(bat.glyphSize * 1.25)
+                    readonly property int bodyH: Math.round(bat.glyphSize * 0.68)
+                    readonly property int nubW: 2
+
+                    // same line height as the volume icon glyph
+                    TextMetrics {
+                        id: refGlyph
+                        text: "\uDB81\uDD7E"
+                        font.family: Theme.iconFont
+                        font.pixelSize: bat.glyphSize
+                    }
+
+                    implicitWidth: bodyW + nubW
+                    implicitHeight: Math.max(refGlyph.height, bodyH)
+
+                    // shell
+                    Rectangle {
+                        x: 0
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: ico.bodyW
+                        height: ico.bodyH
+                        radius: 2
+                        color: "transparent"
+                        border.width: 1
+                        border.color: Qt.alpha(bat.fg, 0.9)
+
+                        // level bar
+                        Rectangle {
+                            x: 2; y: 2
+                            height: parent.height - 4
+                            width: root.batPct > 0
+                                   ? Math.max(1, Math.round((parent.width - 4) * Math.min(100, root.batPct) / 100))
+                                   : 0
+                            radius: 1
+                            color: bat.fg
+                        }
+                    }
+
+                    // terminal nub
+                    Rectangle {
+                        x: ico.bodyW
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: ico.nubW
+                        height: Math.round(ico.bodyH * 0.4)
+                        radius: 1
+                        color: Qt.alpha(bat.fg, 0.9)
+                    }
+                }
+            }
         }
     }
 
@@ -1769,6 +1916,7 @@ echo "$u $t"
 
                             bold: true
                             baseSize: root.sz.clock
+                            yOffset: 1
                             text: root.clockBarText(clk.date)
                             vtext: root.clockBarVText(clk.date)
                             active: clockPanel.calOpen

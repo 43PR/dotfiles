@@ -859,7 +859,7 @@ Scope {
                             radius: root.px(16)
                             color: Theme.bg
                             border.width: wrapper.critical ? 1 : 0
-                            border.color: Theme.danger
+                            border.color: Theme.accent
                             opacity: wrapper.shown ? 1 : 0
 
                             // slides in from the right edge of the screen (and
@@ -1101,13 +1101,6 @@ Scope {
                             }
                             IconBtn {
                                 ui: root.ui
-                                icon: root.dnd ? "󰂛" : "󰂚"
-                                tip: "Do Not Disturb: " + (root.dnd ? "ON" : "OFF")
-                                rest: root.dnd ? 0.3 : 0.08
-                                onClicked: root.toggleDnd()
-                            }
-                            IconBtn {
-                                ui: root.ui
                                 visible: root.groupCount > 1
                                 icon: root.allCollapsed ? root.icDown : root.icUp
                                 tip: root.allCollapsed ? "Expand all groups" : "Collapse all groups"
@@ -1117,7 +1110,7 @@ Scope {
                                 ui: root.ui
                                 icon: "󰆴"
                                 tip: "Clear all"
-                                tint: Theme.danger
+                                tint: Theme.accent
                                 rest: 0.1
                                 hot: 0.25
                                 visible: history.count > 0
@@ -1317,7 +1310,7 @@ Scope {
                                     base: 20
                                     icon: "󰆴"
                                     tip: "Clear " + rowItem.groupName
-                                    tint: Theme.danger
+                                    tint: Theme.accent
                                     rest: 0.0
                                     hot: 0.25
                                     anchors { right: parent.right; rightMargin: root.px(6); verticalCenter: parent.verticalCenter }
@@ -1452,7 +1445,7 @@ Scope {
                                                 rest: 0.0
                                                 icon: "󰅖"
                                                 tip: "Remove"
-                                                tint: Theme.danger
+                                                tint: Theme.accent
                                                 hot: 0.25
                                                 onClicked: root.removeHistory(rowItem.hIndex)
                                             }

@@ -309,6 +309,13 @@ Scope {
         root.saveState()
     }
 
+    // First launch: make sure the state directory exists before anything is saved.
+    Process {
+        id: mkStateDir
+        command: ["mkdir", "-p", Quickshell.env("HOME") + "/.config/quickshell/state"]
+        running: true
+    }
+
     FileView {
         id: stateFile
         path: root.statePath
@@ -403,55 +410,45 @@ Scope {
             WlrLayershell.namespace: "settings"
             WlrLayershell.keyboardFocus: root.showing ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
-            // ---- Input region (FIX for "settings window stops detecting the mouse") ----
+            // ---- Input region ----
             //
-            // Previously the Region toggled between three shapes (whole backdrop via `item`,
-            // a card rect built from int x/y/width/height bindings, and an empty 0x0 rect),
-            // and the card rect could briefly have a negative size while winW was still 0.
-            // Quickshell's Region docs state it does not always update automatically and
-            // that changed() may need to be emitted manually, so a missed update left the
-            // surface with a stale/empty input region, and since clickOutsideClose and
-            // settingsScale are restored from hub.json, it came back on every start.
+            // While showing, the whole window takes input (the backdrop, which only changes
+            // when the window itself is resized). While hidden/closing the region is empty,
+            // so clicks pass through. The region never depends on the card's geometry, which
+            // is what used to leave it stale (card ignoring the mouse) on some machines.
             //
-            // Now the region is always driven by a real Item (item overrides x/y/width/height),
-            // sizes can never be negative, and changed() is emitted whenever an input changes.
-            //
-            //  - hidden / closing                       -> item null  (empty: clicks pass through)
-            //  - showing + clickOutsideClose on         -> whole backdrop takes input
-            //  - showing + clickOutsideClose off        -> only the padded, scaled card takes input
-            //
-            // cardMask is a plain Item: it paints nothing and takes no input, it only supplies
-            // geometry. The card is scaled around its centre by Theme.settingsScale, so the
-            // rect is shrunk/grown the same way, with padding so the drag strip and snap
-            // buttons at the very top edge are never clipped.
-            Item {
-                id: cardMask
-                readonly property real pad: 16
-                readonly property real s: Theme.settingsScale
-                x: Math.round(root.cardX + root.cardWidth * (1 - s) / 2) - pad
-                y: Math.round(root.cardY + root.cardHeight * (1 - s) / 2) - pad
-                width: Math.max(0, Math.round(root.cardWidth * s) + pad * 2)
-                height: Math.max(0, Math.round(root.cardHeight * s) + pad * 2)
-            }
-
+            // Quickshell's Region does not always update by itself, so changed() is emitted
+            // whenever an input changes, and again shortly after the window is created to
+            // cover first-launch timing (saved state, fonts, page load finishing late).
             mask: Region {
                 id: inputMask
-                item: !root.showing ? null
-                    : (Theme.clickOutsideClose ? backdrop : cardMask)
+                item: (root.showing && win.sized) ? backdrop : null
             }
 
-            // Nudge the region once bindings have settled (see note above).
+            function refreshMask() { Qt.callLater(function () { inputMask.changed() }) }
+
+            onSizedChanged: refreshMask()
+            onRevealChanged: refreshMask()
+
             Connections {
                 target: root
-                function onShowingChanged() { Qt.callLater(function () { inputMask.changed() }) }
-                function onWinWChanged()    { Qt.callLater(function () { inputMask.changed() }) }
-                function onWinHChanged()    { Qt.callLater(function () { inputMask.changed() }) }
+                function onShowingChanged() { win.refreshMask() }
+                function onWinWChanged()    { win.refreshMask() }
+                function onWinHChanged()    { win.refreshMask() }
             }
 
-            Connections {
-                target: Theme
-                function onClickOutsideCloseChanged() { Qt.callLater(function () { inputMask.changed() }) }
-                function onSettingsScaleChanged()     { Qt.callLater(function () { inputMask.changed() }) }
+            // First-launch safety net: re-assert the region after things have settled.
+            Timer {
+                running: root.showing
+                interval: 400
+                repeat: false
+                onTriggered: win.refreshMask()
+            }
+            Timer {
+                running: root.showing
+                interval: 1500
+                repeat: false
+                onTriggered: win.refreshMask()
             }
 
             function syncSize() {
@@ -497,6 +494,8 @@ Scope {
                 }
             }
 
+            // Invisible full-window item that holds keyboard focus (Esc / Tab handling).
+            // It has no MouseArea, so clicking outside the card does nothing.
             Rectangle {
                 id: backdrop
                 anchors.fill: parent
@@ -518,10 +517,6 @@ Scope {
                         root.toggleSidebar()
                         event.accepted = true
                     }
-                }
-                MouseArea {
-                    anchors.fill: parent
-                    onClicked: if (Theme.clickOutsideClose) root.hide()
                 }
             }
 

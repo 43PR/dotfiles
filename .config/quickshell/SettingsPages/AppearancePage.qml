@@ -913,10 +913,6 @@ Item {
                     Column {
                         width: parent.width; spacing: 6
                         ToggleRow {
-                            label: "CLOSE ON OUTSIDE CLICK"; checked: Theme.clickOutsideClose
-                            onToggled: v => Theme.setHub("clickOutsideClose", v)
-                        }
-                        ToggleRow {
                             label: "SYNC OPACITY SCRIPT"; checked: page.qsOpacityFollow
                             onToggled: v => page.setQsOpacityFollow(v)
                         }
