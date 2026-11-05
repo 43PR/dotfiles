@@ -303,6 +303,15 @@ Scope {
               || battery.state === UPowerDeviceState.FullyCharged)
     readonly property bool batLow: hasBattery && !batCharging && batPct <= cfg.batLowPct
 
+    // Vertical battery glyphs, used on horizontal bars (top / bottom):
+    //   nf-md-battery_outline (f008e), nf-md-battery_10 … _90 (f007a … f0082), nf-md-battery (f0079 = full).
+    // Index = charge rounded to the nearest 10 %.
+    readonly property var batGlyphsV: [
+        "\uDB80\uDC8E", "\uDB80\uDC7A", "\uDB80\uDC7B", "\uDB80\uDC7C", "\uDB80\uDC7D", "\uDB80\uDC7E",
+        "\uDB80\uDC7F", "\uDB80\uDC80", "\uDB80\uDC81", "\uDB80\uDC82", "\uDB80\uDC79"
+    ]
+    readonly property string batGlyphV: batGlyphsV[Math.max(0, Math.min(10, Math.round(batPct / 10)))]
+
     function fmtTime(sec) {
         const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
         return h > 0 ? h + "h " + m + "m" : m + "m";
@@ -1027,7 +1036,15 @@ echo "$u $t $c"
         }
     }
 
-    // Icon / text module built on Interactive
+    // Icon / text module built on Interactive.
+    //
+    // ── Positioning ─────────────────────────────────────────────────────────
+    // Four independent nudges (px, positive x = right, positive y = down). None of them
+    // changes the module's size, so nothing else on the bar moves:
+    //   xOffset / yOffset  → icon AND text together   (yOffset is ignored on vertical bars)
+    //   iconX   / iconY    → ONLY the icon (glyph or custom-drawn icon)
+    //   textX   / textY    → ONLY the text
+    // Because icon and text are nudged separately, moving the icon never drags its text along.
     component Mod: Interactive {
         id: mod
         property string mid: ""          // set by Slot; used by generic icon modules
@@ -1040,9 +1057,12 @@ echo "$u $t $c"
         property real baseSize: 11
         property color color: Theme.text
         property bool bold: false
-        property real yOffset: 0
-        property real xOffset: 0         // horizontal nudge (negative → left)
-        property real textLift: 0        // moves the text up by this many px (layout size unchanged)
+        property real xOffset: 0         // icon + text together (negative → left)
+        property real yOffset: 0         // icon + text together, horizontal bars only
+        property real iconX: 0           // icon only
+        property real iconY: 0
+        property real textX: 0           // text only
+        property real textY: 0
         property int spacing: root.sizeIconGap
         property int padX: root.modPadPx
 
@@ -1068,6 +1088,7 @@ echo "$u $t $c"
                 visible: active
                 Layout.alignment: Qt.AlignCenter
                 sourceComponent: mod.iconComp
+                transform: Translate { x: mod.iconX; y: mod.iconY }
             }
             Text {
                 visible: mod.shownGlyph !== ""
@@ -1078,6 +1099,7 @@ echo "$u $t $c"
                 font.family: Theme.iconFont
                 font.pixelSize: mod.glyphSize
                 renderType: Text.NativeRendering
+                transform: Translate { x: mod.iconX; y: mod.iconY }
             }
             Text {
                 visible: mod.shown !== ""
@@ -1089,7 +1111,7 @@ echo "$u $t $c"
                 font.bold: mod.bold
                 font.pixelSize: mod.baseSize
                 renderType: Text.NativeRendering
-                transform: Translate { y: -mod.textLift }
+                transform: Translate { x: mod.textX; y: mod.textY }
             }
         }
     }
@@ -1594,30 +1616,43 @@ component StatBadge: Interactive {
         }
     }
 
+    // Volume: speaker glyph + optional level text.
     Component {
         id: volumeC
         Mod {
+            id: vol
             readonly property var sink: Pipewire.defaultAudioSink
             readonly property bool ready: !!(sink && sink.audio)
-            readonly property real vol: ready ? sink.audio.volume : 0
+            readonly property real level: ready ? sink.audio.volume : 0
             readonly property bool muted: ready ? sink.audio.muted : false
+
+            // ── Alignment: one set of numbers per bar layout ─────────────────────
+            //   x / y         → icon + text together (y only has an effect on horizontal bars)
+            //   iconX / iconY → icon only
+            //   textX / textY → text only (the icon stays where it is)
+            readonly property var tune: root.vertical
+                ? ({ x: -1, y: 0,                         iconX: 0, iconY: 0, textX: 0, textY: -1 })   // left / right bar
+                : ({ x: 0,  y: root.iconYOffset + 0.25,   iconX: 0, iconY: 0, textX: 0, textY: -1 })   // top / bottom bar
+            xOffset: tune.x
+            yOffset: tune.y
+            iconX: tune.iconX
+            iconY: tune.iconY
+            textX: tune.textX
+            textY: tune.textY
 
             glyphSize: root.sz.icon - 2
             baseSize: root.sz.batText
             spacing: Math.round(4 * root.bs)
-            yOffset: root.iconYOffset + 0.25
-            textLift: 1
-            xOffset: root.vertical ? -1 : 0
             // muted / silent → speaker with a slash (nf-md-volume_off); otherwise nf-md-volume_high
-            glyph: muted || vol <= 0 ? "\uDB81\uDD81" : "\uDB81\uDD7E"
+            glyph: muted || level <= 0 ? "\uDB81\uDD81" : "\uDB81\uDD7E"
             // optional level next to the icon (+ "%" when the symbol option is on)
             text: cfg.volNumber && ready
-                  ? String(muted ? 0 : Math.round(vol * 100)) + (cfg.volPercent ? "%" : "")
+                  ? String(muted ? 0 : Math.round(level * 100)) + (cfg.volPercent ? "%" : "")
                   : ""
             warning: muted
             disabled: !ready
             disabledReason: "No audio output available"
-            tip: !ready ? "Volume" : muted ? "Volume: muted" : "Volume: " + Math.round(vol * 100) + "%"
+            tip: !ready ? "Volume" : muted ? "Volume: muted" : "Volume: " + Math.round(level * 100) + "%"
             primaryHint: "Open sound settings"
             secondaryHint: "Mute / unmute"
             scrollHint: "Adjust volume"
@@ -1632,30 +1667,53 @@ component StatBadge: Interactive {
         }
     }
 
-    // Battery: a drawn battery with a fill bar inside that follows the charge level.
-    // The icon item is as tall as the volume glyph, so the optional percentage text
-    // sits on exactly the same line as the volume text (same yOffset / textLift too).
+    // Battery: two looks, chosen by the bar layout.
+    //   vertical bar   (left / right) → a drawn HORIZONTAL battery whose fill bar follows the charge
+    //   horizontal bar (top / bottom) → a VERTICAL battery glyph (nf-md-battery_10 … _90)
+    // The icon item is as tall as the volume glyph, so the optional percentage text sits
+    // on exactly the same line as the volume text.
     Component {
         id: batteryC
         Mod {
             id: bat
+
+            // ── Alignment: one set of numbers per bar layout ─────────────────────
+            //   x / y         → icon + text together (y only has an effect on horizontal bars)
+            //   iconX / iconY → icon only
+            //   textX / textY → text only (the icon stays where it is)
+            // Positive x = right, positive y = down. Moving an icon never moves its text.
+            readonly property var tune: root.vertical
+                // left / right bar → drawn horizontal battery
+                ? ({ x: 0, y: 0,                        iconX: 0, iconY: 0, textX: 0, textY: -1 })
+                // top / bottom bar → vertical battery glyph
+                // (y stays at the shared baseline so the text doesn't move; only iconY lifts the glyph)
+                : ({ x: 0, y: root.iconYOffset + 0.25,  iconX: 0, iconY: -1.25, textX: 0, textY: -1 })
+            xOffset: tune.x
+            yOffset: tune.y
+            iconX: tune.iconX
+            iconY: tune.iconY
+            textX: tune.textX
+            textY: tune.textY
+
             glyphSize: root.sz.icon - 2
             baseSize: root.sz.batText
             spacing: Math.round(4 * root.bs)
-            yOffset: root.iconYOffset + 0.25
-            textLift: 1
-            xOffset: root.vertical ? 0 : 0
-            glyph: ""
+
+            // horizontal bar → vertical glyph; vertical bar → drawn icon below
+            glyph: root.vertical ? "" : root.batGlyphV
+            iconComp: root.vertical ? batHoriz : null
+
             // optional percentage next to the icon (+ "%" when the symbol option is on)
             text: cfg.batNumber ? String(root.batPct) + (cfg.batPercent ? "%" : "") : ""
             warning: root.batLow
             tip: root.batTip
 
-            iconComp: Component {
+            Component {
+                id: batHoriz
                 Item {
                     id: ico
                     transform: Scale {
-                        xScale: root.vertical ? 0.9 : 1.0
+                        xScale: 0.9
                         yScale: 1.0
                         origin.x: ico.width / 2
                         origin.y: ico.height / 2

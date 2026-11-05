@@ -5,7 +5,7 @@
 <p align="center">
 <img src="https://img.shields.io/badge/HYPRLAND-0.57-667A82?style=flat&labelColor=101418" height="20" alt="Hyprland">
 <a href="https://discord.gg/j32UAE4WFP"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Finvites%2Fj32UAE4WFP%3Fwith_counts%3Dtrue&query=%24.approximate_member_count&style=flat&logo=discord&logoColor=ffffff&label=DISCORD&labelColor=101418&color=7289a8" height="20" alt="Discord"></a>
-<a href="https://www.youtube.com/@43PR2"><img src="https://img.shields.io/badge/YOUTUBE-SUBSCRIBE-b05a63?style=flat&logo=youtube&logoColor=ffffff&labelColor=101418" height="20" alt="YouTube"></a>
+<a href="https://www.youtube.com/@43PR"><img src="https://img.shields.io/badge/YOUTUBE-SUBSCRIBE-b05a63?style=flat&logo=youtube&logoColor=ffffff&labelColor=101418" height="20" alt="YouTube"></a>
 <a href="https://ko-fi.com/43pr"><img src="https://img.shields.io/badge/SUPPORT-KOFI?style=flat&logo=ko-fi&logoColor=ffffff&label=KO--FI&labelColor=101418&color=9a6570" height="20" alt="Ko-Fi"></a>
 </p>
 
@@ -51,24 +51,17 @@ As reference I made this project with a i5 6th dell laptop with integrated graph
 
 ## Features
 
-- **Fast & Lightweight Quickshell** — Optimized desktop components designed to be fast and easy to customize.
-- **Top bar** - Customizable bar with settings menu, and quick shortcuts.
-- **Settings** — System settings, customize hyprland appearance, bar & themes.
-- **Wallpaper picker & Dynamic Colors** — Wallpaper-based color generation & live wallpapers support.
-- **Preset Themes** — Monochrome, Nord, Tokyo Night and other popular ones, with support for creating your own.
+- **Quickshell** — Fast, lightweight, customizable desktop components.
+- **Top bar** - Customizable bar with settings, and quick shortcuts.
+- **Settings** — System settings, customize hyprland appearance, and themes.
+- **Wallpaper picker** — Customizable | Wallpaper-based color generation, and live wallpapers.
+- **Preset Themes** — Monochrome, Nord, Tokyo Night and more, with custom theme support.
 - **App Launcher** — **Rofi** App search, clipboard history, and opacity controls.
-- **Zsh + Starship** — Customizable shell with autosuggestions and history.
-- **Notes & Reminders** —  Quick notes, tasks, and reminders.
-- **Quick Actions** - Customizable quick actions for Wi-Fi, Bluetooth, night light, and more.
-- **Power Menu** — Customizable power menu to shut down, reboot, log out, etc.
-- **Hyprlock** — Custom lock screen.
-- **Spotify + Spicetify** — Custom theme based on **text - darkthemer**, (modified).
-
-> All programs: [packages.txt](packages.txt)
+- **Zsh + Starship** — Enhanced shell with autosuggestions and command history.
 
 ## Keybinds
 
-Middle click the clock to open settings. To close components use Esc key or use the same keybind. Hover over elements to see actions. 
+Hover over elements to see actions. 
 
 | Keybind                 | Action                    |
 | -----------             | ------------------------- |
@@ -83,6 +76,7 @@ Middle click the clock to open settings. To close components use Esc key or use 
 | `Super + B`             | Browser                   |
 | `Super + V`             | Clipboard history         |
 | `Super + I`             | Settings menu             |
+| `Super + Grave`         | Logout menu               |
 | `Super + S`             | Quick actions             |
 | `Super + O`             | Switch opacity            |
 | `Super + C`             | Notes & Reminders         |
@@ -90,12 +84,9 @@ Middle click the clock to open settings. To close components use Esc key or use 
 | `Super + Shift + C`     | Color picker tool         |
 | `Super + Mouse wheel`   | Zoom in/out               |
 | `Super + Shift + W`     | Toggle bar                |
-| `Super + Grave`         | Logout menu               |
 | `Super + Tab`           | Lock screen               |
-| `Super + N`             | Notifications             |
 | `Super + R`             | Toggle screen recorder    |
-| `Delete`                | Screenshot fullscreen     |
-| `SHIFT + Delete`        | Screenshot area select    |
+| `SHIFT + F12`           | Text extractor (OCR)      |
 
 > [!note]
 >
@@ -126,6 +117,12 @@ chmod +x install.sh
 ```
 
 After the installation finishes log out and back in. 
+
+> Check settings and keybinds first.
+>
+> Right-click on desktop components to customize them. 
+>
+> To close components use Esc key or use the same keybind. 
 
 > [!important]
 > **Do not move or delete the dotfiles repository after installation.**

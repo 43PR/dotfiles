@@ -24,6 +24,7 @@ PanelWindow {
     // mult/dec/unit only affect how the value is *displayed*.
     readonly property var numSpec: ({
         tileCount:          { min: 3,    max: 20,   def: 10,   step: 1,    dec: 0, mult: 1,   unit: "" },
+        globalScale:        { min: 0.5,  max: 1.5,  def: 1.0,  step: 0.05, dec: 0, mult: 100, unit: "%" },
         zoomScale:          { min: 0.3,  max: 1.2,  def: 0.4,  step: 0.05, dec: 0, mult: 100, unit: "%" },
         edgeScale:          { min: 0.1,  max: 1.0,  def: 0.7,  step: 0.05, dec: 0, mult: 100, unit: "%" },
         edgeSpacing:        { min: -200, max: 600,  def: 130,  step: 10,   dec: 0, mult: 1,   unit: " px" },
@@ -36,7 +37,9 @@ PanelWindow {
         tiltDepth:          { min: 1,    max: 8,    def: 3,    step: 0.5,  dec: 1, mult: 1,   unit: "×" },
         tiltCurve:          { min: 1,    max: 3,    def: 1.25, step: 0.25, dec: 2, mult: 1,   unit: "" },
         animDuration:       { min: 100,  max: 2000, def: 1000, step: 50,   dec: 0, mult: 1,   unit: " ms" },
-        transitionDuration: { min: 0.2,  max: 3,    def: 1,    step: 0.1,  dec: 1, mult: 1,   unit: " s" }
+        transitionDuration: { min: 0.2,  max: 3,    def: 1,    step: 0.1,  dec: 1, mult: 1,   unit: " s" },
+        activeOpacity:      { min: 0.1,  max: 1,    def: 1.0,  step: 0.05, dec: 0, mult: 100, unit: "%" },
+        inactiveOpacity:    { min: 0,    max: 1,    def: 0.8,  step: 0.05, dec: 0, mult: 100, unit: "%" }
     })
     readonly property var numKeys: Object.keys(numSpec)
 
@@ -50,6 +53,8 @@ PanelWindow {
 
     // tileCount follows config.json (number_of_pictures) until you change it in the menu.
     property real tileCount: configs.number_of_pictures
+    // Scales the whole carousel (tiles, gaps, edge pull-in, tilt) around the screen center.
+    property real globalScale: numSpec.globalScale.def
     property real zoomScale: numSpec.zoomScale.def
     property real edgeScale: numSpec.edgeScale.def
     property real edgeSpacing: numSpec.edgeSpacing.def   // px @1920 wide, how far outer tiles are pulled inward
@@ -64,6 +69,8 @@ PanelWindow {
     property real tiltDepth: numSpec.tiltDepth.def       // camera distance in tile widths (lower = stronger perspective)
     property real tiltCurve: numSpec.tiltCurve.def       // 1 = linear with distance from center, higher = only near the edges
     property real shadowOpacity: numSpec.shadowOpacity.def
+    property real activeOpacity: numSpec.activeOpacity.def       // selected tile
+    property real inactiveOpacity: numSpec.inactiveOpacity.def   // all other tiles
     property real animDuration: numSpec.animDuration.def
     property real transitionDuration: numSpec.transitionDuration.def   // seconds, awww transition length
     property bool shadowEnabled: boolDefaults.shadowEnabled
@@ -243,6 +250,7 @@ PanelWindow {
     aboveWindows: true
     exclusionMode: "Ignore"
     exclusiveZone: 1
+    WlrLayershell.namespace: "wallpaper-picker"
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
 
@@ -361,9 +369,9 @@ PanelWindow {
         model: n > 0 ? n * reps : 0
         // ---------------------------------------------------------------------
 
-        // Launch animation: fade + subtle scale-up + small rise
+        // Launch animation (fade + subtle scale-up + small rise) combined with the global scale.
         opacity: main.fade
-        scale: main.introScale + (1 - main.introScale) * main.intro
+        scale: main.globalScale * (main.introScale + (1 - main.introScale) * main.intro)
         transformOrigin: Item.Center
         transform: Translate { y: (1 - main.intro) * main.introRise * main.ui }
 
@@ -581,7 +589,7 @@ PanelWindow {
                 Image {
                     id: img
                     anchors.fill: parent
-                    opacity: delegateItem.active ? 1.0 : 0.8
+                    opacity: delegateItem.active ? main.activeOpacity : main.inactiveOpacity
                     Behavior on opacity { NumberAnimation { duration: 150 } }
                     fillMode: Image.PreserveAspectCrop
                     asynchronous: true
@@ -590,8 +598,9 @@ PanelWindow {
                     cache: true
                     smooth: true
                     source: delegateItem.fileName !== "" ? "file://" + main.cachePath + delegateItem.fileName : ""
-                    sourceSize.width: delegateItem.baseWidth * main.zoomScale
-                    sourceSize.height: delegateItem.height
+                    // Decode at a higher resolution when the global scale is above 100% so it stays sharp.
+                    sourceSize.width: delegateItem.baseWidth * main.zoomScale * Math.max(1, main.globalScale)
+                    sourceSize.height: delegateItem.height * Math.max(1, main.globalScale)
                     transform: Shear { xFactor: main.skewFactor }
 
                     Timer {
@@ -777,6 +786,7 @@ PanelWindow {
                 width: flick.width - 40 * panel.u
 
                 SectionHeader { text: "Layout" }
+                SliderRow { key: "globalScale"; label: "Scale" }
                 SliderRow { key: "tileCount"; label: "Tiles on screen" }
                 SliderRow { key: "zoomScale"; label: "Center tile size" }
                 SliderRow { key: "edgeScale"; label: "Edge tile size" }
@@ -794,6 +804,8 @@ PanelWindow {
 
                 SectionHeader { text: "Style" }
                 SliderRow { key: "skewFactor"; label: "Skew" }
+                SliderRow { key: "activeOpacity"; label: "Selected tile opacity" }
+                SliderRow { key: "inactiveOpacity"; label: "Other tiles opacity" }
                 ToggleRow { key: "shadowEnabled"; label: "Shadow" }
                 SliderRow { key: "shadowOpacity"; label: "Shadow opacity"; enabled: main.shadowEnabled }
 

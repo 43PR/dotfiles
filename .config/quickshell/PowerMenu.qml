@@ -14,6 +14,15 @@ Scope {
     property real winW: 0             // reported by the window while mounted
     property real winH: 0
 
+    // ---- per-icon size tweaks ----------------------------------------------
+    // Multiplier applied on top of the "Icon size" setting, one per action.
+    // 1.0 = the Icon size slider value; 0.9 = 10% smaller; 1.15 = 15% bigger.
+    property real shutdownIconScale: 1.1
+    property real rebootIconScale: 1.1
+    property real suspendIconScale: 0.8
+    property real logoutIconScale: 1.0
+    property real hibernateIconScale: 1.1
+
     onShowingChanged: {
         if (showing) {
             unmountTimer.stop()
@@ -31,6 +40,41 @@ Scope {
             root.mounted = false
             root.winW = 0
             root.winH = 0
+        }
+    }
+
+    // ---- settings window look (same properties as the wallpaper picker) ----
+    // Font, text sizes, radius and the menu scale are the same values the wallpaper
+    // picker's settings menu uses; scale / radius come from the same hub.json.
+    // Colours still come from the Theme singleton, as before.
+    //   ui     : resolution scale (1.0 at 1080p height)
+    //   menuUi : ui * hub "settingsScale"; multiply every settings-window size by it
+    readonly property QtObject th: QtObject {
+        property real settingsScale: 1.0
+        property int radius: 10
+
+        readonly property string fontFamily: "JetBrains Mono"
+        readonly property int animFast: 120
+        readonly property int animMed: 220
+        readonly property int textSizeSection: 15
+        readonly property int textSizeGroup: 12
+        readonly property int textSizeBody: 11
+        readonly property int textSizeSmall: 10
+    }
+    readonly property real ui: (targetScreen?.height ?? 1080) / 1080
+    readonly property real menuUi: ui * th.settingsScale
+
+    FileView {
+        path: Quickshell.env("HOME") + "/.config/quickshell/state/hub.json"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: {
+            try {
+                const h = JSON.parse(text())
+                if (typeof h.settingsScale === "number") root.th.settingsScale = Math.max(0.6, Math.min(1.2, h.settingsScale))
+                if (typeof h.radius === "number") root.th.radius = Math.round(Math.max(0, Math.min(50, h.radius)))
+            } catch (e) { console.warn("powermenu: malformed hub.json:", e) }
         }
     }
 
@@ -117,10 +161,8 @@ Scope {
     // how much of the panel must stay on screen when dragged past borders
     readonly property int keepVisible: 40
 
-    // icons: box around the glyph = icon + 12px, texture decoded at 2x
+    // box around the icon glyph = icon size + 12px
     readonly property int iconBox: showIcons ? iconSize + 12 : 0
-    readonly property int iconRes: Math.max(48, iconSize * 2)
-    readonly property bool lightMode: Theme._bgBase.hslLightness > 0.5
 
     // colours derived from the theme + opacity settings
     readonly property color panelColor: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, panelOpacity / 100)
@@ -136,18 +178,23 @@ Scope {
         || boolKeys.some(k => root[k] !== boolDefaults[k])
         || hiddenNames.length > 0
 
-    readonly property string iconDir: "file://" + Quickshell.env("HOME") + "/.config/quickshell/imgs/"
     readonly property string statePath: Quickshell.env("HOME") + "/.config/quickshell/state/powermenu-state.json"
 
     onCurrentIndexChanged: confirmName = ""
 
     // ---- actions ----------------------------------------------------------
+    // `glyph` is a Nerd Font icon drawn in the Theme.text colour.
+    //   shutdown  nf-md-power          U+F0425
+    //   reboot                         U+F0450
+    //   suspend   nf-fa-moon_o         U+F186
+    //   logout    nf-md-logout         U+F0343
+    //   hibernate nf-md-sleep          U+F04B2
     readonly property var actions: [
-        { name: "shutdown",  label: "Shut down", icon: "shutdown.png",  key: "s", danger: true,  cmd: ["systemctl", "poweroff"] },
-        { name: "reboot",    label: "Reboot",    icon: "reboot.png",    key: "r", danger: true,  cmd: ["systemctl", "reboot"] },
-        { name: "suspend",   label: "Suspend",   icon: "suspend.png",   key: "z", danger: false, cmd: ["systemctl", "suspend"] },
-        { name: "logout",    label: "Log out",   icon: "logout.png",    key: "e", danger: true,  dispatch: "hl.dsp.exit()" },
-        { name: "hibernate", label: "Hibernate", icon: "hibernate.png", key: "h", danger: false, cmd: ["systemctl", "hibernate"] }
+        { name: "shutdown",  label: "Shut down", glyph: "\udb81\udc25", key: "s", danger: true,  cmd: ["systemctl", "poweroff"] },
+        { name: "reboot",    label: "Reboot",    glyph: "\uead2", key: "r", danger: true,  cmd: ["systemctl", "reboot"] },
+        { name: "suspend",   label: "Suspend",   glyph: "\uf186",       key: "z", danger: false, cmd: ["systemctl", "suspend"] },
+        { name: "logout",    label: "Log out",   glyph: "\udb80\udf43", key: "e", danger: true,  dispatch: "hl.dsp.exit()" },
+        { name: "hibernate", label: "Hibernate", glyph: "\udb82\udd01", key: "h", danger: false, cmd: ["systemctl", "hibernate"] }
     ]
 
     readonly property var visibleActions: actions.filter(function (a) {
@@ -167,9 +214,10 @@ Scope {
         { keys: "Drag handle",            desc: "Move the menu" }
     ])
 
-    function iconFile(name) {
-        if (!root.lightMode) return name
-        return name.replace(/\.png$/, "2.png")
+    // per-icon multiplier, looked up from the *IconScale properties at the top
+    function iconScaleOf(name) {
+        var v = root[name + "IconScale"]
+        return (typeof v === "number" && v > 0) ? v : 1.0
     }
 
     function clamp(v, lo, hi) {
@@ -621,15 +669,14 @@ Scope {
                                             ? (entry.height - height - eLabel.implicitHeight - 2) / 2
                                             : (entry.height - height) / 2
 
-                                        Image {
+                                        // Font icon, coloured by the theme text colour
+                                        Text {
                                             anchors.centerIn: parent
-                                            width: root.iconSize
-                                            height: root.iconSize
-                                            sourceSize: Qt.size(root.iconRes, root.iconRes)
-                                            fillMode: Image.PreserveAspectFit
-                                            smooth: true
-                                            asynchronous: true
-                                            source: root.iconDir + root.iconFile(entry.modelData.icon)
+                                            text: entry.modelData.glyph
+                                            font.family: "Symbols Nerd Font"
+                                            font.pixelSize: Math.round(root.iconSize * root.iconScaleOf(entry.modelData.name))
+                                            color: entry.pending ? Theme.accent : Theme.text
+                                            Behavior on color { ColorAnimation { duration: 120 } }
                                         }
                                     }
 
@@ -712,7 +759,7 @@ Scope {
                                 id: footBtn
                                 anchors.right: parent.right
                                 anchors.verticalCenter: parent.verticalCenter
-                                label: "󰒓"
+                                label: "\udb81\udc93"
                                 fontSize: 12
                                 active: root.settingsOpen
                                 opacity: (hovered || root.settingsOpen) ? 1 : 0.1
@@ -734,6 +781,11 @@ Scope {
         }
     }
 
+    // ---- settings window ----------------------------------------------------
+    // Look matches the wallpaper picker's settings menu: JetBrains Mono, the same text
+    // sizes, hub.json radius, and everything scaled by `u` (= root.menuUi).
+    // No custom layer namespace is set here (the picker sets none either), so the
+    // compositor's layer rules, e.g. blur, apply to this window the same way.
     LazyLoader {
         active: root.settingsOpen
 
@@ -741,18 +793,19 @@ Scope {
             id: settingsWin
             screen: root.targetScreen
 
+            readonly property real u: root.menuUi
+
             color: "transparent"
-            implicitWidth: 420
-            implicitHeight: Math.min(640, (screen?.height ?? 800) * 0.85)
+            implicitWidth: Math.round(420 * u)
+            implicitHeight: Math.round(Math.min(640 * u, (screen?.height ?? 800) * 0.88))
             exclusionMode: ExclusionMode.Ignore
 
             WlrLayershell.layer: WlrLayer.Overlay
-            WlrLayershell.namespace: "powermenu-settings"
             WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
 
             Rectangle {
                 anchors.fill: parent
-                radius: 20
+                radius: root.th.radius * settingsWin.u
                 color: Theme.bg
                 border.width: 1
                 border.color: Theme.alpha(Theme.text, 0.12)
@@ -768,31 +821,34 @@ Scope {
                     id: head
                     anchors.top: parent.top
                     width: parent.width
-                    height: 60
+                    height: 58 * settingsWin.u
 
                     Text {
-                        x: 20; y: 12
+                        x: 20 * settingsWin.u; y: 9 * settingsWin.u
                         text: "Power menu settings"
-                        font.pixelSize: 15
+                        font.family: root.th.fontFamily
+                        font.pixelSize: root.th.textSizeSection * settingsWin.u
                         font.bold: true
                         color: Theme.text
                     }
                     Text {
-                        x: 20; y: 34
+                        x: 20 * settingsWin.u; y: 34 * settingsWin.u
                         text: "Drag the handle to move."
-                        font.pixelSize: 12
+                        font.family: root.th.fontFamily
+                        font.pixelSize: root.th.textSizeSmall * settingsWin.u
                         color: Theme.textDim
                     }
                     Text {
                         id: closeX
                         anchors.right: parent.right
-                        anchors.rightMargin: 20
-                        y: 10
-                        width: 24; height: 24
+                        anchors.rightMargin: 16 * settingsWin.u
+                        y: 8 * settingsWin.u
+                        width: 26 * settingsWin.u; height: 26 * settingsWin.u
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                         text: "×"
-                        font.pixelSize: 22
+                        font.family: root.th.fontFamily
+                        font.pixelSize: 22 * settingsWin.u
                         color: closeArea.containsMouse ? Theme.text : Theme.textDim
                         MouseArea {
                             id: closeArea
@@ -805,6 +861,8 @@ Scope {
                             hovered: closeArea.containsMouse
                             side: "belowEnd"
                             text: "Close (Esc)"
+                            u: settingsWin.u
+                            family: root.th.fontFamily
                         }
                     }
                 }
@@ -814,22 +872,22 @@ Scope {
                 Flickable {
                     id: flick
                     anchors.top: head.bottom
-                    anchors.topMargin: 4
+                    anchors.topMargin: 4 * settingsWin.u
                     anchors.bottom: foot.top
                     anchors.left: parent.left
                     anchors.right: parent.right
                     contentWidth: width
-                    contentHeight: contentCol.height + 16
+                    contentHeight: contentCol.height + 16 * settingsWin.u
                     clip: true
                     flickableDirection: Flickable.VerticalFlick
                     boundsBehavior: Flickable.StopAtBounds
 
                     Column {
                         id: contentCol
-                        x: 20
-                        width: flick.width - 48
+                        x: 20 * settingsWin.u
+                        width: flick.width - 48 * settingsWin.u
 
-                        SectionHeader { text: "Hints" }
+                        SectionHeader { host: root; text: "Hints" }
                         ToggleRow {
                             host: root
                             key: "showTooltips"
@@ -844,18 +902,18 @@ Scope {
                             checked: root.showFooter
                             tip: "Hides the gear button; C and right-click still work"
                         }
-                        SectionHeader { text: "Global" }
+                        SectionHeader { host: root; text: "Global" }
                         SliderRow { host: root; key: "menuSize"; label: "Scale"; tip: "Overall size of the power menu" }
                         SliderRow { host: root; key: "animMs"; label: "Animation duration"; tip: "0 disables animations" }
 
-                        SectionHeader { text: "Layout" }
+                        SectionHeader { host: root; text: "Layout" }
                         ToggleRow { host: root; key: "horizontal"; label: "Horizontal layout"; checked: root.horizontal; tip: "Show actions in a row instead of a list" }
                         SliderRow { host: root; key: "cardWidth"; label: "Width" }
                         SliderRow { host: root; key: "itemHeight"; label: "Item height" }
                         SliderRow { host: root; key: "itemSpacing"; label: "Item spacing" }
                         SliderRow { host: root; key: "panelPadding"; label: "Panel padding" }
 
-                        SectionHeader { text: "Content" }
+                        SectionHeader { host: root; text: "Content" }
                         ToggleRow { host: root; key: "showIcons"; label: "Icons"; checked: root.showIcons }
                         ToggleRow { host: root; key: "showLabels"; label: "Labels"; checked: root.showLabels }
                         ToggleRow {
@@ -867,26 +925,26 @@ Scope {
                             tip: "Small key badges (vertical layout only)"
                         }
 
-                        SectionHeader { text: "Appearance" }
+                        SectionHeader { host: root; text: "Appearance" }
                         SliderRow { host: root; key: "panelRadius"; label: "Panel roundness" }
                         SliderRow { host: root; key: "itemRadius"; label: "Item roundness" }
                         SliderRow { host: root; key: "iconSize"; label: "Icon size"; enabled: root.showIcons }
                         SliderRow { host: root; key: "labelSize"; label: "Label size"; enabled: root.showLabels }
                         SliderRow { host: root; key: "borderWidth"; label: "Selection border" }
 
-                        SectionHeader { text: "Opacity" }
+                        SectionHeader { host: root; text: "Opacity" }
                         SliderRow { host: root; key: "panelOpacity"; label: "Panel background" }
                         SliderRow { host: root; key: "itemOpacity"; label: "Item background" }
                         SliderRow { host: root; key: "hoverBoost"; label: "Hover / selected highlight" }
                         SliderRow { host: root; key: "dimOpacity"; label: "Dim screen behind menu" }
 
-                        SectionHeader { text: "Behavior" }
+                        SectionHeader { host: root; text: "Behavior" }
                         ToggleRow { host: root; key: "confirmDangerous"; label: "Confirm shutdown / reboot / logout"; checked: root.confirmDangerous; tip: "Requires a second press to confirm" }
                         ToggleRow { host: root; key: "wrapNav"; label: "Wrap around when navigating"; checked: root.wrapNav }
                         ToggleRow { host: root; key: "hoverSelect"; label: "Hover selects item"; checked: root.hoverSelect }
                         ToggleRow { host: root; key: "closeOnOutside"; label: "Close on click outside"; checked: root.closeOnOutside }
 
-                        SectionHeader { text: "Visible actions" }
+                        SectionHeader { host: root; text: "Visible actions" }
                         Repeater {
                             model: root.actions
                             delegate: ToggleRow {
@@ -898,8 +956,9 @@ Scope {
                             }
                         }
 
-                        SectionHeader { text: "Position" }
+                        SectionHeader { host: root; text: "Position" }
                         ActionButton {
+                            host: root
                             label: "Reset position"
                             enabled: root.movedFromDefault
                             tipsOn: root.showTooltips
@@ -907,11 +966,12 @@ Scope {
                             onClicked: root.resetPosition()
                         }
 
-                        SectionHeader { text: "Keybinds" }
+                        SectionHeader { host: root; text: "Keybinds" }
                         Repeater {
                             model: root.keybindInfo
                             delegate: KeyRow {
                                 required property var modelData
+                                host: root
                                 keys: modelData.keys
                                 desc: modelData.desc
                             }
@@ -924,21 +984,21 @@ Scope {
                 Rectangle {
                     id: sbTrack
                     visible: flick.contentHeight > flick.height
-                    x: flick.x + flick.width - 14
+                    x: flick.x + flick.width - 14 * settingsWin.u
                     y: flick.y
-                    width: 4
+                    width: 4 * settingsWin.u
                     height: flick.height
-                    radius: 2
+                    radius: width / 2
                     color: Theme.alpha(Theme.text, 0.08)
                 }
 
                 Rectangle {
                     id: sbHandle
                     visible: flick.contentHeight > flick.height
-                    x: flick.x + flick.width - 14
-                    width: 4
-                    radius: 2
-                    height: Math.max(24, flick.height * flick.visibleArea.heightRatio)
+                    x: flick.x + flick.width - 14 * settingsWin.u
+                    width: 4 * settingsWin.u
+                    radius: width / 2
+                    height: Math.max(24 * settingsWin.u, flick.height * flick.visibleArea.heightRatio)
                     y: flick.y + flick.visibleArea.yPosition * flick.height
                     color: Theme.text
                     opacity: (sbArea.containsMouse || sbArea.pressed || flick.moving) ? 0.7 : 0.3
@@ -947,7 +1007,7 @@ Scope {
                     MouseArea {
                         id: sbArea
                         anchors.fill: parent
-                        anchors.margins: -5
+                        anchors.margins: -5 * settingsWin.u
                         hoverEnabled: true
 
                         // Not using drag.target: dragging would overwrite the
@@ -977,7 +1037,7 @@ Scope {
                     id: foot
                     anchors.bottom: parent.bottom
                     width: parent.width
-                    height: 58
+                    height: 58 * settingsWin.u
 
                     Rectangle {
                         width: parent.width
@@ -986,7 +1046,8 @@ Scope {
                     }
 
                     ActionButton {
-                        x: 20
+                        host: root
+                        x: 20 * settingsWin.u
                         anchors.verticalCenter: parent.verticalCenter
                         label: "Reset all"
                         enabled: root.modified
@@ -996,8 +1057,9 @@ Scope {
                         onClicked: root.resetAll()
                     }
                     ActionButton {
+                        host: root
                         anchors.right: parent.right
-                        anchors.rightMargin: 20
+                        anchors.rightMargin: 20 * settingsWin.u
                         anchors.verticalCenter: parent.verticalCenter
                         label: "Done"
                         primary: true
@@ -1016,12 +1078,15 @@ Scope {
     // Lightweight hover hint drawn inside the host's own window (no extra
     // popup surface). Appears after a short delay, only if `allowed`.
     // The host should raise its own z while `shown` so the hint isn't covered
-    // by siblings.
+    // by siblings. `u` / `family` let the settings window scale it and use the
+    // shared font; the main menu keeps the defaults.
     component Tip: Rectangle {
         id: tp
         property string text: ""
         property bool allowed: false
         property bool hovered: false
+        property real u: 1
+        property string family: Qt.application.font.family
         // left | below | belowStart | belowEnd | above
         property string side: "belowStart"
         property bool shown: false
@@ -1043,9 +1108,9 @@ Scope {
         }
 
         z: 1000
-        width: tipText.implicitWidth + 16
-        height: tipText.implicitHeight + 10
-        radius: 6
+        width: tipText.implicitWidth + 16 * u
+        height: tipText.implicitHeight + 10 * u
+        radius: 6 * u
         color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, 1)
         border.width: 1
         border.color: Theme.alpha(Theme.text, 0.15)
@@ -1053,19 +1118,20 @@ Scope {
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: 120 } }
 
-        x: side === "left" ? -width - 8
+        x: side === "left" ? -width - 8 * u
          : side === "below" ? (parent.width - width) / 2
          : side === "belowEnd" ? parent.width - width
          : 0
         y: side === "left" ? (parent.height - height) / 2
-         : side === "above" ? -height - 4
-         : parent.height + 4
+         : side === "above" ? -height - 4 * u
+         : parent.height + 4 * u
 
         Text {
             id: tipText
             anchors.centerIn: parent
             text: tp.text
-            font.pixelSize: 10
+            font.family: tp.family
+            font.pixelSize: 10 * tp.u
             color: Theme.text
         }
     }
@@ -1108,31 +1174,37 @@ Scope {
         }
     }
 
+    // Settings-window components below take `host` (the root Scope) and read the
+    // shared scale / font / sizes from host.menuUi and host.th, like the picker's.
     component ActionButton: Rectangle {
         id: ab
+        property var host
         property string label: ""
         property bool primary: false
         property string tip: ""
         property bool tipsOn: false
         property string tipSide: "belowStart"
+        readonly property real u: host.menuUi
+        readonly property QtObject th: host.th
         signal clicked()
 
-        implicitWidth: abText.implicitWidth + 28
+        implicitWidth: abText.implicitWidth + 28 * u
         width: implicitWidth
-        height: 30
-        radius: 15
+        height: 30 * u
+        radius: Math.min(height / 2, ab.th.radius * u)
         z: abTip.shown ? 100 : 0
         opacity: enabled ? 1 : 0.4
         color: primary
             ? Theme.accent
-            : Theme.alpha(Theme.text, abArea.containsMouse ? 0.18 : 0.1)
-        Behavior on color { ColorAnimation { duration: 120 } }
+            : Theme.alpha(Theme.text, abArea.containsMouse && enabled ? 0.18 : 0.1)
+        Behavior on color { ColorAnimation { duration: ab.th.animFast } }
 
         Text {
             id: abText
             anchors.centerIn: parent
             text: ab.label
-            font.pixelSize: 11
+            font.family: ab.th.fontFamily
+            font.pixelSize: ab.th.textSizeBody * ab.u
             font.bold: true
             color: ab.primary ? Theme.bg : Theme.text
         }
@@ -1151,20 +1223,27 @@ Scope {
             hovered: abArea.containsMouse
             side: ab.tipSide
             text: ab.tip
+            u: ab.u
+            family: ab.th.fontFamily
         }
     }
 
     component SectionHeader: Item {
+        id: sh
+        property var host
         property string text: ""
+        readonly property real u: host.menuUi
+        readonly property QtObject th: host.th
         width: parent?.width ?? 0
-        height: 32
+        height: 32 * u
 
         Text {
             anchors.left: parent.left
             anchors.bottom: parent.bottom
-            anchors.bottomMargin: 4
-            text: parent.text
-            font.pixelSize: 10
+            anchors.bottomMargin: 4 * sh.u
+            text: sh.text
+            font.family: sh.th.fontFamily
+            font.pixelSize: sh.th.textSizeSmall * sh.u
             font.bold: true
             font.letterSpacing: 1.2
             font.capitalization: Font.AllUppercase
@@ -1175,20 +1254,24 @@ Scope {
     // One line of the keybind cheat-sheet: description left, key chip right.
     component KeyRow: Item {
         id: kr
+        property var host
         property string keys: ""
         property string desc: ""
+        readonly property real u: host.menuUi
+        readonly property QtObject th: host.th
 
         width: parent?.width ?? 0
-        height: 26
+        height: 26 * u
 
         Text {
             anchors.left: parent.left
             anchors.right: chip.left
-            anchors.rightMargin: 12
+            anchors.rightMargin: 12 * kr.u
             anchors.verticalCenter: parent.verticalCenter
             text: kr.desc
             elide: Text.ElideRight
-            font.pixelSize: 11
+            font.family: kr.th.fontFamily
+            font.pixelSize: kr.th.textSizeBody * kr.u
             color: Theme.text
         }
 
@@ -1196,16 +1279,17 @@ Scope {
             id: chip
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
-            width: chipText.implicitWidth + 14
-            height: 18
-            radius: 5
+            width: chipText.implicitWidth + 14 * kr.u
+            height: 18 * kr.u
+            radius: 5 * kr.u
             color: Theme.alpha(Theme.text, 0.08)
 
             Text {
                 id: chipText
                 anchors.centerIn: parent
                 text: kr.keys
-                font.pixelSize: 10
+                font.family: kr.th.fontFamily
+                font.pixelSize: kr.th.textSizeSmall * kr.u
                 font.bold: true
                 color: Theme.textDim
             }
@@ -1221,29 +1305,32 @@ Scope {
         property string label: ""
         property string tip: ""
         property bool checked: false
+        readonly property real u: host.menuUi
+        readonly property QtObject th: host.th
         signal toggled()
 
         width: parent?.width ?? 0
-        height: 34
+        height: 34 * u
         z: trTip.shown ? 100 : 0
         opacity: enabled ? 1 : 0.4
 
         Rectangle {
             anchors.fill: parent
-            anchors.leftMargin: -8
-            anchors.rightMargin: -8
-            radius: 8
+            anchors.leftMargin: -8 * tr.u
+            anchors.rightMargin: -8 * tr.u
+            radius: Math.min(8 * tr.u, tr.th.radius * tr.u)
             color: trArea.containsMouse && tr.enabled ? Theme.alpha(Theme.text, 0.06) : "transparent"
         }
 
         Text {
             anchors.left: parent.left
             anchors.right: sw.left
-            anchors.rightMargin: 12
+            anchors.rightMargin: 12 * tr.u
             anchors.verticalCenter: parent.verticalCenter
             text: tr.label
             elide: Text.ElideRight
-            font.pixelSize: 12
+            font.family: tr.th.fontFamily
+            font.pixelSize: tr.th.textSizeGroup * tr.u
             font.bold: true
             color: Theme.text
         }
@@ -1252,18 +1339,18 @@ Scope {
             id: sw
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
-            width: 36; height: 20; radius: 10
+            width: 36 * tr.u; height: 20 * tr.u; radius: height / 2
             color: tr.checked ? Theme.accent : "transparent"
             border.width: 1
             border.color: tr.checked ? Theme.accent : Theme.alpha(Theme.text, 0.3)
-            Behavior on color { ColorAnimation { duration: 150 } }
+            Behavior on color { ColorAnimation { duration: tr.th.animMed } }
 
             Rectangle {
-                width: 14; height: 14; radius: 7
+                width: 14 * tr.u; height: 14 * tr.u; radius: width / 2
                 anchors.verticalCenter: parent.verticalCenter
-                x: tr.checked ? parent.width - width - 3 : 3
+                x: tr.checked ? parent.width - width - 3 * tr.u : 3 * tr.u
                 color: tr.checked ? Theme.bg : Theme.text
-                Behavior on x { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                Behavior on x { NumberAnimation { duration: tr.th.animMed; easing.type: Easing.OutCubic } }
             }
         }
 
@@ -1286,6 +1373,8 @@ Scope {
             hovered: trArea.containsMouse
             side: "belowStart"
             text: tr.tip
+            u: tr.u
+            family: tr.th.fontFamily
         }
     }
 
@@ -1297,30 +1386,34 @@ Scope {
         property string key: ""
         property string label: ""
         property string tip: ""
+        readonly property real u: host.menuUi
+        readonly property QtObject th: host.th
 
         readonly property var spec: host.numSpec[key]
         readonly property real ratio: Math.max(0, Math.min(1,
             (host[key] - spec.min) / (spec.max - spec.min)))
 
         width: parent?.width ?? 0
-        height: 44
+        height: 46 * u
         z: srTip.shown ? 100 : 0
         opacity: enabled ? 1 : 0.4
 
         Text {
             anchors.left: parent.left
-            y: 6
+            y: 6 * sr.u
             text: sr.label
-            font.pixelSize: 12
+            font.family: sr.th.fontFamily
+            font.pixelSize: sr.th.textSizeGroup * sr.u
             font.bold: true
             color: Theme.text
         }
 
         Text {
             anchors.right: parent.right
-            y: 6
+            y: 6 * sr.u
             text: sr.host.fmtValue(sr.key, sr.host[sr.key])
-            font.pixelSize: 11
+            font.family: sr.th.fontFamily
+            font.pixelSize: sr.th.textSizeBody * sr.u
             color: Theme.textDim
         }
 
@@ -1328,23 +1421,23 @@ Scope {
             id: track
             anchors.left: parent.left
             anchors.right: parent.right
-            y: 30
-            height: 4
-            radius: 2
+            y: 31 * sr.u
+            height: 4 * sr.u
+            radius: height / 2
             color: Theme.alpha(Theme.text, 0.15)
 
             Rectangle {
                 width: knob.x + knob.width / 2
                 height: parent.height
-                radius: 2
+                radius: parent.radius
                 color: Theme.accent
             }
 
             Rectangle {
                 id: knob
-                width: 14
-                height: 14
-                radius: 7
+                width: 14 * sr.u
+                height: 14 * sr.u
+                radius: width / 2
                 anchors.verticalCenter: parent.verticalCenter
                 x: sr.ratio * (track.width - width)
                 color: Theme.text
@@ -1354,9 +1447,9 @@ Scope {
         MouseArea {
             id: sliderArea
             anchors.fill: parent
-            anchors.topMargin: 20
+            anchors.topMargin: 20 * sr.u
             hoverEnabled: true
-            preventStealing: true  
+            preventStealing: true
             enabled: sr.enabled
 
             function apply(mx) {
@@ -1380,6 +1473,8 @@ Scope {
             hovered: sliderArea.containsMouse && !sliderArea.pressed
             side: "belowStart"
             text: sr.tip
+            u: sr.u
+            family: sr.th.fontFamily
         }
     }
 }

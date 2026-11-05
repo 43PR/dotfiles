@@ -36,7 +36,7 @@ case "${img,,}" in
             awww img "$theme_img" -t "$transition" --transition-duration "$duration"
             sleep "$duration"
         fi
-        setsid -f mpvpaper -o "no-audio loop hwdec=auto" '*' "$img" \
+        setsid -f mpvpaper -o "no-audio loop hwdec=auto --panscan=1.0" '*' "$img" \
             >>"$HOME/.cache/43pr/mpvpaper.log" 2>&1
         echo "$img" > "$HOME/.cache/43pr/last-live"
         ;;

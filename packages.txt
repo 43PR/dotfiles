@@ -39,6 +39,8 @@ slurp
 gpu-screen-recorder
 imagemagick
 matugen
+tesseract
+tesseract-data-eng
 
 # --------------------------------------------------
 # Networking / Bluetooth

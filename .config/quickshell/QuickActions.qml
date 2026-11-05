@@ -15,6 +15,8 @@ Scope {
     property real winW: 0             // reported by the window while mounted
     property real winH: 0
 
+    Component.onCompleted: BluetoothState.init()
+
     onShowingChanged: {
         if (showing) {
             unmountTimer.stop()
@@ -32,6 +34,41 @@ Scope {
             root.mounted = false
             root.winW = 0
             root.winH = 0
+        }
+    }
+
+    // ---- settings window look (same properties as the wallpaper picker) ----
+    // Font, text sizes, radius and the menu scale are the same values the wallpaper
+    // picker's settings menu uses; scale / radius come from the same hub.json.
+    // Colours still come from the Theme singleton, as before.
+    //   ui     : resolution scale (1.0 at 1080p height)
+    //   menuUi : ui * hub "settingsScale"; multiply every settings-window size by it
+    readonly property QtObject th: QtObject {
+        property real settingsScale: 1.0
+        property int radius: 10
+
+        readonly property string fontFamily: "JetBrains Mono"
+        readonly property int animFast: 120
+        readonly property int animMed: 220
+        readonly property int textSizeSection: 15
+        readonly property int textSizeGroup: 12
+        readonly property int textSizeBody: 11
+        readonly property int textSizeSmall: 10
+    }
+    readonly property real ui: (targetScreen?.height ?? 1080) / 1080
+    readonly property real menuUi: ui * th.settingsScale
+
+    FileView {
+        path: Quickshell.env("HOME") + "/.config/quickshell/state/hub.json"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: {
+            try {
+                const h = JSON.parse(text())
+                if (typeof h.settingsScale === "number") root.th.settingsScale = Math.max(0.6, Math.min(1.2, h.settingsScale))
+                if (typeof h.radius === "number") root.th.radius = Math.round(Math.max(0, Math.min(50, h.radius)))
+            } catch (e) { console.warn("quickactions: malformed hub.json:", e) }
         }
     }
 
@@ -129,6 +166,15 @@ Scope {
     property bool dndOn: false
     property real brightness: 0.6          // 0..1, synced from brightnessctl
     readonly property bool btOn: Bluetooth.defaultAdapter ? Bluetooth.defaultAdapter.enabled : false
+    // true while any device is mid-connect (reconnectRemembered(), manual connect, etc.)
+    readonly property bool btConnecting: {
+        const a = Bluetooth.defaultAdapter
+        if (!a || !a.enabled || !a.devices) return false
+        const devs = a.devices.values !== undefined ? a.devices.values : a.devices
+        for (let i = 0; i < devs.length; i++)
+        if (devs[i].state === BluetoothDeviceState.Connecting) return true
+        return false
+    }
 
     readonly property int edgeGap: 0
     // how much of the panel must stay on screen when dragged past borders
@@ -441,28 +487,7 @@ Scope {
             root.adjustNight(dir * root.nightStep)
     }
 
-    // ---- bluetooth: disconnect devices first, then power off --------------
-    Timer {
-        id: btOffTimer
-        interval: 400
-        onTriggered: {
-            if (Bluetooth.defaultAdapter) Bluetooth.defaultAdapter.enabled = false
-        }
-    }
-
-    function toggleBluetooth() {
-        var a = Bluetooth.defaultAdapter
-        if (!a) return
-        if (a.enabled) {
-            var devs = a.devices.values
-            for (var i = 0; i < devs.length; i++) {
-                if (devs[i].connected) devs[i].disconnect()
-            }
-            btOffTimer.restart()
-        } else {
-            a.enabled = true
-        }
-    }
+    function toggleBluetooth() { BluetoothState.togglePower() }
 
     function toggleItem(name) {
         switch (name) {
@@ -1065,6 +1090,23 @@ Scope {
                                             border.color: Theme.accent
                                         }
                                     }
+                                    // Blinking border while Bluetooth is connecting. Separate from the
+                                    // focus border so both can coexist. The animation only runs while needed.
+                                    Rectangle {
+                                        visible: entry.modelData.name === "bt" && root.btConnecting
+                                        anchors.fill: parent
+                                        radius: entry.radius
+                                        color: "transparent"
+                                        border.width: Math.max(1, root.borderWidth)
+                                        border.color: Theme.accent
+                                        opacity: 1
+                                        SequentialAnimation on opacity {
+                                            running: parent.visible && root.animMs > 0
+                                            loops: Animation.Infinite
+                                            NumberAnimation { to: 0.1; duration: 500; easing.type: Easing.InOutSine }
+                                            NumberAnimation { to: 1.0; duration: 500; easing.type: Easing.InOutSine }
+                                        }
+                                    }
 
                                     MouseArea {
                                         id: entryArea
@@ -1143,6 +1185,11 @@ Scope {
         }
     }
 
+    // ---- settings window ----------------------------------------------------
+    // Look matches the wallpaper picker's settings menu: JetBrains Mono, the same text
+    // sizes, hub.json radius, and everything scaled by `u` (= root.menuUi).
+    // No custom layer namespace is set here (the picker sets none either), so the
+    // compositor's layer rules, e.g. blur, apply to this window the same way.
     LazyLoader {
         active: root.settingsOpen
 
@@ -1150,18 +1197,19 @@ Scope {
             id: settingsWin
             screen: root.targetScreen
 
+            readonly property real u: root.menuUi
+
             color: "transparent"
-            implicitWidth: 420
-            implicitHeight: Math.min(640, (screen?.height ?? 800) * 0.85)
+            implicitWidth: Math.round(420 * u)
+            implicitHeight: Math.round(Math.min(640 * u, (screen?.height ?? 800) * 0.88))
             exclusionMode: ExclusionMode.Ignore
 
             WlrLayershell.layer: WlrLayer.Overlay
-            WlrLayershell.namespace: "qa-settings"
             WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
 
             Rectangle {
                 anchors.fill: parent
-                radius: 20
+                radius: root.th.radius * settingsWin.u
                 color: Theme.bg
                 border.width: 1
                 border.color: Theme.alpha(Theme.text, 0.12)
@@ -1177,31 +1225,34 @@ Scope {
                     id: head
                     anchors.top: parent.top
                     width: parent.width
-                    height: 60
+                    height: 58 * settingsWin.u
 
                     Text {
-                        x: 20; y: 12
+                        x: 20 * settingsWin.u; y: 9 * settingsWin.u
                         text: "Quick actions settings"
-                        font.pixelSize: 15
+                        font.family: root.th.fontFamily
+                        font.pixelSize: root.th.textSizeSection * settingsWin.u
                         font.bold: true
                         color: Theme.text
                     }
                     Text {
-                        x: 20; y: 34
+                        x: 20 * settingsWin.u; y: 34 * settingsWin.u
                         text: "Drag the handle to move."
-                        font.pixelSize: 12
+                        font.family: root.th.fontFamily
+                        font.pixelSize: root.th.textSizeSmall * settingsWin.u
                         color: Theme.textDim
                     }
                     Text {
                         id: closeX
                         anchors.right: parent.right
-                        anchors.rightMargin: 20
-                        y: 10
-                        width: 24; height: 24
+                        anchors.rightMargin: 16 * settingsWin.u
+                        y: 8 * settingsWin.u
+                        width: 26 * settingsWin.u; height: 26 * settingsWin.u
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                         text: "×"
-                        font.pixelSize: 22
+                        font.family: root.th.fontFamily
+                        font.pixelSize: 22 * settingsWin.u
                         color: closeArea.containsMouse ? Theme.text : Theme.textDim
                         MouseArea {
                             id: closeArea
@@ -1214,6 +1265,8 @@ Scope {
                             hovered: closeArea.containsMouse
                             side: "belowEnd"
                             text: "Close (Esc)"
+                            u: settingsWin.u
+                            family: root.th.fontFamily
                         }
                     }
                 }
@@ -1223,22 +1276,22 @@ Scope {
                 Flickable {
                     id: flick
                     anchors.top: head.bottom
-                    anchors.topMargin: 4
+                    anchors.topMargin: 4 * settingsWin.u
                     anchors.bottom: foot.top
                     anchors.left: parent.left
                     anchors.right: parent.right
                     contentWidth: width
-                    contentHeight: contentCol.height + 16
+                    contentHeight: contentCol.height + 16 * settingsWin.u
                     clip: true
                     flickableDirection: Flickable.VerticalFlick
                     boundsBehavior: Flickable.StopAtBounds
 
                     Column {
                         id: contentCol
-                        x: 20
-                        width: flick.width - 48
+                        x: 20 * settingsWin.u
+                        width: flick.width - 48 * settingsWin.u
 
-                        QaSectionHeader { text: "Hints" }
+                        QaSectionHeader { host: root; text: "Hints" }
                         QaToggleRow {
                             host: root
                             key: "showTooltips"
@@ -1253,18 +1306,18 @@ Scope {
                             checked: root.showFooter
                             tip: "Hides the gear button; C and right-click still work"
                         }
-                        QaSectionHeader { text: "Global" }
+                        QaSectionHeader { host: root; text: "Global" }
                         QaSliderRow { host: root; key: "menuSize"; label: "Scale"; tip: "Overall size of the menu" }
                         QaSliderRow { host: root; key: "animMs"; label: "Animation duration"; tip: "0 disables animations" }
 
-                        QaSectionHeader { text: "Layout" }
+                        QaSectionHeader { host: root; text: "Layout" }
                         QaToggleRow { host: root; key: "horizontal"; label: "Horizontal layout"; checked: root.horizontal; tip: "Show actions in a row instead of a list" }
                         QaSliderRow { host: root; key: "cardWidth"; label: "Width" }
                         QaSliderRow { host: root; key: "itemHeight"; label: "Item height" }
                         QaSliderRow { host: root; key: "itemSpacing"; label: "Item spacing" }
                         QaSliderRow { host: root; key: "panelPadding"; label: "Panel padding" }
 
-                        QaSectionHeader { text: "Content" }
+                        QaSectionHeader { host: root; text: "Content" }
                         QaToggleRow { host: root; key: "showIcons"; label: "Icons"; checked: root.showIcons }
                         QaToggleRow { host: root; key: "showLabels"; label: "Labels"; checked: root.showLabels }
                         QaToggleRow {
@@ -1284,30 +1337,30 @@ Scope {
                             tip: "Small key badges (vertical layout only)"
                         }
 
-                        QaSectionHeader { text: "Appearance" }
+                        QaSectionHeader { host: root; text: "Appearance" }
                         QaSliderRow { host: root; key: "panelRadius"; label: "Panel roundness" }
                         QaSliderRow { host: root; key: "itemRadius"; label: "Item roundness" }
                         QaSliderRow { host: root; key: "iconSize"; label: "Icon size"; enabled: root.showIcons }
                         QaSliderRow { host: root; key: "labelSize"; label: "Label size"; enabled: root.showLabels }
                         QaSliderRow { host: root; key: "borderWidth"; label: "Selection border"; tip: "Also the thickness of the brightness / night light progress border" }
 
-                        QaSectionHeader { text: "Opacity" }
+                        QaSectionHeader { host: root; text: "Opacity" }
                         QaSliderRow { host: root; key: "panelOpacity"; label: "Panel background" }
                         QaSliderRow { host: root; key: "itemOpacity"; label: "Item background" }
                         QaSliderRow { host: root; key: "hoverBoost"; label: "Hover / selected highlight" }
                         QaSliderRow { host: root; key: "dimOpacity"; label: "Dim screen behind menu" }
 
-                        QaSectionHeader { text: "Quick actions" }
+                        QaSectionHeader { host: root; text: "Quick actions" }
                         QaSliderRow { host: root; key: "brightnessStep"; label: "Brightness step"; tip: "Percent per scroll notch / keypress" }
                         QaSliderRow { host: root; key: "nightTemp"; label: "Night light temperature"; tip: "Scroll over the Night light row to change it; applies live while on" }
                         QaSliderRow { host: root; key: "nightStep"; label: "Night light step"; tip: "Kelvin per scroll notch / keypress" }
 
-                        QaSectionHeader { text: "Behavior" }
+                        QaSectionHeader { host: root; text: "Behavior" }
                         QaToggleRow { host: root; key: "wrapNav"; label: "Wrap around when navigating"; checked: root.wrapNav }
                         QaToggleRow { host: root; key: "hoverSelect"; label: "Hover selects item"; checked: root.hoverSelect }
                         QaToggleRow { host: root; key: "closeOnOutside"; label: "Close on click outside"; checked: root.closeOnOutside }
 
-                        QaSectionHeader { text: "Visible actions" }
+                        QaSectionHeader { host: root; text: "Visible actions" }
                         Repeater {
                             model: root.actions
                             delegate: QaToggleRow {
@@ -1319,8 +1372,9 @@ Scope {
                             }
                         }
 
-                        QaSectionHeader { text: "Position" }
+                        QaSectionHeader { host: root; text: "Position" }
                         QaActionButton {
+                            host: root
                             label: "Reset position"
                             enabled: root.movedFromDefault
                             tipsOn: root.showTooltips
@@ -1328,7 +1382,7 @@ Scope {
                             onClicked: root.resetPosition()
                         }
 
-                        QaSectionHeader { text: "Keybinds" }
+                        QaSectionHeader { host: root; text: "Keybinds" }
                         Repeater {
                             model: root.keybindInfo
                             // one line of the keybind cheat-sheet:
@@ -1337,16 +1391,17 @@ Scope {
                                 id: kbRow
                                 required property var modelData
                                 width: contentCol.width
-                                height: 26
+                                height: 26 * settingsWin.u
 
                                 Text {
                                     anchors.left: parent.left
                                     anchors.right: kbChip.left
-                                    anchors.rightMargin: 12
+                                    anchors.rightMargin: 12 * settingsWin.u
                                     anchors.verticalCenter: parent.verticalCenter
                                     text: kbRow.modelData.desc
                                     elide: Text.ElideRight
-                                    font.pixelSize: 11
+                                    font.family: root.th.fontFamily
+                                    font.pixelSize: root.th.textSizeBody * settingsWin.u
                                     color: Theme.text
                                 }
 
@@ -1354,16 +1409,17 @@ Scope {
                                     id: kbChip
                                     anchors.right: parent.right
                                     anchors.verticalCenter: parent.verticalCenter
-                                    width: kbChipText.implicitWidth + 14
-                                    height: 18
-                                    radius: 5
+                                    width: kbChipText.implicitWidth + 14 * settingsWin.u
+                                    height: 18 * settingsWin.u
+                                    radius: 5 * settingsWin.u
                                     color: Theme.alpha(Theme.text, 0.08)
 
                                     Text {
                                         id: kbChipText
                                         anchors.centerIn: parent
                                         text: kbRow.modelData.keys
-                                        font.pixelSize: 10
+                                        font.family: root.th.fontFamily
+                                        font.pixelSize: root.th.textSizeSmall * settingsWin.u
                                         font.bold: true
                                         color: Theme.textDim
                                     }
@@ -1378,21 +1434,21 @@ Scope {
                 Rectangle {
                     id: sbTrack
                     visible: flick.contentHeight > flick.height
-                    x: flick.x + flick.width - 14
+                    x: flick.x + flick.width - 14 * settingsWin.u
                     y: flick.y
-                    width: 4
+                    width: 4 * settingsWin.u
                     height: flick.height
-                    radius: 2
+                    radius: width / 2
                     color: Theme.alpha(Theme.text, 0.08)
                 }
 
                 Rectangle {
                     id: sbHandle
                     visible: flick.contentHeight > flick.height
-                    x: flick.x + flick.width - 14
-                    width: 4
-                    radius: 2
-                    height: Math.max(24, flick.height * flick.visibleArea.heightRatio)
+                    x: flick.x + flick.width - 14 * settingsWin.u
+                    width: 4 * settingsWin.u
+                    radius: width / 2
+                    height: Math.max(24 * settingsWin.u, flick.height * flick.visibleArea.heightRatio)
                     y: flick.y + flick.visibleArea.yPosition * flick.height
                     color: Theme.text
                     opacity: (sbArea.containsMouse || sbArea.pressed || flick.moving) ? 0.7 : 0.3
@@ -1401,7 +1457,7 @@ Scope {
                     MouseArea {
                         id: sbArea
                         anchors.fill: parent
-                        anchors.margins: -5
+                        anchors.margins: -5 * settingsWin.u
                         hoverEnabled: true
 
                         // Not using drag.target: dragging would overwrite the
@@ -1431,7 +1487,7 @@ Scope {
                     id: foot
                     anchors.bottom: parent.bottom
                     width: parent.width
-                    height: 58
+                    height: 58 * settingsWin.u
 
                     Rectangle {
                         width: parent.width
@@ -1440,7 +1496,8 @@ Scope {
                     }
 
                     QaActionButton {
-                        x: 20
+                        host: root
+                        x: 20 * settingsWin.u
                         anchors.verticalCenter: parent.verticalCenter
                         label: "Reset all"
                         enabled: root.modified
@@ -1450,8 +1507,9 @@ Scope {
                         onClicked: root.resetAll()
                     }
                     QaActionButton {
+                        host: root
                         anchors.right: parent.right
-                        anchors.rightMargin: 20
+                        anchors.rightMargin: 20 * settingsWin.u
                         anchors.verticalCenter: parent.verticalCenter
                         label: "Done"
                         primary: true
@@ -1470,12 +1528,15 @@ Scope {
     // Lightweight hover hint drawn inside the host's own window (no extra
     // popup surface). Appears after a short delay, only if `allowed`.
     // The host should raise its own z while `shown` so the hint isn't covered
-    // by siblings.
+    // by siblings. `u` / `family` let the settings window scale it and use the
+    // shared font; the main menu keeps the defaults.
     component QaTip: Rectangle {
         id: tp
         property string text: ""
         property bool allowed: false
         property bool hovered: false
+        property real u: 1
+        property string family: Qt.application.font.family
         // left | below | belowStart | belowEnd | above
         property string side: "belowStart"
         property bool shown: false
@@ -1497,9 +1558,9 @@ Scope {
         }
 
         z: 1000
-        width: tipText.implicitWidth + 16
-        height: tipText.implicitHeight + 10
-        radius: 6
+        width: tipText.implicitWidth + 16 * u
+        height: tipText.implicitHeight + 10 * u
+        radius: 6 * u
         color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, 1)
         border.width: 1
         border.color: Theme.alpha(Theme.text, 0.15)
@@ -1507,19 +1568,20 @@ Scope {
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: 120 } }
 
-        x: side === "left" ? -width - 8
+        x: side === "left" ? -width - 8 * u
          : side === "below" ? (parent.width - width) / 2
          : side === "belowEnd" ? parent.width - width
          : 0
         y: side === "left" ? (parent.height - height) / 2
-         : side === "above" ? -height - 4
-         : parent.height + 4
+         : side === "above" ? -height - 4 * u
+         : parent.height + 4 * u
 
         Text {
             id: tipText
             anchors.centerIn: parent
             text: tp.text
-            font.pixelSize: 10
+            font.family: tp.family
+            font.pixelSize: 10 * tp.u
             color: Theme.text
         }
     }
@@ -1562,31 +1624,37 @@ Scope {
         }
     }
 
+    // Settings-window components below take `host` (the root Scope) and read the
+    // shared scale / font / sizes from host.menuUi and host.th, like the picker's.
     component QaActionButton: Rectangle {
         id: ab
+        property var host
         property string label: ""
         property bool primary: false
         property string tip: ""
         property bool tipsOn: false
         property string tipSide: "belowStart"
+        readonly property real u: host.menuUi
+        readonly property QtObject th: host.th
         signal clicked()
 
-        implicitWidth: abText.implicitWidth + 28
+        implicitWidth: abText.implicitWidth + 28 * u
         width: implicitWidth
-        height: 30
-        radius: 15
+        height: 30 * u
+        radius: Math.min(height / 2, ab.th.radius * u)
         z: abTip.shown ? 100 : 0
         opacity: enabled ? 1 : 0.4
         color: primary
             ? Theme.accent
-            : Theme.alpha(Theme.text, abArea.containsMouse ? 0.18 : 0.1)
-        Behavior on color { ColorAnimation { duration: 120 } }
+            : Theme.alpha(Theme.text, abArea.containsMouse && enabled ? 0.18 : 0.1)
+        Behavior on color { ColorAnimation { duration: ab.th.animFast } }
 
         Text {
             id: abText
             anchors.centerIn: parent
             text: ab.label
-            font.pixelSize: 11
+            font.family: ab.th.fontFamily
+            font.pixelSize: ab.th.textSizeBody * ab.u
             font.bold: true
             color: ab.primary ? Theme.bg : Theme.text
         }
@@ -1605,20 +1673,27 @@ Scope {
             hovered: abArea.containsMouse
             side: ab.tipSide
             text: ab.tip
+            u: ab.u
+            family: ab.th.fontFamily
         }
     }
 
     component QaSectionHeader: Item {
+        id: sh
+        property var host
         property string text: ""
+        readonly property real u: host.menuUi
+        readonly property QtObject th: host.th
         width: parent?.width ?? 0
-        height: 32
+        height: 32 * u
 
         Text {
             anchors.left: parent.left
             anchors.bottom: parent.bottom
-            anchors.bottomMargin: 4
-            text: parent.text
-            font.pixelSize: 10
+            anchors.bottomMargin: 4 * sh.u
+            text: sh.text
+            font.family: sh.th.fontFamily
+            font.pixelSize: sh.th.textSizeSmall * sh.u
             font.bold: true
             font.letterSpacing: 1.2
             font.capitalization: Font.AllUppercase
@@ -1635,29 +1710,32 @@ Scope {
         property string label: ""
         property string tip: ""
         property bool checked: false
+        readonly property real u: host.menuUi
+        readonly property QtObject th: host.th
         signal toggled()
 
         width: parent?.width ?? 0
-        height: 34
+        height: 34 * u
         z: trTip.shown ? 100 : 0
         opacity: enabled ? 1 : 0.4
 
         Rectangle {
             anchors.fill: parent
-            anchors.leftMargin: -8
-            anchors.rightMargin: -8
-            radius: 8
+            anchors.leftMargin: -8 * tr.u
+            anchors.rightMargin: -8 * tr.u
+            radius: Math.min(8 * tr.u, tr.th.radius * tr.u)
             color: trArea.containsMouse && tr.enabled ? Theme.alpha(Theme.text, 0.06) : "transparent"
         }
 
         Text {
             anchors.left: parent.left
             anchors.right: sw.left
-            anchors.rightMargin: 12
+            anchors.rightMargin: 12 * tr.u
             anchors.verticalCenter: parent.verticalCenter
             text: tr.label
             elide: Text.ElideRight
-            font.pixelSize: 12
+            font.family: tr.th.fontFamily
+            font.pixelSize: tr.th.textSizeGroup * tr.u
             font.bold: true
             color: Theme.text
         }
@@ -1666,18 +1744,18 @@ Scope {
             id: sw
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
-            width: 36; height: 20; radius: 10
+            width: 36 * tr.u; height: 20 * tr.u; radius: height / 2
             color: tr.checked ? Theme.accent : "transparent"
             border.width: 1
             border.color: tr.checked ? Theme.accent : Theme.alpha(Theme.text, 0.3)
-            Behavior on color { ColorAnimation { duration: 150 } }
+            Behavior on color { ColorAnimation { duration: tr.th.animMed } }
 
             Rectangle {
-                width: 14; height: 14; radius: 7
+                width: 14 * tr.u; height: 14 * tr.u; radius: width / 2
                 anchors.verticalCenter: parent.verticalCenter
-                x: tr.checked ? parent.width - width - 3 : 3
+                x: tr.checked ? parent.width - width - 3 * tr.u : 3 * tr.u
                 color: tr.checked ? Theme.bg : Theme.text
-                Behavior on x { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                Behavior on x { NumberAnimation { duration: tr.th.animMed; easing.type: Easing.OutCubic } }
             }
         }
 
@@ -1700,6 +1778,8 @@ Scope {
             hovered: trArea.containsMouse
             side: "belowStart"
             text: tr.tip
+            u: tr.u
+            family: tr.th.fontFamily
         }
     }
 
@@ -1711,30 +1791,34 @@ Scope {
         property string key: ""
         property string label: ""
         property string tip: ""
+        readonly property real u: host.menuUi
+        readonly property QtObject th: host.th
 
         readonly property var spec: host.numSpec[key]
         readonly property real ratio: Math.max(0, Math.min(1,
             (host[key] - spec.min) / (spec.max - spec.min)))
 
         width: parent?.width ?? 0
-        height: 44
+        height: 46 * u
         z: srTip.shown ? 100 : 0
         opacity: enabled ? 1 : 0.4
 
         Text {
             anchors.left: parent.left
-            y: 6
+            y: 6 * sr.u
             text: sr.label
-            font.pixelSize: 12
+            font.family: sr.th.fontFamily
+            font.pixelSize: sr.th.textSizeGroup * sr.u
             font.bold: true
             color: Theme.text
         }
 
         Text {
             anchors.right: parent.right
-            y: 6
+            y: 6 * sr.u
             text: sr.host.fmtValue(sr.key, sr.host[sr.key])
-            font.pixelSize: 11
+            font.family: sr.th.fontFamily
+            font.pixelSize: sr.th.textSizeBody * sr.u
             color: Theme.textDim
         }
 
@@ -1742,23 +1826,23 @@ Scope {
             id: track
             anchors.left: parent.left
             anchors.right: parent.right
-            y: 30
-            height: 4
-            radius: 2
+            y: 31 * sr.u
+            height: 4 * sr.u
+            radius: height / 2
             color: Theme.alpha(Theme.text, 0.15)
 
             Rectangle {
                 width: knob.x + knob.width / 2
                 height: parent.height
-                radius: 2
+                radius: parent.radius
                 color: Theme.accent
             }
 
             Rectangle {
                 id: knob
-                width: 14
-                height: 14
-                radius: 7
+                width: 14 * sr.u
+                height: 14 * sr.u
+                radius: width / 2
                 anchors.verticalCenter: parent.verticalCenter
                 x: sr.ratio * (track.width - width)
                 color: Theme.text
@@ -1768,7 +1852,7 @@ Scope {
         MouseArea {
             id: sliderArea
             anchors.fill: parent
-            anchors.topMargin: 20
+            anchors.topMargin: 20 * sr.u
             hoverEnabled: true
             preventStealing: true
             enabled: sr.enabled
@@ -1794,6 +1878,8 @@ Scope {
             hovered: sliderArea.containsMouse && !sliderArea.pressed
             side: "belowStart"
             text: sr.tip
+            u: sr.u
+            family: sr.th.fontFamily
         }
     }
 }

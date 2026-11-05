@@ -18,14 +18,16 @@ set -uo pipefail
 #   2. Install new packages.txt entries
 #   3. Link new files, repair wrong links, replace real files in the way
 #      (backed up first), remove stale links for files deleted/renamed in repo
-#   4. Seed user-owned + generated files
-#   5. Regenerate theme, reload Hyprland
+#   4. Seed user-owned + generated files, fix exec bits
+#   5. Verify every link, then regenerate theme and reload Hyprland
 #
 # Usage:
-#   ./update2.sh                  normal update
+#   ./update2.sh                  normal update (uses the repo as it is on disk)
 #   ./update2.sh --dry-run        show what would change, write nothing
 #   ./update2.sh --pull           bring the repo to upstream first (automatic;
-#                                 diverged local work is backed up, upstream wins)
+#                                 diverged local work is backed up, upstream wins;
+#                                 if the pull fails, the sync continues with the
+#                                 local copy of the repo)
 #   ./update2.sh --skip-packages
 #   ./update2.sh --skip-theme
 #   ./update2.sh --restart-shell  restart Quickshell afterwards
@@ -144,7 +146,7 @@ sync_repo_upstream_wins() {
     local g=(git -C "$REPO_DIR") stamp ahead behind
     stamp="$(date '+%Y%m%d-%H%M%S')"
 
-    "${g[@]}" fetch --quiet || { error "git fetch failed (network?)."; return 1; }
+    "${g[@]}" fetch --quiet || { warning "git fetch failed (network?)."; return 1; }
     if ! "${g[@]}" rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then
         warning "No upstream branch configured; skipping pull."
         return 0
@@ -169,7 +171,7 @@ sync_repo_upstream_wins() {
         "${g[@]}" stash push -u -m "update2.sh auto-stash $stamp" >/dev/null \
             && info "Uncommitted edits saved in 'git stash list'"
     fi
-    "${g[@]}" reset --hard '@{u}' >/dev/null || { error "git reset failed."; return 1; }
+    "${g[@]}" reset --hard '@{u}' >/dev/null || { warning "git reset failed."; return 1; }
     return 0
 }
 
@@ -184,11 +186,15 @@ if [[ "$PULL" -eq 1 ]]; then
             # The pull may have changed this script; re-run the fresh copy.
             exec bash "${BASH_SOURCE[0]}" "${REST_ARGS[@]}"
         else
-            exit 1
+            # A failed pull must never skip the link step: new files already on
+            # disk still need to be linked.
+            warning "Could not update the repository; continuing with the local copy."
         fi
     else
         warning "$REPO_DIR is not a git repository; skipping pull."
     fi
+else
+    info "Using the repo as it is on disk (add --pull to fetch the latest first)."
 fi
 
 # --------------------------------------------------
@@ -281,6 +287,9 @@ SEEDED=0
 MIGRATED=0
 RESET_COUNT=0
 STALE_REMOVED=0
+MADE_EXEC=0
+VERIFY_BAD=0
+NEW_LIST=()
 
 # ensure_link <src> <dest> <label> <backup-subpath>
 ensure_link() {
@@ -303,7 +312,11 @@ ensure_link() {
             backup "$dest" "$bak"
             REPLACED_FILES=$((REPLACED_FILES + 1))
         fi
-        ln -sfn "$src" "$dest"
+        if ! ln -sfn "$src" "$dest"; then
+            warning "Could not link: $label"
+            return 1
+        fi
+        [[ "$action" == "link" ]] && NEW_LIST+=("$label")
     fi
 
     if [[ "$action" == "link" ]]; then
@@ -350,6 +363,39 @@ seed_file() {
             cp "$src" "$dest"
         fi
         RESET_COUNT=$((RESET_COUNT + 1))
+    fi
+}
+
+# verify_links: after syncing, confirm every linkable repo file really resolves
+# through ~/.config to the repo copy. Catches anything that slipped through, so a
+# missing link can never go unnoticed again.
+verify_links() {
+    local src rel dest total=0
+    VERIFY_BAD=0
+
+    while IFS= read -r -d '' src; do
+        rel="${src#"$SRC"/}"
+        [[ "$rel" == ".zshrc" ]] && continue
+        is_generated "$rel" && continue
+        is_user_owned "$rel" && continue
+        [[ -e "$src" ]] || continue
+
+        total=$((total + 1))
+        dest="$CONFIG_DIR/$rel"
+
+        if [[ ! -e "$dest" ]] || [[ "$(readlink -f "$dest")" != "$(readlink -f "$src")" ]]; then
+            warning "Not linked correctly: $rel"
+            VERIFY_BAD=$((VERIFY_BAD + 1))
+        elif [[ "$rel" == *.sh || "$rel" == *.py ]] && [[ ! -x "$src" ]]; then
+            warning "Not executable: $rel"
+            VERIFY_BAD=$((VERIFY_BAD + 1))
+        fi
+    done < <(find "$SRC" \( -type f -o -type l \) -not -path '*/.git/*' -print0)
+
+    if [[ "$VERIFY_BAD" -eq 0 ]]; then
+        success "Verified $total linked file(s): all present and pointing at the repo."
+    else
+        warning "$VERIFY_BAD file(s) failed verification (see above). Re-run the updater; if it persists, check permissions on ~/.config."
     fi
 }
 
@@ -405,8 +451,11 @@ if [[ "$DRY_RUN" -eq 0 ]]; then
         fi
     done
 
-    # Scripts may be new or have lost their exec bit.
-    find "$SRC" -type f \( -name "*.sh" -o -name "*.py" \) -exec chmod +x {} \;
+    # Scripts may be new or have lost their exec bit. Only touch the ones that
+    # need it, so the repo isn't dirtied with mode changes on every run.
+    while IFS= read -r -d '' f; do
+        chmod +x "$f" && MADE_EXEC=$((MADE_EXEC + 1))
+    done < <(find "$SRC" -type f \( -name "*.sh" -o -name "*.py" \) ! -perm -u+x -print0)
 fi
 
 # --------------------------------------------------
@@ -414,6 +463,16 @@ fi
 # --------------------------------------------------
 
 success "Linked $NEW_LINKS new, repaired $FIXED_LINKS, removed $STALE_REMOVED stale link(s)."
+
+if [[ "${#NEW_LIST[@]}" -gt 0 ]]; then
+    info "Newly linked:"
+    printf '  %s\n' "${NEW_LIST[@]:0:15}"
+    if [[ "${#NEW_LIST[@]}" -gt 15 ]]; then
+        printf '  ...and %d more\n' $(( ${#NEW_LIST[@]} - 15 ))
+    fi
+fi
+
+[[ "$MADE_EXEC" -gt 0 ]] && info "Made $MADE_EXEC script(s) executable."
 [[ "$SEEDED"   -gt 0 ]] && info "Added $SEEDED new user-owned file(s) (your existing ones were kept)."
 [[ "$MIGRATED" -gt 0 ]] && info "Converted $MIGRATED old symlinked user file(s) into real copies."
 [[ "$RESET_COUNT" -gt 0 ]] && info "Reset $RESET_COUNT user-owned file(s) to repo versions (--reset-user)."
@@ -428,6 +487,8 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
     info "Dry run: nothing was written. Re-run without --dry-run to apply."
     exit 0
 fi
+
+verify_links
 
 # --------------------------------------------------
 # Regenerate theme

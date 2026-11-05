@@ -480,13 +480,11 @@ Item {
                 NavChip { label: "LOOK";       target: secLook }
                 NavChip { label: "MODULES";    target: secModules }
                 NavChip { label: "CLOCK";      target: secClock }
-                NavChip { label: "CALENDAR";   target: secCalendar }
                 NavChip { label: "WORKSPACES"; target: secWorkspaces }
                 NavChip { label: "OPEN APPS";  target: secTasks }
                 NavChip { label: "STATS";      target: secStats }
                 NavChip { label: "BATT & VOL"; target: secBattVol }
                 NavChip { label: "TOOLTIPS";   target: secTooltips }
-                NavChip { label: "ACTIONS";    target: secActions }
             }
 
             // ---------------- LAYOUT ----------------

@@ -27,6 +27,7 @@ local float_key         = "Space"
 local record_key        = "R"
 local shot_key          = "Delete"
 local shot_area_key     = "SHIFT + Delete"
+local ocr_key           = "SHIFT + F12"
 
 do
     local f = os.getenv("HOME") .. "/.config/quickshell/state/binds.lua"
@@ -60,6 +61,7 @@ do
             if kb_record        then record_key        = kb_record end
             if kb_shot          then shot_key          = kb_shot end
             if kb_shot_area     then shot_area_key     = kb_shot_area end
+            if kb_ocr           then ocr_key           = kb_ocr end
         end
     end
 end
@@ -124,7 +126,7 @@ float_key         = normalize_key(float_key)
 record_key        = normalize_key(record_key)
 shot_key          = normalize_key(shot_key)
 shot_area_key     = normalize_key(shot_area_key)
-
+ocr_key           = normalize_key(ocr_key)
 
 
 -- A single bad key string must not take the rest of the config down with it.
@@ -163,6 +165,7 @@ bind(mainMod .. " + " .. clipboard_key, hl.dsp.exec_cmd("pgrep -x rofi >/dev/nul
 
 bind(shot_key, hl.dsp.exec_cmd("sh -c 'file=" .. home .. "/Pictures/$(date +%s).png; grim \"$file\"; wl-copy < \"$file\"; qs ipc call screenshot notify \"$file\"'"))
 bind(shot_area_key, hl.dsp.exec_cmd(home .. "/.config/hypr/scripts/screenshot-area.sh"))
+bind(ocr_key, hl.dsp.exec_cmd(home .. "/.config/hypr/scripts/ocr-area.sh"))
 
 -- Custom binds created in Settings > Keybinds (state/custom_binds.lua).
 -- Keys are stored as full chords (SUPER only if it was held), so mainMod is not prepended.

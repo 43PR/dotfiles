@@ -79,11 +79,11 @@ Scope {
         { name: "Keybinds", icon: "󰧮",  page: "KeybindsPage" },
         { name: "Appearance", icon: "󰏘", page: "AppearancePage" },
         { name: "Themes", icon: "󰉼",  page: "ThemesPage" },
-        { name: "Bar", icon: "󰖔",  page: "BarPage" },
-        { name: "Input", icon: "󰍽", page: "InputPage" },
+        { name: "Bar", icon: "\ue690",  page: "BarPage" },
+        { name: "Input", icon: "\udb83\udfb0", page: "InputPage" },
         { name: "Network", icon: "󰖩", page: "NetworkPage" },
-        { name: "Bluetooth", icon: "󰂯", page: "BluetoothPage" },
-        { name: "Storage", icon: "󰋊", page: "StoragePage" },
+        { name: "Bluetooth", icon: "\uf293", page: "BluetoothPage" },
+        { name: "Storage", icon: "\uf0a0", page: "StoragePage" },
         { name: "Updates", icon: "󰚰",  page: "UpdatesPage" },
     ]
 

@@ -25,33 +25,32 @@ Scope {
     readonly property int toolsHeight: 28
 
     readonly property var numSpec: ({
-        mediaScale:    { min: 50,  max: 120,   def: 70,   step: 5,   unit: "%" },
-        volScale:      { min: 50,  max: 120,   def: 80,   step: 5,   unit: "%" },
-        mediaWidth:    { min: 300, max: 600,   def: 420,  step: 20,  unit: "px" },
-        portraitWidth: { min: 200, max: 400,   def: 260,  step: 20,  unit: "px" },
-        flyoutWidth:   { min: 200, max: 500,   def: 320,  step: 20,  unit: "px" },
-        artSize:       { min: 32,  max: 96,    def: 52,   step: 4,   unit: "px" },
-        cardRadius:    { min: 0,   max: 40,    def: 24,   step: 2,   unit: "px" },
-        barCount:      { min: 4,   max: 64,    def: 24,   step: 2,   unit: "" },
-        barRadius:     { min: 0,   max: 20,    def: 20,   step: 2,   unit: "px", full: true },
-        barSpacing:    { min: 1,   max: 10,    def: 3,    step: 1,   unit: "px" },
-        barHeight:     { min: 10,  max: 240,    def: 20,   step: 2,   unit: "px" },
-        barFps:        { min: 15,  max: 60,    def: 30,   step: 5,   unit: " fps" },
-        mediaTimeout:  { min: 500, max: 15000, def: 3000, step: 500, unit: "s" },
-        volTimeout:    { min: 300, max: 8000,  def: 1200, step: 100, unit: "s" },
-        fadeMs:        { min: 0,   max: 500,   def: 150,  step: 25,  unit: " ms" },
-        volStep:       { min: 1,   max: 20,    def: 5,    step: 1,   unit: "%" },
-        bgOpacity:     { min: 0,  max: 100,   def: Math.max(10, Math.round((Theme.bg.a ?? 1) * 20) * 5),     step: 5, unit: "%" },
-        artOpacity:    { min: 20,  max: 100,   def: Math.max(20, Math.round((Theme.bgAlpha ?? 1) * 20) * 5), step: 5, unit: "%" },
-        barOpacity:    { min: 30,  max: 100,   def: 90,   step: 5,   unit: "%" },
-        barDimOpacity: { min: 0,   max: 60,    def: 30,   step: 5,   unit: "%" }
+        mediaScale:    { min: 20,  max: 200,   def: 70,   step: 5,   unit: "%" },
+        volScale:      { min: 20,  max: 200,   def: 80,   step: 5,   unit: "%" },
+        mediaWidth:    { min: 200, max: 1000,  def: 420,  step: 20,  unit: "px" },
+        portraitWidth: { min: 120, max: 700,   def: 260,  step: 20,  unit: "px" },
+        flyoutWidth:   { min: 120, max: 800,   def: 320,  step: 20,  unit: "px" },
+        artSize:       { min: 16,  max: 200,   def: 52,   step: 4,   unit: "px" },
+        cardRadius:    { min: 0,   max: 80,    def: 24,   step: 2,   unit: "px" },
+        barCount:      { min: 2,   max: 128,   def: 24,   step: 2,   unit: "" },
+        barRadius:     { min: 0,   max: 40,    def: 40,   step: 2,   unit: "px", full: true },
+        barSpacing:    { min: 0,   max: 30,    def: 3,    step: 1,   unit: "px" },
+        barHeight:     { min: 4,   max: 400,   def: 20,   step: 2,   unit: "px" },
+        barFps:        { min: 5,   max: 144,   def: 30,   step: 5,   unit: " fps" },
+        mediaTimeout:  { min: 250, max: 60000, def: 3000, step: 250, unit: "s" },
+        volTimeout:    { min: 100, max: 30000, def: 1200, step: 100, unit: "s" },
+        fadeMs:        { min: 0,   max: 1500,  def: 150,  step: 25,  unit: " ms" },
+        bgOpacity:     { min: 0,   max: 100,   def: Math.max(10, Math.round((Theme.bg.a ?? 1) * 20) * 5),     step: 5, unit: "%" },
+        artOpacity:    { min: 0,   max: 100,   def: Math.max(20, Math.round((Theme.bgAlpha ?? 1) * 20) * 5), step: 5, unit: "%" },
+        barOpacity:    { min: 0,   max: 100,   def: 90,   step: 5,   unit: "%" },
+        barDimOpacity: { min: 0,   max: 100,   def: 30,   step: 5,   unit: "%" }
     })
     readonly property var numKeys: Object.keys(numSpec)
 
     readonly property var boolDefaults: ({
         showTips: true, showTitle: true, showArtist: true, showBar: true, showVisualizer: true,
         trackChangeOsd: true, showArt: true, showControls: true, musicOnly: true, artistBelow: false,
-        portrait: true, showBorder: false, accentBars: false, scrollVolume: true
+        portrait: true, showBorder: false, accentBars: false
     })
     readonly property var boolKeys: Object.keys(boolDefaults)
     readonly property var posKeys: ["offsetX", "offsetY", "volOffsetX", "volOffsetY"]
@@ -68,7 +67,7 @@ Scope {
     property int barSpacing: numSpec.barSpacing.def; property int barHeight: numSpec.barHeight.def
     property int barFps: numSpec.barFps.def; property int mediaTimeout: numSpec.mediaTimeout.def
     property int volTimeout: numSpec.volTimeout.def; property int fadeMs: numSpec.fadeMs.def
-    property int volStep: numSpec.volStep.def; property int bgOpacity: numSpec.bgOpacity.def
+    property int bgOpacity: numSpec.bgOpacity.def
     property int artOpacity: numSpec.artOpacity.def; property int barOpacity: numSpec.barOpacity.def
     property int barDimOpacity: numSpec.barDimOpacity.def
 
@@ -78,7 +77,7 @@ Scope {
     property bool showArt: boolDefaults.showArt; property bool showControls: boolDefaults.showControls
     property bool musicOnly: boolDefaults.musicOnly; property bool artistBelow: boolDefaults.artistBelow
     property bool portrait: boolDefaults.portrait; property bool showBorder: boolDefaults.showBorder
-    property bool accentBars: boolDefaults.accentBars; property bool scrollVolume: boolDefaults.scrollVolume
+    property bool accentBars: boolDefaults.accentBars
 
     readonly property real scaleFactor: (showMedia ? mediaScale : volScale) / 100
     readonly property color cardColor: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, bgOpacity / 100)
@@ -90,6 +89,24 @@ Scope {
         || numKeys.some(k => root[k] !== numSpec[k].def)
         || boolKeys.some(k => root[k] !== boolDefaults[k])
     readonly property string statePath: Quickshell.env("HOME") + "/.config/quickshell/state/mediaosd-state.json"
+
+    // ---- settings menu look / scale -----------------------------------------
+    // Same scale system as the wallpaper picker's menu:
+    //   ui            : screen height / 1080 (resolution independence)
+    //   settingsScale : Theme.settingsScale (user's "settings scale" from hub.json)
+    //   menuUi        : ui * settingsScale, multiplies every size in the settings menu.
+    // menuUi is kept up to date by a Binding inside the settings window (it knows its screen).
+    // Everything below falls back to the picker's defaults if Theme doesn't define it.
+    readonly property real settingsScale: Theme.settingsScale ?? 1
+    property real menuUi: settingsScale
+    readonly property real menuRadius: Theme.radius ?? 20
+    readonly property string menuFont: Theme.fontFamily ?? "JetBrains Mono"
+    readonly property int menuAnimFast: Theme.animFast ?? 120
+    readonly property int menuAnimMed: Theme.animMed ?? 220
+    readonly property int textSizeSection: Theme.textSizeSection ?? 15
+    readonly property int textSizeGroup: Theme.textSizeGroup ?? 12
+    readonly property int textSizeBody: Theme.textSizeBody ?? 11
+    readonly property int textSizeSmall: Theme.textSizeSmall ?? 10
 
     // ---- player detection --------------------------------------------------
     readonly property var musicPlayers: [
@@ -173,13 +190,6 @@ Scope {
         target: root.sink?.audio ?? null
         function onVolumeChanged() { root.triggerOsd() }
         function onMutedChanged() { root.triggerOsd() }
-    }
-
-    function nudgeVolume(dy) {
-        if (!scrollVolume || !sink?.audio || dy === 0) return
-        if (muted && dy > 0) sink.audio.muted = false
-        sink.audio.volume = Math.max(0, Math.min(1, sink.audio.volume + (dy > 0 ? 1 : -1) * volStep / 100))
-        hideTimer.restart()
     }
 
     // ---- OSD state ---------------------------------------------------------
@@ -455,10 +465,6 @@ Scope {
 
                     HoverHandler { id: flyoutHover; enabled: flyout.open }
                     DragArea { anchors.fill: parent; enabled: flyout.open; scene: scene }
-                    WheelHandler {
-                        enabled: flyout.open && root.scrollVolume
-                        onWheel: event => root.nudgeVolume(event.angleDelta.y)
-                    }
 
                     Text {
                         id: icon
@@ -521,10 +527,6 @@ Scope {
 
                     // Declared before the content so buttons stay clickable on top.
                     DragArea { anchors.fill: parent; enabled: mediaPanel.open; scene: scene }
-                    WheelHandler {
-                        enabled: mediaPanel.open && root.scrollVolume
-                        onWheel: event => root.nudgeVolume(event.angleDelta.y)
-                    }
 
                     Column {
                         id: mediaCol
@@ -771,22 +773,32 @@ Scope {
 
     // ---- settings window: only exists while settings are open -------------
     // Fixed size on purpose (content-driven height can leave a blank first frame).
+    // Every size below is multiplied by `u` (= ui * Theme.settingsScale), exactly like the
+    // wallpaper picker's menu, so both menus scale together.
     LazyLoader {
         active: root.settingsOpen
 
         PanelWindow {
+            id: settingsWin
+
+            readonly property real ui: (screen?.height ?? 1080) / 1080
+            readonly property real u: ui * root.settingsScale
+
             color: "transparent"
-            implicitWidth: 420
-            implicitHeight: Math.min(600, (screen?.height ?? 800) * 0.85)
+            implicitWidth: 420 * u
+            implicitHeight: Math.min(600 * u, (screen?.height ?? 800) * 0.85)
             exclusionMode: ExclusionMode.Ignore
 
             WlrLayershell.layer: WlrLayer.Overlay
             WlrLayershell.namespace: "mediaosd-settings"
             WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
 
+            // Shares the scale with the reusable components (they read root.menuUi).
+            Binding { target: root; property: "menuUi"; value: settingsWin.u }
+
             Rectangle {
                 anchors.fill: parent
-                radius: 20
+                radius: root.menuRadius * settingsWin.u
                 color: Theme.bg
                 border.width: 1
                 border.color: Theme.alpha(Theme.text, 0.12)
@@ -801,19 +813,33 @@ Scope {
                     id: head
                     anchors.top: parent.top
                     width: parent.width
-                    height: 60
+                    height: 60 * settingsWin.u
 
-                    Text { x: 20; y: 12; text: "OSD settings"; font.pixelSize: 15; font.bold: true; color: Theme.text }
-                    Text { x: 20; y: 34; text: "Drag to move it. Right-click to open settings"; font.pixelSize: 12; color: Theme.textDim }
+                    Text {
+                        x: 20 * settingsWin.u; y: 12 * settingsWin.u
+                        text: "OSD settings"
+                        font.family: root.menuFont
+                        font.pixelSize: root.textSizeSection * settingsWin.u
+                        font.bold: true
+                        color: Theme.text
+                    }
+                    Text {
+                        x: 20 * settingsWin.u; y: 34 * settingsWin.u
+                        text: "Drag to move it. Right-click to open settings"
+                        font.family: root.menuFont
+                        font.pixelSize: root.textSizeSmall * settingsWin.u
+                        color: Theme.textDim
+                    }
                     Text {
                         anchors.right: parent.right
-                        anchors.rightMargin: 20
-                        y: 10
-                        width: 24; height: 24
+                        anchors.rightMargin: 20 * settingsWin.u
+                        y: 10 * settingsWin.u
+                        width: 24 * settingsWin.u; height: 24 * settingsWin.u
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                         text: "×"
-                        font.pixelSize: 22
+                        font.family: root.menuFont
+                        font.pixelSize: 22 * settingsWin.u
                         color: closeArea.containsMouse ? Theme.text : Theme.textDim
                         MouseArea { id: closeArea; anchors.fill: parent; hoverEnabled: true; onClicked: root.closeSettings() }
                     }
@@ -822,17 +848,17 @@ Scope {
                 Flickable {
                     id: flick
                     anchors { top: head.bottom; bottom: foot.top; left: parent.left; right: parent.right }
-                    anchors.topMargin: 4
+                    anchors.topMargin: 4 * settingsWin.u
                     contentWidth: width
-                    contentHeight: contentCol.height + 16
+                    contentHeight: contentCol.height + 16 * settingsWin.u
                     clip: true
                     flickableDirection: Flickable.VerticalFlick
                     boundsBehavior: Flickable.StopAtBounds
 
                     Column {
                         id: contentCol
-                        x: 20
-                        width: flick.width - 48
+                        x: 20 * settingsWin.u
+                        width: flick.width - 48 * settingsWin.u
 
                         SectionHeader { text: "Global" }
                         ToggleRow { key: "showTips"; label: "Tooltips & hints" }
@@ -879,15 +905,13 @@ Scope {
                         ToggleRow { key: "musicOnly"; label: "Music players only" }
                         ToggleRow { key: "trackChangeOsd"; label: "Pop up on track change" }
                         SliderRow { key: "mediaTimeout"; label: "Media hide after" }
-                        ToggleRow { key: "scrollVolume"; label: "Scroll to change volume" }
-                        SliderRow { key: "volStep"; label: "Scroll step"; enabled: root.scrollVolume }
 
                         SectionHeader { text: "Volume popup" }
                         SliderRow { key: "volTimeout"; label: "Volume hide after" }
 
                         SectionHeader { text: "Position" }
                         Row {
-                            spacing: 8
+                            spacing: 8 * settingsWin.u
                             ActionButton { label: "Reset media position"; enabled: root.mediaMoved; onClicked: root.resetPos(true) }
                             ActionButton { label: "Reset volume position"; enabled: root.volMoved; onClicked: root.resetPos(false) }
                         }
@@ -897,21 +921,21 @@ Scope {
                 // Scrollbar lives outside the Flickable content so it doesn't scroll away.
                 Rectangle {
                     visible: flick.contentHeight > flick.height
-                    x: flick.x + flick.width - 14
+                    x: flick.x + flick.width - 14 * settingsWin.u
                     y: flick.y
-                    width: 4
+                    width: 4 * settingsWin.u
                     height: flick.height
-                    radius: 2
+                    radius: 2 * settingsWin.u
                     color: Theme.alpha(Theme.text, 0.08)
                 }
 
                 Rectangle {
                     id: sbHandle
                     visible: flick.contentHeight > flick.height
-                    x: flick.x + flick.width - 14
-                    width: 4
-                    radius: 2
-                    height: Math.max(24, flick.height * flick.visibleArea.heightRatio)
+                    x: flick.x + flick.width - 14 * settingsWin.u
+                    width: 4 * settingsWin.u
+                    radius: 2 * settingsWin.u
+                    height: Math.max(24 * settingsWin.u, flick.height * flick.visibleArea.heightRatio)
                     y: flick.y + flick.visibleArea.yPosition * flick.height
                     color: Theme.text
                     opacity: (sbArea.containsMouse || sbArea.pressed || flick.moving) ? 0.7 : 0.3
@@ -920,7 +944,7 @@ Scope {
                     MouseArea {
                         id: sbArea
                         anchors.fill: parent
-                        anchors.margins: -5
+                        anchors.margins: -5 * settingsWin.u
                         hoverEnabled: true
 
                         // Drive contentY instead of drag.target (which would break the y binding).
@@ -943,12 +967,12 @@ Scope {
                     id: foot
                     anchors.bottom: parent.bottom
                     width: parent.width
-                    height: 58
+                    height: 58 * settingsWin.u
 
                     Rectangle { width: parent.width; height: 1; color: Theme.alpha(Theme.text, 0.08) }
 
                     ActionButton {
-                        x: 20
+                        x: 20 * settingsWin.u
                         anchors.verticalCenter: parent.verticalCenter
                         label: "Reset all"
                         enabled: root.modified
@@ -957,7 +981,7 @@ Scope {
 
                     ActionButton {
                         anchors.right: parent.right
-                        anchors.rightMargin: 20
+                        anchors.rightMargin: 20 * settingsWin.u
                         anchors.verticalCenter: parent.verticalCenter
                         label: "Done"
                         primary: true
@@ -1072,43 +1096,51 @@ Scope {
         onDoubleClicked: mouse => { if (mouse.button === Qt.LeftButton) host.resetPos(host.showMedia) }
     }
 
+    // ---- settings-menu components (all sizes scale with host.menuUi) --------
     component ActionButton: Rectangle {
         id: ab
+        property var host: root
         property string label: ""
         property bool primary: false
+        readonly property real u: host.menuUi
         signal clicked()
 
-        implicitWidth: abText.implicitWidth + 28
+        implicitWidth: abText.implicitWidth + 28 * u
         width: implicitWidth
-        height: 30
-        radius: 15
+        height: 30 * u
+        radius: Math.min(height / 2, ab.host.menuRadius * u)
         opacity: enabled ? 1 : 0.4
-        color: primary ? Theme.accent : Theme.alpha(Theme.text, abArea.containsMouse ? 0.18 : 0.1)
-        Behavior on color { ColorAnimation { duration: 120 } }
+        color: primary ? Theme.accent : Theme.alpha(Theme.text, abArea.containsMouse && enabled ? 0.18 : 0.1)
+        Behavior on color { ColorAnimation { duration: ab.host.menuAnimFast } }
 
         Text {
             id: abText
             anchors.centerIn: parent
             text: ab.label
-            font.pixelSize: 11
+            font.family: ab.host.menuFont
+            font.pixelSize: ab.host.textSizeBody * ab.u
             font.bold: true
             color: ab.primary ? Theme.bg : Theme.text
         }
 
-        MouseArea { id: abArea; anchors.fill: parent; hoverEnabled: true; onClicked: ab.clicked() }
+        MouseArea { id: abArea; anchors.fill: parent; hoverEnabled: true; enabled: ab.enabled; onClicked: ab.clicked() }
     }
 
     component SectionHeader: Item {
+        id: sh
+        property var host: root
         property string text: ""
+        readonly property real u: host.menuUi
         width: parent?.width ?? 0
-        height: 32
+        height: 32 * u
 
         Text {
             anchors.left: parent.left
             anchors.bottom: parent.bottom
-            anchors.bottomMargin: 4
-            text: parent.text
-            font.pixelSize: 10
+            anchors.bottomMargin: 4 * sh.u
+            text: sh.text
+            font.family: sh.host.menuFont
+            font.pixelSize: sh.host.textSizeSmall * sh.u
             font.bold: true
             font.letterSpacing: 1.2
             font.capitalization: Font.AllUppercase
@@ -1122,27 +1154,29 @@ Scope {
         property string key: ""
         property string label: ""
         property bool checked: host[key]
+        readonly property real u: host.menuUi
 
         width: parent?.width ?? 0
-        height: 34
+        height: 34 * u
         opacity: enabled ? 1 : 0.4
 
         Rectangle {
             anchors.fill: parent
-            anchors.leftMargin: -8
-            anchors.rightMargin: -8
-            radius: 8
+            anchors.leftMargin: -8 * tr.u
+            anchors.rightMargin: -8 * tr.u
+            radius: Math.min(8 * tr.u, tr.host.menuRadius * tr.u)
             color: trArea.containsMouse && tr.enabled ? Theme.alpha(Theme.text, 0.06) : "transparent"
         }
 
         Text {
             anchors.left: parent.left
             anchors.right: sw.left
-            anchors.rightMargin: 12
-            y: 9
+            anchors.rightMargin: 12 * tr.u
+            y: 9 * tr.u
             text: tr.label
             elide: Text.ElideRight
-            font.pixelSize: 12
+            font.family: tr.host.menuFont
+            font.pixelSize: tr.host.textSizeGroup * tr.u
             font.bold: true
             color: Theme.text
         }
@@ -1150,23 +1184,23 @@ Scope {
         Rectangle {
             id: sw
             anchors.right: parent.right
-            y: 7
-            width: 36; height: 20; radius: 10
+            y: 7 * tr.u
+            width: 36 * tr.u; height: 20 * tr.u; radius: height / 2
             color: tr.checked ? Theme.accent : "transparent"
             border.width: 1
             border.color: tr.checked ? Theme.accent : Theme.alpha(Theme.text, 0.3)
-            Behavior on color { ColorAnimation { duration: 150 } }
+            Behavior on color { ColorAnimation { duration: tr.host.menuAnimMed } }
 
             Rectangle {
-                width: 14; height: 14; radius: 7
+                width: 14 * tr.u; height: 14 * tr.u; radius: width / 2
                 anchors.verticalCenter: parent.verticalCenter
-                x: tr.checked ? parent.width - width - 3 : 3
+                x: tr.checked ? parent.width - width - 3 * tr.u : 3 * tr.u
                 color: tr.checked ? Theme.bg : Theme.text
-                Behavior on x { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                Behavior on x { NumberAnimation { duration: tr.host.menuAnimMed; easing.type: Easing.OutCubic } }
             }
         }
 
-        MouseArea { id: trArea; anchors.fill: parent; hoverEnabled: true; onClicked: tr.host.toggleSetting(tr.key) }
+        MouseArea { id: trArea; anchors.fill: parent; hoverEnabled: true; enabled: tr.enabled; onClicked: tr.host.toggleSetting(tr.key) }
     }
 
     // Minimal slider bound to a numSpec entry on the host; saves on release.
@@ -1175,31 +1209,45 @@ Scope {
         property var host: root
         property string key: ""
         property string label: ""
+        readonly property real u: host.menuUi
 
         readonly property var spec: host.numSpec[key]
         readonly property real ratio: Math.max(0, Math.min(1, (host[key] - spec.min) / (spec.max - spec.min)))
 
         width: parent?.width ?? 0
-        height: 44
+        height: 46 * u
         opacity: enabled ? 1 : 0.4
 
-        Text { anchors.left: parent.left; y: 6; text: sr.label; font.pixelSize: 12; font.bold: true; color: Theme.text }
-        Text { anchors.right: parent.right; y: 6; text: sr.host.fmtValue(sr.key, sr.host[sr.key]); font.pixelSize: 11; color: Theme.textDim }
+        Text {
+            anchors.left: parent.left; y: 6 * sr.u
+            text: sr.label
+            font.family: sr.host.menuFont
+            font.pixelSize: sr.host.textSizeGroup * sr.u
+            font.bold: true
+            color: Theme.text
+        }
+        Text {
+            anchors.right: parent.right; y: 6 * sr.u
+            text: sr.host.fmtValue(sr.key, sr.host[sr.key])
+            font.family: sr.host.menuFont
+            font.pixelSize: sr.host.textSizeBody * sr.u
+            color: Theme.textDim
+        }
 
         Rectangle {
             id: track
             anchors.left: parent.left
             anchors.right: parent.right
-            y: 30
-            height: 4
-            radius: 2
+            y: 31 * sr.u
+            height: 4 * sr.u
+            radius: height / 2
             color: Theme.alpha(Theme.text, 0.15)
 
-            Rectangle { width: knob.x + knob.width / 2; height: parent.height; radius: 2; color: Theme.accent }
+            Rectangle { width: knob.x + knob.width / 2; height: parent.height; radius: parent.radius; color: Theme.accent }
 
             Rectangle {
                 id: knob
-                width: 14; height: 14; radius: 7
+                width: 14 * sr.u; height: 14 * sr.u; radius: width / 2
                 anchors.verticalCenter: parent.verticalCenter
                 x: sr.ratio * (track.width - width)
                 color: Theme.text
@@ -1208,7 +1256,7 @@ Scope {
 
         MouseArea {
             anchors.fill: parent
-            anchors.topMargin: 20
+            anchors.topMargin: 20 * sr.u
             preventStealing: true
             enabled: sr.enabled
 

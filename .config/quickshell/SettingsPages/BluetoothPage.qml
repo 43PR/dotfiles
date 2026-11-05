@@ -16,52 +16,8 @@ Item {
     property real marginTop: 0
     property real marginBottom: 0
 
-    // ---- Persisted power state -------------------------------------------
-    // NOTE: if this page is only instantiated when the panel is opened,
-    // move this block (FileView + restorePower) into an always-loaded place
-    // such as your BluetoothState singleton so it runs at shell startup.
-    property bool powerRestored: false
-
-    FileView {
-        id: stateFile
-        path: Quickshell.env("HOME") + "/.local/state/quickshell-bluetooth-power"
-        blockLoading: true
-        printErrors: false
-    }
-
-    function savedPowerState() {
-        try {
-            return (stateFile.text() || "").trim()
-        } catch (e) {
-            return ""   // file doesn't exist yet
-        }
-    }
-
-    function savePowerState(state) {
-        try {
-            stateFile.setText(state)
-        } catch (e) {
-            console.warn("Could not save bluetooth state:", e)
-        }
-    }
-
-    function restorePower() {
-        if (page.powerRestored || !page.adapter)
-            return
-        page.powerRestored = true
-
-        var want = savedPowerState()
-        if (want === "off") {
-            BluetoothState.reconnectPaused = true
-            page.adapter.enabled = false
-        } else if (want === "on") {
-            BluetoothState.reconnectPaused = false
-            page.adapter.enabled = true
-        }
-    }
-
-    onAdapterChanged: restorePower()
-    // ----------------------------------------------------------------------
+    // Power state (saved/restored/toggled) lives in BluetoothState so the
+    // quick actions menu and this page share one code path.
 
     function setStatus(text) {
         page.statusText = text
@@ -81,34 +37,7 @@ Item {
     }
 
     function togglePower() {
-        if (!page.adapter)
-            return
-
-        if (page.adapter.enabled) {
-            savePowerState("off")
-            BluetoothState.reconnectPaused = true
-            setDiscovering(false)
-
-            var devs = BluetoothState.deviceList()
-            for (var i = 0; i < devs.length; i++) {
-                var s = devs[i].state
-                if (s === BluetoothDeviceState.Connected || s === BluetoothDeviceState.Connecting)
-                    devs[i].disconnect()
-            }
-
-            powerOffTimer.restart()
-            return
-        }
-
-        savePowerState("on")
-        BluetoothState.reconnectPaused = false
-        page.adapter.enabled = true
-    }
-
-    Timer {
-        id: powerOffTimer
-        interval: 800
-        onTriggered: if (page.adapter) page.adapter.enabled = false
+        BluetoothState.togglePower()
     }
 
     function deviceAction(dev) {
@@ -134,9 +63,7 @@ Item {
         }
 
         setDiscovering(false)
-        dev.trusted = true
         setStatus("Connecting to " + name + "...")
-        setDiscovering(false)
         delete BluetoothState.reconnectBackoff[dev.address]   // manual attempt resets auto-retry
         dev.trusted = true
         dev.connect()
@@ -175,7 +102,6 @@ Item {
     onVisibleChanged: setDiscovering(page.visible && page.powered)
     onPoweredChanged: setDiscovering(page.visible && page.powered)
     Component.onCompleted: {
-        restorePower()
         if (page.visible && page.powered) setDiscovering(true)
     }
     Component.onDestruction: setDiscovering(false)
@@ -191,7 +117,7 @@ Item {
         id: discoveryRetryTimer
         interval: 1500
         repeat: true
-        running: page.visible && page.powered && !powerOffTimer.running
+        running: page.visible && page.powered && BluetoothState.wantPower !== "off"
         onTriggered: {
             if (page.adapter && page.powered && !page.adapter.discovering)
                 page.adapter.discovering = true

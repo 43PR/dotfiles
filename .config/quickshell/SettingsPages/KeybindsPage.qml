@@ -62,7 +62,8 @@ Item {
         { id: "layout",        label: "KB LAYOUT",                   def: "X" },
         // noSuper: bound as-is in keybinds.lua, SUPER is not prepended
         { id: "shot",          label: "SCREENSHOT (FULL)",           def: "Delete",         noSuper: true },
-        { id: "shot_area",     label: "SCREENSHOT (AREA)",           def: "SHIFT + Delete", noSuper: true }
+        { id: "shot_area",     label: "SCREENSHOT (AREA)",           def: "SHIFT + Delete", noSuper: true },
+        { id: "ocr",           label: "TEXT EXTRACTOR (OCR)",        def: "SHIFT + F12",    noSuper: true }
     ]
 
     // Fixed binds hardcoded in keybinds.lua (display only, not editable)

@@ -1,3 +1,4 @@
+
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Io
@@ -27,20 +28,68 @@ PanelWindow {
     property bool cancelled: false
     property string imagePath: ""
 
+    property string kind: "screenshot"   // "screenshot" | "ocr"
+    property string ocrState: ""         // "working" | "done" | "empty" | "cancelled"
+    property string ocrText: ""
+
+    readonly property bool isOcr: kind === "ocr"
+    readonly property string titleText: {
+        if (isOcr) {
+            switch (ocrState) {
+            case "working":   return "Reading text…"
+            case "done":      return "Text copied"
+            case "empty":     return "No text found"
+            default:          return "OCR cancelled"
+            }
+        }
+        return cancelled ? "Screenshot cancelled" : "Screenshot saved"
+    }
+    readonly property string subText: {
+        if (isOcr) {
+            switch (ocrState) {
+            case "working":   return "Please wait"
+            case "done":      return "Copied to clipboard"
+            case "empty":     return "Try a larger area"
+            default:          return "No area selected"
+            }
+        }
+        return cancelled ? "No area selected" : "Copied to clipboard"
+    }
+
     // Release the decoded pixmap only after the fade-out has finished
     onVisibleChanged: if (!visible) imagePath = ""
 
     function showOsd(path) {
+        kind = "screenshot"
         cancelled = false
+        ocrState = ""
+        ocrText = ""
         imagePath = path
         showing = true
+        hideTimer.interval = 2200
         hideTimer.restart()
     }
 
     function showCancelled() {
+        kind = "screenshot"
         cancelled = true
+        ocrState = ""
+        ocrText = ""
         imagePath = ""
         showing = true
+        hideTimer.interval = 2200
+        hideTimer.restart()
+    }
+
+    function showOcr(state, text) {
+        kind = "ocr"
+        ocrState = state
+        ocrText = text
+        cancelled = false
+        imagePath = ""
+        showing = true
+        // "working" gets a long fallback so the OSD can't get stuck if the script dies
+        hideTimer.interval = state === "working" ? 15000 : 2200
         hideTimer.restart()
     }
 
@@ -59,6 +108,14 @@ PanelWindow {
         function cancelled(): void {
             root.showCancelled()
         }
+    }
+
+    IpcHandler {
+        target: "ocr"
+        function working(): void { root.showOcr("working", "") }
+        function done(preview: string): void { root.showOcr("done", preview) }
+        function empty(): void { root.showOcr("empty", "") }
+        function cancelled(): void { root.showOcr("cancelled", "") }
     }
 
     Rectangle {
@@ -110,7 +167,9 @@ PanelWindow {
                 Text {
                     anchors.centerIn: parent
                     visible: !root.imagePath
-                    text: root.cancelled ? "󰜺" : "󰄀"
+                    text: root.isOcr
+                          ? (root.ocrState === "done" || root.ocrState === "working" ? "Aa" : "󰜺")
+                          : (root.cancelled ? "󰜺" : "󰄀")
                     font.family: "Symbols Nerd Font"
                     font.pixelSize: 22
                     color: Theme.text
@@ -122,22 +181,25 @@ PanelWindow {
                 spacing: 4
                 width: parent.width - thumb.width - parent.spacing
 
+                // title
                 Text {
-                    text: root.cancelled ? "Screenshot cancelled" : "Screenshot saved"
+                    text: root.titleText
                     font.pixelSize: 13
                     font.bold: true
                     color: Theme.text
                 }
+                // middle line: filename for screenshots, text preview for OCR
                 Text {
-                    visible: !root.cancelled
-                    text: root.imagePath.split("/").pop()
+                    visible: root.isOcr ? root.ocrState === "done" : !root.cancelled
+                    text: root.isOcr ? root.ocrText : root.imagePath.split("/").pop()
                     font.pixelSize: 11
                     color: Theme.textDim
-                    elide: Text.ElideMiddle
+                    elide: root.isOcr ? Text.ElideRight : Text.ElideMiddle
                     width: parent.width
                 }
+                // bottom line
                 Text {
-                    text: root.cancelled ? "No area selected" : "Copied to clipboard"
+                    text: root.subText
                     font.pixelSize: 10
                     color: Theme.textDim
                 }

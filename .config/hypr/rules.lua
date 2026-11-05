@@ -73,3 +73,9 @@ hl.window_rule({
     match = { title = "^(Save File)$" },
     float = true,
 })
+
+hl.layer_rule({
+    match = { namespace = "wallpaper-picker" },
+    blur = true,
+    ignore_alpha = 0.95,
+})
