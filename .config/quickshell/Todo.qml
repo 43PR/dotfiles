@@ -45,6 +45,17 @@ Scope {
     property int baseRow: 48
     property int maxItems: 200
 
+    // Multi-column overflow:
+    //   When the notes no longer fit below the input box (panel dragged down),
+    //   the notes that touch the bottom of the screen move into a new column
+    //   beside the list (to the right if there is room, otherwise to the left).
+    property int maxCols: 4
+    // true : the overflowing notes fill the next column in reverse order
+    //        (5 notes: note 5 goes beside note 1, then note 4 goes beside note 2)
+    // false: the overflowing notes keep their order
+    //        (note 4 goes beside note 1, then note 5 beside note 2)
+    property bool overflowReversed: true
+
     property bool ready: false
     property bool dragging: false     // moving the panel
     property int menuSize: 100        // COMPONENT scale (%): panel, spacing, text
@@ -115,6 +126,23 @@ Scope {
         while (root.wheelAccScale <= -120) {
             root.wheelAccScale += 120
             root.setSize(root.menuSize - 5)
+        }
+    }
+
+    // Shared wheel-shortcut handler (used by the input panel AND the notes list):
+    //   Ctrl  + scroll -> text size only
+    //   Shift + scroll -> component scale
+    // Plain scroll is not accepted, so it falls through.
+    function handleWheel(wheel) {
+        var dy = wheel.angleDelta.y !== 0 ? wheel.angleDelta.y : wheel.angleDelta.x
+        if (wheel.modifiers & Qt.ControlModifier) {
+            root.wheelText(dy)
+            wheel.accepted = true
+        } else if (wheel.modifiers & Qt.ShiftModifier) {
+            root.wheelScale(dy)
+            wheel.accepted = true
+        } else {
+            wheel.accepted = false
         }
     }
 
@@ -466,7 +494,16 @@ Scope {
             WlrLayershell.layer: WlrLayer.Overlay
             WlrLayershell.namespace: "todo"
             WlrLayershell.keyboardFocus: root.showing ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
-            mask: Region { item: root.showing ? panel : null }
+
+            // Input regions (combined): the input panel plus one rectangle per
+            // note column (so empty space around short columns stays click-through).
+            mask: Region {
+                item: root.showing ? panel : null
+                Region { item: (root.showing && listBox.visible && listBox.nCols > 0) ? colRect0 : null }
+                Region { item: (root.showing && listBox.visible && listBox.nCols > 1) ? colRect1 : null }
+                Region { item: (root.showing && listBox.visible && listBox.nCols > 2) ? colRect2 : null }
+                Region { item: (root.showing && listBox.visible && listBox.nCols > 3) ? colRect3 : null }
+            }
 
             onWidthChanged: {
                 root.winW = width
@@ -489,6 +526,8 @@ Scope {
                 anchors.fill: parent
                 focus: true
                 Keys.onEscapePressed: root.closeMenu()
+
+                // ---- input panel (the part you drag) -----------------------
                 Rectangle {
                     id: panel
                     width: root.cardWidth
@@ -505,17 +544,15 @@ Scope {
                     opacity: win.reveal ? 1 : 0
                     visible: opacity > 0
 
-                    // ---- space accounting for the notes list ----------------
-                    // Height of everything except the list (list visible: 1 gap).
+                    // Height of the input box plus the gap below it.
                     readonly property real chromeH: inputBox.height + panelCol.spacing
-                    // Vertical room left below the panel's top edge for the list.
-                    readonly property real listAvail: root.winH - root.topGap - root.offsetY - chromeH
-                    // The list hides itself when there isn't room for a row.
-                    readonly property bool listFits: listAvail >= root.rowHeight
-                    // Smallest the panel can ever be (list hidden). Used to clamp dragging
-                    // so the panel can reach the very bottom of the screen.
-                    readonly property real minH: chromeH - panelCol.spacing
-                                                 + (todos.count === 0 ? root.px(40) + panelCol.spacing : 0)
+                    // Where the panel's top / left edge will be once margin animations settle.
+                    readonly property real targetTop: root.topGap + root.offsetY
+                    readonly property real targetX: root.winW - (root.sideGap - root.offsetX) - root.cardWidth
+
+                    // Smallest the panel can ever be. Used to clamp dragging so the
+                    // panel can reach the very bottom of the screen.
+                    readonly property real minH: panelCol.height
 
                     onMinHChanged: {
                         root.panelH = minH
@@ -629,426 +666,6 @@ Scope {
                             font.pixelSize: root.fpx(11)
                             color: Theme.textDim
                         }
-
-                        ListView {
-                            id: list
-                            // hides itself when the panel is dragged so low there's no room
-                            visible: todos.count > 0 && panel.listFits
-                            width: parent.width
-                            height: Math.max(0, Math.min(contentHeight, panel.listAvail))
-                            clip: true
-                            spacing: root.px(8)
-                            model: todos
-                            boundsBehavior: Flickable.StopAtBounds
-
-                            delegate: Rectangle {
-                                id: entry
-                                required property int index
-                                required property string heading
-                                required property string title
-                                required property bool done
-                                required property real remindAt
-                                required property bool notified
-                                required property bool collapsed
-
-                                // reminder picker open?
-                                property bool picking: false
-                                // being dragged with right-click
-                                property bool reordering: false
-
-                                // a collapsed note never shows the reminder picker
-                                onCollapsedChanged: if (entry.collapsed) entry.picking = false
-
-                                width: list.width
-                                height: Math.max(root.rowHeight,
-                                                 content.height + root.px(22),
-                                                 btnCol.height + root.px(16))
-                                radius: root.px(12)
-                                color: Theme.bg
-                                border.width: (edit.activeFocus || titleEdit.activeFocus || entry.reordering) ? 1 : 0
-                                border.color: Theme.accent
-                                z: entry.reordering ? 2 : 1
-                                Behavior on color { ColorAnimation { duration: 120 } }
-
-                                MouseArea {
-                                    id: hoverArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    acceptedButtons: Qt.LeftButton
-                                    onClicked: {
-                                        // clicking a collapsed note expands it
-                                        if (entry.collapsed) {
-                                            root.toggleCollapsed(entry.index)
-                                        } else {
-                                            edit.forceActiveFocus()
-                                            edit.cursorPosition = edit.length
-                                        }
-                                    }
-                                }
-
-                                Rectangle {
-                                    id: check
-                                    width: root.px(15)
-                                    height: width
-                                    radius: root.px(8)
-                                    anchors.left: parent.left
-                                    anchors.leftMargin: root.px(14)
-                                    anchors.top: parent.top
-                                    anchors.topMargin: root.px(12)
-                                    color: entry.done ? Theme.accent : "transparent"
-                                    border.width: 1
-                                    border.color: entry.done ? Theme.accent : Theme.alpha(Theme.text, 0.3)
-                                    Behavior on color { ColorAnimation { duration: 150 } }
-
-                                    Text {
-                                        anchors.centerIn: parent
-                                        visible: entry.done
-                                        text: "✓"
-                                        font.pixelSize: root.fpx(13)
-                                        font.bold: true
-                                        color: Theme.bg
-                                    }
-
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        onClicked: root.toggleTodo(entry.index)
-                                    }
-                                }
-
-                                // title + body + reminder stuff, stacked
-                                Column {
-                                    id: content
-                                    anchors.left: check.right
-                                    anchors.leftMargin: root.px(11)
-                                    anchors.right: btnCol.left
-                                    anchors.rightMargin: root.px(6)
-                                    anchors.top: parent.top
-                                    anchors.topMargin: root.px(11)
-                                    spacing: root.px(4)
-
-                                    // note title (single line)
-                                    TextInput {
-                                        id: titleEdit
-                                        width: content.width
-                                        visible: !entry.collapsed || entry.heading !== "" || titleEdit.activeFocus
-                                        font.pixelSize: root.fpx(12)
-                                        font.bold: true
-                                        font.strikeout: entry.done
-                                        color: entry.done ? Theme.textDim : Theme.text
-                                        opacity: entry.done ? 0.7 : 1
-                                        selectionColor: Theme.accent
-                                        selectedTextColor: Theme.bg
-                                        selectByMouse: true
-                                        clip: true
-
-                                        Component.onCompleted: titleEdit.text = entry.heading
-
-                                        onTextChanged: {
-                                            if (titleEdit.activeFocus)
-                                                root.editHeading(entry.index, titleEdit.text)
-                                        }
-
-                                        Keys.onPressed: function (e) {
-                                            if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter
-                                                    || e.key === Qt.Key_Tab) {
-                                                e.accepted = true
-                                                if (entry.collapsed) input.forceActiveFocus()
-                                                else edit.forceActiveFocus()
-                                            } else if (e.key === Qt.Key_Escape) {
-                                                e.accepted = true
-                                                root.closeMenu()
-                                            }
-                                        }
-
-                                        Text {
-                                            visible: titleEdit.text === "" && !entry.collapsed
-                                                     && !titleEdit.inputMethodComposing
-                                            anchors.verticalCenter: parent.verticalCenter
-                                            text: "Title"
-                                            font.pixelSize: root.fpx(11)
-                                            font.bold: false
-                                            color: Theme.textDim
-                                            opacity: 0.5
-                                        }
-                                    }
-
-                                    // collapsed + no title: show the first line of the body instead
-                                    Text {
-                                        visible: entry.collapsed && entry.heading === ""
-                                        width: content.width
-                                        text: entry.title.split("\n")[0] !== "" ? entry.title.split("\n")[0] : "(empty)"
-                                        elide: Text.ElideRight
-                                        maximumLineCount: 1
-                                        font.pixelSize: root.fpx(11)
-                                        font.strikeout: entry.done
-                                        color: entry.done ? Theme.textDim : Theme.text
-                                        opacity: entry.done ? 0.7 : 1
-                                    }
-
-                                    // note body
-                                    TextEdit {
-                                        id: edit
-                                        width: content.width
-                                        visible: !entry.collapsed
-                                        font.pixelSize: root.fpx(11)
-                                        font.strikeout: entry.done
-                                        color: entry.done ? Theme.textDim : Theme.text
-                                        opacity: entry.done ? 0.7 : 1
-                                        selectionColor: Theme.accent
-                                        selectedTextColor: Theme.bg
-                                        wrapMode: TextEdit.Wrap
-                                        selectByMouse: true
-                                        textFormat: TextEdit.PlainText
-
-                                        Component.onCompleted: edit.text = entry.title
-
-                                        onTextChanged: {
-                                            if (edit.activeFocus)
-                                                root.editTodo(entry.index, edit.text)
-                                        }
-
-                                        Keys.onPressed: function (e) {
-                                            if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter) {
-                                                e.accepted = true
-                                                if (e.modifiers & Qt.ShiftModifier) {
-                                                    edit.insert(edit.cursorPosition, "\n")
-                                                } else {
-                                                    input.forceActiveFocus()
-                                                }
-                                            } else if (e.key === Qt.Key_Escape) {
-                                                e.accepted = true
-                                                root.closeMenu()
-                                            }
-                                        }
-                                    }
-
-                                    // reminder label + picker, below the text
-                                    Column {
-                                        id: extras
-                                        width: content.width
-                                        // an empty Column would still add spacing to `content`
-                                        visible: entry.remindAt > 0 || entry.picking
-                                        spacing: root.px(6)
-
-                                        Text {
-                                            visible: entry.remindAt > 0
-                                            text: "⏰ " + root.formatWhen(entry.remindAt)
-                                                  + (entry.notified ? "  ·  sent" : "")
-                                            font.pixelSize: root.fpx(10)
-                                            color: entry.notified ? Theme.textDim : Theme.accent
-                                        }
-
-                                        Flow {
-                                            visible: entry.picking
-                                            width: parent.width
-                                            spacing: root.px(6)
-
-                                            Repeater {
-                                                // s = seconds
-                                                model: [
-                                                    { l: "5m",  s: 300 },
-                                                    { l: "25m", s: 1500 },
-                                                    { l: "1h",  s: 3600 },
-                                                ]
-
-                                                delegate: ChipBtn {
-                                                    required property var modelData
-                                                    ui: root.ui
-                                                    tx: root.tx
-                                                    label: modelData.l
-                                                    onClicked: {
-                                                        root.setReminder(entry.index, Date.now() + modelData.s * 1000)
-                                                        entry.picking = false
-                                                    }
-                                                }
-                                            }
-
-                                            ChipBtn {
-                                                visible: entry.remindAt > 0
-                                                ui: root.ui
-                                                tx: root.tx
-                                                label: "Clear"
-                                                onClicked: {
-                                                    root.clearReminder(entry.index)
-                                                    entry.picking = false
-                                                }
-                                            }
-                                        }
-
-                                        Rectangle {
-                                            id: customBox
-                                            visible: entry.picking
-                                            property bool bad: false
-                                            width: parent.width
-                                            height: Math.max(root.px(26), customInput.contentHeight + root.px(10))
-                                            radius: root.px(8)
-                                            color: Theme.alpha(Theme.text, 0.08)
-                                            border.width: (customInput.activeFocus || bad) ? 1 : 0
-                                            border.color: bad ? Theme.danger : Theme.accent
-
-                                            TextInput {
-                                                id: customInput
-                                                anchors.fill: parent
-                                                anchors.leftMargin: root.px(8)
-                                                anchors.rightMargin: root.px(8)
-                                                verticalAlignment: TextInput.AlignVCenter
-                                                font.pixelSize: root.fpx(11)
-                                                color: Theme.text
-                                                selectionColor: Theme.accent
-                                                selectedTextColor: Theme.bg
-                                                clip: true
-
-                                                onTextChanged: customBox.bad = false
-
-                                                Keys.onPressed: function (e) {
-                                                    if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter) {
-                                                        e.accepted = true
-                                                        var ts = root.parseWhen(customInput.text)
-                                                        if (ts > 0) {
-                                                            root.setReminder(entry.index, ts)
-                                                            customInput.text = ""
-                                                            entry.picking = false
-                                                            input.forceActiveFocus()
-                                                        } else {
-                                                            customBox.bad = true
-                                                        }
-                                                    } else if (e.key === Qt.Key_Escape) {
-                                                        e.accepted = true
-                                                        entry.picking = false
-                                                        input.forceActiveFocus()
-                                                    }
-                                                }
-
-                                                Text {
-                                                    visible: customInput.text === ""
-                                                    anchors.verticalCenter: parent.verticalCenter
-                                                    text: "e.g. 15m · 20:10 · 9am · 2:30pm · fri 14:30"
-                                                    font.pixelSize: root.fpx(11)
-                                                    color: Theme.textDim
-                                                    opacity: 0.7
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-
-                                // Right-hand button stack, top to bottom:
-                                //   ✕ delete
-                                //   ⏰ reminder   (hidden while the note is collapsed)
-                                //   ▾/▸ collapse / expand
-                                Column {
-                                    id: btnCol
-                                    anchors.right: parent.right
-                                    anchors.rightMargin: root.px(10)
-                                    anchors.top: parent.top
-                                    anchors.topMargin: root.px(8)
-                                    spacing: 0
-                                    Item {
-                                        id: collapseBtn
-                                        width: root.px(22)
-                                        height: width
-
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: entry.collapsed ? "⌵" : "⌃"
-                                            font.pixelSize: root.fpx(12)
-                                            color: collapseArea.containsMouse ? Theme.accent : Theme.textDim
-                                            opacity: (hoverArea.containsMouse || collapseArea.containsMouse) ? 1 : 0.4
-                                            Behavior on opacity { NumberAnimation { duration: 120 } }
-                                        }
-
-                                        MouseArea {
-                                            id: collapseArea
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            onClicked: root.toggleCollapsed(entry.index)
-                                        }
-                                    }
-                                    Item {
-                                        id: bellBtn
-                                        width: root.px(22)
-                                        height: width
-                                        visible: !entry.collapsed
-
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: "󰂚"
-                                            font.pixelSize: root.fpx(12)
-                                            color: Theme.textDim
-                                            opacity: (entry.remindAt > 0 && !entry.notified) || entry.picking ? 1
-                                                     : (hoverArea.containsMouse || bellArea.containsMouse) ? 0.9
-                                                     : 0.4
-                                            Behavior on opacity { NumberAnimation { duration: 120 } }
-                                        }
-
-                                        MouseArea {
-                                            id: bellArea
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            onClicked: {
-                                                entry.picking = !entry.picking
-                                                if (entry.picking)
-                                                    Qt.callLater(function () { customInput.forceActiveFocus() })
-                                            }
-                                        }
-                                    }
-                                    Item {
-                                        id: delBtn
-                                        width: root.px(22)
-                                        height: width
-
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: "✕"
-                                            font.pixelSize: root.fpx(12)
-                                            color: delArea.containsMouse ? Theme.danger : Theme.textDim
-                                            opacity: (hoverArea.containsMouse || delArea.containsMouse) ? 1 : 0.4
-                                            Behavior on opacity { NumberAnimation { duration: 120 } }
-                                        }
-
-                                        MouseArea {
-                                            id: delArea
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            onClicked: root.removeTodo(entry.index)
-                                        }
-                                    }
-                                }
-                                // Right-click + drag: reorder this note.
-                                // Last child = topmost; only reacts to the right button,
-                                // so left-clicks still reach the checkbox, text, buttons.
-                                MouseArea {
-                                    id: reorderArea
-                                    anchors.fill: parent
-                                    acceptedButtons: Qt.RightButton
-                                    preventStealing: true
-
-                                    onPressed: entry.reordering = true
-                                    onReleased: entry.reordering = false
-                                    onCanceled: entry.reordering = false
-
-                                    onPositionChanged: function (mouse) {
-                                        if (!pressed) return
-                                        // cursor position in the list's content coordinates
-                                        var p = reorderArea.mapToItem(list.contentItem, mouse.x, mouse.y)
-                                        var idx = list.indexAt(list.width / 2, p.y)
-                                        if (idx < 0) {
-                                            if (p.y <= 0) idx = 0                                       // above the first note
-                                            else if (p.y >= list.contentHeight) idx = todos.count - 1   // below the last note
-                                            else return                                                 // in the gap between notes
-                                        }
-                                        if (idx === entry.index) return
-                                        var it = list.itemAtIndex(idx)
-                                        if (!it) return
-                                        // swap only after crossing the middle of the other note, so notes
-                                        // of different heights don't flip back and forth
-                                        var mid = it.y + it.height / 2
-                                        if ((idx > entry.index && p.y > mid) || (idx < entry.index && p.y < mid))
-                                            root.moveTodo(entry.index, idx)
-                                    }
-                                }
-                            }
-                        }
                     }
 
                     // drag strip: invisible, runs along the whole top edge of the panel.
@@ -1098,11 +715,9 @@ Scope {
                         onDoubleClicked: root.resetPosition()
                     }
 
-                    // Topmost overlay for wheel shortcuts:
-                    //   Ctrl  + scroll -> text size only
-                    //   Shift + scroll -> component scale
-                    // Plain scroll passes through so the list scrolls normally.
-                    // Starts below the drag strip so the strip keeps its cursor.
+                    // Topmost overlay for wheel shortcuts (see root.handleWheel).
+                    // Plain scroll passes through. Starts below the drag strip so
+                    // the strip keeps its cursor.
                     MouseArea {
                         anchors.left: parent.left
                         anchors.right: parent.right
@@ -1111,16 +726,704 @@ Scope {
                         anchors.topMargin: dragArea.height
                         z: 100
                         acceptedButtons: Qt.NoButton   // never steals clicks
-                        onWheel: function (wheel) {
-                            var dy = wheel.angleDelta.y !== 0 ? wheel.angleDelta.y : wheel.angleDelta.x
-                            if (wheel.modifiers & Qt.ControlModifier) {
-                                root.wheelText(dy)
-                                wheel.accepted = true
-                            } else if (wheel.modifiers & Qt.ShiftModifier) {
-                                root.wheelScale(dy)
-                                wheel.accepted = true
-                            } else {
-                                wheel.accepted = false
+                        onWheel: function (wheel) { root.handleWheel(wheel) }
+                    }
+                }
+
+                // ---- notes: under the panel (columns grow sideways), or beside it ----
+                //
+                // listBox is the ORIGIN of the first notes column (zero-height
+                // anchor is not needed: it simply has the first column's size).
+                // Notes are laid out by relayout():
+                //   * column 1 takes as many notes as fit between the input box and
+                //     the bottom of the screen
+                //   * the notes that touch the bottom move into column 2, 3, 4
+                //     (max root.maxCols), to the right of the list if there is room,
+                //     otherwise to the left
+                //   * if even the last column is full, the list scrolls with the wheel
+                //
+                // sideT: 0 = list directly under the input box, 1 = beside the panel
+                // (used when there is no room for even one row under the input box).
+                Item {
+                    id: listBox
+
+                    // ---- results of relayout() ----
+                    property var slots: []                    // per note index: { x, y, col } (relative to the column origin)
+                    property int nCols: 0
+                    property var colXs: [0, 0, 0, 0]          // left edge of each column, relative to listBox
+                    property var colHs: [0, 0, 0, 0]          // height of each column
+                    property real blockH: 0                   // visible height of the whole block
+                    property real scrollY: 0
+                    property real maxScroll: 0
+                    property bool sideMode: false
+                    property bool goRight: false
+
+                    property real sideT: sideMode ? 1 : 0
+                    // horizontal distance from the panel's left edge when beside it
+                    // (+ = right of the panel, - = left of the panel)
+                    property real sideOff: goRight ? (root.cardWidth + root.px(10))
+                                                   : -(root.cardWidth + root.px(10))
+                    // no animation on the first frames after the window opens
+                    readonly property bool animOn: root.showing && win.reveal && root.winH > 0
+
+                    Behavior on sideT {
+                        enabled: listBox.animOn
+                        NumberAnimation { duration: 260; easing.type: Easing.OutCubic }
+                    }
+                    Behavior on sideOff {
+                        enabled: listBox.animOn
+                        NumberAnimation { duration: 260; easing.type: Easing.OutCubic }
+                    }
+
+                    visible: todos.count > 0 && panel.visible
+                    opacity: panel.opacity
+
+                    width: root.cardWidth
+                    height: blockH
+
+                    x: panel.x + sideT * sideOff
+                    // under: right below the input box. beside: level with the panel's top,
+                    // but pushed up as needed so the whole block stays on screen.
+                    y: (1 - sideT) * (panel.y + panel.chromeH)
+                       + sideT * Math.max(root.topGap,
+                                          Math.min(panel.y, root.winH - root.topGap - listBox.blockH))
+
+                    // ---- layout engine ----------------------------------------
+                    // Anything that can change the layout changes this string,
+                    // which schedules one relayout.
+                    readonly property string layoutKey: [
+                        panel.targetX, panel.targetTop, panel.chromeH,
+                        root.winW, root.winH, root.cardWidth, root.rowHeight,
+                        root.ui, root.tx, root.maxCols, root.overflowReversed,
+                        todos.count
+                    ].join("|")
+                    onLayoutKeyChanged: scheduleLayout()
+
+                    function scheduleLayout() { layoutTimer.restart() }
+
+                    Timer {
+                        id: layoutTimer
+                        interval: 0
+                        onTriggered: listBox.relayout()
+                    }
+
+                    // lets freshly created notes snap to their slot first and only
+                    // animate on later moves
+                    Timer {
+                        id: placeTimer
+                        interval: 30
+                        onTriggered: {
+                            for (var i = 0; i < todos.count; i++) {
+                                var it = rep.itemAt(i)
+                                if (it) it.placed = true
+                            }
+                        }
+                    }
+
+                    // Distribute notes (by height) into columns.
+                    // Column 1 is filled in order. The notes that do not fit go into
+                    // the next columns: reversed order if root.overflowReversed.
+                    function fill(hs, availH, gap, cap) {
+                        var n = hs.length
+                        var cols = [[]]
+                        var y = 0
+                        var k = 0
+                        while (k < n) {
+                            var need = (cols[0].length > 0 ? gap : 0) + hs[k]
+                            if (cap > 1 && cols[0].length > 0 && y + need > availH) break
+                            y += need
+                            cols[0].push(k)
+                            k++
+                        }
+                        if (k < n) {
+                            var order = []
+                            var j
+                            if (root.overflowReversed) { for (j = n - 1; j >= k; j--) order.push(j) }
+                            else { for (j = k; j < n; j++) order.push(j) }
+
+                            cols.push([])
+                            y = 0
+                            for (var o = 0; o < order.length; o++) {
+                                var idx = order[o]
+                                var col = cols[cols.length - 1]
+                                var add = (col.length > 0 ? gap : 0) + hs[idx]
+                                if (col.length > 0 && y + add > availH && cols.length < cap) {
+                                    cols.push([])
+                                    col = cols[cols.length - 1]
+                                    y = 0
+                                    add = hs[idx]
+                                }
+                                y += add
+                                col.push(idx)
+                            }
+                        }
+                        return cols
+                    }
+
+                    function relayout() {
+                        var n = todos.count
+                        if (n === 0 || root.winH <= 0 || root.winW <= 0) {
+                            slots = []
+                            nCols = 0
+                            blockH = 0
+                            maxScroll = 0
+                            scrollY = 0
+                            colXs = [0, 0, 0, 0]
+                            colHs = [0, 0, 0, 0]
+                            return
+                        }
+
+                        var gap = root.px(8)          // vertical gap between notes
+                        var colGap = root.px(10)      // horizontal gap between columns
+                        var cw = root.cardWidth
+                        var step = cw + colGap
+
+                        var hs = []
+                        for (var i = 0; i < n; i++) {
+                            var it = rep.itemAt(i)
+                            hs.push(it ? it.height : root.rowHeight)
+                        }
+
+                        // room under the input box, down to the bottom of the screen
+                        var hUnder = root.winH - panel.targetTop - panel.chromeH - root.topGap
+                        var side = hUnder < root.rowHeight
+                        var availH = Math.max(0, side ? root.winH - 2 * root.topGap : hUnder)
+
+                        // how many columns fit on each side of the panel's left edge
+                        var tx = panel.targetX
+                        var extra = side ? 1 : 0      // beside the panel, the panel itself uses one column
+                        var colsR = Math.floor((root.winW - root.topGap - tx + colGap) / step) - extra
+                        var colsL = Math.floor((tx + cw - root.topGap + colGap) / step) - extra
+                        colsR = Math.max(1, Math.min(root.maxCols, colsR))
+                        colsL = Math.max(1, Math.min(root.maxCols, colsL))
+
+                        // prefer the right; go left when the right has no room
+                        var need = listBox.fill(hs, availH, gap, Math.max(colsR, colsL)).length
+                        var goR = (colsR >= need) || (colsR >= colsL)
+                        var cap = goR ? colsR : colsL
+                        var cols = listBox.fill(hs, availH, gap, cap)
+
+                        var dir = goR ? 1 : -1
+                        var sl = new Array(n)
+                        var cx = [0, 0, 0, 0]
+                        var chs = [0, 0, 0, 0]
+                        var maxH = 0
+                        for (var c = 0; c < cols.length; c++) {
+                            var yy = 0
+                            for (var r = 0; r < cols[c].length; r++) {
+                                var idx = cols[c][r]
+                                sl[idx] = { x: dir * c * step, y: yy, col: c }
+                                yy += hs[idx] + gap
+                            }
+                            var h = Math.max(0, yy - gap)
+                            if (c < 4) { cx[c] = dir * c * step; chs[c] = h }
+                            maxH = Math.max(maxH, h)
+                        }
+
+                        listBox.goRight = goR
+                        listBox.sideMode = side
+                        listBox.nCols = Math.min(4, cols.length)
+                        listBox.colXs = cx
+                        listBox.colHs = chs
+                        listBox.blockH = Math.min(maxH, availH)
+                        listBox.maxScroll = Math.max(0, maxH - availH)
+                        listBox.scrollY = Math.max(0, Math.min(listBox.maxScroll, listBox.scrollY))
+                        listBox.slots = sl
+
+                        placeTimer.restart()
+                    }
+
+                    function scrollBy(d) {
+                        listBox.scrollY = Math.max(0, Math.min(listBox.maxScroll, listBox.scrollY - d / 2))
+                    }
+
+                    // input-region helpers, one per column (see `mask` above)
+                    Item { id: colRect0; x: listBox.colXs[0]; y: 0; width: root.cardWidth; height: Math.min(listBox.colHs[0], listBox.blockH) }
+                    Item { id: colRect1; x: listBox.colXs[1]; y: 0; width: root.cardWidth; height: Math.min(listBox.colHs[1], listBox.blockH) }
+                    Item { id: colRect2; x: listBox.colXs[2]; y: 0; width: root.cardWidth; height: Math.min(listBox.colHs[2], listBox.blockH) }
+                    Item { id: colRect3; x: listBox.colXs[3]; y: 0; width: root.cardWidth; height: Math.min(listBox.colHs[3], listBox.blockH) }
+
+                    // Clipping window for all columns. It is very wide (so it never
+                    // clips sideways) and as tall as the block (so overflow in the
+                    // last column is clipped and can be scrolled).
+                    Item {
+                        id: viewport
+                        readonly property real padX: root.winW
+                        x: -padX
+                        y: 0
+                        width: 2 * padX + root.cardWidth
+                        height: listBox.blockH
+                        clip: true
+
+                        Item {
+                            id: scroller
+                            y: -listBox.scrollY
+
+                            Repeater {
+                                id: rep
+                                model: todos
+                                onItemAdded: listBox.scheduleLayout()
+                                onItemRemoved: listBox.scheduleLayout()
+
+                                delegate: Rectangle {
+                                    id: entry
+                                    required property int index
+                                    required property string heading
+                                    required property string title
+                                    required property bool done
+                                    required property real remindAt
+                                    required property bool notified
+                                    required property bool collapsed
+
+                                    // reminder picker open?
+                                    property bool picking: false
+                                    // being dragged with right-click
+                                    property bool reordering: false
+                                    // becomes true shortly after the note got its first slot
+                                    property bool placed: false
+
+                                    // a collapsed note never shows the reminder picker
+                                    onCollapsedChanged: if (entry.collapsed) entry.picking = false
+
+                                    // position comes from the layout engine
+                                    readonly property var slot: (entry.index >= 0 && entry.index < listBox.slots.length)
+                                                                ? listBox.slots[entry.index] : null
+                                    visible: slot !== null && slot !== undefined
+                                    x: viewport.padX + (slot ? slot.x : 0)
+                                    y: slot ? slot.y : 0
+
+                                    Behavior on x {
+                                        enabled: entry.placed && listBox.animOn
+                                        NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+                                    }
+                                    Behavior on y {
+                                        enabled: entry.placed && listBox.animOn
+                                        NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+                                    }
+
+                                    onHeightChanged: listBox.scheduleLayout()
+                                    onIndexChanged: listBox.scheduleLayout()
+                                    Component.onCompleted: listBox.scheduleLayout()
+
+                                    width: root.cardWidth
+                                    height: Math.max(root.rowHeight,
+                                                     content.height + root.px(22),
+                                                     btnCol.height + root.px(16))
+                                    radius: root.px(12)
+                                    color: Theme.bg
+                                    border.width: (edit.activeFocus || titleEdit.activeFocus || entry.reordering) ? 1 : 0
+                                    border.color: Theme.accent
+                                    z: entry.reordering ? 2 : 1
+                                    Behavior on color { ColorAnimation { duration: 120 } }
+
+                                    MouseArea {
+                                        id: hoverArea
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        acceptedButtons: Qt.LeftButton
+                                        onClicked: {
+                                            // clicking a collapsed note expands it
+                                            if (entry.collapsed) {
+                                                root.toggleCollapsed(entry.index)
+                                            } else {
+                                                edit.forceActiveFocus()
+                                                edit.cursorPosition = edit.length
+                                            }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        id: check
+                                        width: root.px(15)
+                                        height: width
+                                        radius: root.px(8)
+                                        anchors.left: parent.left
+                                        anchors.leftMargin: root.px(14)
+                                        anchors.top: parent.top
+                                        anchors.topMargin: root.px(12)
+                                        color: entry.done ? Theme.accent : "transparent"
+                                        border.width: 1
+                                        border.color: entry.done ? Theme.accent : Theme.alpha(Theme.text, 0.3)
+                                        Behavior on color { ColorAnimation { duration: 150 } }
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            visible: entry.done
+                                            text: "✓"
+                                            font.pixelSize: root.fpx(13)
+                                            font.bold: true
+                                            color: Theme.bg
+                                        }
+
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            onClicked: root.toggleTodo(entry.index)
+                                        }
+                                    }
+
+                                    // title + body + reminder stuff, stacked
+                                    Column {
+                                        id: content
+                                        anchors.left: check.right
+                                        anchors.leftMargin: root.px(11)
+                                        anchors.right: btnCol.left
+                                        anchors.rightMargin: root.px(6)
+                                        anchors.top: parent.top
+                                        anchors.topMargin: root.px(11)
+                                        spacing: root.px(4)
+
+                                        // note title (single line)
+                                        TextInput {
+                                            id: titleEdit
+                                            width: content.width
+                                            visible: !entry.collapsed || entry.heading !== "" || titleEdit.activeFocus
+                                            font.pixelSize: root.fpx(12)
+                                            font.bold: true
+                                            font.strikeout: entry.done
+                                            color: entry.done ? Theme.textDim : Theme.text
+                                            opacity: entry.done ? 0.7 : 1
+                                            selectionColor: Theme.accent
+                                            selectedTextColor: Theme.bg
+                                            selectByMouse: true
+                                            clip: true
+
+                                            Component.onCompleted: titleEdit.text = entry.heading
+
+                                            onTextChanged: {
+                                                if (titleEdit.activeFocus)
+                                                    root.editHeading(entry.index, titleEdit.text)
+                                            }
+
+                                            Keys.onPressed: function (e) {
+                                                if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter
+                                                        || e.key === Qt.Key_Tab) {
+                                                    e.accepted = true
+                                                    if (entry.collapsed) input.forceActiveFocus()
+                                                    else edit.forceActiveFocus()
+                                                } else if (e.key === Qt.Key_Escape) {
+                                                    e.accepted = true
+                                                    root.closeMenu()
+                                                }
+                                            }
+
+                                            Text {
+                                                visible: titleEdit.text === "" && !entry.collapsed
+                                                         && !titleEdit.inputMethodComposing
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                text: "Title"
+                                                font.pixelSize: root.fpx(11)
+                                                font.bold: false
+                                                color: Theme.textDim
+                                                opacity: 0.5
+                                            }
+                                        }
+
+                                        // collapsed + no title: show the first line of the body instead
+                                        Text {
+                                            visible: entry.collapsed && entry.heading === ""
+                                            width: content.width
+                                            text: entry.title.split("\n")[0] !== "" ? entry.title.split("\n")[0] : "(empty)"
+                                            elide: Text.ElideRight
+                                            maximumLineCount: 1
+                                            font.pixelSize: root.fpx(11)
+                                            font.strikeout: entry.done
+                                            color: entry.done ? Theme.textDim : Theme.text
+                                            opacity: entry.done ? 0.7 : 1
+                                        }
+
+                                        // note body
+                                        TextEdit {
+                                            id: edit
+                                            width: content.width
+                                            visible: !entry.collapsed
+                                            font.pixelSize: root.fpx(11)
+                                            font.strikeout: entry.done
+                                            color: entry.done ? Theme.textDim : Theme.text
+                                            opacity: entry.done ? 0.7 : 1
+                                            selectionColor: Theme.accent
+                                            selectedTextColor: Theme.bg
+                                            wrapMode: TextEdit.Wrap
+                                            selectByMouse: true
+                                            textFormat: TextEdit.PlainText
+
+                                            Component.onCompleted: edit.text = entry.title
+
+                                            onTextChanged: {
+                                                if (edit.activeFocus)
+                                                    root.editTodo(entry.index, edit.text)
+                                            }
+
+                                            Keys.onPressed: function (e) {
+                                                if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter) {
+                                                    e.accepted = true
+                                                    if (e.modifiers & Qt.ShiftModifier) {
+                                                        edit.insert(edit.cursorPosition, "\n")
+                                                    } else {
+                                                        input.forceActiveFocus()
+                                                    }
+                                                } else if (e.key === Qt.Key_Escape) {
+                                                    e.accepted = true
+                                                    root.closeMenu()
+                                                }
+                                            }
+                                        }
+
+                                        // reminder label + picker, below the text
+                                        Column {
+                                            id: extras
+                                            width: content.width
+                                            // an empty Column would still add spacing to `content`
+                                            visible: entry.remindAt > 0 || entry.picking
+                                            spacing: root.px(6)
+
+                                            Text {
+                                                visible: entry.remindAt > 0
+                                                text: "⏰ " + root.formatWhen(entry.remindAt)
+                                                      + (entry.notified ? "  ·  sent" : "")
+                                                font.pixelSize: root.fpx(10)
+                                                color: entry.notified ? Theme.textDim : Theme.accent
+                                            }
+
+                                            Flow {
+                                                visible: entry.picking
+                                                width: parent.width
+                                                spacing: root.px(6)
+
+                                                Repeater {
+                                                    // s = seconds
+                                                    model: [
+                                                        { l: "5m",  s: 300 },
+                                                        { l: "25m", s: 1500 },
+                                                        { l: "1h",  s: 3600 },
+                                                    ]
+
+                                                    delegate: ChipBtn {
+                                                        required property var modelData
+                                                        ui: root.ui
+                                                        tx: root.tx
+                                                        label: modelData.l
+                                                        onClicked: {
+                                                            root.setReminder(entry.index, Date.now() + modelData.s * 1000)
+                                                            entry.picking = false
+                                                        }
+                                                    }
+                                                }
+
+                                                ChipBtn {
+                                                    visible: entry.remindAt > 0
+                                                    ui: root.ui
+                                                    tx: root.tx
+                                                    label: "Clear"
+                                                    onClicked: {
+                                                        root.clearReminder(entry.index)
+                                                        entry.picking = false
+                                                    }
+                                                }
+                                            }
+
+                                            Rectangle {
+                                                id: customBox
+                                                visible: entry.picking
+                                                property bool bad: false
+                                                width: parent.width
+                                                height: Math.max(root.px(26), customInput.contentHeight + root.px(10))
+                                                radius: root.px(8)
+                                                color: Theme.alpha(Theme.text, 0.08)
+                                                border.width: (customInput.activeFocus || bad) ? 1 : 0
+                                                border.color: bad ? Theme.danger : Theme.accent
+
+                                                TextInput {
+                                                    id: customInput
+                                                    anchors.fill: parent
+                                                    anchors.leftMargin: root.px(8)
+                                                    anchors.rightMargin: root.px(8)
+                                                    verticalAlignment: TextInput.AlignVCenter
+                                                    font.pixelSize: root.fpx(11)
+                                                    color: Theme.text
+                                                    selectionColor: Theme.accent
+                                                    selectedTextColor: Theme.bg
+                                                    clip: true
+
+                                                    onTextChanged: customBox.bad = false
+
+                                                    Keys.onPressed: function (e) {
+                                                        if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter) {
+                                                            e.accepted = true
+                                                            var ts = root.parseWhen(customInput.text)
+                                                            if (ts > 0) {
+                                                                root.setReminder(entry.index, ts)
+                                                                customInput.text = ""
+                                                                entry.picking = false
+                                                                input.forceActiveFocus()
+                                                            } else {
+                                                                customBox.bad = true
+                                                            }
+                                                        } else if (e.key === Qt.Key_Escape) {
+                                                            e.accepted = true
+                                                            entry.picking = false
+                                                            input.forceActiveFocus()
+                                                        }
+                                                    }
+
+                                                    Text {
+                                                        visible: customInput.text === ""
+                                                        anchors.verticalCenter: parent.verticalCenter
+                                                        text: "e.g. 15m · 20:10 · 9am · 2:30pm · fri 14:30"
+                                                        font.pixelSize: root.fpx(11)
+                                                        color: Theme.textDim
+                                                        opacity: 0.7
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // Right-hand button stack, top to bottom:
+                                    //   ▾/▸ collapse / expand
+                                    //   ⏰ reminder   (hidden while the note is collapsed)
+                                    //   ✕ delete
+                                    Column {
+                                        id: btnCol
+                                        anchors.right: parent.right
+                                        anchors.rightMargin: root.px(10)
+                                        anchors.top: parent.top
+                                        anchors.topMargin: root.px(8)
+                                        spacing: 0
+                                        Item {
+                                            id: collapseBtn
+                                            width: root.px(22)
+                                            height: width
+
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: entry.collapsed ? "⌵" : "⌃"
+                                                font.pixelSize: root.fpx(12)
+                                                color: collapseArea.containsMouse ? Theme.accent : Theme.textDim
+                                                opacity: (hoverArea.containsMouse || collapseArea.containsMouse) ? 1 : 0.4
+                                                Behavior on opacity { NumberAnimation { duration: 120 } }
+                                            }
+
+                                            MouseArea {
+                                                id: collapseArea
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                onClicked: root.toggleCollapsed(entry.index)
+                                            }
+                                        }
+                                        Item {
+                                            id: bellBtn
+                                            width: root.px(22)
+                                            height: width
+                                            visible: !entry.collapsed
+
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: "󰂚"
+                                                font.pixelSize: root.fpx(12)
+                                                color: Theme.textDim
+                                                opacity: (entry.remindAt > 0 && !entry.notified) || entry.picking ? 1
+                                                         : (hoverArea.containsMouse || bellArea.containsMouse) ? 0.9
+                                                         : 0.4
+                                                Behavior on opacity { NumberAnimation { duration: 120 } }
+                                            }
+
+                                            MouseArea {
+                                                id: bellArea
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                onClicked: {
+                                                    entry.picking = !entry.picking
+                                                    if (entry.picking)
+                                                        Qt.callLater(function () { customInput.forceActiveFocus() })
+                                                }
+                                            }
+                                        }
+                                        Item {
+                                            id: delBtn
+                                            width: root.px(22)
+                                            height: width
+
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: "✕"
+                                                font.pixelSize: root.fpx(12)
+                                                color: delArea.containsMouse ? Theme.danger : Theme.textDim
+                                                opacity: (hoverArea.containsMouse || delArea.containsMouse) ? 1 : 0.4
+                                                Behavior on opacity { NumberAnimation { duration: 120 } }
+                                            }
+
+                                            MouseArea {
+                                                id: delArea
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                onClicked: root.removeTodo(entry.index)
+                                            }
+                                        }
+                                    }
+
+                                    // Right-click + drag: reorder this note (works across columns).
+                                    // Last child = topmost; only reacts to the right button,
+                                    // so left-clicks still reach the checkbox, text, buttons.
+                                    MouseArea {
+                                        id: reorderArea
+                                        anchors.fill: parent
+                                        acceptedButtons: Qt.RightButton
+                                        preventStealing: true
+
+                                        onPressed: entry.reordering = true
+                                        onReleased: entry.reordering = false
+                                        onCanceled: entry.reordering = false
+
+                                        onPositionChanged: function (mouse) {
+                                            if (!pressed) return
+                                            // cursor position in the notes' coordinates
+                                            var p = reorderArea.mapToItem(scroller, mouse.x, mouse.y)
+
+                                            // which other note is under the cursor?
+                                            var hit = -1
+                                            for (var i = 0; i < todos.count; i++) {
+                                                if (i === entry.index) continue
+                                                var o = rep.itemAt(i)
+                                                if (!o || !o.visible) continue
+                                                if (p.x >= o.x && p.x <= o.x + o.width
+                                                        && p.y >= o.y && p.y <= o.y + o.height) {
+                                                    hit = i
+                                                    break
+                                                }
+                                            }
+                                            if (hit < 0) return
+
+                                            var other = rep.itemAt(hit)
+                                            var sameCol = other.slot && entry.slot && other.slot.col === entry.slot.col
+                                            if (sameCol) {
+                                                // swap only after crossing the middle of the other note, so notes
+                                                // of different heights don't flip back and forth
+                                                var mid = other.y + other.height / 2
+                                                var ok = (other.y < entry.y && p.y < mid)
+                                                         || (other.y > entry.y && p.y > mid)
+                                                if (!ok) return
+                                            }
+                                            root.moveTodo(entry.index, hit)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Wheel shortcuts also work over the notes:
+                        //   Ctrl/Shift + wheel -> text size / scale
+                        //   plain wheel        -> scroll (only when the last column overflows)
+                        // Never steals clicks.
+                        MouseArea {
+                            anchors.fill: parent
+                            z: 100
+                            acceptedButtons: Qt.NoButton
+                            onWheel: function (wheel) {
+                                root.handleWheel(wheel)
+                                if (!wheel.accepted && listBox.maxScroll > 0) {
+                                    listBox.scrollBy(wheel.angleDelta.y)
+                                    wheel.accepted = true
+                                }
                             }
                         }
                     }

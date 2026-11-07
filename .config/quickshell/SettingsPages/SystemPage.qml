@@ -12,7 +12,6 @@ Item {
     readonly property int hardwareLabelSize: Theme.textSizeGroup
     readonly property int hardwareTextSize: Theme.textSizeGroup
     readonly property int rightMargin: 10
-    readonly property int historyLength: 60
 
     // ── Paths ─────────────────────────────────────────────────
     readonly property string homeDir: Quickshell.env("HOME")
@@ -20,176 +19,45 @@ Item {
     readonly property string defaultAvatar: imgDir + "/pfp3.png"
     readonly property string customAvatar: imgDir + "/pfp_custom"
 
-    // ── GPU probe (vendor-agnostic, no root needed) ───────────
-    // Kept identical to the bar's probe (Bar.qml) so both show the same value.
-    // Prints "<usage%> <tempC>"; a field is "-" when unavailable.
-    // Order of attempts for usage:
-    //   1. NVIDIA  : nvidia-smi
-    //   2. AMD     : sysfs gpu_busy_percent (largest-VRAM card wins)
-    //   3. Intel   : intel_gpu_top (only if permitted, 4s timeout)
-    //   4. Intel/other fallback: GPU clock estimate (act_freq / max_freq),
-    //      works unprivileged on i915 and xe drivers
-    // Temperature: nvidia-smi, else any DRM card hwmon temp, else `sensors`.
-    readonly property string gpuProbeScript: `
-u=-; t=-
-isnum() { case "$1" in ''|*[!0-9.]*) return 1;; *) return 0;; esac; }
-
-# 1. NVIDIA
-if command -v nvidia-smi >/dev/null 2>&1; then
-  o=$(nvidia-smi --query-gpu=utilization.gpu,temperature.gpu --format=csv,noheader,nounits 2>/dev/null | head -n1)
-  if [ -n "$o" ]; then
-    a=$(echo "$o" | cut -d, -f1 | tr -d ' ')
-    b=$(echo "$o" | cut -d, -f2 | tr -d ' ')
-    isnum "$a" && u="$a"
-    isnum "$b" && t="$b"
-  fi
-fi
-
-# 2. AMD (amdgpu sysfs)
-if [ "$u" = "-" ]; then
-  best=""; bestmem=-1
-  for d in /sys/class/drm/card[0-9]*/device; do
-    [ -r "$d/gpu_busy_percent" ] || continue
-    m=$(cat "$d/mem_info_vram_total" 2>/dev/null || echo 0)
-    isnum "$m" || m=0
-    if [ "$m" -gt "$bestmem" ]; then best="$d"; bestmem="$m"; fi
-  done
-  if [ -n "$best" ]; then
-    a=$(cat "$best/gpu_busy_percent" 2>/dev/null)
-    isnum "$a" && u="$a"
-    if [ "$t" = "-" ]; then
-      for h in "$best"/hwmon/hwmon*/temp1_input; do
-        if [ -r "$h" ]; then t=$(( $(cat "$h") / 1000 )); break; fi
-      done
-    fi
-  fi
-fi
-
-# 3. Intel via intel_gpu_top (needs CAP_PERFMON / root; silently skipped otherwise)
-if [ "$u" = "-" ] && command -v intel_gpu_top >/dev/null 2>&1; then
-    v=$(timeout 4 intel_gpu_top -J -s 1000 -n 2 2>/dev/null | awk 'index($0,"Render/3D"){f=1;next} f==1 && /busy/{x=$0;gsub(/[^0-9.]/,"",x);f=2;next} f==2{if(/sema/)last=x;f=0} END{print last}')
-    isnum "$v" && u="$v"
-fi
-
-# 4. Unprivileged fallback: GPU clock as a load estimate (i915 / xe)
-if [ "$u" = "-" ]; then
-  for c in /sys/class/drm/card[0-9]*; do
-    [ -d "$c" ] || continue
-    for pair in \
-      "$c/gt/gt0/rps_act_freq_mhz:$c/gt/gt0/rps_max_freq_mhz" \
-      "$c/gt/gt0/rps_cur_freq_mhz:$c/gt/gt0/rps_max_freq_mhz" \
-      "$c/gt_act_freq_mhz:$c/gt_max_freq_mhz" \
-      "$c/gt_cur_freq_mhz:$c/gt_max_freq_mhz" \
-      "$c/device/tile0/gt0/freq0/act_freq:$c/device/tile0/gt0/freq0/max_freq"; do
-      f1=\${pair%%:*}; f2=\${pair#*:}
-      [ -r "$f1" ] && [ -r "$f2" ] || continue
-      cur=$(cat "$f1" 2>/dev/null); max=$(cat "$f2" 2>/dev/null)
-      if isnum "$cur" && isnum "$max" && [ "$max" -gt 0 ]; then
-        u=$(( cur * 100 / max )); [ "$u" -gt 100 ] && u=100
-        break 2
-      fi
-    done
-  done
-fi
-
-# Temperature fallback: any DRM card hwmon (i915 / xe / nouveau / amdgpu)
-if [ "$t" = "-" ]; then
-  for h in /sys/class/drm/card[0-9]*/device/hwmon/hwmon*/temp1_input; do
-    if [ -r "$h" ]; then
-      r=$(cat "$h" 2>/dev/null)
-      if isnum "$r"; then t=$(( r / 1000 )); break; fi
-    fi
-  done
-fi
-
-echo "$u $t"
-`
-
     // ── State ─────────────────────────────────────────────────
+    // CPU / GPU / memory / network / temperatures come from the shared
+    // SystemStats singleton. The bar reads the same one, so both always agree.
     property string os: "..."
     property string wm: "Hyprland"
     property string uptime: "..."
-    property string cpu: "Loading..."
-    property string gpu: "Loading..."
-    property string memory: "Loading..."
-    property string ramSpeed: "Loading..."
-    property string cpuTemp: "—"
-    property string gpuTempProbe: "—"      // from nvidia-smi / sysfs hwmon
-    property string gpuTempSensors: "—"    // fallback from `sensors`
-    readonly property string gpuTemp: gpuTempProbe !== "—" ? gpuTempProbe : gpuTempSensors
     property string currentTime: ""
 
-    property real cpuUsage: 0
-    property real gpuUsage: 0
-    property bool gpuHasUsage: false
-    property real gpuAvg: -1               // smoothed GPU usage (same filter as the bar)
-    property real memoryUsage: 0
-    property var cpuHistory: []
-    property var gpuHistory: []
-    property var memoryHistory: []
-    property var cpuPrev: null
+    readonly property string memoryText: SystemStats.memTotalKb > 0
+        ? formatMemory(SystemStats.memUsedKb) + " / " + formatMemory(SystemStats.memTotalKb)
+        : "Loading..."
+
+    // Network graph scale: peak of the visible history (at least 100 KB/s)
+    function netScaleOf(down, up) {
+        var peak = 0
+        for (var i = 0; i < down.length; i++) if (down[i] > peak) peak = down[i]
+        for (var j = 0; j < up.length; j++) if (up[j] > peak) peak = up[j]
+        return Math.max(100 * 1024, peak * 1.15)
+    }
+    readonly property real netScale: netScaleOf(SystemStats.netDownHistory, SystemStats.netUpHistory)
 
     // ── Helpers ───────────────────────────────────────────────
-    function poll(proc) {
-        if (!proc.running) proc.running = true
-    }
-
-    function updateGraph(value, type) {
-        value = parseFloat(value)
-        if (isNaN(value)) return
-        value = Math.max(0, Math.min(100, value))
-        page[type + "Usage"] = value
-        page[type + "History"] = page[type + "History"].concat([value]).slice(-historyLength)
-    }
-
-    // Same smoothing as the bar: exponential average (0.6 old / 0.4 new),
-    // rounded, so the page and the bar always show the same GPU percentage.
-    function updateGpuFromProbe(text) {
-        var p = text.trim().split(/\s+/)
-        var u = parseFloat(p[0])
-        var t = parseFloat(p[1])
-
-        gpuHasUsage = !isNaN(u)
-        if (gpuHasUsage) {
-            var v = Math.max(0, Math.min(100, u))
-            gpuAvg = gpuAvg < 0 ? v : gpuAvg * 0.6 + v * 0.4
-            updateGraph(Math.round(gpuAvg), "gpu")
-        } else {
-            gpuAvg = -1
-        }
-
-        gpuTempProbe = isNaN(t) ? "—" : Math.round(t) + "°C"
-    }
-
-    function updateCpuFromStat(line) {
-        var p = line.trim().split(/\s+/)
-        if (p.length < 5) return
-        // user nice system idle iowait irq softirq steal
-        var v = []
-        for (var i = 1; i <= 8; i++) v.push(Number(p[i] || 0))
-        var idle = v[3] + v[4]
-        var total = v.reduce(function(a, b) { return a + b }, 0)
-
-        if (cpuPrev) {
-            var totalDelta = total - cpuPrev.total
-            if (totalDelta > 0)
-                updateGraph(100 * (1 - (idle - cpuPrev.idle) / totalDelta), "cpu")
-        }
-        cpuPrev = { total: total, idle: idle }
-    }
-
     function formatMemory(kb) {
         var gb = kb / 1024 / 1024
         return gb >= 1 ? gb.toFixed(1) + " GiB" : Math.round(kb / 1024) + " MiB"
     }
 
-    function updateMemoryFromStat(text) {
-        var total = Number((text.match(/^MemTotal:\s+(\d+)/m) || [])[1])
-        var available = Number((text.match(/^MemAvailable:\s+(\d+)/m) || [])[1])
-        if (!(total > 0)) return
-        var used = total - available
-        updateGraph(used / total * 100, "memory")
-        memory = formatMemory(used) + " / " + formatMemory(total)
+    function formatRate(b) {
+        if (b >= 1073741824) return (b / 1073741824).toFixed(2) + " GB/s"
+        if (b >= 1048576)    return (b / 1048576).toFixed(1) + " MB/s"
+        if (b >= 1024)       return Math.round(b / 1024) + " KB/s"
+        return Math.round(b) + " B/s"
+    }
+
+    function formatBytes(b) {
+        if (b >= 1099511627776) return (b / 1099511627776).toFixed(2) + " TiB"
+        if (b >= 1073741824)    return (b / 1073741824).toFixed(1) + " GiB"
+        if (b >= 1048576)       return (b / 1048576).toFixed(0) + " MiB"
+        return Math.round(b / 1024) + " KiB"
     }
 
     function formatUptime(text) {
@@ -201,55 +69,196 @@ echo "$u $t"
         return (d ? d + "d " : "") + (h || d ? h + "h " : "") + m + "m"
     }
 
-    // Finds the first `sensors` line starting with one of the keys
-    // (keys are tried in priority order) and returns "NN°C".
-    function tempFromSensors(lines, keys) {
-        for (var k = 0; k < keys.length; k++) {
-            for (var i = 0; i < lines.length; i++) {
-                var line = lines[i].trim()
-                if (line.indexOf(keys[k]) !== 0) continue
-                var m = line.match(/([+-]?\d+(?:\.\d+)?)\s*°C/)
-                if (m) return Math.round(parseFloat(m[1])) + "°C"
-            }
-        }
-        return "—"
-    }
-
-    function parseRamSpeed(text) {
-        var m = text.match(/^\s*Configured Memory Speed:\s*(\d+)\s*(\S+)/m)
-            || text.match(/^\s*Speed:\s*(\d+)\s*(\S+)/m)
-        return m ? m[1] + " " + m[2] : "Unknown"
-    }
+    function tempText(t) { return t >= 0 ? t + "°C" : "—" }
 
     function updateClock() {
         currentTime = Qt.formatTime(new Date(), "HH:mm:ss")
     }
 
-    function drawGraph(ctx, history) {
+    // Thin line with a soft fade toward the baseline and a live point.
+    // The graph scrolls in from the right edge.
+    function drawGraph(ctx, hist) {
         var w = ctx.canvas.width
         var h = ctx.canvas.height
         ctx.clearRect(0, 0, w, h)
-        if (history.length < 2) return
 
-        var step = w / (history.length - 1)
+        // baseline hairline
+        ctx.globalAlpha = 0.5
+        ctx.strokeStyle = Theme.border
+        ctx.lineWidth = 1
         ctx.beginPath()
-        for (var i = 0; i < history.length; i++) {
-            var x = i * step
-            var y = h - history[i] / 100 * h
-            if (i) ctx.lineTo(x, y)
-            else ctx.moveTo(x, y)
+        ctx.moveTo(0, h - 0.5)
+        ctx.lineTo(w, h - 0.5)
+        ctx.stroke()
+        ctx.globalAlpha = 1
+
+        // No samples yet -> flat line at 0, so the graph is never empty
+        var n = hist.length
+        if (n === 0) { hist = [0]; n = 1 }
+
+        var a = Theme.accent
+        var baseY = h - 1
+        var span = h - 6
+        // Horizontal zoom: the samples always stretch across the full width,
+        // so the graph is complete from the first seconds instead of
+        // slowly scrolling in from the right.
+        var step = n > 1 ? w / (n - 1) : 0
+
+        // Zoom: fit the vertical range to the visible data (min..max) instead
+        // of a fixed 0..100, with a minimum window of 10 points and 15% padding
+        var lo = hist[0], hi = hist[0]
+        for (var q = 1; q < n; q++) {
+            if (hist[q] < lo) lo = hist[q]
+            if (hist[q] > hi) hi = hist[q]
         }
-        ctx.strokeStyle = Theme.accent
-        ctx.lineWidth = 2
+        if (hi - lo < 10) {
+            var mid = (hi + lo) / 2
+            lo = mid - 5
+            hi = mid + 5
+        }
+        var pad = (hi - lo) * 0.15
+        lo = Math.max(0, lo - pad)
+        hi = Math.min(100, hi + pad)
+        var range = Math.max(1, hi - lo)
+
+        var xs = [], ys = []
+        for (var i = 0; i < n; i++) {
+            xs.push(i * step)
+            ys.push(baseY - Math.max(0, Math.min(1, (hist[i] - lo) / range)) * span)
+        }
+
+        // Single sample -> flat line across the full width
+        if (n === 1) {
+            xs = [0, w]
+            ys = [ys[0], ys[0]]
+            n = 2
+        }
+
+        // soft fill
+        var g = ctx.createLinearGradient(0, baseY, 0, baseY - span)
+        g.addColorStop(0, Qt.rgba(a.r, a.g, a.b, 0.0))
+        g.addColorStop(1, Qt.rgba(a.r, a.g, a.b, 0.20))
+        ctx.beginPath()
+        ctx.moveTo(xs[0], baseY)
+        for (var j = 0; j < n; j++) ctx.lineTo(xs[j], ys[j])
+        ctx.lineTo(xs[n - 1], baseY)
+        ctx.closePath()
+        ctx.fillStyle = g
+        ctx.fill()
+
+        // line
+        ctx.beginPath()
+        for (var k = 0; k < n; k++) {
+            if (k) ctx.lineTo(xs[k], ys[k])
+            else ctx.moveTo(xs[k], ys[k])
+        }
+        ctx.strokeStyle = a
+        ctx.lineWidth = 1.5
         ctx.lineJoin = "round"
         ctx.lineCap = "round"
         ctx.stroke()
 
-        ctx.lineTo(w, h)
-        ctx.lineTo(0, h)
-        ctx.closePath()
-        ctx.fillStyle = Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.10)
+        // live point
+        ctx.beginPath()
+        ctx.arc(xs[n - 1], ys[n - 1], 2.5, 0, Math.PI * 2)
+        ctx.fillStyle = a
         ctx.fill()
+    }
+
+    // One series for the mirrored network graph.
+    // dir = -1 grows upward from baseY, +1 grows downward.
+    function drawSeries(ctx, hist, maxV, baseY, span, dir, alpha) {
+        var w = ctx.canvas.width
+        var n = hist.length
+        if (n === 0) { hist = [0]; n = 1 }
+
+        var a = Theme.accent
+        var step = n > 1 ? w / (n - 1) : 0
+        var xs = [], ys = []
+        for (var i = 0; i < n; i++) {
+            xs.push(i * step)
+            ys.push(baseY + dir * Math.min(1, hist[i] / maxV) * span)
+        }
+        if (n === 1) {
+            xs = [0, w]
+            ys = [ys[0], ys[0]]
+            n = 2
+        }
+
+        var g = ctx.createLinearGradient(0, baseY, 0, baseY + dir * span)
+        g.addColorStop(0, Qt.rgba(a.r, a.g, a.b, 0.0))
+        g.addColorStop(1, Qt.rgba(a.r, a.g, a.b, 0.20 * alpha))
+        ctx.beginPath()
+        ctx.moveTo(xs[0], baseY)
+        for (var j = 0; j < n; j++) ctx.lineTo(xs[j], ys[j])
+        ctx.lineTo(xs[n - 1], baseY)
+        ctx.closePath()
+        ctx.fillStyle = g
+        ctx.fill()
+
+        ctx.beginPath()
+        for (var k = 0; k < n; k++) {
+            if (k) ctx.lineTo(xs[k], ys[k])
+            else ctx.moveTo(xs[k], ys[k])
+        }
+        // same color handling as drawGraph (accent used as-is, alpha via globalAlpha)
+        ctx.globalAlpha = alpha
+        ctx.strokeStyle = a
+        ctx.lineWidth = 1.5
+        ctx.lineJoin = "round"
+        ctx.lineCap = "round"
+        ctx.stroke()
+
+        ctx.beginPath()
+        ctx.arc(xs[n - 1], ys[n - 1], 2.5, 0, Math.PI * 2)
+        ctx.fillStyle = a
+        ctx.fill()
+        ctx.globalAlpha = 1
+    }
+
+    // Mirrored graph: download above the center line, upload below it.
+    function drawMirror(ctx, down, up, maxV) {
+        var w = ctx.canvas.width
+        var h = ctx.canvas.height
+        ctx.clearRect(0, 0, w, h)
+
+        var mid = Math.round(h / 2)
+        ctx.globalAlpha = 0.5
+        ctx.strokeStyle = Theme.border
+        ctx.lineWidth = 1
+        ctx.beginPath()
+        ctx.moveTo(0, mid + 0.5)
+        ctx.lineTo(w, mid + 0.5)
+        ctx.stroke()
+        ctx.globalAlpha = 1
+
+        var span = h / 2 - 4
+        drawSeries(ctx, down, maxV, mid, span, -1, 1.0)
+        drawSeries(ctx, up, maxV, mid, span, 1, 1.0)
+    }
+
+    // Hairline frame with accent corner brackets
+    function drawFrame(ctx) {
+        var w = ctx.canvas.width
+        var h = ctx.canvas.height
+        var L = 12
+        ctx.clearRect(0, 0, w, h)
+
+        ctx.globalAlpha = 0.35
+        ctx.strokeStyle = Theme.border
+        ctx.lineWidth = 1
+        ctx.strokeRect(0.5, 0.5, w - 1, h - 1)
+
+        ctx.globalAlpha = 0.9
+        ctx.strokeStyle = Theme.accent
+        ctx.lineWidth = 1.5
+        ctx.beginPath()
+        ctx.moveTo(0.75, L); ctx.lineTo(0.75, 0.75); ctx.lineTo(L, 0.75)
+        ctx.moveTo(w - L, 0.75); ctx.lineTo(w - 0.75, 0.75); ctx.lineTo(w - 0.75, L)
+        ctx.moveTo(w - 0.75, h - L); ctx.lineTo(w - 0.75, h - 0.75); ctx.lineTo(w - L, h - 0.75)
+        ctx.moveTo(L, h - 0.75); ctx.lineTo(0.75, h - 0.75); ctx.lineTo(0.75, h - L)
+        ctx.stroke()
+        ctx.globalAlpha = 1
     }
 
     // ── Avatar handling ───────────────────────────────────────
@@ -291,46 +300,67 @@ echo "$u $t"
         }
     }
 
+    // Header layout:  LABEL (left)  ·  info (next to it)  ·  temp / usage (right)
     component HardwareGraph: Column {
         id: block
-        property string icon: ""
         property string label: ""
         property string valueText: ""
         property var badges: []
         property var history: []
+        property var history2: []        // second series (network upload)
+        property real maxValue: 100      // scale for the mirrored graph
+        property bool dual: false        // true = mirrored down/up graph
         width: parent.width
         spacing: 10
         onHistoryChanged: graphCanvas.requestPaint()
+        onHistory2Changed: graphCanvas.requestPaint()
 
-        Row {
+        Item {
+            id: header
             width: parent.width
             height: 24
-            spacing: 20
 
             Text {
-                text: block.icon + "  " + block.label
+                id: labelText
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                text: block.label
                 color: Theme.textDim
                 font.family: page.mono
                 font.pixelSize: page.hardwareLabelSize
                 font.letterSpacing: 2
-                anchors.verticalCenter: parent.verticalCenter
             }
+
             Text {
+                id: infoText
+                anchors.left: labelText.right
+                anchors.leftMargin: 20
+                anchors.verticalCenter: parent.verticalCenter
+                // never overlap the usage on the right
+                width: Math.max(0, Math.min(implicitWidth,
+                    header.width - labelText.implicitWidth - badgeRow.implicitWidth - 40))
+                horizontalAlignment: Text.AlignLeft
                 text: block.valueText
                 color: Theme.text
                 font.family: Theme.fontFamily
                 font.pixelSize: page.hardwareTextSize
-                elide: Text.ElideLeft
-                anchors.verticalCenter: parent.verticalCenter
+                elide: Text.ElideRight
             }
-            Repeater {
-                model: block.badges
-                Text {
-                    text: modelData
-                    color: Theme.text
-                    font.family: page.mono
-                    font.pixelSize: Theme.textSizeGroup
-                    anchors.verticalCenter: parent.verticalCenter
+
+            Row {
+                id: badgeRow
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 20
+
+                Repeater {
+                    model: block.badges
+                    Text {
+                        text: modelData
+                        color: Theme.text
+                        font.family: page.mono
+                        font.pixelSize: Theme.textSizeGroup
+                    }
                 }
             }
         }
@@ -339,47 +369,37 @@ echo "$u $t"
             width: parent.width
             height: 60
 
-            Rectangle {
+            // hairline frame + accent corner brackets
+            Canvas {
                 anchors.fill: parent
-                color: "transparent"
-                border.color: Theme.border
-            }
-            Repeater {
-                model: [0.25, 0.5, 0.75]
-                Rectangle {
-                    y: parent.height * modelData
-                    width: parent.width
-                    height: 1
-                    color: Theme.border
-                    opacity: 0.35
-                }
+                onPaint: page.drawFrame(getContext("2d"))
+                onWidthChanged: requestPaint()
+                onHeightChanged: requestPaint()
             }
             Canvas {
                 id: graphCanvas
                 anchors.fill: parent
-                anchors.margins: 6
-                onPaint: page.drawGraph(getContext("2d"), block.history)
-            }
-            Text {
-                text: "100%"
-                anchors { top: parent.top; right: parent.right; margins: 5 }
-                color: Theme.text
-                opacity: 0.35
-                font.family: page.mono
-                font.pixelSize: Theme.textSizeSmall
-            }
-            Text {
-                text: "0%"
-                anchors { bottom: parent.bottom; right: parent.right; margins: 5 }
-                color: Theme.text
-                opacity: 0.35
-                font.family: page.mono
-                font.pixelSize: Theme.textSizeSmall
+                anchors.leftMargin: 12
+                anchors.rightMargin: 12
+                anchors.topMargin: 8
+                anchors.bottomMargin: 8
+                onPaint: {
+                    if (block.dual) page.drawMirror(getContext("2d"), block.history, block.history2, block.maxValue)
+                    else page.drawGraph(getContext("2d"), block.history)
+                }
+                onWidthChanged: requestPaint()
             }
         }
     }
 
-    // ── One-shot data sources ─────────────────────────────────
+    // ── Data sources ──────────────────────────────────────────
+    // What this page shows is polled by SystemStats, only while the page is visible.
+    StatsSubscription {
+        active: page.visible
+        fast: true      // live graphs: CPU / network every second
+        keys: ["cpu", "mem", "gpu", "temp", "net", "info"]
+    }
+
     FileView {
         path: "/etc/os-release"
         onLoaded: {
@@ -388,61 +408,9 @@ echo "$u $t"
         }
     }
     FileView {
-        path: "/proc/cpuinfo"
-        onLoaded: {
-            var m = text().match(/^model name\s*:\s*(.+)$/m)
-            page.cpu = m ? m[1].trim() : "Unknown"
-        }
-    }
-    Process {
-        // GPU name: prefer a discrete NVIDIA/AMD/Arc card over a plain iGPU
-        command: ["sh", "-c",
-            "l=$(lspci 2>/dev/null | grep -Ei 'VGA|3D|Display'); " +
-            "g=$(echo \"$l\" | grep -Ei 'NVIDIA|AMD|ATI|Arc' | head -n1); " +
-            "[ -n \"$g\" ] || g=$(echo \"$l\" | head -n1); " +
-            "echo \"$g\" | sed -E 's/.*: //; s/ \\(rev.*\\)//'"]
-        running: true
-        stdout: StdioCollector { onStreamFinished: page.gpu = text.trim() || "Unknown" }
-    }
-    Process {
-        // needs a NOPASSWD sudoers rule for dmidecode
-        command: ["sudo", "-n", "/usr/bin/dmidecode", "-t", "memory"]
-        running: true
-        stdout: StdioCollector { onStreamFinished: page.ramSpeed = page.parseRamSpeed(text) }
-    }
-
-    // ── Polled data sources ───────────────────────────────────
-    FileView {
-        id: cpuStat
-        path: "/proc/stat"
-        onLoaded: page.updateCpuFromStat(text().split("\n")[0])
-    }
-    FileView {
-        id: memInfo
-        path: "/proc/meminfo"
-        onLoaded: page.updateMemoryFromStat(text())
-    }
-    FileView {
         id: upInfo
         path: "/proc/uptime"
         onLoaded: page.uptime = page.formatUptime(text())
-    }
-    Process {
-        // single `sensors` call serves CPU temp and the GPU temp fallback
-        id: pSensors
-        command: ["sensors"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                var lines = text.split("\n")
-                page.cpuTemp = page.tempFromSensors(lines, ["Package id 0:", "Tctl:", "Tdie:"])
-                page.gpuTempSensors = page.tempFromSensors(lines, ["GPU Temp:", "edge:", "junction:"])
-            }
-        }
-    }
-    Process {
-        id: pGpu
-        command: ["sh", "-c", page.gpuProbeScript]
-        stdout: StdioCollector { onStreamFinished: page.updateGpuFromProbe(text) }
     }
 
     // ── Avatar processes ──────────────────────────────────────
@@ -484,21 +452,7 @@ echo "$u $t"
         running: page.visible
         repeat: true
         triggeredOnStart: true
-        onTriggered: {
-            page.updateClock()
-            cpuStat.reload()
-        }
-    }
-    Timer {
-        interval: 2000
-        running: page.visible
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: {
-            memInfo.reload()
-            page.poll(pSensors)
-            page.poll(pGpu)
-        }
+        onTriggered: page.updateClock()
     }
     Timer {
         interval: 10000
@@ -534,12 +488,31 @@ echo "$u $t"
             anchors.rightMargin: page.rightMargin
             spacing: 14
 
-            Text {
-                text: "SYSTEM"
-                color: Theme.text
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.textSizeTitle
-                font.letterSpacing: 3
+            // top bar: title (left) + clock (right), scrolls away with the content
+            Item {
+                width: parent.width
+                height: titleText.implicitHeight
+
+                Text {
+                    id: titleText
+                    anchors.left: parent.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "SYSTEM"
+                    color: Theme.text
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.textSizeTitle
+                    font.letterSpacing: 3
+                }
+
+                Text {
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: page.currentTime
+                    color: Theme.text
+                    font.family: page.mono
+                    font.pixelSize: Theme.textSizeTitle
+                    font.letterSpacing: 1
+                }
             }
 
             Rectangle {
@@ -645,37 +618,32 @@ echo "$u $t"
             }
 
             HardwareGraph {
-                icon: "󰍛"
                 label: "CPU"
-                valueText: page.cpu
-                badges: [Math.round(page.cpuUsage) + "%", page.cpuTemp]
-                history: page.cpuHistory
+                valueText: SystemStats.cpuName
+                badges: [page.tempText(SystemStats.cpuTemp), Math.round(SystemStats.cpuUsage) + "%"]
+                history: SystemStats.cpuHistory
             }
             HardwareGraph {
-                icon: "󰘚"
-                label: "RAM"
-                valueText: page.memory
-                badges: [page.ramSpeed, Math.round(page.memoryUsage) + "%"]
-                history: page.memoryHistory
-            }
-            HardwareGraph {
-                icon: "󰢮"
                 label: "GPU"
-                valueText: page.gpu
-                badges: [page.gpuHasUsage ? Math.round(page.gpuUsage) + "%" : "N/A", page.gpuTemp]
-                history: page.gpuHistory
+                valueText: SystemStats.gpuName
+                badges: [page.tempText(SystemStats.gpuTemp), SystemStats.gpuHasUsage ? Math.round(SystemStats.gpuUsage) + "%" : "N/A"]
+                history: SystemStats.gpuHistory
+            }
+            HardwareGraph {
+                label: "MEMORY"
+                valueText: page.memoryText
+                badges: [SystemStats.ramSpeed, Math.round(SystemStats.memPercent) + "%"]
+                history: SystemStats.memHistory
+            }
+            HardwareGraph {
+                label: "NETWORK"
+                valueText: "↓ " + page.formatBytes(SystemStats.netTotalDown) + "   ↑ " + page.formatBytes(SystemStats.netTotalUp)
+                badges: ["↓ " + page.formatRate(SystemStats.netDown), "↑ " + page.formatRate(SystemStats.netUp)]
+                dual: true
+                history: SystemStats.netDownHistory
+                history2: SystemStats.netUpHistory
+                maxValue: page.netScale
             }
         }
-    }
-
-    Text {
-        anchors.top: parent.top
-        anchors.right: parent.right
-        anchors.rightMargin: page.rightMargin
-        text: page.currentTime
-        color: Theme.text
-        font.family: page.mono
-        font.pixelSize: Theme.textSizeTitle
-        font.letterSpacing: 1
     }
 }

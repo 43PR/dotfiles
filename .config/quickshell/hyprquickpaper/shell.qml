@@ -703,8 +703,8 @@ PanelWindow {
         z: 50
         width: 340 * u
         height: Math.min(Screen.height * 0.88, 720 * u)
-        x: Screen.width - width - 24 * u
-        y: 24 * u
+        x: Screen.width - width - 12 * u
+        y: (Screen.height - height) / 2
         radius: main.th.radius * u
         color: main.th.bg
         border.width: 1

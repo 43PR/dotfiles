@@ -521,214 +521,33 @@ Scope {
     }
 
     // ───────────────────────── System stats ─────────────────────────
-    property int cpuUsage: 0
-    property int memPercent: 0
-    property real memUsedG: 0
-    property real memTotalG: 0
-    property string netState: "disconnected"
-    property real _prevTotal: 0
-    property real _prevIdle: 0
+    // CPU / memory / GPU / temperatures come from the shared SystemStats singleton
+    // (the settings page reads the same one). The bar only says what it needs;
+    // polling for a reading runs only while a module that shows it is enabled.
+    StatsSubscription { active: root.barVisible && root.isOn("cpu");  keys: ["cpu"] }
+    StatsSubscription { active: root.barVisible && root.isOn("ram");  keys: ["mem"] }
+    StatsSubscription { active: root.barVisible && root.isOn("gpu");  keys: ["gpu"] }
+    StatsSubscription { active: root.barVisible && (root.isOn("cputemp") || root.isOn("gputemp")); keys: ["temp"] }
 
-    // GPU / temperatures (-1 = unavailable)
-    property int gpuUsage: 0
-    property bool gpuHasUsage: false
-    property int cpuTempSensors: -1    // from `sensors`
-    property int cpuTempProbe: -1       // from sysfs hwmon / thermal zones (works without lm_sensors)
-    readonly property int cpuTemp: cpuTempSensors >= 0 ? cpuTempSensors : cpuTempProbe
-    property int gpuTempProbe: -1       // from nvidia-smi / sysfs hwmon
-    property int gpuTempSensors: -1     // fallback from `sensors`
-    // GPUs without a sensor of their own (e.g. Intel iGPUs) stay at -1 → shown as "–".
-    readonly property int gpuTemp: gpuTempProbe >= 0 ? gpuTempProbe : gpuTempSensors
+    readonly property int cpuUsage: Math.round(SystemStats.cpuUsage)
+    readonly property int memPercent: Math.round(SystemStats.memPercent)
+    readonly property real memUsedG: SystemStats.memUsedG
+    readonly property real memTotalG: SystemStats.memTotalG
+    readonly property int gpuUsage: SystemStats.gpuUsage
+    readonly property bool gpuHasUsage: SystemStats.gpuHasUsage
+    readonly property int cpuTemp: SystemStats.cpuTemp      // -1 = unavailable
+    readonly property int gpuTemp: SystemStats.gpuTemp      // -1 = no sensor (e.g. Intel iGPU) → shown as "–"
 
     function tempText(v) { return v >= 0 ? v + "" : "–"; }
     function tempTip(name, v) {
         return v >= 0 ? name + " temperature: " + v + "°C" : name + " temperature: no sensor detected";
     }
 
+    property string netState: "disconnected"
     readonly property string netGlyph: netState === "wifi" ? "\uDB81\uDDA9"
                                      : netState === "ethernet" ? "\uDB80\uDE00" : "\uDB81\uDDAA"
     readonly property string netTip: netState === "wifi" ? "Wi-Fi connected"
                                    : netState === "ethernet" ? "Ethernet connected" : "Disconnected"
-
-    FileView {
-        id: statFile
-        path: "/proc/stat"
-        onLoaded: {
-            const f = text().split("\n")[0].trim().split(/\s+/).slice(1, 9).map(Number);
-            const total = f.reduce((a, b) => a + b, 0);
-            const idle = f[3] + f[4];
-            const dT = total - root._prevTotal, dI = idle - root._prevIdle;
-            if (root._prevTotal > 0 && dT > 0) root.cpuUsage = Math.round(100 * (dT - dI) / dT);
-            root._prevTotal = total;
-            root._prevIdle = idle;
-        }
-    }
-
-    FileView {
-        id: memFile
-        path: "/proc/meminfo"
-        onLoaded: {
-            const t = text();
-            const kb = k => Number(t.match(new RegExp(k + ":\\s+(\\d+)"))[1]);
-            const total = kb("MemTotal"), used = total - kb("MemAvailable");
-            root.memPercent = Math.round(100 * used / total);
-            root.memUsedG = used / 1048576;
-            root.memTotalG = total / 1048576;
-        }
-    }
-
-    // ── GPU probe (vendor-agnostic, no root needed) ──
-    // Prints "<usage%> <tempC>"; a field is "-" when unavailable.
-    //   1. NVIDIA  : nvidia-smi
-    //   2. AMD     : sysfs gpu_busy_percent (largest-VRAM card wins)
-    //   3. Intel   : intel_gpu_top (only if permitted, 3s timeout)
-    //   4. Intel/other fallback: GPU clock estimate (act_freq / max_freq)
-    // Temperature: nvidia-smi, else any DRM card hwmon temp, else `sensors`.
-    readonly property string gpuProbeScript: `
-u=-; t=-
-isnum() { case "$1" in ''|*[!0-9.]*) return 1;; *) return 0;; esac; }
-
-# 1. NVIDIA
-if command -v nvidia-smi >/dev/null 2>&1; then
-  o=$(nvidia-smi --query-gpu=utilization.gpu,temperature.gpu --format=csv,noheader,nounits 2>/dev/null | head -n1)
-  if [ -n "$o" ]; then
-    a=$(echo "$o" | cut -d, -f1 | tr -d ' ')
-    b=$(echo "$o" | cut -d, -f2 | tr -d ' ')
-    isnum "$a" && u="$a"
-    isnum "$b" && t="$b"
-  fi
-fi
-
-# 2. AMD (amdgpu sysfs)
-if [ "$u" = "-" ]; then
-  best=""; bestmem=-1
-  for d in /sys/class/drm/card[0-9]*/device; do
-    [ -r "$d/gpu_busy_percent" ] || continue
-    m=$(cat "$d/mem_info_vram_total" 2>/dev/null || echo 0)
-    isnum "$m" || m=0
-    if [ "$m" -gt "$bestmem" ]; then best="$d"; bestmem="$m"; fi
-  done
-  if [ -n "$best" ]; then
-    a=$(cat "$best/gpu_busy_percent" 2>/dev/null)
-    isnum "$a" && u="$a"
-    if [ "$t" = "-" ]; then
-      for h in "$best"/hwmon/hwmon*/temp1_input; do
-        if [ -r "$h" ]; then t=$(( $(cat "$h") / 1000 )); break; fi
-      done
-    fi
-  fi
-fi
-
-# 3. Intel via intel_gpu_top (needs CAP_PERFMON / root; silently skipped otherwise)
-if [ "$u" = "-" ] && command -v intel_gpu_top >/dev/null 2>&1; then
-    v=$(timeout 4 intel_gpu_top -J -s 1000 -n 2 2>/dev/null | awk 'index($0,"Render/3D"){f=1;next} f==1 && /busy/{x=$0;gsub(/[^0-9.]/,"",x);f=2;next} f==2{if(/sema/)last=x;f=0} END{print last}')
-    isnum "$v" && u="$v"
-fi
-
-# 4. Unprivileged fallback: GPU clock as a load estimate (i915 / xe)
-if [ "$u" = "-" ]; then
-  for c in /sys/class/drm/card[0-9]*; do
-    [ -d "$c" ] || continue
-    for pair in \
-      "$c/gt/gt0/rps_act_freq_mhz:$c/gt/gt0/rps_max_freq_mhz" \
-      "$c/gt/gt0/rps_cur_freq_mhz:$c/gt/gt0/rps_max_freq_mhz" \
-      "$c/gt_act_freq_mhz:$c/gt_max_freq_mhz" \
-      "$c/gt_cur_freq_mhz:$c/gt_max_freq_mhz" \
-      "$c/device/tile0/gt0/freq0/act_freq:$c/device/tile0/gt0/freq0/max_freq"; do
-      f1=\${pair%%:*}; f2=\${pair#*:}
-      [ -r "$f1" ] && [ -r "$f2" ] || continue
-      cur=$(cat "$f1" 2>/dev/null); max=$(cat "$f2" 2>/dev/null)
-      if isnum "$cur" && isnum "$max" && [ "$max" -gt 0 ]; then
-        u=$(( cur * 100 / max )); [ "$u" -gt 100 ] && u=100
-        break 2
-      fi
-    done
-  done
-fi
-
-# Temperature fallback: any DRM card hwmon (i915 / xe / nouveau / amdgpu)
-if [ "$t" = "-" ]; then
-  for h in /sys/class/drm/card[0-9]*/device/hwmon/hwmon*/temp1_input; do
-    if [ -r "$h" ]; then
-      r=$(cat "$h" 2>/dev/null)
-      if isnum "$r"; then t=$(( r / 1000 )); break; fi
-    fi
-  done
-fi
-
-# CPU temperature straight from sysfs (works even without lm_sensors)
-c=-
-for h in /sys/class/hwmon/hwmon*; do
-  n=$(cat "$h/name" 2>/dev/null)
-  case "$n" in
-    coretemp|k10temp|zenpower|cpu_thermal)
-      r=$(cat "$h/temp1_input" 2>/dev/null)
-      if isnum "$r"; then c=$(( r / 1000 )); break; fi
-      ;;
-  esac
-done
-if [ "$c" = "-" ]; then
-  for z in /sys/class/thermal/thermal_zone*; do
-    case "$(cat "$z/type" 2>/dev/null)" in
-      x86_pkg_temp|cpu*|soc*)
-        r=$(cat "$z/temp" 2>/dev/null)
-        if isnum "$r"; then c=$(( r / 1000 )); break; fi
-        ;;
-    esac
-  done
-fi
-
-echo "$u $t $c"
-`
-
-    property real _gpuAvg: -1
-    function updateGpuFromProbe(out) {
-        const p = out.trim().split(/\s+/);
-        const u = parseFloat(p[0]), t = parseFloat(p[1]);
-        gpuHasUsage = !isNaN(u);
-        if (gpuHasUsage) {
-            const v = Math.max(0, Math.min(100, u));
-            _gpuAvg = _gpuAvg < 0 ? v : _gpuAvg * 0.6 + v * 0.4;
-            gpuUsage = Math.round(_gpuAvg);
-        } else {
-            _gpuAvg = -1;
-        }
-        gpuTempProbe = isNaN(t) ? -1 : Math.round(t);
-        const c = parseFloat(p[2]);
-        cpuTempProbe = isNaN(c) ? -1 : Math.round(c);
-    }
-
-    // First `sensors` line starting with one of the keys (tried in priority order) → °C, or -1.
-    function tempFromSensors(lines, keys) {
-        for (const k of keys) {
-            for (const l of lines) {
-                const line = l.trim();
-                if (line.indexOf(k) !== 0) continue;
-                const m = line.match(/([+-]?\d+(?:\.\d+)?)\s*°/);
-                if (m) return Math.round(parseFloat(m[1]));
-            }
-        }
-        return -1;
-    }
-
-    Process {
-        id: gpuProc
-        command: ["sh", "-c", root.gpuProbeScript]
-        stdout: StdioCollector { onStreamFinished: root.updateGpuFromProbe(text) }
-    }
-
-    Process {
-        // single `sensors` call serves CPU temp and the GPU temp fallback
-        id: sensorsProc
-        command: ["sensors"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const lines = text.split("\n");
-                root.cpuTempSensors = root.tempFromSensors(lines, ["Package id 0:", "Tctl:", "Tdie:"]);
-                root.gpuTempSensors = root.tempFromSensors(lines, ["GPU Temp:", "GPU core:", "edge:", "junction:"]);
-            }
-        }
-    }
 
     // Notification count: the notifications panel persists its history here
     property int notifCount: 0
@@ -783,23 +602,6 @@ echo "$u $t $c"
         }
     }
 
-    // CPU / RAM sampling (only while one of those modules is enabled)
-    Timer {
-        interval: 2000; repeat: true; triggeredOnStart: true
-        running: root.barVisible && (root.isOn("cpu") || root.isOn("ram"))
-        onTriggered: { statFile.reload(); memFile.reload(); }
-    }
-    // GPU usage / temps (only while the GPU or temperature module is enabled)
-    Timer {
-        interval: 2000; repeat: true; triggeredOnStart: true
-        running: root.barVisible && (root.isOn("gpu") || root.isOn("cputemp") || root.isOn("gputemp"))
-        onTriggered: { if (!gpuProc.running) gpuProc.running = true; }
-    }
-    Timer {
-        interval: 2000; repeat: true; triggeredOnStart: true
-        running: root.barVisible && (root.isOn("cputemp") || root.isOn("gputemp"))
-        onTriggered: { if (!sensorsProc.running) sensorsProc.running = true; }
-    }
     Timer {
         interval: 10000; running: root.barVisible; repeat: true; triggeredOnStart: true
         onTriggered: if (!netProc.running) netProc.running = true

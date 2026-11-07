@@ -27,32 +27,16 @@ Item {
     // Fonts
     property string monoFont: "JetBrains Mono"
 
-    // Speed stats (bytes / second)
-    property real downSpeed: 0
-    property real upSpeed: 0
-    property real lastRx: -1
-    property real lastTx: -1
-    property real lastTs: 0
-
     property real marginLeft: 0
     property real marginRight: 10
     property real marginTop: 0
     property real marginBottom: 0
 
     // Nerd Font glyphs
-    readonly property string icDown: "\uf019"
-    readonly property string icUp: "\uf093"
     readonly property string icWifi: "\uf1eb"
     readonly property string icLock: "\uf023"
     readonly property string icEth: "\uf6ff"
     readonly property string icRefresh: "\uf021"
-
-    function formatSpeed(bps) {
-        if (bps < 1024) return bps.toFixed(0) + " B/s"
-        if (bps < 1024 * 1024) return (bps / 1024).toFixed(1) + " KB/s"
-        if (bps < 1024 * 1024 * 1024) return (bps / 1024 / 1024).toFixed(2) + " MB/s"
-        return (bps / 1024 / 1024 / 1024).toFixed(2) + " GB/s"
-    }
 
     // Split an nmcli "terse" (-t) line on unescaped ":" and unescape "\:" / "\\".
     function splitTerse(line) {
@@ -82,58 +66,6 @@ Item {
 
     function isSaved(ssid) {
         return page.savedProfiles.indexOf(ssid) !== -1
-    }
-
-    // ── Network speed (all real interfaces, wifi + ethernet) ───────
-    FileView {
-        id: netDev
-        path: "/proc/net/dev"
-
-        onLoaded: {
-            var lines = text().split("\n")
-            var rx = 0
-            var tx = 0
-
-            for (var i = 2; i < lines.length; ++i) {
-                var line = lines[i].trim()
-                if (!line) continue
-
-                var idx = line.indexOf(":")
-                if (idx < 0) continue
-
-                var name = line.slice(0, idx).trim()
-                if (name === "lo"
-                    || name.indexOf("veth") === 0
-                    || name.indexOf("docker") === 0
-                    || name.indexOf("br-") === 0
-                    || name.indexOf("virbr") === 0) continue
-
-                var parts = line.slice(idx + 1).trim().split(/\s+/)
-                rx += parseFloat(parts[0]) || 0
-                tx += parseFloat(parts[8]) || 0
-            }
-
-            var now = Date.now()
-            if (page.lastTs > 0) {
-                var dt = (now - page.lastTs) / 1000
-                if (dt > 0) {
-                    page.downSpeed = Math.max(0, (rx - page.lastRx) / dt)
-                    page.upSpeed = Math.max(0, (tx - page.lastTx) / dt)
-                }
-            }
-
-            page.lastRx = rx
-            page.lastTx = tx
-            page.lastTs = now
-        }
-    }
-
-    Timer {
-        interval: 1000
-        running: true
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: netDev.reload()
     }
 
     // ── Ethernet status (device / state / connection name) ─────────
@@ -450,126 +382,67 @@ Item {
             font.family: page.monoFont; font.pixelSize: Theme.textSizeTitle; font.letterSpacing: 3
         }
         Rectangle { width: parent.width; height: 1; color: Theme.border }
-        Column {
-            id: statsRow
+
+        // ── Wi-Fi toggle + rescan ────────────────────────────────
+        Row {
+            id: controlsRow
             width: parent.width
+            height: 36
             spacing: 9
 
-            Row {
-                width: parent.width
+            Rectangle {
+                id: wifiToggle
+                width: parent.width - rescanBtn.width - parent.spacing
                 height: 36
-                spacing: 9
+                radius: Theme.radius
+                color: page.wifiEnabled
+                    ? Theme.alpha(Theme.accent, 0.1)
+                    : Theme.alpha(Theme.textFaint, 0.15)
+                border.width: 1
+                border.color: page.wifiEnabled ? Theme.accent : Theme.textFaint
 
-                Rectangle {
-                    id: wifiToggle
-                    width: parent.width - rescanBtn.width - parent.spacing
-                    height: 36
-                    radius: Theme.radius
-                    color: page.wifiEnabled
-                        ? Theme.alpha(Theme.accent, 0.1)
-                        : Theme.alpha(Theme.textFaint, 0.15)
-                    border.width: 1
-                    border.color: page.wifiEnabled ? Theme.accent : Theme.textFaint
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: page.wifiEnabled ? "WI-FI ON" : "WI-FI OFF"
-                        color: page.wifiEnabled ? Theme.accent : Theme.textFaint
-                        font.family: page.monoFont
-                        font.pixelSize: Theme.textSizeSmall
-                        font.bold: true
-                        font.letterSpacing: 1
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: page.setWifiEnabled(!page.wifiEnabled)
-                    }
+                Text {
+                    anchors.centerIn: parent
+                    text: page.wifiEnabled ? "WI-FI ON" : "WI-FI OFF"
+                    color: page.wifiEnabled ? Theme.accent : Theme.textFaint
+                    font.family: page.monoFont
+                    font.pixelSize: Theme.textSizeSmall
+                    font.bold: true
+                    font.letterSpacing: 1
                 }
 
-                Rectangle {
-                    id: rescanBtn
-                    width: 36
-                    height: 36
-                    radius: Theme.radius
-                    color: "#00000000"
-                    border.width: 1
-                    border.color: rescanMouse.containsMouse ? Theme.accent : Theme.border
-                    opacity: page.wifiEnabled ? 1.0 : 0.35
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: page.icRefresh
-                        color: pRescan.running ? Theme.accent : Theme.textDim
-                        font.family: Theme.iconFont
-                        font.pixelSize: Theme.textSizeGroup
-                    }
-
-                    MouseArea {
-                        id: rescanMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        enabled: page.wifiEnabled
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: page.rescan()
-                    }
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: page.setWifiEnabled(!page.wifiEnabled)
                 }
             }
 
-            Row {
-                id: statsInner
-                width: parent.width
-                height: 40
-                spacing: 9
+            Rectangle {
+                id: rescanBtn
+                width: 36
+                height: 36
+                radius: Theme.radius
+                color: "#00000000"
+                border.width: 1
+                border.color: rescanMouse.containsMouse ? Theme.accent : Theme.border
+                opacity: page.wifiEnabled ? 1.0 : 0.35
 
-                Repeater {
-                    model: [
-                        { icon: page.icDown, label: "", value: page.downSpeed, down: true },
-                        { icon: page.icUp,   label: "",   value: page.upSpeed,   down: false }
-                    ]
+                Text {
+                    anchors.centerIn: parent
+                    text: page.icRefresh
+                    color: pRescan.running ? Theme.accent : Theme.textDim
+                    font.family: Theme.iconFont
+                    font.pixelSize: Theme.textSizeGroup
+                }
 
-                    delegate: Rectangle {
-                        required property var modelData
-                        width: (statsInner.width - statsInner.spacing) / 2
-                        height: statsInner.height
-                        radius: Theme.radius
-                        color: "#00000000"
-                        border.width: 1
-                        border.color: Theme.border
-
-                        Text {
-                            id: statIcon
-                            anchors.left: parent.left
-                            anchors.leftMargin: 14
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: modelData.icon
-                            color: modelData.down ? Theme.accent : Theme.accent2
-                            font.family: Theme.iconFont
-                            font.pixelSize: Theme.textSizeSection
-                        }
-
-                        Text {
-                            anchors.left: statIcon.right
-                            anchors.leftMargin: 90
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: modelData.label
-                            color: Theme.textDim
-                            font.family: page.monoFont
-                            font.pixelSize: Theme.textSizeGroup
-                            font.letterSpacing: 1.5
-                        }
-
-                        Text {
-                            anchors.right: parent.right
-                            anchors.rightMargin: 14
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: page.formatSpeed(modelData.value)
-                            color: Theme.text
-                            font.family: page.monoFont
-                            font.pixelSize: Theme.textSizeGroup
-                            font.bold: true
-                        }
-                    }
+                MouseArea {
+                    id: rescanMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    enabled: page.wifiEnabled
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: page.rescan()
                 }
             }
         }

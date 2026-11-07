@@ -16,6 +16,9 @@ Item {
     property real marginTop: 0
     property real marginBottom: 0
 
+    // Nerd Font glyphs
+    readonly property string icRefresh: "\uf021"
+
     // Power state (saved/restored/toggled) lives in BluetoothState so the
     // quick actions menu and this page share one code path.
 
@@ -34,6 +37,21 @@ Item {
         if (!page.adapter || !page.powered)
             return
         page.adapter.discovering = on
+    }
+
+    // Restart discovery: stop, then start again after a short pause.
+    function rescan() {
+        if (!page.adapter || !page.powered || rescanTimer.running)
+            return
+        page.adapter.discovering = false
+        setStatus("Refreshing devices...")
+        rescanTimer.restart()
+    }
+
+    Timer {
+        id: rescanTimer
+        interval: 400
+        onTriggered: page.setDiscovering(true)
     }
 
     function togglePower() {
@@ -119,7 +137,7 @@ Item {
         repeat: true
         running: page.visible && page.powered && BluetoothState.wantPower !== "off"
         onTriggered: {
-            if (page.adapter && page.powered && !page.adapter.discovering)
+            if (page.adapter && page.powered && !page.adapter.discovering && !rescanTimer.running)
                 page.adapter.discovering = true
         }
     }
@@ -137,31 +155,67 @@ Item {
 
         Rectangle { width: parent.width; height: 1; color: Theme.border }
 
-        Rectangle {
-            id: bluetoothToggle
+        // ── Bluetooth toggle + refresh ───────────────────────────
+        Row {
+            id: controlsRow
             width: parent.width
             height: 36
-            radius: Theme.radius
-            color: page.powered
-                ? Theme.alpha(Theme.accent, 0.1)
-                : Theme.alpha(Theme.textFaint, 0.15)
-            border.width: 1
-            border.color: page.powered ? Theme.accent : Theme.textFaint
+            spacing: 9
 
-            Text {
-                anchors.centerIn: parent
-                text: page.powered ? "BLUETOOTH ON" : "BLUETOOTH OFF"
-                color: page.powered ? Theme.accent : Theme.textFaint
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.textSizeSmall
-                font.bold: true
-                font.letterSpacing: 1
+            Rectangle {
+                id: bluetoothToggle
+                width: parent.width - rescanBtn.width - parent.spacing
+                height: 36
+                radius: Theme.radius
+                color: page.powered
+                    ? Theme.alpha(Theme.accent, 0.1)
+                    : Theme.alpha(Theme.textFaint, 0.15)
+                border.width: 1
+                border.color: page.powered ? Theme.accent : Theme.textFaint
+
+                Text {
+                    anchors.centerIn: parent
+                    text: page.powered ? "BLUETOOTH ON" : "BLUETOOTH OFF"
+                    color: page.powered ? Theme.accent : Theme.textFaint
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.textSizeSmall
+                    font.bold: true
+                    font.letterSpacing: 1
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: page.togglePower()
+                }
             }
 
-            MouseArea {
-                anchors.fill: parent
-                cursorShape: Qt.PointingHandCursor
-                onClicked: page.togglePower()
+            Rectangle {
+                id: rescanBtn
+                width: 36
+                height: 36
+                radius: Theme.radius
+                color: "#00000000"
+                border.width: 1
+                border.color: rescanMouse.containsMouse ? Theme.accent : Theme.border
+                opacity: page.powered ? 1.0 : 0.35
+
+                Text {
+                    anchors.centerIn: parent
+                    text: page.icRefresh
+                    color: (rescanTimer.running || page.scanning) ? Theme.accent : Theme.textDim
+                    font.family: Theme.iconFont
+                    font.pixelSize: Theme.textSizeGroup
+                }
+
+                MouseArea {
+                    id: rescanMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    enabled: page.powered
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: page.rescan()
+                }
             }
         }
 
