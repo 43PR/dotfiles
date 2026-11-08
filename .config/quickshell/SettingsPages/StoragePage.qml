@@ -421,74 +421,83 @@ Item {
                         font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeSection; font.bold: true; font.letterSpacing: 2
                     }
 
-                    Repeater {
-                        model: [
-                            {
-                                key: "trash", label: "TRASH", action: "EMPTY", title: "EMPTY TRASH?",
-                                message: "This permanently deletes everything in ~/.local/share/Trash.\n\nCommand: rm -rf -- \"$HOME/.local/share/Trash/files/\"* \"$HOME/.local/share/Trash/info/\"*",
-                                command: "rm -rf -- \"$HOME/.local/share/Trash/files/\"* \"$HOME/.local/share/Trash/info/\"*"
-                            },
-                            {
-                                key: "cliphist", label: "CLIPHIST", action: "WIPE", title: "WIPE CLIPBOARD HISTORY?",
-                                message: "This keeps the 20 most recent clipboard entries and permanently deletes the rest.\n\nCommand: cliphist list | tail -n +21 | cliphist delete",
-                                command: "cliphist list | tail -n +21 | cliphist delete"
-                            },
-                            {
-                                key: "thumbs", label: "WALLPAPER PICKER", action: "CLEAR", title: "CLEAR THUMBNAIL CACHE?",
-                                message: "This permanently deletes everything in ~/.cache/quickshell/thumbs.\n\nCommand: rm -rf -- \"$HOME/.cache/quickshell/thumbs/\"*",
-                                command: "rm -rf -- \"$HOME/.cache/quickshell/thumbs/\"*"
-                            },
-                            {
-                                key: "yay", label: "YAY CACHE", action: "CLEAN", title: "CLEAR YAY CACHE?",
-                                message: "This permanently deletes cached AUR build files and downloaded sources.\n\nCommand: rm -rf -- \"$HOME/.cache/yay/\"*",
-                                command: "rm -rf -- \"$HOME/.cache/yay/\"*"
-                            },
-                            {
-                                key: "pacman", label: "PACMAN CACHE", action: "KEEP 3", title: "CLEAN PACMAN CACHE?",
-                                message: "This removes old cached package versions while keeping the 3 most recent versions of each package.\n\nCommand: pkexec paccache -r",
-                                command: "pkexec paccache -r"
-                            },
-                            {
-                                key: "pacman1", label: "PACMAN CACHE", action: "KEEP 1", title: "KEEP ONLY 1 VERSION?",
-                                message: "This removes all cached versions of installed packages except the most recent one. You will not be able to downgrade a package from the cache.\n\nCommand: pkexec paccache -rk1",
-                                command: "pkexec paccache -rk1"
-                            },
-                            {
-                                key: "pacmanrm", label: "PACMAN UNINSTALLED", action: "REMOVE", title: "REMOVE UNINSTALLED PACKAGES?",
-                                message: "This removes every cached version of packages that are no longer installed.\n\nCommand: pkexec paccache -ruk0",
-                                command: "pkexec paccache -ruk0"
-                            },
-                            {
-                                key: "journal", label: "JOURNAL", action: "7 DAYS", title: "VACUUM JOURNAL?",
-                                message: "This permanently deletes system journal logs older than 7 days.\n\nCommand: pkexec journalctl --vacuum-time=7d",
-                                command: "pkexec journalctl --vacuum-time=7d"
-                            },
-                            {
-                                key: "flatpak", label: "FLATPAK UNUSED", action: "CLEAN", title: "REMOVE UNUSED FLATPAKS?",
-                                message: "This removes unused Flatpak runtimes and packages.\n\nCommand: flatpak uninstall --unused -y",
-                                command: "flatpak uninstall --unused -y"
+                    // 3-column grid of cleanup buttons
+                    Grid {
+                        id: cleanupGrid
+                        width: list.width
+                        columns: 3
+                        spacing: 10
+                        readonly property real cellW: Math.floor((width - (columns - 1) * spacing) / columns)
+
+                        Repeater {
+                            model: [
+                                {
+                                    key: "trash", label: "TRASH", action: "EMPTY", title: "EMPTY TRASH?",
+                                    message: "This permanently deletes everything in ~/.local/share/Trash.\n\nCommand: rm -rf -- \"$HOME/.local/share/Trash/files/\"* \"$HOME/.local/share/Trash/info/\"*",
+                                    command: "rm -rf -- \"$HOME/.local/share/Trash/files/\"* \"$HOME/.local/share/Trash/info/\"*"
+                                },
+                                {
+                                    key: "cliphist", label: "CLIPHIST", action: "WIPE", title: "WIPE CLIPBOARD HISTORY?",
+                                    message: "This keeps the 20 most recent clipboard entries and permanently deletes the rest.\n\nCommand: cliphist list | tail -n +21 | cliphist delete",
+                                    command: "cliphist list | tail -n +21 | cliphist delete"
+                                },
+                                {
+                                    key: "thumbs", label: "WALLPAPER PICKER", action: "CLEAR", title: "CLEAR THUMBNAIL CACHE?",
+                                    message: "This permanently deletes everything in ~/.cache/quickshell/thumbs.\n\nCommand: rm -rf -- \"$HOME/.cache/quickshell/thumbs/\"*",
+                                    command: "rm -rf -- \"$HOME/.cache/quickshell/thumbs/\"*"
+                                },
+                                {
+                                    key: "yay", label: "YAY CACHE", action: "CLEAN", title: "CLEAR YAY CACHE?",
+                                    message: "This permanently deletes cached AUR build files and downloaded sources.\n\nCommand: rm -rf -- \"$HOME/.cache/yay/\"*",
+                                    command: "rm -rf -- \"$HOME/.cache/yay/\"*"
+                                },
+                                {
+                                    key: "pacman", label: "PACMAN CACHE", action: "KEEP 3", title: "CLEAN PACMAN CACHE?",
+                                    message: "This removes old cached package versions while keeping the 3 most recent versions of each package.\n\nCommand: pkexec paccache -r",
+                                    command: "pkexec paccache -r"
+                                },
+                                {
+                                    key: "pacman1", label: "PACMAN CACHE", action: "KEEP 1", title: "KEEP ONLY 1 VERSION?",
+                                    message: "This removes all cached versions of installed packages except the most recent one. You will not be able to downgrade a package from the cache.\n\nCommand: pkexec paccache -rk1",
+                                    command: "pkexec paccache -rk1"
+                                },
+                                {
+                                    key: "pacmanrm", label: "PACMAN UNINSTALLED", action: "REMOVE", title: "REMOVE UNINSTALLED PACKAGES?",
+                                    message: "This removes every cached version of packages that are no longer installed.\n\nCommand: pkexec paccache -ruk0",
+                                    command: "pkexec paccache -ruk0"
+                                },
+                                {
+                                    key: "journal", label: "JOURNAL", action: "7 DAYS", title: "VACUUM JOURNAL?",
+                                    message: "This permanently deletes system journal logs older than 7 days.\n\nCommand: pkexec journalctl --vacuum-time=7d",
+                                    command: "pkexec journalctl --vacuum-time=7d"
+                                },
+                                {
+                                    key: "flatpak", label: "FLATPAK UNUSED", action: "CLEAN", title: "REMOVE UNUSED FLATPAKS?",
+                                    message: "This removes unused Flatpak runtimes and packages.\n\nCommand: flatpak uninstall --unused -y",
+                                    command: "flatpak uninstall --unused -y"
+                                }
+                            ]
+
+                            delegate: CleanupButton {
+                                required property var modelData
+                                readonly property bool busy: page.runningKey === modelData.key
+                                readonly property var res: page.cleanupResults[modelData.key]
+
+                                width: cleanupGrid.cellW
+                                label: modelData.label
+                                value: modelData.key === "cliphist" ? page.formatCount(page.cleanupInfo.cliphist) : page.formatBytes(page.cleanupInfo[modelData.key])
+                                actionText: modelData.action
+                                resultText: busy ? (commandProcess.running ? "WORKING..." : "MEASURING...") : (res ? res.text : "")
+                                resultKind: busy ? "busy" : (res ? res.kind : "")
+                                onClicked: page.confirmAction(
+                                    modelData.title,
+                                    modelData.message === "CACHE_PLACEHOLDER"
+                                        ? page.formatBytes(page.cleanupInfo.yay) + " currently in ~/.cache/yay"
+                                        : modelData.message,
+                                    modelData.command,
+                                    modelData.key
+                                )
                             }
-                        ]
-
-                        delegate: CleanupButton {
-                            required property var modelData
-                            readonly property bool busy: page.runningKey === modelData.key
-                            readonly property var res: page.cleanupResults[modelData.key]
-
-                            width: list.width
-                            label: modelData.label
-                            value: modelData.key === "cliphist" ? page.formatCount(page.cleanupInfo.cliphist) : page.formatBytes(page.cleanupInfo[modelData.key])
-                            actionText: modelData.action
-                            resultText: busy ? (commandProcess.running ? "WORKING..." : "MEASURING...") : (res ? res.text : "")
-                            resultKind: busy ? "busy" : (res ? res.kind : "")
-                            onClicked: page.confirmAction(
-                                modelData.title,
-                                modelData.message === "CACHE_PLACEHOLDER"
-                                    ? page.formatBytes(page.cleanupInfo.yay) + " currently in ~/.cache/yay"
-                                    : modelData.message,
-                                modelData.command,
-                                modelData.key
-                            )
                         }
                     }
                 }
@@ -517,6 +526,11 @@ Item {
         }
     }
 
+    // Card-style cleanup button for the 3-column grid:
+    //   LABEL                (top, elided)
+    //   VALUE        ACTION  (middle)
+    //   RESULT TEXT          (bottom, only when there is one)
+    // Fixed height so every card in a grid row lines up.
     component CleanupButton: Rectangle {
         id: cleanupRoot
         required property string label
@@ -529,58 +543,76 @@ Item {
         readonly property bool hasResult: resultText !== ""
 
         width: parent.width
-        height: hasResult ? 58 : 42
+        height: 58
         radius: Theme.radius
         color: "#00000000"
         border.width: 1
         border.color: Theme.border
 
+        // label
         Text {
             anchors.left: parent.left
-            anchors.leftMargin: 14
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.verticalCenterOffset: cleanupRoot.hasResult ? -9 : 0
+            anchors.leftMargin: 12
+            anchors.right: parent.right
+            anchors.rightMargin: 12
+            anchors.top: parent.top
+            anchors.topMargin: 10
             text: cleanupRoot.label
             color: Theme.textDim
+            elide: Text.ElideRight
             font.family: Theme.fontFamily
             font.pixelSize: Theme.textSizeGroup
             font.bold: true
-            font.letterSpacing: 2
+            font.letterSpacing: 1
         }
 
-        Row {
+        // value (left) + action (right)
+        Item {
+            id: midRow
+            anchors.left: parent.left
+            anchors.leftMargin: 12
             anchors.right: parent.right
-            anchors.rightMargin: 14
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.verticalCenterOffset: cleanupRoot.hasResult ? -9 : 0
-            spacing: 8
+            anchors.rightMargin: 12
+            anchors.top: parent.top
+            anchors.topMargin: 32
+            height: 18
 
             Text {
+                anchors.left: parent.left
+                anchors.right: actionLabel.left
+                anchors.rightMargin: 6
+                anchors.verticalCenter: parent.verticalCenter
                 text: cleanupRoot.value
-                color: Theme.textDim
+                color: Theme.text
+                elide: Text.ElideRight
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.textSizeGroup
-                anchors.verticalCenter: parent.verticalCenter
             }
 
             Text {
+                id: actionLabel
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
                 text: cleanupRoot.actionText
-                color: Theme.textDim
+                color: Theme.accent
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.textSizeGroup
                 font.bold: true
                 font.letterSpacing: 1
-                anchors.verticalCenter: parent.verticalCenter
             }
         }
 
+        // result line
         Text {
             visible: cleanupRoot.hasResult
             anchors.left: parent.left
-            anchors.leftMargin: 14
+            anchors.leftMargin: 12
+            anchors.right: parent.right
+            anchors.rightMargin: 12
             anchors.bottom: parent.bottom
             anchors.bottomMargin: 9
             text: cleanupRoot.resultText
+            elide: Text.ElideRight
             color: cleanupRoot.resultKind === "ok" ? Theme.accent
                  : cleanupRoot.resultKind === "fail" ? Theme.danger
                  : Theme.textDim
@@ -593,6 +625,7 @@ Item {
         MouseArea {
             anchors.fill: parent
             hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
 
             onEntered: {
                 parent.color = Theme.alpha(Theme.accent, 0.08)

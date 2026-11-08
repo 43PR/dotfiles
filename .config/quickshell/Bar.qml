@@ -42,7 +42,7 @@ Scope {
         endMods: "media,battery,wall,settings,volume,net,power"
     })
     readonly property var positions: ["top", "right", "bottom", "left"]
-    readonly property var styles: ["floating", "joined", "strip"]
+    readonly property var styles: ["floating", "joined", "strip", "islands"]
     // Five zones along the bar: start · midLeft · center · midRight · end
     //   midLeft  is centered between the start zone and the center zone
     //   midRight is centered between the center zone and the end zone
@@ -134,8 +134,9 @@ Scope {
 
     // ───────────────────────── Derived layout ─────────────────────────
     readonly property bool vertical: cfg.position === "left" || cfg.position === "right"
-    readonly property bool joined: cfg.style !== "floating"
     readonly property bool strip: cfg.style === "strip"
+    readonly property bool islands: cfg.style === "islands"
+    readonly property bool joined: cfg.style === "joined" || cfg.style === "strip"
     readonly property real bs: cfg.barScale
     readonly property int panelThick: Math.round((vertical ? cfg.thickness + 12 : cfg.thickness) * bs)
     readonly property int effEdge: strip ? 0 : Math.round(cfg.margin * bs)
@@ -418,6 +419,25 @@ Scope {
     // config keys: startMods · midLeftMods · centerMods · midRightMods · endMods
     function setList(sec, a) { cfg[sec + "Mods"] = a.join(","); }
     function sectionOf(id) { return sections.find(k => listOf(k).indexOf(id) >= 0) ?? "end"; }
+
+    // Modules that share one island. Anything not listed gets its own island.
+    readonly property var statIds: ["cpu", "ram", "gpu", "cputemp", "gputemp"]
+
+    // Splits a section's module list into island groups.
+    // Without the islands style the whole section is one group, so nothing changes.
+    function groupsOf(ids) {
+        if (!islands) return [ids];
+        const out = [];
+        let last = "";
+        for (const id of ids) {
+            if (!isOn(id)) continue;                      // disabled modules never split a group
+            const key = statIds.indexOf(id) >= 0 ? "stats" : id;
+            if (out.length > 0 && key === last) out[out.length - 1].push(id);
+            else out.push([id]);
+            last = key;
+        }
+        return out;
+    }
 
     function moveTo(id, sec) {
         const next = {};
@@ -918,101 +938,101 @@ Scope {
         }
     }
 
-// Rounded stat badge (CPU / RAM / GPU / temperatures), informational only.
-// Capsule with label + value ("CPU 12" / stacked on vertical bars).
-// `unit` ("%" or "°C") is appended when the "show unit symbols" option is on.
-component StatBadge: Interactive {
-    id: stat
-    anchors.verticalCenterOffset: 1
-    property string label: ""
-    property string valueText: ""
-    property string unit: ""
-    readonly property string shownLabel: label
-    readonly property string shownValue: valueText + (cfg.statsPercent ? unit : "")
-    readonly property color fg: warning ? Theme.danger : Theme.text
+    // Rounded stat badge (CPU / RAM / GPU / temperatures), informational only.
+    // Capsule with label + value ("CPU 12" / stacked on vertical bars).
+    // `unit` ("%" or "°C") is appended when the "show unit symbols" option is on.
+    component StatBadge: Interactive {
+        id: stat
+        anchors.verticalCenterOffset: 1
+        property string label: ""
+        property string valueText: ""
+        property string unit: ""
+        readonly property string shownLabel: label
+        readonly property string shownValue: valueText + (cfg.statsPercent ? unit : "")
+        readonly property color fg: warning ? Theme.danger : Theme.text
 
-    // ── Never outgrow the bar ──
-    // Badge follows the text size and is always clamped to maxCross.
-    // statsScale never changes the bar thickness.
-    // Base ≈ 10px at scale/barScale 1.0; statsScale 1.0 is a comfortable default.
-    readonly property int maxCross: Math.max(8, root.panelThick - (cfg.border ? 2 : 0))
-    readonly property int crossPad: root.vertical ? 8 : 6
-    readonly property int wantedPx: Math.max(4, Math.round(10 * cfg.statsScale * cfg.scale * cfg.barScale))
-    readonly property int labelWantedPx: Math.max(4, wantedPx - 1)
-    // worst-case value ("100" / "100%") so the font does not jump while the numbers change
-    readonly property string sampleValue: "100" + (cfg.statsPercent ? "%" : "")
-    readonly property real contentCross: root.vertical
-        ? Math.max(mLabel.width, mValue.width)
-        : Math.max(mLabel.height, mValue.height)
-    // shrink text only when the wanted size would exceed the bar
-    readonly property int fontPx: contentCross + crossPad > maxCross
-        ? Math.max(4, Math.floor(wantedPx * (maxCross - crossPad) / contentCross))
-        : wantedPx
+        // ── Never outgrow the bar ──
+        // Badge follows the text size and is always clamped to maxCross.
+        // statsScale never changes the bar thickness.
+        // Base ≈ 10px at scale/barScale 1.0; statsScale 1.0 is a comfortable default.
+        readonly property int maxCross: Math.max(8, root.panelThick - (cfg.border ? 2 : 0))
+        readonly property int crossPad: root.vertical ? 8 : 6
+        readonly property int wantedPx: Math.max(4, Math.round(10 * cfg.statsScale * cfg.scale * cfg.barScale))
+        readonly property int labelWantedPx: Math.max(4, wantedPx - 1)
+        // worst-case value ("100" / "100%") so the font does not jump while the numbers change
+        readonly property string sampleValue: "100" + (cfg.statsPercent ? "%" : "")
+        readonly property real contentCross: root.vertical
+            ? Math.max(mLabel.width, mValue.width)
+            : Math.max(mLabel.height, mValue.height)
+        // shrink text only when the wanted size would exceed the bar
+        readonly property int fontPx: contentCross + crossPad > maxCross
+            ? Math.max(4, Math.floor(wantedPx * (maxCross - crossPad) / contentCross))
+            : wantedPx
 
-    TextMetrics {
-        id: mLabel
-        text: stat.shownLabel
-        font.family: Theme.iconFont
-        font.pixelSize: stat.labelWantedPx
-    }
-    TextMetrics {
-        id: mValue
-        text: stat.sampleValue
-        font.family: Theme.iconFont
-        font.bold: true
-        font.pixelSize: stat.wantedPx
-    }
+        TextMetrics {
+            id: mLabel
+            text: stat.shownLabel
+            font.family: Theme.iconFont
+            font.pixelSize: stat.labelWantedPx
+        }
+        TextMetrics {
+            id: mValue
+            text: stat.sampleValue
+            font.family: Theme.iconFont
+            font.bold: true
+            font.pixelSize: stat.wantedPx
+        }
 
-    Layout.alignment: Qt.AlignCenter
-    implicitWidth: root.vertical ? root.panelThick : badge.width + cfg.statsGap
-    // stay inside the bar thickness; never expand it
-    implicitHeight: root.vertical ? badge.height + cfg.statsGap
-                                  : Math.min(root.panelThick, Math.max(root.panelThick - 2, badge.height + 4))
-    interactive: false
+        Layout.alignment: Qt.AlignCenter
+        implicitWidth: root.vertical ? root.panelThick : badge.width + cfg.statsGap
+        // stay inside the bar thickness; never expand it
+        implicitHeight: root.vertical ? badge.height + cfg.statsGap
+                                      : Math.min(root.panelThick, Math.max(root.panelThick - 2, badge.height + 4))
+        interactive: false
 
-    Rectangle {
-        id: badge
-        anchors.centerIn: parent
-        // size follows the text (with padding); always clamped to the bar cross-section
-        width: root.vertical
-               ? Math.min(stat.maxCross, statRow.implicitWidth + 8)
-               : statRow.implicitWidth + 12
-        height: root.vertical
-                ? statRow.implicitHeight + 8
-                : Math.min(stat.maxCross, statRow.implicitHeight + 4)
-        clip: true
-        radius: Math.min(cfg.statsRadius, Math.min(width, height) / 2)
-        color: "transparent"
-        border.width: cfg.statsBorder ? 1 : 0
-        border.color: Qt.alpha(stat.fg, 0.18)
-
-        GridLayout {
-            id: statRow
+        Rectangle {
+            id: badge
             anchors.centerIn: parent
-            flow: root.vertical ? GridLayout.TopToBottom : GridLayout.LeftToRight
-            rowSpacing: 0
-            columnSpacing: 3
+            // size follows the text (with padding); always clamped to the bar cross-section
+            width: root.vertical
+                   ? Math.min(stat.maxCross, statRow.implicitWidth + 8)
+                   : statRow.implicitWidth + 12
+            height: root.vertical
+                    ? statRow.implicitHeight + 8
+                    : Math.min(stat.maxCross, statRow.implicitHeight + 4)
+            clip: true
+            radius: Math.min(cfg.statsRadius, Math.min(width, height) / 2)
+            color: "transparent"
+            border.width: cfg.statsBorder ? 1 : 0
+            border.color: Qt.alpha(stat.fg, 0.18)
 
-            Text {
-                Layout.alignment: Qt.AlignCenter
-                text: stat.shownLabel
-                color: Qt.alpha(stat.fg, 0.75)
-                font.family: Theme.iconFont
-                font.pixelSize: Math.max(4, stat.fontPx - 1)
-                renderType: Text.NativeRendering
-            }
-            Text {
-                Layout.alignment: Qt.AlignCenter
-                text: stat.shownValue
-                color: stat.fg
-                font.family: Theme.iconFont
-                font.bold: true
-                font.pixelSize: stat.fontPx
-                renderType: Text.NativeRendering
+            GridLayout {
+                id: statRow
+                anchors.centerIn: parent
+                flow: root.vertical ? GridLayout.TopToBottom : GridLayout.LeftToRight
+                rowSpacing: 0
+                columnSpacing: 3
+
+                Text {
+                    Layout.alignment: Qt.AlignCenter
+                    text: stat.shownLabel
+                    color: Qt.alpha(stat.fg, 0.75)
+                    font.family: Theme.iconFont
+                    font.pixelSize: Math.max(4, stat.fontPx - 1)
+                    renderType: Text.NativeRendering
+                }
+                Text {
+                    Layout.alignment: Qt.AlignCenter
+                    text: stat.shownValue
+                    color: stat.fg
+                    font.family: Theme.iconFont
+                    font.bold: true
+                    font.pixelSize: stat.fontPx
+                    renderType: Text.NativeRendering
+                }
             }
         }
     }
-}
 
     // Container for one module. Also owns the drag state while the module is being dragged:
     // the module follows the pointer visually (transform only, layout is untouched) and,
@@ -1050,7 +1070,8 @@ component StatBadge: Interactive {
         onLoaded: if (item.mid !== undefined) item.mid = modelData
     }
 
-    // One of the five bar sections: a rounded panel holding a Lane of Slots
+    // One of the five bar sections: a panel holding a Lane of islands.
+    // Outside the islands style there is a single, invisible island that wraps the whole section.
     component Panel: Rectangle {
         id: panel
         property var model: []
@@ -1064,24 +1085,57 @@ component StatBadge: Interactive {
         // (e.g. re-enabling the clock in an otherwise empty section).
         readonly property bool hasVisible: model.some(id => root.modVisible(id))
         visible: hasVisible
-        z: dragActive ? 100 : 0                  // keep the dragged module above the other panels
-        width: root.vertical ? root.panelThick : laneItem.implicitWidth + 4
-        height: root.vertical ? laneItem.implicitHeight + 4 : root.panelThick
+        z: dragActive ? 100 : 0
+        width: root.vertical ? root.panelThick : laneItem.implicitWidth + (root.islands ? 0 : 4)
+        height: root.vertical ? laneItem.implicitHeight + (root.islands ? 0 : 4) : root.panelThick
         radius: root.barRadius
-        color: root.joined ? "transparent" : root.bgColor
-        border.width: cfg.border && !root.joined ? 1 : 0
+        color: root.joined || root.islands ? "transparent" : root.bgColor
+        border.width: cfg.border && !root.joined && !root.islands ? 1 : 0
         border.color: root.borderColor
 
         Lane {
             id: laneItem
             anchors.centerIn: parent
+            gap: root.islands ? root.effGap : 0
+
             Repeater {
-                model: panel.model
-                delegate: Slot {
-                    id: slotD
-                    clockComp: panel.clockComp
-                    onDroppedAt: (sx, sy) => panel.dropped(slotD.modelData, sx, sy)
-                    onDraggingChanged: panel.dragActive = dragging
+                model: root.groupsOf(panel.model)
+
+                // One island: a rounded background holding one or more Slots.
+                delegate: Rectangle {
+                    id: isl
+                    required property var modelData
+                    readonly property Item lane: islLane
+                    readonly property int pad: root.islands ? 4 : 0
+                    property bool dragActive: false
+
+                    // Must not depend on the lane's size (see the note above).
+                    visible: modelData.some(id => root.modVisible(id))
+                    z: dragActive ? 100 : 0
+                    Layout.alignment: Qt.AlignCenter
+                    implicitWidth: root.vertical ? root.panelThick : islLane.implicitWidth + pad
+                    implicitHeight: root.vertical ? islLane.implicitHeight + pad : root.panelThick
+                    radius: root.barRadius
+                    color: root.islands ? root.bgColor : "transparent"
+                    border.width: root.islands && cfg.border ? 1 : 0
+                    border.color: root.borderColor
+
+                    onDragActiveChanged: panel.dragActive = dragActive
+
+                    Lane {
+                        id: islLane
+                        anchors.centerIn: parent
+
+                        Repeater {
+                            model: isl.modelData
+                            delegate: Slot {
+                                id: slotD
+                                clockComp: panel.clockComp
+                                onDroppedAt: (sx, sy) => panel.dropped(slotD.modelData, sx, sy)
+                                onDraggingChanged: isl.dragActive = dragging
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1155,10 +1209,10 @@ component StatBadge: Interactive {
             readonly property bool isSettings: mid === "settings"
             // icons 2px smaller; power nudged down so it lines up with volume/battery text
             baseSize: mid === "power" ? root.sz.power - 3 : root.sz.icon - 2
-            yOffset: mid === "power" ? root.iconYOffset 
+            yOffset: mid === "power" ? root.iconYOffset
                    : isNotif && !root.vertical ? root.iconYOffset - 0.5
                    : root.iconYOffset
-            xOffset: !root.vertical ? 0 : isNet ? -2 : (mid === "power" || isSettings) ? -1 : 0
+                   xOffset: !root.vertical ? 0 : isNet ? -1 : isNotif ? -1 : (mid === "power" || isSettings) ? -1 : 0
             text: isNet ? root.netGlyph : (isNotif && root.notifDnd ? "\uDB80\uDC9B" : (def.g ?? ""))
             tip: isNet ? root.netTip : mid === "notif" ? root.notifTip : (def.tip ?? "")
             // The settings button has configurable click binds (see Bar page → Settings button)
@@ -1245,7 +1299,7 @@ component StatBadge: Interactive {
     Component {
         id: cpuTempC
         StatBadge {
-            label: "TEMP"
+            label: "CPUT"
             unit: root.cpuTemp >= 0 ? "°C" : ""
             valueText: root.tempText(root.cpuTemp)
             warning: root.cpuTemp >= cfg.tempWarn
@@ -1257,7 +1311,7 @@ component StatBadge: Interactive {
     Component {
         id: gpuTempC
         StatBadge {
-            label: "GPU T"
+            label: "GPUT"
             unit: root.gpuTemp >= 0 ? "°C" : ""
             valueText: root.tempText(root.gpuTemp)
             warning: root.gpuTemp >= cfg.tempWarn
@@ -1648,11 +1702,12 @@ component StatBadge: Interactive {
                 const panel = panels[sec];
                 const list = root.listOf(sec);
 
+                // Slots now sit one level deeper: panel lane → island → island lane → Slot
                 const slots = {};
-                const kids = panel.lane.children;
-                for (let j = 0; j < kids.length; j++) {
-                    const ch = kids[j];
-                    if (ch.isSlot === true) slots[ch.modelData] = ch;
+                for (const isl of panel.lane.children) {
+                    if (!isl.lane) continue;                       // skip the Repeater
+                    for (const ch of isl.lane.children)
+                        if (ch.isSlot === true) slots[ch.modelData] = ch;
                 }
 
                 let idx = 0;
@@ -1803,7 +1858,10 @@ component StatBadge: Interactive {
 
                             onVisibleChanged: if (!visible) clockPanel.calOpen = false   // clock hidden → close calendar
                             Component.onCompleted: clockPanel.clockItem = clockMod
-                            Component.onDestruction: if (clockPanel.clockItem === clockMod) clockPanel.clockItem = null
+                            Component.onDestruction: if (clockPanel.clockItem === clockMod) {
+                                clockPanel.clockItem = null;
+                                clockPanel.calOpen = false;
+                            }
                         }
                     }
                     LazyLoader {

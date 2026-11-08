@@ -23,6 +23,8 @@ Scope {
     property real logoutIconScale: 1.0
     property real hibernateIconScale: 1.1
 
+    property real iconOffsetX: 1
+
     onShowingChanged: {
         if (showing) {
             unmountTimer.stop()
@@ -219,6 +221,10 @@ Scope {
     function iconScaleOf(name) {
         var v = root[name + "IconScale"]
         return (typeof v === "number" && v > 0) ? v : 1.0
+    }
+    function iconOffsetOf(name) {
+        var v = root[name + "IconOffsetX"]
+        return (typeof v === "number") ? v : root.iconOffsetX
     }
 
     // width of one cell when `p` is a Grid with several columns, else the full width
@@ -680,7 +686,9 @@ Scope {
 
                                         // Font icon, coloured by the theme text colour
                                         Text {
-                                            anchors.centerIn: parent
+                                            anchors.horizontalCenter: parent.horizontalCenter
+                                            anchors.horizontalCenterOffset: root.horizontal ? 0 : root.iconOffsetOf(entry.modelData.name)
+                                            anchors.verticalCenter: parent.verticalCenter
                                             text: entry.modelData.glyph
                                             font.family: "Symbols Nerd Font"
                                             font.pixelSize: Math.round(root.iconSize * root.iconScaleOf(entry.modelData.name))
