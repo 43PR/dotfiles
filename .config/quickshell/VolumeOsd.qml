@@ -192,6 +192,44 @@ Scope {
         function onMutedChanged() { root.triggerOsd() }
     }
 
+        // ---- scroll to change volume (same behaviour as the bar) ---------------
+    // Step / max come from the bar's settings file so both stay in sync.
+    property int volStep: 2
+    property int volMax: 100
+    property real wheelAcc: 0
+
+    FileView {
+        path: Quickshell.env("HOME") + "/.config/quickshell/state/bar-state.json"
+        printErrors: false
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: {
+            try {
+                var j = JSON.parse(text())
+                if (typeof j.volStep === "number") root.volStep = j.volStep
+                if (typeof j.volMax === "number") root.volMax = j.volMax
+            } catch (e) {}
+        }
+    }
+
+    function scrollVolume(delta) {
+        if (!sink || !sink.audio) return
+
+        // accumulate so smooth-scroll devices still give exactly one step per notch
+        wheelAcc += delta
+        if (Math.abs(wheelAcc) < 120) return
+        var dir = wheelAcc > 0 ? 1 : -1
+        wheelAcc = 0
+        var step = Math.max(1, volStep)
+        var cur = Math.round(sink.audio.volume * 100)
+        // snap to the step grid (0, 3, 6, 9 ...)
+        var next = dir > 0 ? (Math.floor(cur / step) + 1) * step
+                           : (Math.ceil(cur / step) - 1) * step
+        next = Math.max(0, Math.min(volMax, next))
+        if (dir > 0 && sink.audio.muted) sink.audio.muted = false
+        sink.audio.volume = next / 100
+    }
+
     // ---- OSD state ---------------------------------------------------------
     property bool ready: false; property bool showing: false; property bool showMedia: false
     property bool pendingShow: false; property bool settingsOpen: false; property bool dragging: false
@@ -1038,6 +1076,13 @@ Scope {
 
         Behavior on opacity { NumberAnimation { duration: host.fadeMs } }
         Behavior on scale { NumberAnimation { duration: host.fadeMs; easing.type: Easing.OutCubic } }
+
+        // scroll anywhere on the card to change the volume
+        WheelHandler {
+            enabled: parent.open
+            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+            onWheel: e => host.scrollVolume(e.angleDelta.y)
+        }
     }
 
     component FooterButton: Rectangle {

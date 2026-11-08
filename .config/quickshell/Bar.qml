@@ -1461,10 +1461,22 @@ component StatBadge: Interactive {
 
             onPrimary: root.run("qs ipc call settings sound")
             onSecondary: root.run("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle")
+            property real wheelAcc: 0
             onScrolled: delta => {
                 if (!ready) return;
-                sink.audio.volume = Math.max(0, Math.min(cfg.volMax / 100,
-                    sink.audio.volume + (delta / 120) * (cfg.volStep / 100)));
+                // accumulate so smooth-scroll devices still give exactly one step per notch
+                wheelAcc += delta;
+                if (Math.abs(wheelAcc) < 120) return;
+                const dir = wheelAcc > 0 ? 1 : -1;
+                wheelAcc = 0;
+                const step = Math.max(1, cfg.volStep);
+                const max = cfg.volMax;
+                const cur = Math.round(sink.audio.volume * 100);
+                // snap to the step grid: 0, 3, 6, 9 ... (not 0, 3, 7, 11 ...)
+                let next = dir > 0 ? (Math.floor(cur / step) + 1) * step
+                                   : (Math.ceil(cur / step) - 1) * step;
+                next = Math.max(0, Math.min(max, next));
+                sink.audio.volume = next / 100;
             }
         }
     }
