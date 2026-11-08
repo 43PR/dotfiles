@@ -2,7 +2,7 @@
 # Select a screen region, OCR it, copy the text, report via the Quickshell OSD.
 set -uo pipefail
 
-LANGS="${OCR_LANG:-eng}"   # e.g. OCR_LANG=eng+spa
+LANGS="${OCR_LANG:-rus+eng}"   # e.g. OCR_LANG=eng+spa
 osd() { qs ipc call ocr "$@" >/dev/null 2>&1 || true; }
 
 geom="$(slurp)" || { osd cancelled; exit 0; }
