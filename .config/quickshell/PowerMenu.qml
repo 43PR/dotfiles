@@ -201,23 +201,32 @@ Scope {
         return root.hiddenNames.indexOf(a.name) < 0
     })
 
-    // rows shown in the "Keybinds" section at the end of the settings menu
-    readonly property var keybindInfo: [
+    // rows shown in the "Keybinds" section at the end of the settings menu:
+    // general keys (one per line) and the per-action keys (shown in a grid)
+    readonly property var keybindGeneral: [
         { keys: "Super + Grave",          desc: "Power menu" },
         { keys: "Esc / Click outside",    desc: "Close menu / settings" },
         { keys: "↑ ↓ ← → Tab",            desc: "Move selection" },
         { keys: "Enter / Space / LMB",    desc: "Run selected action" },
-        { keys: "C / RMB (any button)",   desc: "Open settings" }
-    ].concat(actions.map(function (a) {
-        return { keys: a.key.toUpperCase(), desc: a.label }
-    })).concat([
+        { keys: "C / RMB (any button)",   desc: "Open settings" },
         { keys: "Drag handle",            desc: "Move the menu" }
-    ])
+    ]
+    readonly property var keybindActionKeys: actions.map(function (a) {
+        return { keys: a.key.toUpperCase(), desc: a.label }
+    })
 
     // per-icon multiplier, looked up from the *IconScale properties at the top
     function iconScaleOf(name) {
         var v = root[name + "IconScale"]
         return (typeof v === "number" && v > 0) ? v : 1.0
+    }
+
+    // width of one cell when `p` is a Grid with several columns, else the full width
+    function cellW(p) {
+        if (!p) return 0
+        if (p.columns !== undefined && p.columns > 1 && p.columnSpacing !== undefined)
+            return Math.floor((p.width - (p.columns - 1) * p.columnSpacing) / p.columns)
+        return p.width
     }
 
     function clamp(v, lo, hi) {
@@ -786,6 +795,9 @@ Scope {
     // sizes, hub.json radius, and everything scaled by `u` (= root.menuUi).
     // No custom layer namespace is set here (the picker sets none either), so the
     // compositor's layer rules, e.g. blur, apply to this window the same way.
+    //
+    // Compact layout: sliders and toggles sit in plain `Grid`s (2 columns, 3 for
+    // the key list), so the whole page needs far less scrolling.
     LazyLoader {
         active: root.settingsOpen
 
@@ -796,7 +808,7 @@ Scope {
             readonly property real u: root.menuUi
 
             color: "transparent"
-            implicitWidth: Math.round(420 * u)
+            implicitWidth: Math.round(440 * u)
             implicitHeight: Math.round(Math.min(640 * u, (screen?.height ?? 800) * 0.88))
             exclusionMode: ExclusionMode.Ignore
 
@@ -821,10 +833,10 @@ Scope {
                     id: head
                     anchors.top: parent.top
                     width: parent.width
-                    height: 58 * settingsWin.u
+                    height: 52 * settingsWin.u
 
                     Text {
-                        x: 20 * settingsWin.u; y: 9 * settingsWin.u
+                        x: 20 * settingsWin.u; y: 8 * settingsWin.u
                         text: "Power menu settings"
                         font.family: root.th.fontFamily
                         font.pixelSize: root.th.textSizeSection * settingsWin.u
@@ -832,7 +844,7 @@ Scope {
                         color: Theme.text
                     }
                     Text {
-                        x: 20 * settingsWin.u; y: 34 * settingsWin.u
+                        x: 20 * settingsWin.u; y: 30 * settingsWin.u
                         text: "Drag the handle to move."
                         font.family: root.th.fontFamily
                         font.pixelSize: root.th.textSizeSmall * settingsWin.u
@@ -872,12 +884,12 @@ Scope {
                 Flickable {
                     id: flick
                     anchors.top: head.bottom
-                    anchors.topMargin: 4 * settingsWin.u
+                    anchors.topMargin: 2 * settingsWin.u
                     anchors.bottom: foot.top
                     anchors.left: parent.left
                     anchors.right: parent.right
                     contentWidth: width
-                    contentHeight: contentCol.height + 16 * settingsWin.u
+                    contentHeight: contentCol.height + 12 * settingsWin.u
                     clip: true
                     flickableDirection: Flickable.VerticalFlick
                     boundsBehavior: Flickable.StopAtBounds
@@ -887,93 +899,112 @@ Scope {
                         x: 20 * settingsWin.u
                         width: flick.width - 48 * settingsWin.u
 
-                        SectionHeader { host: root; text: "Hints" }
-                        ToggleRow {
-                            host: root
-                            key: "showTooltips"
-                            label: "Show tooltips / hints"
-                            checked: root.showTooltips
-                            tip: "Turn off to hide all hover hints"
-                        }
-                        ToggleRow {
-                            host: root
-                            key: "showFooter"
-                            label: "Settings button"
-                            checked: root.showFooter
-                            tip: "Hides the gear button; C and right-click still work"
-                        }
-                        SectionHeader { host: root; text: "Global" }
-                        SliderRow { host: root; key: "menuSize"; label: "Scale"; tip: "Overall size of the power menu" }
-                        SliderRow { host: root; key: "animMs"; label: "Animation duration"; tip: "0 disables animations" }
-
-                        SectionHeader { host: root; text: "Layout" }
-                        ToggleRow { host: root; key: "horizontal"; label: "Horizontal layout"; checked: root.horizontal; tip: "Show actions in a row instead of a list" }
-                        SliderRow { host: root; key: "cardWidth"; label: "Width" }
-                        SliderRow { host: root; key: "itemHeight"; label: "Item height" }
-                        SliderRow { host: root; key: "itemSpacing"; label: "Item spacing" }
-                        SliderRow { host: root; key: "panelPadding"; label: "Panel padding" }
-
-                        SectionHeader { host: root; text: "Content" }
-                        ToggleRow { host: root; key: "showIcons"; label: "Icons"; checked: root.showIcons }
-                        ToggleRow { host: root; key: "showLabels"; label: "Labels"; checked: root.showLabels }
-                        ToggleRow {
-                            host: root
-                            key: "showKeyHints"
-                            label: "Key hints"
-                            checked: root.showKeyHints
-                            enabled: !root.horizontal
-                            tip: "Small key badges (vertical layout only)"
-                        }
-
-                        SectionHeader { host: root; text: "Appearance" }
-                        SliderRow { host: root; key: "panelRadius"; label: "Panel roundness" }
-                        SliderRow { host: root; key: "itemRadius"; label: "Item roundness" }
-                        SliderRow { host: root; key: "iconSize"; label: "Icon size"; enabled: root.showIcons }
-                        SliderRow { host: root; key: "labelSize"; label: "Label size"; enabled: root.showLabels }
-                        SliderRow { host: root; key: "borderWidth"; label: "Selection border" }
-
-                        SectionHeader { host: root; text: "Opacity" }
-                        SliderRow { host: root; key: "panelOpacity"; label: "Panel background" }
-                        SliderRow { host: root; key: "itemOpacity"; label: "Item background" }
-                        SliderRow { host: root; key: "hoverBoost"; label: "Hover / selected highlight" }
-                        SliderRow { host: root; key: "dimOpacity"; label: "Dim screen behind menu" }
-
-                        SectionHeader { host: root; text: "Behavior" }
-                        ToggleRow { host: root; key: "confirmDangerous"; label: "Confirm shutdown / reboot / logout"; checked: root.confirmDangerous; tip: "Requires a second press to confirm" }
-                        ToggleRow { host: root; key: "wrapNav"; label: "Wrap around when navigating"; checked: root.wrapNav }
-                        ToggleRow { host: root; key: "hoverSelect"; label: "Hover selects item"; checked: root.hoverSelect }
-                        ToggleRow { host: root; key: "closeOnOutside"; label: "Close on click outside"; checked: root.closeOnOutside }
-
-                        SectionHeader { host: root; text: "Visible actions" }
-                        Repeater {
-                            model: root.actions
-                            delegate: ToggleRow {
-                                required property var modelData
+                        // ---------------- GENERAL ----------------
+                        SectionHeader { host: root; text: "General" }
+                        Grid {
+                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                            ToggleRow {
                                 host: root
-                                label: modelData.label + "  (" + modelData.key.toUpperCase() + ")"
-                                checked: root.hiddenNames.indexOf(modelData.name) < 0
-                                onToggled: root.toggleAction(modelData.name)
+                                key: "showTooltips"
+                                label: "Tooltips"
+                                checked: root.showTooltips
+                                tip: "Turn off to hide all hover hints"
+                            }
+                            ToggleRow {
+                                host: root
+                                key: "showFooter"
+                                label: "Settings button"
+                                checked: root.showFooter
+                                tip: "Hides the gear button; C and right-click still work"
+                            }
+                            SliderRow { host: root; key: "menuSize"; label: "Scale"; tip: "Overall size of the power menu" }
+                            SliderRow { host: root; key: "animMs"; label: "Animation"; tip: "Animation duration. 0 disables animations" }
+                        }
+
+                        // ---------------- LAYOUT & CONTENT ----------------
+                        SectionHeader { host: root; text: "Layout & content" }
+                        Grid {
+                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                            ToggleRow { host: root; key: "horizontal"; label: "Horizontal"; checked: root.horizontal; tip: "Show actions in a row instead of a list" }
+                            ToggleRow { host: root; key: "showIcons"; label: "Icons"; checked: root.showIcons }
+                            ToggleRow { host: root; key: "showLabels"; label: "Labels"; checked: root.showLabels }
+                            ToggleRow {
+                                host: root
+                                key: "showKeyHints"
+                                label: "Key hints"
+                                checked: root.showKeyHints
+                                enabled: !root.horizontal
+                                tip: "Small key badges (vertical layout only)"
+                            }
+                            SliderRow { host: root; key: "cardWidth"; label: "Width" }
+                            SliderRow { host: root; key: "itemHeight"; label: "Item height" }
+                            SliderRow { host: root; key: "itemSpacing"; label: "Item spacing" }
+                            SliderRow { host: root; key: "panelPadding"; label: "Panel padding" }
+                        }
+
+                        // ---------------- APPEARANCE ----------------
+                        SectionHeader { host: root; text: "Appearance" }
+                        Grid {
+                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                            SliderRow { host: root; key: "panelRadius"; label: "Panel roundness" }
+                            SliderRow { host: root; key: "itemRadius"; label: "Item roundness" }
+                            SliderRow { host: root; key: "iconSize"; label: "Icon size"; enabled: root.showIcons }
+                            SliderRow { host: root; key: "labelSize"; label: "Label size"; enabled: root.showLabels }
+                            SliderRow { host: root; key: "borderWidth"; label: "Selection border" }
+                            SliderRow { host: root; key: "panelOpacity"; label: "Panel opacity"; tip: "Panel background opacity" }
+                            SliderRow { host: root; key: "itemOpacity"; label: "Item opacity"; tip: "Item background opacity" }
+                            SliderRow { host: root; key: "hoverBoost"; label: "Hover highlight"; tip: "Extra opacity on hovered / selected items" }
+                            SliderRow { host: root; key: "dimOpacity"; label: "Screen dim"; tip: "Dim the screen behind the menu" }
+                        }
+
+                        // ---------------- BEHAVIOR ----------------
+                        SectionHeader { host: root; text: "Behavior" }
+                        Grid {
+                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                            ToggleRow { host: root; key: "confirmDangerous"; label: "Confirm danger"; checked: root.confirmDangerous; tip: "Shutdown / reboot / logout need a second press to confirm" }
+                            ToggleRow { host: root; key: "wrapNav"; label: "Wrap around"; checked: root.wrapNav; tip: "Wrap around when navigating with the keyboard" }
+                            ToggleRow { host: root; key: "hoverSelect"; label: "Hover selects"; checked: root.hoverSelect; tip: "Hovering an item selects it" }
+                            ToggleRow { host: root; key: "closeOnOutside"; label: "Click outside"; checked: root.closeOnOutside; tip: "Close the menu when clicking outside of it" }
+                        }
+
+                        // ---------------- VISIBLE ACTIONS ----------------
+                        SectionHeader { host: root; text: "Visible actions" }
+                        Grid {
+                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                            Repeater {
+                                model: root.actions
+                                delegate: ToggleRow {
+                                    required property var modelData
+                                    host: root
+                                    label: modelData.label + " (" + modelData.key.toUpperCase() + ")"
+                                    checked: root.hiddenNames.indexOf(modelData.name) < 0
+                                    onToggled: root.toggleAction(modelData.name)
+                                }
                             }
                         }
 
-                        SectionHeader { host: root; text: "Position" }
-                        ActionButton {
-                            host: root
-                            label: "Reset position"
-                            enabled: root.movedFromDefault
-                            tipsOn: root.showTooltips
-                            tip: "Move the menu back to its default spot"
-                            onClicked: root.resetPosition()
-                        }
-
+                        // ---------------- KEYBINDS ----------------
                         SectionHeader { host: root; text: "Keybinds" }
                         Repeater {
-                            model: root.keybindInfo
+                            model: root.keybindGeneral
                             delegate: KeyRow {
                                 required property var modelData
                                 host: root
                                 keys: modelData.keys
                                 desc: modelData.desc
+                            }
+                        }
+                        Item { width: 1; height: 4 * settingsWin.u }
+                        Grid {
+                            width: parent.width; columns: 3; columnSpacing: 18 * settingsWin.u
+                            Repeater {
+                                model: root.keybindActionKeys
+                                delegate: KeyRow {
+                                    required property var modelData
+                                    host: root
+                                    keys: modelData.keys
+                                    desc: modelData.desc
+                                }
                             }
                         }
                     }
@@ -1037,7 +1068,7 @@ Scope {
                     id: foot
                     anchors.bottom: parent.bottom
                     width: parent.width
-                    height: 58 * settingsWin.u
+                    height: 50 * settingsWin.u
 
                     Rectangle {
                         width: parent.width
@@ -1045,17 +1076,31 @@ Scope {
                         color: Theme.alpha(Theme.text, 0.08)
                     }
 
-                    ActionButton {
-                        host: root
+                    Row {
                         x: 20 * settingsWin.u
                         anchors.verticalCenter: parent.verticalCenter
-                        label: "Reset all"
-                        enabled: root.modified
-                        tipsOn: root.showTooltips
-                        tip: "Restore every setting to its default"
-                        tipSide: "above"
-                        onClicked: root.resetAll()
+                        spacing: 8 * settingsWin.u
+
+                        ActionButton {
+                            host: root
+                            label: "Reset all"
+                            enabled: root.modified
+                            tipsOn: root.showTooltips
+                            tip: "Restore every setting to its default"
+                            tipSide: "above"
+                            onClicked: root.resetAll()
+                        }
+                        ActionButton {
+                            host: root
+                            label: "Reset position"
+                            enabled: root.movedFromDefault
+                            tipsOn: root.showTooltips
+                            tip: "Move the menu back to its default spot"
+                            tipSide: "above"
+                            onClicked: root.resetPosition()
+                        }
                     }
+
                     ActionButton {
                         host: root
                         anchors.right: parent.right
@@ -1176,6 +1221,10 @@ Scope {
 
     // Settings-window components below take `host` (the root Scope) and read the
     // shared scale / font / sizes from host.menuUi and host.th, like the picker's.
+    //
+    // Sliders, toggles and key rows size themselves from their parent: inside a
+    // multi-column `Grid` they take one cell (see cellW() on the root), anywhere else the full width.
+
     component ActionButton: Rectangle {
         id: ab
         property var host
@@ -1190,7 +1239,7 @@ Scope {
 
         implicitWidth: abText.implicitWidth + 28 * u
         width: implicitWidth
-        height: 30 * u
+        height: 28 * u
         radius: Math.min(height / 2, ab.th.radius * u)
         z: abTip.shown ? 100 : 0
         opacity: enabled ? 1 : 0.4
@@ -1235,12 +1284,12 @@ Scope {
         readonly property real u: host.menuUi
         readonly property QtObject th: host.th
         width: parent?.width ?? 0
-        height: 32 * u
+        height: 26 * u
 
         Text {
             anchors.left: parent.left
             anchors.bottom: parent.bottom
-            anchors.bottomMargin: 4 * sh.u
+            anchors.bottomMargin: 3 * sh.u
             text: sh.text
             font.family: sh.th.fontFamily
             font.pixelSize: sh.th.textSizeSmall * sh.u
@@ -1260,13 +1309,13 @@ Scope {
         readonly property real u: host.menuUi
         readonly property QtObject th: host.th
 
-        width: parent?.width ?? 0
-        height: 26 * u
+        width: host.cellW(parent)
+        height: 22 * u
 
         Text {
             anchors.left: parent.left
             anchors.right: chip.left
-            anchors.rightMargin: 12 * kr.u
+            anchors.rightMargin: 8 * kr.u
             anchors.verticalCenter: parent.verticalCenter
             text: kr.desc
             elide: Text.ElideRight
@@ -1309,15 +1358,15 @@ Scope {
         readonly property QtObject th: host.th
         signal toggled()
 
-        width: parent?.width ?? 0
-        height: 34 * u
+        width: host.cellW(parent)
+        height: 28 * u
         z: trTip.shown ? 100 : 0
         opacity: enabled ? 1 : 0.4
 
         Rectangle {
             anchors.fill: parent
-            anchors.leftMargin: -8 * tr.u
-            anchors.rightMargin: -8 * tr.u
+            anchors.leftMargin: -6 * tr.u
+            anchors.rightMargin: -6 * tr.u
             radius: Math.min(8 * tr.u, tr.th.radius * tr.u)
             color: trArea.containsMouse && tr.enabled ? Theme.alpha(Theme.text, 0.06) : "transparent"
         }
@@ -1325,7 +1374,7 @@ Scope {
         Text {
             anchors.left: parent.left
             anchors.right: sw.left
-            anchors.rightMargin: 12 * tr.u
+            anchors.rightMargin: 8 * tr.u
             anchors.verticalCenter: parent.verticalCenter
             text: tr.label
             elide: Text.ElideRight
@@ -1339,14 +1388,14 @@ Scope {
             id: sw
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
-            width: 36 * tr.u; height: 20 * tr.u; radius: height / 2
+            width: 32 * tr.u; height: 18 * tr.u; radius: height / 2
             color: tr.checked ? Theme.accent : "transparent"
             border.width: 1
             border.color: tr.checked ? Theme.accent : Theme.alpha(Theme.text, 0.3)
             Behavior on color { ColorAnimation { duration: tr.th.animMed } }
 
             Rectangle {
-                width: 14 * tr.u; height: 14 * tr.u; radius: width / 2
+                width: 12 * tr.u; height: 12 * tr.u; radius: width / 2
                 anchors.verticalCenter: parent.verticalCenter
                 x: tr.checked ? parent.width - width - 3 * tr.u : 3 * tr.u
                 color: tr.checked ? Theme.bg : Theme.text
@@ -1379,7 +1428,7 @@ Scope {
     }
 
     // Self-contained minimal slider. Reads/writes a numSpec entry on the
-    // host and saves on release.
+    // host and saves on release. Label and value share the top line.
     component SliderRow: Item {
         id: sr
         property var host
@@ -1393,15 +1442,18 @@ Scope {
         readonly property real ratio: Math.max(0, Math.min(1,
             (host[key] - spec.min) / (spec.max - spec.min)))
 
-        width: parent?.width ?? 0
-        height: 46 * u
+        width: host.cellW(parent)
+        height: 38 * u
         z: srTip.shown ? 100 : 0
         opacity: enabled ? 1 : 0.4
 
         Text {
             anchors.left: parent.left
-            y: 6 * sr.u
+            anchors.right: srValue.left
+            anchors.rightMargin: 6 * sr.u
+            y: 4 * sr.u
             text: sr.label
+            elide: Text.ElideRight
             font.family: sr.th.fontFamily
             font.pixelSize: sr.th.textSizeGroup * sr.u
             font.bold: true
@@ -1409,8 +1461,9 @@ Scope {
         }
 
         Text {
+            id: srValue
             anchors.right: parent.right
-            y: 6 * sr.u
+            y: 5 * sr.u
             text: sr.host.fmtValue(sr.key, sr.host[sr.key])
             font.family: sr.th.fontFamily
             font.pixelSize: sr.th.textSizeBody * sr.u
@@ -1421,7 +1474,7 @@ Scope {
             id: track
             anchors.left: parent.left
             anchors.right: parent.right
-            y: 31 * sr.u
+            y: 27 * sr.u
             height: 4 * sr.u
             radius: height / 2
             color: Theme.alpha(Theme.text, 0.15)
@@ -1447,7 +1500,7 @@ Scope {
         MouseArea {
             id: sliderArea
             anchors.fill: parent
-            anchors.topMargin: 20 * sr.u
+            anchors.topMargin: 18 * sr.u
             hoverEnabled: true
             preventStealing: true
             enabled: sr.enabled

@@ -38,6 +38,25 @@ find "$wallpaper_path" -type f \( \
     filename=$(basename "$img")
     out="$cache_path/$filename"
 
+    case "${filename,,}" in
+        *.mp4|*.mkv|*.webm|*.mov)
+            prev="$out.preview.gif"
+            if [[ ! -f "$prev" ]]; then
+                echo "Generating preview for $filename"
+                # first 3 s, 12 fps, 300px tall; written to .tmp then renamed so a
+                # half-finished file is never picked up by the picker
+                ffmpeg -nostdin -loglevel error -y -t 3 -i "$img" \
+                    -vf "fps=12,scale=-2:300:flags=lanczos,split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=bayer:bayer_scale=4" \
+                    -loop 0 -f gif "$prev.tmp" && mv "$prev.tmp" "$prev" &
+                if (( cache_batch_size > 0 )); then
+                    while (( $(jobs -rp | wc -l) >= cache_batch_size )); do
+                        wait -n
+                    done
+                fi
+            fi
+            ;;
+    esac
+
     if [[ -f "$out" ]]; then
         continue
     fi

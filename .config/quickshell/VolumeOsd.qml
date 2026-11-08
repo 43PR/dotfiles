@@ -265,6 +265,14 @@ Scope {
     // ---- settings helpers --------------------------------------------------
     function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, Math.round(v))) }
 
+    // width of one cell when `p` is a multi-column Grid, else the full width
+    function cellW(p) {
+        if (!p) return 0
+        if (p.columns !== undefined && p.columns > 1 && p.columnSpacing !== undefined)
+            return Math.floor((p.width - (p.columns - 1) * p.columnSpacing) / p.columns)
+        return p.width
+    }
+
     function fmtValue(key, v) {
         var s = numSpec[key]
         if (s.unit === "s") return (v / 1000).toFixed(1) + "s"
@@ -785,7 +793,7 @@ Scope {
             readonly property real u: ui * root.settingsScale
 
             color: "transparent"
-            implicitWidth: 420 * u
+            implicitWidth: 440 * u
             implicitHeight: Math.min(600 * u, (screen?.height ?? 800) * 0.85)
             exclusionMode: ExclusionMode.Ignore
 
@@ -813,10 +821,10 @@ Scope {
                     id: head
                     anchors.top: parent.top
                     width: parent.width
-                    height: 60 * settingsWin.u
+                    height: 54 * settingsWin.u
 
                     Text {
-                        x: 20 * settingsWin.u; y: 12 * settingsWin.u
+                        x: 20 * settingsWin.u; y: 10 * settingsWin.u
                         text: "OSD settings"
                         font.family: root.menuFont
                         font.pixelSize: root.textSizeSection * settingsWin.u
@@ -824,7 +832,7 @@ Scope {
                         color: Theme.text
                     }
                     Text {
-                        x: 20 * settingsWin.u; y: 34 * settingsWin.u
+                        x: 20 * settingsWin.u; y: 31 * settingsWin.u
                         text: "Drag to move it. Right-click to open settings"
                         font.family: root.menuFont
                         font.pixelSize: root.textSizeSmall * settingsWin.u
@@ -850,7 +858,7 @@ Scope {
                     anchors { top: head.bottom; bottom: foot.top; left: parent.left; right: parent.right }
                     anchors.topMargin: 4 * settingsWin.u
                     contentWidth: width
-                    contentHeight: contentCol.height + 16 * settingsWin.u
+                    contentHeight: contentCol.height + 12 * settingsWin.u
                     clip: true
                     flickableDirection: Flickable.VerticalFlick
                     boundsBehavior: Flickable.StopAtBounds
@@ -861,53 +869,69 @@ Scope {
                         width: flick.width - 48 * settingsWin.u
 
                         SectionHeader { text: "Global" }
-                        ToggleRow { key: "showTips"; label: "Tooltips & hints" }
-                        SliderRow { key: "mediaScale"; label: "Media scale" }
-                        SliderRow { key: "volScale"; label: "Volume scale" }
-                        SliderRow { key: "fadeMs"; label: "Animation speed" }
+                        Grid {
+                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                            ToggleRow { key: "showTips"; label: "Tooltips" }
+                            SliderRow { key: "fadeMs"; label: "Animation" }
+                            SliderRow { key: "mediaScale"; label: "Media scale" }
+                            SliderRow { key: "volScale"; label: "Volume scale" }
+                        }
 
                         SectionHeader { text: "Content" }
-                        ToggleRow { key: "showArt"; label: "Album art" }
-                        ToggleRow { key: "showTitle"; label: "Title" }
-                        ToggleRow { key: "showArtist"; label: "Artist" }
-                        ToggleRow { key: "showBar"; label: "Visualizer & progress bar" }
-                        ToggleRow { key: "showVisualizer"; label: "Visualizer"; enabled: root.showBar }
-                        ToggleRow { key: "showControls"; label: "Playback buttons" }
+                        Grid {
+                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                            ToggleRow { key: "showArt"; label: "Album art" }
+                            ToggleRow { key: "showTitle"; label: "Title" }
+                            ToggleRow { key: "showArtist"; label: "Artist" }
+                            ToggleRow { key: "showControls"; label: "Controls" }
+                            ToggleRow { key: "showBar"; label: "Visualizer & bar" }
+                            ToggleRow { key: "showVisualizer"; label: "Visualizer"; enabled: root.showBar }
+                        }
 
                         SectionHeader { text: "Layout" }
-                        ToggleRow { key: "portrait"; label: "Portrait layout" }
-                        ToggleRow {
-                            key: "artistBelow"
-                            label: "Artist below title"
-                            checked: root.artistBelow || root.portrait
-                            enabled: !root.portrait && root.showTitle && root.showArtist
+                        Grid {
+                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                            ToggleRow { key: "portrait"; label: "Portrait" }
+                            ToggleRow {
+                                key: "artistBelow"
+                                label: "Artist below"
+                                checked: root.artistBelow || root.portrait
+                                enabled: !root.portrait && root.showTitle && root.showArtist
+                            }
+                            ToggleRow { key: "showBorder"; label: "Border" }
+                            SliderRow { key: root.portrait ? "portraitWidth" : "mediaWidth"; label: "Width" }
+                            SliderRow { key: "artSize"; label: "Art size"; enabled: root.showArt && !root.portrait }
+                            SliderRow { key: "cardRadius"; label: "Corner radius" }
                         }
-                        SliderRow { key: root.portrait ? "portraitWidth" : "mediaWidth"; label: "Width" }
-                        SliderRow { key: "artSize"; label: "Art size"; enabled: root.showArt && !root.portrait }
-                        SliderRow { key: "cardRadius"; label: "Corner radius" }
-                        ToggleRow { key: "showBorder"; label: "Border" }
 
                         SectionHeader { text: "Visualizer" }
-                        SliderRow { key: "barCount"; label: "Bars"; enabled: root.showBar && root.showVisualizer }
-                        SliderRow { key: "barSpacing"; label: "Spacing"; enabled: root.showBar && root.showVisualizer }
-                        SliderRow { key: "barHeight"; label: "Height"; enabled: root.showBar }
-                        SliderRow { key: "barRadius"; label: "Round"; enabled: root.showBar }
-                        SliderRow { key: "barFps"; label: "Frame rate"; enabled: root.showBar && root.showVisualizer }
-                        ToggleRow { key: "accentBars"; label: "Accent colour"; enabled: root.showBar }
+                        Grid {
+                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                            SliderRow { key: "barCount"; label: "Bars"; enabled: root.showBar && root.showVisualizer }
+                            SliderRow { key: "barSpacing"; label: "Spacing"; enabled: root.showBar && root.showVisualizer }
+                            SliderRow { key: "barHeight"; label: "Height"; enabled: root.showBar }
+                            SliderRow { key: "barRadius"; label: "Round"; enabled: root.showBar }
+                            SliderRow { key: "barFps"; label: "Frame rate"; enabled: root.showBar && root.showVisualizer }
+                            ToggleRow { key: "accentBars"; label: "Accent colour"; enabled: root.showBar }
+                        }
 
                         SectionHeader { text: "Opacity" }
-                        SliderRow { key: "bgOpacity"; label: "Background" }
-                        SliderRow { key: "artOpacity"; label: "Album art"; enabled: root.showArt }
-                        SliderRow { key: "barOpacity"; label: "Bars / progress (played)"; enabled: root.showBar }
-                        SliderRow { key: "barDimOpacity"; label: "Bars / progress (remaining)"; enabled: root.showBar }
+                        Grid {
+                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                            SliderRow { key: "bgOpacity"; label: "Background" }
+                            SliderRow { key: "artOpacity"; label: "Album art"; enabled: root.showArt }
+                            SliderRow { key: "barOpacity"; label: "Bars played"; enabled: root.showBar }
+                            SliderRow { key: "barDimOpacity"; label: "Bars remaining"; enabled: root.showBar }
+                        }
 
                         SectionHeader { text: "Behavior" }
-                        ToggleRow { key: "musicOnly"; label: "Music players only" }
-                        ToggleRow { key: "trackChangeOsd"; label: "Pop up on track change" }
-                        SliderRow { key: "mediaTimeout"; label: "Media hide after" }
-
-                        SectionHeader { text: "Volume popup" }
-                        SliderRow { key: "volTimeout"; label: "Volume hide after" }
+                        Grid {
+                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                            ToggleRow { key: "musicOnly"; label: "Music only" }
+                            ToggleRow { key: "trackChangeOsd"; label: "On track change" }
+                            SliderRow { key: "mediaTimeout"; label: "Media hide after" }
+                            SliderRow { key: "volTimeout"; label: "Volume hide after" }
+                        }
 
                         SectionHeader { text: "Position" }
                         Row {
@@ -967,7 +991,7 @@ Scope {
                     id: foot
                     anchors.bottom: parent.bottom
                     width: parent.width
-                    height: 58 * settingsWin.u
+                    height: 50 * settingsWin.u
 
                     Rectangle { width: parent.width; height: 1; color: Theme.alpha(Theme.text, 0.08) }
 
@@ -1132,12 +1156,12 @@ Scope {
         property string text: ""
         readonly property real u: host.menuUi
         width: parent?.width ?? 0
-        height: 32 * u
+        height: 26 * u
 
         Text {
             anchors.left: parent.left
             anchors.bottom: parent.bottom
-            anchors.bottomMargin: 4 * sh.u
+            anchors.bottomMargin: 3 * sh.u
             text: sh.text
             font.family: sh.host.menuFont
             font.pixelSize: sh.host.textSizeSmall * sh.u
@@ -1156,14 +1180,14 @@ Scope {
         property bool checked: host[key]
         readonly property real u: host.menuUi
 
-        width: parent?.width ?? 0
-        height: 34 * u
+        width: host.cellW(parent)
+        height: 28 * u
         opacity: enabled ? 1 : 0.4
 
         Rectangle {
             anchors.fill: parent
-            anchors.leftMargin: -8 * tr.u
-            anchors.rightMargin: -8 * tr.u
+            anchors.leftMargin: -6 * tr.u
+            anchors.rightMargin: -6 * tr.u
             radius: Math.min(8 * tr.u, tr.host.menuRadius * tr.u)
             color: trArea.containsMouse && tr.enabled ? Theme.alpha(Theme.text, 0.06) : "transparent"
         }
@@ -1171,8 +1195,8 @@ Scope {
         Text {
             anchors.left: parent.left
             anchors.right: sw.left
-            anchors.rightMargin: 12 * tr.u
-            y: 9 * tr.u
+            anchors.rightMargin: 8 * tr.u
+            anchors.verticalCenter: parent.verticalCenter
             text: tr.label
             elide: Text.ElideRight
             font.family: tr.host.menuFont
@@ -1184,15 +1208,15 @@ Scope {
         Rectangle {
             id: sw
             anchors.right: parent.right
-            y: 7 * tr.u
-            width: 36 * tr.u; height: 20 * tr.u; radius: height / 2
+            anchors.verticalCenter: parent.verticalCenter
+            width: 32 * tr.u; height: 18 * tr.u; radius: height / 2
             color: tr.checked ? Theme.accent : "transparent"
             border.width: 1
             border.color: tr.checked ? Theme.accent : Theme.alpha(Theme.text, 0.3)
             Behavior on color { ColorAnimation { duration: tr.host.menuAnimMed } }
 
             Rectangle {
-                width: 14 * tr.u; height: 14 * tr.u; radius: width / 2
+                width: 12 * tr.u; height: 12 * tr.u; radius: width / 2
                 anchors.verticalCenter: parent.verticalCenter
                 x: tr.checked ? parent.width - width - 3 * tr.u : 3 * tr.u
                 color: tr.checked ? Theme.bg : Theme.text
@@ -1214,12 +1238,13 @@ Scope {
         readonly property var spec: host.numSpec[key]
         readonly property real ratio: Math.max(0, Math.min(1, (host[key] - spec.min) / (spec.max - spec.min)))
 
-        width: parent?.width ?? 0
-        height: 46 * u
+        width: host.cellW(parent)
+        height: 38 * u
         opacity: enabled ? 1 : 0.4
 
         Text {
-            anchors.left: parent.left; y: 6 * sr.u
+            anchors.left: parent.left; anchors.right: srValue.left; anchors.rightMargin: 6 * sr.u; y: 4 * sr.u
+            elide: Text.ElideRight
             text: sr.label
             font.family: sr.host.menuFont
             font.pixelSize: sr.host.textSizeGroup * sr.u
@@ -1227,7 +1252,8 @@ Scope {
             color: Theme.text
         }
         Text {
-            anchors.right: parent.right; y: 6 * sr.u
+            id: srValue
+            anchors.right: parent.right; y: 5 * sr.u
             text: sr.host.fmtValue(sr.key, sr.host[sr.key])
             font.family: sr.host.menuFont
             font.pixelSize: sr.host.textSizeBody * sr.u
@@ -1238,7 +1264,7 @@ Scope {
             id: track
             anchors.left: parent.left
             anchors.right: parent.right
-            y: 31 * sr.u
+            y: 27 * sr.u
             height: 4 * sr.u
             radius: height / 2
             color: Theme.alpha(Theme.text, 0.15)
@@ -1256,7 +1282,7 @@ Scope {
 
         MouseArea {
             anchors.fill: parent
-            anchors.topMargin: 20 * sr.u
+            anchors.topMargin: 18 * sr.u
             preventStealing: true
             enabled: sr.enabled
 

@@ -506,6 +506,14 @@ PanelWindow {
 
             property bool active: index === list.selectedIndex
             readonly property bool isGif: fileName.toLowerCase().endsWith(".gif")
+            readonly property bool isVideo: /\.(mp4|mkv|webm|mov)$/i.test(fileName)
+            // Debounced so sweeping the mouse across tiles doesn't spin up a decoder per tile.
+            property bool videoArmed: false
+            onActiveChanged: {
+                if (active && isVideo) videoDelay.restart()
+                else { videoDelay.stop(); videoArmed = false }
+            }
+            Timer { id: videoDelay; interval: 250; onTriggered: delegateItem.videoArmed = true }
             readonly property real baseWidth: list.tileWidth
             readonly property real baseCenterX: x - list.contentX + baseWidth / 2
             readonly property real distance: Math.abs(baseCenterX - list.viewportCenterX)
@@ -628,6 +636,20 @@ PanelWindow {
                     cache: false
                     smooth: true
                     opacity: 1.0
+                    transform: Shear { xFactor: main.skewFactor }
+                }
+                AnimatedImage {
+                    id: videoPreview
+                    anchors.fill: parent
+                    z: 5
+                    source: delegateItem.videoArmed
+                    ? "file://" + main.cachePath + delegateItem.fileName + ".preview.gif" : ""
+                    visible: status === AnimatedImage.Ready
+                    playing: visible
+                    fillMode: Image.PreserveAspectCrop
+                    asynchronous: true
+                    cache: false
+                    smooth: true
                     transform: Shear { xFactor: main.skewFactor }
                 }
 

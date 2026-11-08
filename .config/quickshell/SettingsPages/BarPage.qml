@@ -184,7 +184,20 @@ Item {
 
     // ------------------------------------------------------------------
     // Reusable inline components
+    //
+    // Controls size themselves from their parent: inside a `Cols` grid they
+    // take one cell (parent.cellWidth), anywhere else they take the full width.
     // ------------------------------------------------------------------
+
+    // Grid of N equal columns. Put sliders / toggles / cycle buttons inside.
+    component Cols: Grid {
+        property int cols: 2
+        readonly property real cellWidth: Math.floor((width - (cols - 1) * columnSpacing) / cols)
+        width: parent.width
+        columns: cols
+        columnSpacing: 12
+        rowSpacing: 6
+    }
 
     component SectionTitle: Text {
         color: Theme.text
@@ -214,15 +227,15 @@ Item {
         id: card
         default property alias contentData: cardColumn.data
         width: parent.width
-        height: cardColumn.implicitHeight + 28
+        height: cardColumn.implicitHeight + 20
         radius: Theme.radius
         color: "#00000000"; border.width: 1; border.color: Theme.border
 
         Column {
             id: cardColumn
-            x: 14; y: 14
-            width: parent.width - 28
-            spacing: 16
+            x: 10; y: 10
+            width: parent.width - 20
+            spacing: 8
         }
     }
 
@@ -232,7 +245,7 @@ Item {
         property bool current: false
         property bool buttonEnabled: true
         signal clicked()
-        height: 28; radius: Theme.radius
+        height: 26; radius: Theme.radius
         opacity: buttonEnabled ? 1.0 : 0.35
         color: current ? Theme.alpha(Theme.accent, 0.10) : (sbMouse.containsMouse ? Theme.alpha(Theme.accent, 0.08) : "#00000000")
         border.width: 1
@@ -260,8 +273,8 @@ Item {
     // Section chip: sized to its text, scrolls the page to `target`.
     component NavChip: SmallButton {
         property Item target: null
-        width: Math.ceil(navMetrics.advanceWidth) + 24
-        height: 24
+        width: Math.ceil(navMetrics.advanceWidth) + 20
+        height: 22
 
         TextMetrics {
             id: navMetrics
@@ -275,6 +288,7 @@ Item {
         onClicked: page.jumpTo(target)
     }
 
+    // On/off switch as a single button: filled dot + highlight = on.
     component ToggleRow: Item {
         id: tg
         property string label: ""
@@ -282,27 +296,20 @@ Item {
         property bool locked: false
         signal toggled(bool v)
 
-        width: parent.width; height: 28
+        width: parent.cellWidth ?? parent.width
+        height: 26
         opacity: enabled ? 1.0 : 0.4
 
-        Text {
-            anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
-            text: tg.label
-            color: Theme.textDim
-            font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody; font.letterSpacing: 1
-        }
-
         SmallButton {
-            anchors.right: parent.right
-            width: 72
-            label: tg.checked ? "ON" : "OFF"
+            width: tg.width; height: tg.height
+            label: (tg.checked ? "● " : "○ ") + tg.label
             current: tg.checked
             buttonEnabled: !tg.locked
             onClicked: tg.toggled(!tg.checked)
         }
     }
 
-    // Label + value on top, drag track below.
+    // Label + value on one line, drag track right below.
     component BarSlider: Item {
         id: sl
         property string label: ""
@@ -317,17 +324,21 @@ Item {
 
         readonly property real ratio: to > from ? Math.max(0, Math.min(1, (value - from) / (to - from))) : 0
 
-        width: parent.width; height: 40
+        width: parent.cellWidth ?? parent.width
+        height: 34
         opacity: enabled ? 1.0 : 0.4
 
         Text {
-            anchors.left: parent.left; y: 0
+            anchors.left: parent.left; anchors.right: valueText.left; anchors.rightMargin: 6
+            y: 0
+            elide: Text.ElideRight
             text: sl.label
             color: Theme.textDim
             font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody; font.letterSpacing: 1
         }
 
         Text {
+            id: valueText
             anchors.right: parent.right; y: 0
             text: (sl.value * sl.displayScale).toFixed(sl.decimals) + sl.unit
             color: Theme.accent2
@@ -337,7 +348,7 @@ Item {
         Rectangle {
             id: track
             anchors.left: parent.left; anchors.right: parent.right
-            y: 28; height: 4; radius: 2
+            y: 24; height: 4; radius: 2
             color: Theme.border
 
             Rectangle {
@@ -356,7 +367,7 @@ Item {
 
         MouseArea {
             anchors.left: parent.left; anchors.right: parent.right
-            y: 18; height: 22
+            y: 14; height: 20
             hoverEnabled: true
             preventStealing: true      // keep the page from scrolling while dragging
             enabled: sl.enabled
@@ -374,18 +385,21 @@ Item {
         }
     }
 
-    // Label on top, a wrapping row of buttons below.
+    // Label on top, one button per option side by side (wraps after `maxCols`).
+    // Use for short lists where seeing every option at once helps.
     component BarChoice: Item {
         id: ch
         property string label: ""
         property var options: []
         property string current: ""
-        property int btnWidth: 92
+        property int maxCols: 4
         property var labels: ({})       // optional id → display text (default: id in upper case)
         signal picked(string v)
 
-        width: parent.width
-        height: lbl.implicitHeight + 8 + flow.implicitHeight
+        readonly property int cols: Math.max(1, Math.min(options.length, maxCols))
+
+        width: parent.cellWidth ?? parent.width
+        height: lbl.implicitHeight + 3 + flow.implicitHeight
         opacity: enabled ? 1.0 : 0.4
 
         Text {
@@ -397,7 +411,7 @@ Item {
 
         Flow {
             id: flow
-            y: lbl.implicitHeight + 8
+            y: lbl.implicitHeight + 3
             width: parent.width
             spacing: 6
 
@@ -405,7 +419,7 @@ Item {
                 model: ch.options
                 delegate: SmallButton {
                     required property string modelData
-                    width: ch.btnWidth
+                    width: Math.floor((ch.width - (ch.cols - 1) * 6) / ch.cols)
                     label: ch.labels[modelData] ?? modelData.toUpperCase()
                     current: modelData === ch.current
                     buttonEnabled: ch.enabled
@@ -415,11 +429,44 @@ Item {
         }
     }
 
+    // Label on top, ONE button below that shows the current option; click = next option.
+    // Compact replacement for long option lists.
+    component CycleChoice: Item {
+        id: cy
+        property string label: ""
+        property var options: []
+        property string current: ""
+        property var labels: ({})
+        signal picked(string v)
+
+        width: parent.cellWidth ?? parent.width
+        height: cyLabel.implicitHeight + 3 + 26
+        opacity: enabled ? 1.0 : 0.4
+
+        Text {
+            id: cyLabel
+            text: cy.label
+            color: Theme.textDim
+            font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody; font.letterSpacing: 1
+        }
+
+        SmallButton {
+            y: cyLabel.implicitHeight + 3
+            width: cy.width
+            label: (cy.labels[cy.current] ?? cy.current.toUpperCase()) + "  ›"
+            buttonEnabled: cy.enabled
+            onClicked: {
+                const i = cy.options.indexOf(cy.current)
+                cy.picked(cy.options[(i + 1) % cy.options.length])
+            }
+        }
+    }
+
     // ------------------------------------------------------------------
     // UI
     //
     // Sections, most used first:
-    //   Layout · Appearance · Modules · Clock & Date · Calendar · Workspaces
+    //   Bar (layout + look) · Modules · Clock & Calendar · Workspaces & Open apps
     //   System stats · Battery & Volume · Tooltips · Click actions
     // Options that belong to a module are dimmed while that module is off.
     // ------------------------------------------------------------------
@@ -450,11 +497,11 @@ Item {
         Column {
             id: content
             width: flick.width
-            spacing: 14
+            spacing: 8
 
             // ---------------- TITLE + RESET ----------------
             Item {
-                width: parent.width; height: 28
+                width: parent.width; height: 26
 
                 Text {
                     anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
@@ -464,7 +511,7 @@ Item {
 
                 SmallButton {
                     anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-                    width: 110; height: 24
+                    width: 110; height: 22
                     label: "RESET ALL"
                     buttonEnabled: page.modified
                     onClicked: page.resetAll()
@@ -473,45 +520,32 @@ Item {
 
             Rectangle { width: parent.width; height: 1; color: Theme.border }
 
-            // ---------------- QUICK JUMP ----------------
-            Flow {
-                width: parent.width
-                spacing: 6
-                NavChip { label: "LOOK";       target: secLook }
-                NavChip { label: "MODULES";    target: secModules }
-                NavChip { label: "CLOCK";      target: secClock }
-                NavChip { label: "WORKSPACES"; target: secWorkspaces }
-                NavChip { label: "OPEN APPS";  target: secTasks }
-                NavChip { label: "STATS";      target: secStats }
-                NavChip { label: "BATT & VOL"; target: secBattVol }
-                NavChip { label: "TOOLTIPS";   target: secTooltips }
-            }
-
-            // ---------------- LAYOUT ----------------
-            // Where the bar sits, how big it is and how modules are spaced.
+            // ---------------- LAYOUT + APPEARANCE ----------------
+            // Where the bar sits, how big it is, and how it looks.
             Column {
-                id: secLayout
-                width: parent.width; spacing: 10
-                topPadding: 6
+                id: secBar
+                width: parent.width; spacing: 6
+                topPadding: 2
 
-                SectionTitle { text: "LAYOUT" }
+                SectionTitle { text: "LAYOUT & APPEARANCE" }
 
                 Card {
-                    Column {
-                        width: parent.width; spacing: 12
+                    BarChoice {
+                        label: "POSITION"
+                        options: page.positions
+                        current: page.val("position")
+                        onPicked: v => page.set("position", v)
+                    }
+                    BarChoice {
+                        label: "STYLE"
+                        options: page.styles
+                        current: page.val("style")
+                        onPicked: v => page.set("style", v)
+                    }
 
-                        BarChoice {
-                            label: "POSITION"
-                            options: page.positions
-                            current: page.val("position")
-                            onPicked: v => page.set("position", v)
-                        }
-                        BarChoice {
-                            label: "STYLE"
-                            options: page.styles
-                            current: page.val("style")
-                            onPicked: v => page.set("style", v)
-                        }
+                    Divider {}
+
+                    Cols {
                         BarSlider {
                             label: "THICKNESS"
                             from: 16; to: 40; step: 1; unit: " px"
@@ -537,38 +571,8 @@ Item {
                             value: page.val("modPad")
                             onMoved: v => page.set("modPad", v)
                         }
-                        Divider {}
-                        ToggleRow {
-                            label: "RESERVE SCREEN SPACE"; checked: page.val("reserveSpace")
-                            onToggled: v => page.set("reserveSpace", v)
-                        }
-                        ToggleRow {
-                            label: "SHOW ON ALL MONITORS"; checked: page.val("allScreens")
-                            onToggled: v => page.set("allScreens", v)
-                        }
-                        ToggleRow {
-                            label: "DRAG MODULES ON BAR"; checked: page.val("dragModules")
-                            onToggled: v => page.set("dragModules", v)
-                        }
-                    }
-                }
-            }
-
-            // ---------------- LOOK ----------------
-            // Colors, shape and text size of the bar itself.
-            Column {
-                id: secLook
-                width: parent.width; spacing: 10
-                topPadding: 6
-
-                SectionTitle { text: "APPEARANCE" }
-
-                Card {
-                    Column {
-                        width: parent.width; spacing: 10
-
                         BarSlider {
-                            label: "BACKGROUND OPACITY"
+                            label: "BG OPACITY"
                             from: 0; to: 1; step: 0.05; unit: "%"; displayScale: 100
                             value: page.val("bgOpacity")
                             onMoved: v => page.set("bgOpacity", v)
@@ -586,9 +590,27 @@ Item {
                             value: page.val("scale")
                             onMoved: v => page.set("scale", v)
                         }
+                    }
+
+                    Divider {}
+
+                    Cols {
+                        cols: 3
                         ToggleRow {
                             label: "BORDER"; checked: page.val("border")
                             onToggled: v => page.set("border", v)
+                        }
+                        ToggleRow {
+                            label: "RESERVE SPACE"; checked: page.val("reserveSpace")
+                            onToggled: v => page.set("reserveSpace", v)
+                        }
+                        ToggleRow {
+                            label: "ALL MONITORS"; checked: page.val("allScreens")
+                            onToggled: v => page.set("allScreens", v)
+                        }
+                        ToggleRow {
+                            label: "DRAG MODULES"; checked: page.val("dragModules")
+                            onToggled: v => page.set("dragModules", v)
                         }
                     }
                 }
@@ -599,8 +621,8 @@ Item {
             // Highlighted = shown on the bar. Reorder by dragging modules on the bar.
             Column {
                 id: secModules
-                width: parent.width; spacing: 10
-                topPadding: 6
+                width: parent.width; spacing: 6
+                topPadding: 2
 
                 SectionTitle { text: "MODULES" }
 
@@ -626,13 +648,14 @@ Item {
                 }
             }
 
-            // ---------------- CLOCK & DATE ----------------
+            // ---------------- CLOCK, DATE & CALENDAR ----------------
+            // The calendar is the popup that opens from the clock.
             Column {
                 id: secClock
-                width: parent.width; spacing: 10
-                topPadding: 6
+                width: parent.width; spacing: 6
+                topPadding: 2
 
-                SectionTitle { text: "CLOCK & DATE" }
+                SectionTitle { text: "CLOCK & CALENDAR" }
 
                 Note {
                     visible: !page.isOn("clock")
@@ -642,72 +665,43 @@ Item {
                 Card {
                     enabled: page.isOn("clock")
 
-                    Column {
-                        width: parent.width; spacing: 10
-
-                        GroupLabel { text: "TIME" }
+                    Cols {
+                        cols: 3
                         ToggleRow {
-                            label: "24-HOUR CLOCK"; checked: page.val("clock24")
+                            label: "24-HOUR"; checked: page.val("clock24")
                             onToggled: v => page.set("clock24", v)
                         }
                         ToggleRow {
-                            label: "SHOW SECONDS"; checked: page.val("clockSeconds")
+                            label: "SECONDS"; checked: page.val("clockSeconds")
                             onToggled: v => page.set("clockSeconds", v)
                         }
                         ToggleRow {
-                            label: "LEADING ZERO (02:20)"; checked: page.val("clockPadHour")
+                            label: "LEADING 0"; checked: page.val("clockPadHour")
                             onToggled: v => page.set("clockPadHour", v)
                         }
-
-                        Divider {}
-
-                        GroupLabel { text: "DATE" }
                         ToggleRow {
-                            label: "SHOW DATE (TUE, 03/11)"; checked: page.val("clockDate")
+                            label: "SHOW DATE"; checked: page.val("clockDate")
                             onToggled: v => page.set("clockDate", v)
                         }
                         ToggleRow {
-                            label: "SHOW DAY (MON / TUE)"; checked: page.val("clockDay")
+                            label: "WEEKDAY"; checked: page.val("clockDay")
                             enabled: page.val("clockDate")
                             onToggled: v => page.set("clockDay", v)
                         }
+                    }
 
-                        Divider {}
+                    Divider {}
 
-                        GroupLabel { text: "LETTERS" }
-                        BarChoice {
+                    Cols {
+                        CycleChoice {
                             label: "DAY & AM/PM CASE"
                             // only matters while the weekday or the AM/PM suffix is visible
                             enabled: (page.val("clockDate") && page.val("clockDay")) || !page.val("clock24")
-                            options: page.caseOptions; labels: page.caseLabels; btnWidth: 100
+                            options: page.caseOptions; labels: page.caseLabels
                             current: page.val("clockCase")
                             onPicked: v => page.set("clockCase", v)
                         }
-                    }
-                }
-            }
-
-            // ---------------- CALENDAR ----------------
-            // The popup that opens from the clock.
-            Column {
-                id: secCalendar
-                width: parent.width; spacing: 10
-                topPadding: 6
-
-                SectionTitle { text: "CALENDAR" }
-
-                Note {
-                    visible: !page.isOn("clock")
-                    text: "Turn on the CLOCK module to use these options."
-                }
-
-                Card {
-                    enabled: page.isOn("clock")
-
-                    Column {
-                        width: parent.width; spacing: 10
-
-                        BarChoice {
+                        CycleChoice {
                             label: "WEEK STARTS ON"
                             options: ["monday", "sunday"]
                             current: page.val("weekMonday") ? "monday" : "sunday"
@@ -729,86 +723,72 @@ Item {
                 }
             }
 
-            // ---------------- WORKSPACES ----------------
+            // ---------------- WORKSPACES + OPEN APPS ----------------
             Column {
                 id: secWorkspaces
-                width: parent.width; spacing: 10
-                topPadding: 6
+                width: parent.width; spacing: 6
+                topPadding: 2
 
-                SectionTitle { text: "WORKSPACES" }
-
-                Note {
-                    visible: !page.isOn("ws")
-                    text: "Turn on the WORKSPACES module to use these options."
-                }
+                SectionTitle { text: "WORKSPACES & OPEN APPS" }
 
                 Card {
-                    enabled: page.isOn("ws")
-
                     Column {
-                        width: parent.width; spacing: 10
+                        width: parent.width; spacing: 6
+                        enabled: page.isOn("ws")
+                        opacity: enabled ? 1.0 : 0.45
 
-                        ToggleRow {
-                            label: "SHOW WORKSPACE NUMBERS"; checked: page.val("wsNumbers")
-                            onToggled: v => page.set("wsNumbers", v)
+                        GroupLabel { text: page.isOn("ws") ? "WORKSPACES" : "WORKSPACES  (turn the module on in MODULES)" }
+                        Cols {
+                            BarSlider {
+                                label: "DOT SIZE"
+                                from: 6; to: 30; step: 1; unit: " px"
+                                value: page.val("wsDot")
+                                onMoved: v => page.set("wsDot", v)
+                            }
+                            BarSlider {
+                                label: "DOT SPACING"
+                                from: 0; to: 20; step: 1; unit: " px"
+                                value: page.val("wsGap")
+                                onMoved: v => page.set("wsGap", v)
+                            }
+                            ToggleRow {
+                                label: "NUMBERS"; checked: page.val("wsNumbers")
+                                onToggled: v => page.set("wsNumbers", v)
+                            }
+                            /*ToggleRow {
+                                label: "SCROLL TO SWITCH"; checked: page.val("wsScroll")
+                                onToggled: v => page.set("wsScroll", v)
+                            }*/
                         }
-                        BarSlider {
-                            label: "DOT SIZE"
-                            from: 6; to: 30; step: 1; unit: " px"
-                            value: page.val("wsDot")
-                            onMoved: v => page.set("wsDot", v)
-                        }
-                        BarSlider {
-                            label: "DOT SPACING"
-                            from: 0; to: 20; step: 1; unit: " px"
-                            value: page.val("wsGap")
-                            onMoved: v => page.set("wsGap", v)
-                        }
-                        /*ToggleRow {
-                            label: "SCROLL TO SWITCH WORKSPACE"; checked: page.val("wsScroll")
-                            onToggled: v => page.set("wsScroll", v)
-                        }*/
                     }
-                }
-            }
 
-            // ---------------- OPEN APPS ----------------
-            // Icon size, spacing and tint of the open-apps module.
-            Column {
-                id: secTasks
-                width: parent.width; spacing: 10
-                topPadding: 6
-
-                SectionTitle { text: "OPEN APPS" }
-
-                Note {
-                    visible: !page.isOn("tasks")
-                    text: "Turn on the OPEN APPS module to use these options."
-                }
-
-                Card {
-                    enabled: page.isOn("tasks")
+                    Divider {}
 
                     Column {
-                        width: parent.width; spacing: 10
+                        width: parent.width; spacing: 6
+                        enabled: page.isOn("tasks")
+                        opacity: enabled ? 1.0 : 0.45
 
-                        BarSlider {
-                            label: "ICON SCALE"
-                            from: 0.5; to: 1.5; step: 0.05; unit: "×"; decimals: 2
-                            value: page.val("tasksScale")
-                            onMoved: v => page.set("tasksScale", v)
-                        }
-                        BarSlider {
-                            label: "ICON SPACING"
-                            from: 0; to: 16; step: 1; unit: " px"
-                            value: page.val("tasksGap")
-                            onMoved: v => page.set("tasksGap", v)
-                        }
-                        BarChoice {
-                            label: "ICON COLOR"
-                            options: ["normal", "accent"]
-                            current: page.val("tasksColor")
-                            onPicked: v => page.set("tasksColor", v)
+                        GroupLabel { text: page.isOn("tasks") ? "OPEN APPS" : "OPEN APPS  (turn the module on in MODULES)" }
+                        Cols {
+                            BarSlider {
+                                label: "ICON SCALE"
+                                from: 0.5; to: 1.5; step: 0.05; unit: "×"; decimals: 2
+                                value: page.val("tasksScale")
+                                onMoved: v => page.set("tasksScale", v)
+                            }
+                            BarSlider {
+                                label: "ICON SPACING"
+                                from: 0; to: 16; step: 1; unit: " px"
+                                value: page.val("tasksGap")
+                                onMoved: v => page.set("tasksGap", v)
+                            }
+                            CycleChoice {
+                                label: "ICON COLOR"
+                                options: ["normal", "accent"]
+                                current: page.val("tasksColor")
+                                onPicked: v => page.set("tasksColor", v)
+                            }
                         }
                     }
                 }
@@ -818,8 +798,8 @@ Item {
             // CPU / RAM / GPU / TEMP badges.
             Column {
                 id: secStats
-                width: parent.width; spacing: 10
-                topPadding: 6
+                width: parent.width; spacing: 6
+                topPadding: 2
 
                 SectionTitle { text: "SYSTEM STATS" }
 
@@ -831,48 +811,44 @@ Item {
                 Card {
                     enabled: page.statsOn
 
-                    Column {
-                        width: parent.width; spacing: 10
-
-                        GroupLabel { text: "BADGE STYLE" }
+                    Cols {
                         ToggleRow {
-                            label: "SHOW % / °C SYMBOLS"; checked: page.val("statsPercent")
+                            label: "% / °C SYMBOLS"; checked: page.val("statsPercent")
                             onToggled: v => page.set("statsPercent", v)
                         }
                         ToggleRow {
                             label: "BADGE BORDER"; checked: page.val("statsBorder")
                             onToggled: v => page.set("statsBorder", v)
                         }
+                    }
+
+                    Cols {
                         BarSlider {
-                            label: "BADGE TEXT SCALE"
+                            label: "TEXT SCALE"
                             from: 0.5; to: 2.0; step: 0.05; unit: "×"; decimals: 2
                             value: page.val("statsScale")
                             onMoved: v => page.set("statsScale", v)
                         }
                         BarSlider {
-                            label: "BADGE CORNER RADIUS"
+                            label: "CORNER RADIUS"
                             from: 0; to: 24; step: 1; unit: " px"
                             value: page.val("statsRadius")
                             onMoved: v => page.set("statsRadius", v)
                         }
                         BarSlider {
-                            label: "BADGE SPACING"
+                            label: "SPACING"
                             from: 0; to: 24; step: 1; unit: " px"
                             value: page.val("statsGap")
                             onMoved: v => page.set("statsGap", v)
                         }
-
-                        Divider {}
-
-                        GroupLabel { text: "WARNING THRESHOLDS" }
                         BarSlider {
-                            label: "HIGH CPU / RAM / GPU WARNING"
+                            label: "HIGH LOAD WARNING"
                             from: 50; to: 100; step: 5; unit: "%"
                             value: page.val("statsWarn")
                             onMoved: v => page.set("statsWarn", v)
                         }
                         BarSlider {
-                            label: "HIGH TEMPERATURE WARNING"
+                            label: "HIGH TEMP WARNING"
                             from: 50; to: 110; step: 5; unit: " °"
                             value: page.val("tempWarn")
                             onMoved: v => page.set("tempWarn", v)
@@ -881,63 +857,69 @@ Item {
                 }
             }
 
-            // ---------------- BATTERY & VOLUME ----------------
+            // ---------------- BATTERY & VOLUME (side by side) ----------------
             Column {
                 id: secBattVol
-                width: parent.width; spacing: 10
-                topPadding: 6
+                width: parent.width; spacing: 6
+                topPadding: 2
 
                 SectionTitle { text: "BATTERY & VOLUME" }
 
                 Card {
-                    Column {
-                        width: parent.width; spacing: 10
+                    Cols {
+                        Column {
+                            width: parent.cellWidth ?? parent.width
+                            spacing: 6
 
-                        GroupLabel { text: "BATTERY" }
-                        ToggleRow {
-                            label: "SHOW NUMBER"; checked: page.val("batNumber")
-                            enabled: page.isOn("battery")
-                            onToggled: v => page.set("batNumber", v)
-                        }
-                        ToggleRow {
-                            label: "SHOW % SYMBOL"; checked: page.val("batPercent")
-                            enabled: page.isOn("battery") && page.val("batNumber")
-                            onToggled: v => page.set("batPercent", v)
-                        }
-                        BarSlider {
-                            label: "LOW BATTERY WARNING"
-                            enabled: page.isOn("battery")
-                            from: 5; to: 50; step: 5; unit: "%"
-                            value: page.val("batLowPct")
-                            onMoved: v => page.set("batLowPct", v)
+                            GroupLabel { text: "BATTERY" }
+                            ToggleRow {
+                                label: "NUMBER"; checked: page.val("batNumber")
+                                enabled: page.isOn("battery")
+                                onToggled: v => page.set("batNumber", v)
+                            }
+                            ToggleRow {
+                                label: "% SYMBOL"; checked: page.val("batPercent")
+                                enabled: page.isOn("battery") && page.val("batNumber")
+                                onToggled: v => page.set("batPercent", v)
+                            }
+                            BarSlider {
+                                label: "LOW WARNING"
+                                enabled: page.isOn("battery")
+                                from: 5; to: 50; step: 5; unit: "%"
+                                value: page.val("batLowPct")
+                                onMoved: v => page.set("batLowPct", v)
+                            }
                         }
 
-                        Divider {}
+                        Column {
+                            width: parent.cellWidth ?? parent.width
+                            spacing: 6
 
-                        GroupLabel { text: "VOLUME" }
-                        ToggleRow {
-                            label: "SHOW NUMBER"; checked: page.val("volNumber")
-                            enabled: page.isOn("volume")
-                            onToggled: v => page.set("volNumber", v)
-                        }
-                        ToggleRow {
-                            label: "SHOW % SYMBOL"; checked: page.val("volPercent")
-                            enabled: page.isOn("volume") && page.val("volNumber")
-                            onToggled: v => page.set("volPercent", v)
-                        }
-                        BarSlider {
-                            label: "SCROLL STEP"
-                            enabled: page.isOn("volume")
-                            from: 1; to: 10; step: 1; unit: "%"
-                            value: page.val("volStep")
-                            onMoved: v => page.set("volStep", v)
-                        }
-                        BarSlider {
-                            label: "MAXIMUM VOLUME"
-                            enabled: page.isOn("volume")
-                            from: 100; to: 150; step: 5; unit: "%"
-                            value: page.val("volMax")
-                            onMoved: v => page.set("volMax", v)
+                            GroupLabel { text: "VOLUME" }
+                            ToggleRow {
+                                label: "NUMBER"; checked: page.val("volNumber")
+                                enabled: page.isOn("volume")
+                                onToggled: v => page.set("volNumber", v)
+                            }
+                            ToggleRow {
+                                label: "% SYMBOL"; checked: page.val("volPercent")
+                                enabled: page.isOn("volume") && page.val("volNumber")
+                                onToggled: v => page.set("volPercent", v)
+                            }
+                            BarSlider {
+                                label: "SCROLL STEP"
+                                enabled: page.isOn("volume")
+                                from: 1; to: 10; step: 1; unit: "%"
+                                value: page.val("volStep")
+                                onMoved: v => page.set("volStep", v)
+                            }
+                            BarSlider {
+                                label: "MAX VOLUME"
+                                enabled: page.isOn("volume")
+                                from: 100; to: 150; step: 5; unit: "%"
+                                value: page.val("volMax")
+                                onMoved: v => page.set("volMax", v)
+                            }
                         }
                     }
                 }
@@ -946,31 +928,33 @@ Item {
             // ---------------- TOOLTIPS ----------------
             Column {
                 id: secTooltips
-                width: parent.width; spacing: 10
-                topPadding: 6
+                width: parent.width; spacing: 6
+                topPadding: 2
 
                 SectionTitle { text: "TOOLTIPS" }
 
                 Card {
-                    Column {
-                        width: parent.width; spacing: 10
-
+                    Cols {
+                        cols: 3
                         ToggleRow {
-                            label: "SHOW TOOLTIPS"; checked: page.val("tooltips")
+                            label: "SHOW"; checked: page.val("tooltips")
                             onToggled: v => page.set("tooltips", v)
                         }
                         ToggleRow {
-                            label: "HINTS IN TOOLTIPS"; checked: page.val("tooltipHints")
+                            label: "HINTS"; checked: page.val("tooltipHints")
                             enabled: page.val("tooltips")
                             onToggled: v => page.set("tooltipHints", v)
                         }
                         ToggleRow {
-                            label: "TOOLTIP BORDER"; checked: page.val("tooltipBorder")
+                            label: "BORDER"; checked: page.val("tooltipBorder")
                             enabled: page.val("tooltips")
                             onToggled: v => page.set("tooltipBorder", v)
                         }
+                    }
+
+                    Cols {
                         BarSlider {
-                            label: "TOOLTIP DELAY"
+                            label: "DELAY"
                             enabled: page.val("tooltips")
                             from: 0; to: 1500; step: 50; unit: " ms"
                             value: page.val("tipDelay")
@@ -982,61 +966,60 @@ Item {
 
             // ---------------- CLICK ACTIONS ----------------
             // What a click on the clock / settings button does.
+            // Click a button to cycle through the available actions.
             Column {
                 id: secActions
-                width: parent.width; spacing: 10
-                topPadding: 6
+                width: parent.width; spacing: 6
+                topPadding: 2
 
                 SectionTitle { text: "CLICK ACTIONS" }
 
                 Card {
-                    Column {
-                        width: parent.width; spacing: 10
-
-                        GroupLabel { text: "CLOCK" }
-                        BarChoice {
-                            label: "LEFT CLICK"
-                            enabled: page.isOn("clock")
-                            options: page.clockActions; labels: page.actionLabels; btnWidth: 110
+                    GroupLabel { text: "CLOCK" }
+                    Cols {
+                        cols: 3
+                        enabled: page.isOn("clock")
+                        CycleChoice {
+                            label: "LEFT"
+                            options: page.clockActions; labels: page.actionLabels
                             current: page.val("clockPrimary")
                             onPicked: v => page.set("clockPrimary", v)
                         }
-                        BarChoice {
-                            label: "RIGHT CLICK"
-                            enabled: page.isOn("clock")
-                            options: page.clockActions; labels: page.actionLabels; btnWidth: 110
+                        CycleChoice {
+                            label: "RIGHT"
+                            options: page.clockActions; labels: page.actionLabels
                             current: page.val("clockSecondary")
                             onPicked: v => page.set("clockSecondary", v)
                         }
-                        BarChoice {
-                            label: "MIDDLE CLICK"
-                            enabled: page.isOn("clock")
-                            options: page.clockActions; labels: page.actionLabels; btnWidth: 110
+                        CycleChoice {
+                            label: "MIDDLE"
+                            options: page.clockActions; labels: page.actionLabels
                             current: page.val("clockTertiary")
                             onPicked: v => page.set("clockTertiary", v)
                         }
+                    }
 
-                        Divider {}
+                    Divider {}
 
-                        GroupLabel { text: "SETTINGS BUTTON" }
-                        BarChoice {
-                            label: "LEFT CLICK"
-                            enabled: page.isOn("settings")
-                            options: page.settingsActions; labels: page.actionLabels; btnWidth: 110
+                    GroupLabel { text: "SETTINGS BUTTON" }
+                    Cols {
+                        cols: 3
+                        enabled: page.isOn("settings")
+                        CycleChoice {
+                            label: "LEFT"
+                            options: page.settingsActions; labels: page.actionLabels
                             current: page.val("settingsPrimary")
                             onPicked: v => page.set("settingsPrimary", v)
                         }
-                        BarChoice {
-                            label: "RIGHT CLICK"
-                            enabled: page.isOn("settings")
-                            options: page.settingsActions; labels: page.actionLabels; btnWidth: 110
+                        CycleChoice {
+                            label: "RIGHT"
+                            options: page.settingsActions; labels: page.actionLabels
                             current: page.val("settingsSecondary")
                             onPicked: v => page.set("settingsSecondary", v)
                         }
-                        BarChoice {
-                            label: "MIDDLE CLICK"
-                            enabled: page.isOn("settings")
-                            options: page.settingsActions; labels: page.actionLabels; btnWidth: 110
+                        CycleChoice {
+                            label: "MIDDLE"
+                            options: page.settingsActions; labels: page.actionLabels
                             current: page.val("settingsTertiary")
                             onPicked: v => page.set("settingsTertiary", v)
                         }

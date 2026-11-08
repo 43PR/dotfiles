@@ -214,18 +214,19 @@ Scope {
         return root.hiddenNames.indexOf(a.name) < 0
     })
 
-    // rows shown in the "Keybinds" section at the end of the settings menu
-    readonly property var keybindInfo: [
+    // rows shown in the "Keybinds" section at the end of the settings menu:
+    // general keys (one per line) and the per-action keys (shown in a grid)
+    readonly property var keybindGeneral: [
         { keys: "Esc / Click outside",    desc: "Close menu / settings" },
         { keys: "↑ ↓ ← → Tab",            desc: "Move selection" },
         { keys: "Enter / Space / LMB",    desc: "Run / toggle selected" },
-        { keys: "+ - PgUp PgDn / Scroll", desc: "Adjust brightness / night light (when selected)" },
-        { keys: "C / RMB (any button)",   desc: "Open settings" }
-    ].concat(actions.map(function (a) {
-        return { keys: a.key.toUpperCase(), desc: a.label }
-    })).concat([
+        { keys: "+ - PgUp PgDn / Scroll", desc: "Adjust brightness / night" },
+        { keys: "C / RMB (any button)",   desc: "Open settings" },
         { keys: "Drag handle",            desc: "Move the menu" }
-    ])
+    ]
+    readonly property var keybindActionKeys: actions.map(function (a) {
+        return { keys: a.key.toUpperCase(), desc: a.label }
+    })
 
     function isOn(name) {
         switch (name) {
@@ -269,6 +270,14 @@ Scope {
 
     function clamp(v, lo, hi) {
         return Math.max(lo, Math.min(hi, Math.round(v)))
+    }
+
+    // width of one cell when `p` is a multi-column Grid, else the full width
+    function cellW(p) {
+        if (!p) return 0
+        if (p.columns !== undefined && p.columns > 1 && p.columnSpacing !== undefined)
+            return Math.floor((p.width - (p.columns - 1) * p.columnSpacing) / p.columns)
+        return p.width
     }
 
     // ---- state readers ----------------------------------------------------
@@ -1200,7 +1209,7 @@ Scope {
             readonly property real u: root.menuUi
 
             color: "transparent"
-            implicitWidth: Math.round(420 * u)
+            implicitWidth: Math.round(440 * u)
             implicitHeight: Math.round(Math.min(640 * u, (screen?.height ?? 800) * 0.88))
             exclusionMode: ExclusionMode.Ignore
 
@@ -1225,10 +1234,10 @@ Scope {
                     id: head
                     anchors.top: parent.top
                     width: parent.width
-                    height: 58 * settingsWin.u
+                    height: 52 * settingsWin.u
 
                     Text {
-                        x: 20 * settingsWin.u; y: 9 * settingsWin.u
+                        x: 20 * settingsWin.u; y: 8 * settingsWin.u
                         text: "Quick actions settings"
                         font.family: root.th.fontFamily
                         font.pixelSize: root.th.textSizeSection * settingsWin.u
@@ -1236,7 +1245,7 @@ Scope {
                         color: Theme.text
                     }
                     Text {
-                        x: 20 * settingsWin.u; y: 34 * settingsWin.u
+                        x: 20 * settingsWin.u; y: 30 * settingsWin.u
                         text: "Drag the handle to move."
                         font.family: root.th.fontFamily
                         font.pixelSize: root.th.textSizeSmall * settingsWin.u
@@ -1281,7 +1290,7 @@ Scope {
                     anchors.left: parent.left
                     anchors.right: parent.right
                     contentWidth: width
-                    contentHeight: contentCol.height + 16 * settingsWin.u
+                    contentHeight: contentCol.height + 12 * settingsWin.u
                     clip: true
                     flickableDirection: Flickable.VerticalFlick
                     boundsBehavior: Flickable.StopAtBounds
@@ -1291,112 +1300,101 @@ Scope {
                         x: 20 * settingsWin.u
                         width: flick.width - 48 * settingsWin.u
 
-                        QaSectionHeader { host: root; text: "Hints" }
-                        QaToggleRow {
-                            host: root
-                            key: "showTooltips"
-                            label: "Show tooltips / hints"
-                            checked: root.showTooltips
-                            tip: "Turn off to hide all hover hints"
+                        QaSectionHeader { host: root; text: "General" }
+                        Grid {
+                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                            QaToggleRow { host: root; key: "showTooltips"; label: "Tooltips"; checked: root.showTooltips; tip: "Turn off to hide all hover hints" }
+                            QaToggleRow { host: root; key: "showFooter"; label: "Settings button"; checked: root.showFooter; tip: "Hides the gear button; C and right-click still work" }
+                            QaSliderRow { host: root; key: "menuSize"; label: "Scale"; tip: "Overall size of the menu" }
+                            QaSliderRow { host: root; key: "animMs"; label: "Animation"; tip: "Animation duration. 0 disables animations" }
                         }
-                        QaToggleRow {
-                            host: root
-                            key: "showFooter"
-                            label: "Settings button"
-                            checked: root.showFooter
-                            tip: "Hides the gear button; C and right-click still work"
-                        }
-                        QaSectionHeader { host: root; text: "Global" }
-                        QaSliderRow { host: root; key: "menuSize"; label: "Scale"; tip: "Overall size of the menu" }
-                        QaSliderRow { host: root; key: "animMs"; label: "Animation duration"; tip: "0 disables animations" }
 
-                        QaSectionHeader { host: root; text: "Layout" }
-                        QaToggleRow { host: root; key: "horizontal"; label: "Horizontal layout"; checked: root.horizontal; tip: "Show actions in a row instead of a list" }
-                        QaSliderRow { host: root; key: "cardWidth"; label: "Width" }
-                        QaSliderRow { host: root; key: "itemHeight"; label: "Item height" }
-                        QaSliderRow { host: root; key: "itemSpacing"; label: "Item spacing" }
-                        QaSliderRow { host: root; key: "panelPadding"; label: "Panel padding" }
-
-                        QaSectionHeader { host: root; text: "Content" }
-                        QaToggleRow { host: root; key: "showIcons"; label: "Icons"; checked: root.showIcons }
-                        QaToggleRow { host: root; key: "showLabels"; label: "Labels"; checked: root.showLabels }
-                        QaToggleRow {
-                            host: root
-                            key: "showState"
-                            label: "ON / OFF state text"
-                            checked: root.showState
-                            enabled: !root.horizontal
-                            tip: "Status text on each row (vertical layout only)"
-                        }
-                        QaToggleRow {
-                            host: root
-                            key: "showKeyHints"
-                            label: "Key hints"
-                            checked: root.showKeyHints
-                            enabled: !root.horizontal
-                            tip: "Small key badges (vertical layout only)"
+                        QaSectionHeader { host: root; text: "Layout & content" }
+                        Grid {
+                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                            QaToggleRow { host: root; key: "horizontal"; label: "Horizontal"; checked: root.horizontal; tip: "Show actions in a row instead of a list" }
+                            QaToggleRow { host: root; key: "showIcons"; label: "Icons"; checked: root.showIcons }
+                            QaToggleRow { host: root; key: "showLabels"; label: "Labels"; checked: root.showLabels }
+                            QaToggleRow {
+                                host: root
+                                key: "showState"
+                                label: "State text"
+                                checked: root.showState
+                                enabled: !root.horizontal
+                                tip: "ON / OFF status text on each row (vertical layout only)"
+                            }
+                            QaToggleRow {
+                                host: root
+                                key: "showKeyHints"
+                                label: "Key hints"
+                                checked: root.showKeyHints
+                                enabled: !root.horizontal
+                                tip: "Small key badges (vertical layout only)"
+                            }
+                            QaSliderRow { host: root; key: "cardWidth"; label: "Width" }
+                            QaSliderRow { host: root; key: "itemHeight"; label: "Item height" }
+                            QaSliderRow { host: root; key: "itemSpacing"; label: "Item spacing" }
+                            QaSliderRow { host: root; key: "panelPadding"; label: "Panel padding" }
                         }
 
                         QaSectionHeader { host: root; text: "Appearance" }
-                        QaSliderRow { host: root; key: "panelRadius"; label: "Panel roundness" }
-                        QaSliderRow { host: root; key: "itemRadius"; label: "Item roundness" }
-                        QaSliderRow { host: root; key: "iconSize"; label: "Icon size"; enabled: root.showIcons }
-                        QaSliderRow { host: root; key: "labelSize"; label: "Label size"; enabled: root.showLabels }
-                        QaSliderRow { host: root; key: "borderWidth"; label: "Selection border"; tip: "Also the thickness of the brightness / night light progress border" }
-
-                        QaSectionHeader { host: root; text: "Opacity" }
-                        QaSliderRow { host: root; key: "panelOpacity"; label: "Panel background" }
-                        QaSliderRow { host: root; key: "itemOpacity"; label: "Item background" }
-                        QaSliderRow { host: root; key: "hoverBoost"; label: "Hover / selected highlight" }
-                        QaSliderRow { host: root; key: "dimOpacity"; label: "Dim screen behind menu" }
-
-                        QaSectionHeader { host: root; text: "Quick actions" }
-                        QaSliderRow { host: root; key: "brightnessStep"; label: "Brightness step"; tip: "Percent per scroll notch / keypress" }
-                        QaSliderRow { host: root; key: "nightTemp"; label: "Night light temperature"; tip: "Scroll over the Night light row to change it; applies live while on" }
-                        QaSliderRow { host: root; key: "nightStep"; label: "Night light step"; tip: "Kelvin per scroll notch / keypress" }
-
-                        QaSectionHeader { host: root; text: "Behavior" }
-                        QaToggleRow { host: root; key: "wrapNav"; label: "Wrap around when navigating"; checked: root.wrapNav }
-                        QaToggleRow { host: root; key: "hoverSelect"; label: "Hover selects item"; checked: root.hoverSelect }
-                        QaToggleRow { host: root; key: "closeOnOutside"; label: "Close on click outside"; checked: root.closeOnOutside }
-
-                        QaSectionHeader { host: root; text: "Visible actions" }
-                        Repeater {
-                            model: root.actions
-                            delegate: QaToggleRow {
-                                required property var modelData
-                                host: root
-                                label: modelData.label + "  (" + modelData.key.toUpperCase() + ")"
-                                checked: root.hiddenNames.indexOf(modelData.name) < 0
-                                onToggled: root.toggleAction(modelData.name)
-                            }
+                        Grid {
+                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                            QaSliderRow { host: root; key: "panelRadius"; label: "Panel roundness" }
+                            QaSliderRow { host: root; key: "itemRadius"; label: "Item roundness" }
+                            QaSliderRow { host: root; key: "iconSize"; label: "Icon size"; enabled: root.showIcons }
+                            QaSliderRow { host: root; key: "labelSize"; label: "Label size"; enabled: root.showLabels }
+                            QaSliderRow { host: root; key: "borderWidth"; label: "Selection border"; tip: "Also the thickness of the brightness / night light progress border" }
+                            QaSliderRow { host: root; key: "panelOpacity"; label: "Panel opacity"; tip: "Panel background opacity" }
+                            QaSliderRow { host: root; key: "itemOpacity"; label: "Item opacity"; tip: "Item background opacity" }
+                            QaSliderRow { host: root; key: "hoverBoost"; label: "Hover highlight"; tip: "Extra opacity on hovered / selected items" }
+                            QaSliderRow { host: root; key: "dimOpacity"; label: "Screen dim"; tip: "Dim the screen behind the menu" }
                         }
 
-                        QaSectionHeader { host: root; text: "Position" }
-                        QaActionButton {
-                            host: root
-                            label: "Reset position"
-                            enabled: root.movedFromDefault
-                            tipsOn: root.showTooltips
-                            tip: "Move the menu back to its default spot"
-                            onClicked: root.resetPosition()
+                        QaSectionHeader { host: root; text: "Quick actions" }
+                        Grid {
+                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                            QaSliderRow { host: root; key: "brightnessStep"; label: "Brightness step"; tip: "Percent per scroll notch / keypress" }
+                            QaSliderRow { host: root; key: "nightTemp"; label: "Night temperature"; tip: "Scroll over the Night light row to change it; applies live while on" }
+                            QaSliderRow { host: root; key: "nightStep"; label: "Night step"; tip: "Kelvin per scroll notch / keypress" }
+                        }
+
+                        QaSectionHeader { host: root; text: "Behavior" }
+                        Grid {
+                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                            QaToggleRow { host: root; key: "wrapNav"; label: "Wrap around"; checked: root.wrapNav; tip: "Wrap around when navigating with the keyboard" }
+                            QaToggleRow { host: root; key: "hoverSelect"; label: "Hover selects"; checked: root.hoverSelect; tip: "Hovering an item selects it" }
+                            QaToggleRow { host: root; key: "closeOnOutside"; label: "Click outside"; checked: root.closeOnOutside; tip: "Close the menu when clicking outside of it" }
+                        }
+
+                        QaSectionHeader { host: root; text: "Visible actions" }
+                        Grid {
+                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                            Repeater {
+                                model: root.actions
+                                delegate: QaToggleRow {
+                                    required property var modelData
+                                    host: root
+                                    label: modelData.label
+                                    checked: root.hiddenNames.indexOf(modelData.name) < 0
+                                    onToggled: root.toggleAction(modelData.name)
+                                }
+                            }
                         }
 
                         QaSectionHeader { host: root; text: "Keybinds" }
                         Repeater {
-                            model: root.keybindInfo
-                            // one line of the keybind cheat-sheet:
-                            // description left, key chip right
+                            model: root.keybindGeneral
                             delegate: Item {
                                 id: kbRow
                                 required property var modelData
                                 width: contentCol.width
-                                height: 26 * settingsWin.u
+                                height: 22 * settingsWin.u
 
                                 Text {
                                     anchors.left: parent.left
                                     anchors.right: kbChip.left
-                                    anchors.rightMargin: 12 * settingsWin.u
+                                    anchors.rightMargin: 8 * settingsWin.u
                                     anchors.verticalCenter: parent.verticalCenter
                                     text: kbRow.modelData.desc
                                     elide: Text.ElideRight
@@ -1422,6 +1420,51 @@ Scope {
                                         font.pixelSize: root.th.textSizeSmall * settingsWin.u
                                         font.bold: true
                                         color: Theme.textDim
+                                    }
+                                }
+                            }
+                        }
+                        Item { width: 1; height: 4 * settingsWin.u }
+                        Grid {
+                            width: parent.width; columns: 3; columnSpacing: 18 * settingsWin.u
+                            Repeater {
+                                model: root.keybindActionKeys
+                                delegate: Item {
+                                    id: kbRow
+                                    required property var modelData
+                                    width: root.cellW(parent)
+                                    height: 22 * settingsWin.u
+
+                                    Text {
+                                        anchors.left: parent.left
+                                        anchors.right: kbChip.left
+                                        anchors.rightMargin: 8 * settingsWin.u
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: kbRow.modelData.desc
+                                        elide: Text.ElideRight
+                                        font.family: root.th.fontFamily
+                                        font.pixelSize: root.th.textSizeBody * settingsWin.u
+                                        color: Theme.text
+                                    }
+
+                                    Rectangle {
+                                        id: kbChip
+                                        anchors.right: parent.right
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: kbChipText.implicitWidth + 14 * settingsWin.u
+                                        height: 18 * settingsWin.u
+                                        radius: 5 * settingsWin.u
+                                        color: Theme.alpha(Theme.text, 0.08)
+
+                                        Text {
+                                            id: kbChipText
+                                            anchors.centerIn: parent
+                                            text: kbRow.modelData.keys
+                                            font.family: root.th.fontFamily
+                                            font.pixelSize: root.th.textSizeSmall * settingsWin.u
+                                            font.bold: true
+                                            color: Theme.textDim
+                                        }
                                     }
                                 }
                             }
@@ -1487,7 +1530,7 @@ Scope {
                     id: foot
                     anchors.bottom: parent.bottom
                     width: parent.width
-                    height: 58 * settingsWin.u
+                    height: 50 * settingsWin.u
 
                     Rectangle {
                         width: parent.width
@@ -1495,16 +1538,29 @@ Scope {
                         color: Theme.alpha(Theme.text, 0.08)
                     }
 
-                    QaActionButton {
-                        host: root
+                    Row {
                         x: 20 * settingsWin.u
                         anchors.verticalCenter: parent.verticalCenter
-                        label: "Reset all"
-                        enabled: root.modified
-                        tipsOn: root.showTooltips
-                        tip: "Restore every setting to its default"
-                        tipSide: "above"
-                        onClicked: root.resetAll()
+                        spacing: 8 * settingsWin.u
+
+                        QaActionButton {
+                            host: root
+                            label: "Reset all"
+                            enabled: root.modified
+                            tipsOn: root.showTooltips
+                            tip: "Restore every setting to its default"
+                            tipSide: "above"
+                            onClicked: root.resetAll()
+                        }
+                        QaActionButton {
+                            host: root
+                            label: "Reset position"
+                            enabled: root.movedFromDefault
+                            tipsOn: root.showTooltips
+                            tip: "Move the menu back to its default spot"
+                            tipSide: "above"
+                            onClicked: root.resetPosition()
+                        }
                     }
                     QaActionButton {
                         host: root
@@ -1640,7 +1696,7 @@ Scope {
 
         implicitWidth: abText.implicitWidth + 28 * u
         width: implicitWidth
-        height: 30 * u
+        height: 28 * u
         radius: Math.min(height / 2, ab.th.radius * u)
         z: abTip.shown ? 100 : 0
         opacity: enabled ? 1 : 0.4
@@ -1685,12 +1741,12 @@ Scope {
         readonly property real u: host.menuUi
         readonly property QtObject th: host.th
         width: parent?.width ?? 0
-        height: 32 * u
+        height: 26 * u
 
         Text {
             anchors.left: parent.left
             anchors.bottom: parent.bottom
-            anchors.bottomMargin: 4 * sh.u
+            anchors.bottomMargin: 3 * sh.u
             text: sh.text
             font.family: sh.th.fontFamily
             font.pixelSize: sh.th.textSizeSmall * sh.u
@@ -1714,15 +1770,15 @@ Scope {
         readonly property QtObject th: host.th
         signal toggled()
 
-        width: parent?.width ?? 0
-        height: 34 * u
+        width: host.cellW(parent)
+        height: 28 * u
         z: trTip.shown ? 100 : 0
         opacity: enabled ? 1 : 0.4
 
         Rectangle {
             anchors.fill: parent
-            anchors.leftMargin: -8 * tr.u
-            anchors.rightMargin: -8 * tr.u
+            anchors.leftMargin: -6 * tr.u
+            anchors.rightMargin: -6 * tr.u
             radius: Math.min(8 * tr.u, tr.th.radius * tr.u)
             color: trArea.containsMouse && tr.enabled ? Theme.alpha(Theme.text, 0.06) : "transparent"
         }
@@ -1730,7 +1786,7 @@ Scope {
         Text {
             anchors.left: parent.left
             anchors.right: sw.left
-            anchors.rightMargin: 12 * tr.u
+            anchors.rightMargin: 8 * tr.u
             anchors.verticalCenter: parent.verticalCenter
             text: tr.label
             elide: Text.ElideRight
@@ -1744,14 +1800,14 @@ Scope {
             id: sw
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
-            width: 36 * tr.u; height: 20 * tr.u; radius: height / 2
+            width: 32 * tr.u; height: 18 * tr.u; radius: height / 2
             color: tr.checked ? Theme.accent : "transparent"
             border.width: 1
             border.color: tr.checked ? Theme.accent : Theme.alpha(Theme.text, 0.3)
             Behavior on color { ColorAnimation { duration: tr.th.animMed } }
 
             Rectangle {
-                width: 14 * tr.u; height: 14 * tr.u; radius: width / 2
+                width: 12 * tr.u; height: 12 * tr.u; radius: width / 2
                 anchors.verticalCenter: parent.verticalCenter
                 x: tr.checked ? parent.width - width - 3 * tr.u : 3 * tr.u
                 color: tr.checked ? Theme.bg : Theme.text
@@ -1798,14 +1854,17 @@ Scope {
         readonly property real ratio: Math.max(0, Math.min(1,
             (host[key] - spec.min) / (spec.max - spec.min)))
 
-        width: parent?.width ?? 0
-        height: 46 * u
+        width: host.cellW(parent)
+        height: 38 * u
         z: srTip.shown ? 100 : 0
         opacity: enabled ? 1 : 0.4
 
         Text {
             anchors.left: parent.left
-            y: 6 * sr.u
+            anchors.right: srValue.left
+            anchors.rightMargin: 6 * sr.u
+            y: 4 * sr.u
+            elide: Text.ElideRight
             text: sr.label
             font.family: sr.th.fontFamily
             font.pixelSize: sr.th.textSizeGroup * sr.u
@@ -1814,8 +1873,9 @@ Scope {
         }
 
         Text {
+            id: srValue
             anchors.right: parent.right
-            y: 6 * sr.u
+            y: 5 * sr.u
             text: sr.host.fmtValue(sr.key, sr.host[sr.key])
             font.family: sr.th.fontFamily
             font.pixelSize: sr.th.textSizeBody * sr.u
@@ -1826,7 +1886,7 @@ Scope {
             id: track
             anchors.left: parent.left
             anchors.right: parent.right
-            y: 31 * sr.u
+            y: 27 * sr.u
             height: 4 * sr.u
             radius: height / 2
             color: Theme.alpha(Theme.text, 0.15)
@@ -1852,7 +1912,7 @@ Scope {
         MouseArea {
             id: sliderArea
             anchors.fill: parent
-            anchors.topMargin: 20 * sr.u
+            anchors.topMargin: 18 * sr.u
             hoverEnabled: true
             preventStealing: true
             enabled: sr.enabled

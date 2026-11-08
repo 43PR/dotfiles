@@ -163,8 +163,23 @@ bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 bind(mainMod .. " + " .. bar_key, hl.dsp.exec_cmd("qs ipc call bar toggle"))
 bind(mainMod .. " + " .. clipboard_key, hl.dsp.exec_cmd("pgrep -x rofi >/dev/null && pkill -x rofi || cliphist list | rofi -dmenu -p '' | cliphist decode | wl-copy"))
 
-bind(shot_key, hl.dsp.exec_cmd("sh -c 'file=" .. home .. "/Pictures/$(date +%s).png; grim \"$file\"; wl-copy < \"$file\"; qs ipc call screenshot notify \"$file\"'"))
+bind(shot_key, hl.dsp.exec_cmd([==[sh -c '
+conf="$HOME/.config/quickshell/state/screenshot.conf"
+[ -r "$conf" ] && . "$conf"
+stamp="$(date +%F_%H-%M-%S).png"
+if [ "${shot_full_save:-1}" = 1 ]; then
+    dir="$HOME/Pictures/Screenshots"
+    mkdir -p "$dir"
+    file="$dir/$stamp"
+else
+    file="/tmp/shot-$stamp"
+fi
+grim "$file" || exit 1
+if [ "${shot_full_clip:-1}" = 1 ]; then wl-copy --type image/png < "$file"; fi
+qs ipc call screenshot notify "$file"
+']==]))
 bind(shot_area_key, hl.dsp.exec_cmd(home .. "/.config/hypr/scripts/screenshot-area.sh"))
+
 bind(ocr_key, hl.dsp.exec_cmd(home .. "/.config/hypr/scripts/ocr-area.sh"))
 
 -- Custom binds created in Settings > Keybinds (state/custom_binds.lua).

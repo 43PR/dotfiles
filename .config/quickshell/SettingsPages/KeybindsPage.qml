@@ -37,6 +37,17 @@ Item {
     property var installed: []
     property bool reloadAfterSave: false
 
+    // Number of columns in the keybind grid
+    readonly property int bindColumns: 3
+
+    // Screenshot actions (state/screenshot.conf, read at runtime by the
+    // screenshot binds, so no Hyprland reload is needed)
+    property bool shotFullSave: true
+    property bool shotFullClip: true
+    property bool shotAreaSave: true
+    property bool shotAreaClip: true
+    readonly property string shotPath: home + "/.config/quickshell/state/screenshot.conf"
+
     // Editable binds (saved to state/binds.lua as kb_<id>)
     readonly property var bindDefs: [
         { id: "terminal",      label: "TERMINAL",                    def: "T" },
@@ -435,6 +446,65 @@ Item {
         browserSetter.running = true
     }
 
+    // ---- screenshot options -------------------------------------------
+
+    function parseShot(t) {
+        const get = (k, cur) => {
+            const m = new RegExp("^\\s*" + k + "\\s*=\\s*([01])", "m").exec(t)
+            return m ? m[1] === "1" : cur
+        }
+        shotFullSave = get("shot_full_save", shotFullSave)
+        shotFullClip = get("shot_full_clip", shotFullClip)
+        shotAreaSave = get("shot_area_save", shotAreaSave)
+        shotAreaClip = get("shot_area_clip", shotAreaClip)
+    }
+
+    function saveShot() {
+        const b = v => v ? "1" : "0"
+        shotWriter.body = "shot_full_save=" + b(shotFullSave) + "\n"
+                        + "shot_full_clip=" + b(shotFullClip) + "\n"
+                        + "shot_area_save=" + b(shotAreaSave) + "\n"
+                        + "shot_area_clip=" + b(shotAreaClip) + "\n"
+        shotWriter.running = false
+        shotWriter.running = true
+    }
+
+    // At least one of save / clipboard must stay on, otherwise the
+    // screenshot would be thrown away.
+    function setShotOpt(prop, value) {
+        const pair = prop.indexOf("shotFull") === 0
+            ? ["shotFullSave", "shotFullClip"]
+            : ["shotAreaSave", "shotAreaClip"]
+        const other = pair[0] === prop ? pair[1] : pair[0]
+        if (!value && !page[other]) return
+        page[prop] = value
+        saveShot()
+    }
+
+    FileView {
+        id: shotFile
+        path: page.shotPath
+        printErrors: false
+        onLoaded: page.parseShot(text())
+    }
+
+    Process {
+        id: shotWriter
+        property string body: ""
+        command: [
+            "sh", "-c",
+            "mkdir -p -- \"$1\" && printf '%s' \"$2\" > \"$3\"",
+            "shotwrite",
+            page.home + "/.config/quickshell/state",
+            body,
+            page.shotPath
+        ]
+        onExited: code => {
+            if (code !== 0)
+                console.warn("KeybindsPage: screenshot settings save failed (" + code + ")")
+        }
+    }
+
     Process {
         id: browserQuery
         command: ["xdg-mime", "query", "default", "x-scheme-handler/https"]
@@ -652,6 +722,45 @@ Item {
         font.family: Theme.fontFamily
         font.pixelSize: Theme.textSizeSmall
     }
+    component ShotOption: Column {
+        id: opt
+        property string title: ""
+        property bool save: true
+        property bool clip: true
+        signal saveToggled(bool value)
+        signal clipToggled(bool value)
+
+        width: parent.width
+        spacing: 8
+
+        Text {
+            text: opt.title
+            color: Theme.text
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.textSizeGroup
+            font.bold: true
+            font.letterSpacing: 1
+        }
+
+        Row {
+            width: parent.width
+            spacing: 8
+
+            ChoiceButton {
+                width: (parent.width - parent.spacing) / 2
+                label: "SAVE TO FOLDER"
+                current: opt.save
+                onClicked: opt.saveToggled(!opt.save)
+            }
+            ChoiceButton {
+                width: (parent.width - parent.spacing) / 2
+                label: "COPY TO CLIPBOARD"
+                current: opt.clip
+                onClicked: opt.clipToggled(!opt.clip)
+            }
+        }
+    }
+
     component CodeBlock: Rectangle {
         property alias text: codeText.text
         width: parent.width
@@ -960,9 +1069,9 @@ Item {
                         Grid {
                             id: bindGrid
                             width: parent.width
-                            columns: 2
+                            columns: page.bindColumns
                             spacing: 8
-                            property real cellWidth: (width - spacing) / 2
+                            property real cellWidth: Math.floor((width - spacing * (columns - 1)) / columns)
                             Repeater {
                                 model: page.shownBinds
                                 delegate: BindRow {
@@ -1049,6 +1158,44 @@ Item {
                                 current: page.browserBin === modelData.bin
                                 onClicked: page.setBrowser(modelData)
                             }
+                        }
+                    }
+                }
+            }
+
+            Column {
+                width: parent.width
+                spacing: 10
+                topPadding: 6
+
+                SectionTitle { text: "SCREENSHOTS" }
+
+                Card {
+                    Column {
+                        width: parent.width
+                        spacing: 16
+
+                        ShotOption {
+                            title: "SCREENSHOT (FULL)"
+                            save: page.shotFullSave
+                            clip: page.shotFullClip
+                            onSaveToggled: v => page.setShotOpt("shotFullSave", v)
+                            onClipToggled: v => page.setShotOpt("shotFullClip", v)
+                        }
+
+                        Rectangle { width: parent.width; height: 1; color: Theme.border }
+
+                        ShotOption {
+                            title: "SCREENSHOT (AREA)"
+                            save: page.shotAreaSave
+                            clip: page.shotAreaClip
+                            onSaveToggled: v => page.setShotOpt("shotAreaSave", v)
+                            onClipToggled: v => page.setShotOpt("shotAreaClip", v)
+                        }
+
+                        HelpText {
+                            text: "Screenshots are saved to ~/Pictures/Screenshots. At least one option stays on. "
+                                  + "Changes apply to the next screenshot, no reload needed."
                         }
                     }
                 }
