@@ -42,7 +42,7 @@ Item {
     })
 
     readonly property var positions: ["top", "right", "bottom", "left"]
-    readonly property var styles: ["floating", "joined", "strip"]
+    readonly property var styles: ["floating", "joined", "strip", "islands"]
     readonly property var clockActions: ["calendar", "quickactions", "settings", "barsettings", "none"]
     readonly property var settingsActions: ["settings", "barsettings", "quickactions", "none"]
     readonly property var actionLabels: ({ quickactions: "QUICK ACTIONS", barsettings: "BAR SETTINGS" })
@@ -580,7 +580,7 @@ Item {
                         BarSlider {
                             label: "CORNER RADIUS"
                             enabled: !page.strip
-                            from: 0; to: 24; step: 1; unit: " px"
+                            from: 0; to: 30; step: 1; unit: " px"
                             value: page.val("radius")
                             onMoved: v => page.set("radius", v)
                         }

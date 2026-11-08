@@ -12,9 +12,9 @@ Item {
     property real marginRight: 10
     property real marginTop: 0
     property real marginBottom: 0
-    property real labelWidth: 200
+    property real labelWidth: 200   // kept for compatibility with callers; no longer used internally
 
-    // ---- Hub slider ranges (opacity stops at 20% so the window can't become invisible) ----
+    // ---- Hub slider ranges ----
     readonly property real opacityMin: 0
     readonly property real opacityMax: 1.0
     readonly property real tiltMin: 0
@@ -26,7 +26,6 @@ Item {
     // Border opacity stops at 10% so borders can't vanish completely by accident
     readonly property real borderOpacityMin: 0.1
     readonly property real borderOpacityMax: 1.0
-    // Quickshell component corner-arm length range (px)
     readonly property real blurAlphaCap: Math.max(0, round2(Theme.bgAlpha - 0.05))
     readonly property real effectiveBlurAlpha: Math.min(look.blurLayerAlpha, blurAlphaCap)
 
@@ -41,9 +40,7 @@ Item {
     property bool qsOpacityFollow: true
     property string lastLua: ""
 
-    // Battery + power profile come from UPower / power-profiles-daemon over D-Bus
-    // (event-driven). This replaces the old 5 s `sh -c cat ...` poll and the
-    // powerprofilesctl get/list/set processes.
+    // Battery + power profile come from UPower / power-profiles-daemon over D-Bus (event-driven).
     readonly property bool hasBattery: UPower.displayDevice.ready && UPower.displayDevice.isLaptopBattery
     // UPowerDevice.percentage is documented as energy / energyCapacity, i.e. 0..1.
     readonly property int batteryPercent: hasBattery ? Math.round(UPower.displayDevice.percentage * 100) : 0
@@ -100,46 +97,19 @@ Item {
         || (hasBattery && batteryStatus === "Discharging" && batteryPercent <= lowBatteryPercent)
     readonly property bool animationsEnabled: animationMode === "on" || (animationMode === "auto" && !lowPower)
 
-    readonly property var animationOptions: [
-        { id: "off",  label: "OFF" },
-        { id: "auto", label: "AUTO" },
-        { id: "on",   label: "ON" }
-    ]
+    // Option lists (ids) + display labels, used by BarChoice
+    readonly property var animationOptions: ["off", "auto", "on"]
+    readonly property var effectsOptions: ["off", "moderate", "high"]
+    readonly property var profileOptions: ["power-saver", "balanced", "performance"]
+    readonly property var layoutOptions: ["dwindle", "scrolling", "master"]
+    readonly property var borderStyleOptions: ["full", "corner"]
+    readonly property var workspaceStyleOptions: ["slide", "slidefade", "slidevert", "slidefadevert"]
 
-    readonly property var profiles: [
-        { id: "power-saver", label: "POWER SAVER" },
-        { id: "balanced",    label: "BALANCED" },
-        { id: "performance", label: "PERFORMANCE" }
-    ]
+    readonly property var profileLabels: ({ "power-saver": "POWER SAVER", balanced: "BALANCED", performance: "PERFORMANCE" })
+    readonly property var workspaceStyleLabels: ({ slide: "SLIDE", slidefade: "FADE", slidevert: "VERT", slidefadevert: "VERT FADE" })
 
-    function profileLabel(id) {
-        for (let i = 0; i < profiles.length; i++)
-            if (profiles[i].id === id) return profiles[i].label
-        return id.toUpperCase()
-    }
-    readonly property var effectsOptions: [
-        { id: "off",      label: "OFF" },
-        { id: "moderate", label: "MODERATE" },
-        { id: "high",     label: "HIGH" }
-    ]
-
-    readonly property var layoutOptions: [
-        { id: "dwindle", label: "DWINDLE" },
-        { id: "scrolling", label: "SCROLLING" },
-        { id: "master",  label: "MASTER" }
-    ]
-
-    readonly property var borderStyleOptions: [
-        { id: "full",   label: "FULL" },
-        { id: "corner", label: "CORNER" }
-    ]
-
-    readonly property var workspaceStyleOptions: [
-        { id: "slide",         label: "SLIDE" },
-        { id: "slidefade",     label: "FADE" },
-        { id: "slidevert",     label: "VERT" },
-        { id: "slidefadevert", label: "VERT FADE" }
-    ]
+    // Profiles the system can't provide are shown dimmed instead of hidden
+    readonly property var unavailableProfiles: profileOptions.filter(p => availableProfiles.indexOf(p) < 0)
 
     // ------------------------------------------------------------------
     // Lua generation
@@ -256,8 +226,7 @@ Item {
         saveTimer.restart()
     }
 
-    // Background opacity affects the blur threshold cap; border opacity and the
-    // palette colours feed directly into the Hyprland border colours.
+    // Background opacity affects the blur threshold cap.
     Connections {
         target: Theme
         function onBgAlphaChanged() {
@@ -380,7 +349,6 @@ Item {
                     if (saved.look[k] !== undefined && typeof saved.look[k] === typeof n[k])
                         n[k] = saved.look[k]
                 }
-                // (the old two-value layout check that reset "scrolling" to dwindle was removed)
                 if (["dwindle", "scrolling", "master"].indexOf(n.layout) === -1) n.layout = lookDefaults.layout
                 if (["slide", "slidefade", "slidevert", "slidefadevert"].indexOf(n.workspaceStyle) === -1)
                     n.workspaceStyle = lookDefaults.workspaceStyle
@@ -409,6 +377,7 @@ Item {
     }
 
     function setLook(key, value) {
+        if (look[key] === value) return
         const n = Object.assign({}, look)
         n[key] = value
         look = n
@@ -449,8 +418,40 @@ Item {
     Timer { id: saveTimer; interval: 300; onTriggered: page.persist() }
 
     // ------------------------------------------------------------------
-    // Reusable inline components
+    // Quick jump (section chips at the top of the page)
     // ------------------------------------------------------------------
+
+    NumberAnimation {
+        id: jumpAnim
+        target: flick
+        property: "contentY"
+        duration: 220
+        easing.type: Easing.OutCubic
+    }
+
+    function jumpTo(item) {
+        if (!item) return
+        jumpAnim.stop()
+        jumpAnim.from = flick.contentY
+        jumpAnim.to = Math.max(0, Math.min(item.y, flick.contentHeight - flick.height))
+        jumpAnim.start()
+    }
+
+    // ------------------------------------------------------------------
+    // Reusable inline components (same pattern as BarPage)
+    //
+    // Controls size themselves from their parent: inside a `Cols` grid they
+    // take one cell (parent.cellWidth), anywhere else they take the full width.
+    // ------------------------------------------------------------------
+
+    component Cols: Grid {
+        property int cols: 2
+        readonly property real cellWidth: Math.floor((width - (cols - 1) * columnSpacing) / cols)
+        width: parent.width
+        columns: cols
+        columnSpacing: 12
+        rowSpacing: 6
+    }
 
     component SectionTitle: Text {
         color: Theme.text
@@ -458,23 +459,36 @@ Item {
     }
 
     component GroupLabel: Text {
-        color: Theme.text
+        color: Theme.accent2
         font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeGroup; font.bold: true; font.letterSpacing: 1
+    }
+
+    component Note: Text {
+        width: parent.width
+        wrapMode: Text.WordWrap
+        color: Theme.textDim
+        font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeSmall
+    }
+
+    component Divider: Rectangle {
+        width: parent.width; height: 1
+        color: Theme.border
+        opacity: 0.5
     }
 
     component Card: Rectangle {
         id: card
         default property alias contentData: cardColumn.data
         width: parent.width
-        height: cardColumn.implicitHeight + 28
+        height: cardColumn.implicitHeight + 20
         radius: Theme.radius
         color: "#00000000"; border.width: 1; border.color: Theme.border
 
         Column {
             id: cardColumn
-            x: 14; y: 14
-            width: parent.width - 28
-            spacing: 16
+            x: 10; y: 10
+            width: parent.width - 20
+            spacing: 8
         }
     }
 
@@ -484,7 +498,7 @@ Item {
         property bool current: false
         property bool buttonEnabled: true
         signal clicked()
-        height: 28; radius: Theme.radius
+        height: 26; radius: Theme.radius
         opacity: buttonEnabled ? 1.0 : 0.35
         color: current ? Theme.alpha(Theme.accent, 0.10) : (sbMouse.containsMouse ? Theme.alpha(Theme.accent, 0.08) : "#00000000")
         border.width: 1
@@ -492,8 +506,11 @@ Item {
 
         Text {
             anchors.centerIn: parent
+            width: Math.min(implicitWidth, sb.width - 8)
+            horizontalAlignment: Text.AlignHCenter
+            elide: Text.ElideRight
             text: sb.label
-            color: sb.current ? Theme.accentSolid : Theme.text
+            color: sb.current ? Theme.accent : Theme.text
             font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody; font.bold: true; font.letterSpacing: 1
         }
 
@@ -506,141 +523,198 @@ Item {
         }
     }
 
-    component OptionRow: Row {
-        id: optRow
-        property var options: []
-        property string currentId: ""
-        signal picked(string id)
-        width: parent.width; spacing: 8
+    // Section chip: sized to its text, scrolls the page to `target`.
+    component NavChip: SmallButton {
+        property Item target: null
+        width: Math.ceil(navMetrics.advanceWidth) + 20
+        height: 22
 
-        Repeater {
-            model: optRow.options
-
-            delegate: SmallButton {
-                required property var modelData
-                width: (optRow.width - optRow.spacing * (optRow.options.length - 1)) / optRow.options.length
-                label: modelData.label
-                current: optRow.currentId === modelData.id
-                onClicked: optRow.picked(modelData.id)
-            }
+        TextMetrics {
+            id: navMetrics
+            text: label
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.textSizeBody
+            font.bold: true
+            font.letterSpacing: 1
         }
+
+        onClicked: page.jumpTo(target)
     }
 
-    component Stepper: Item {
-        id: st
-        property string label: ""
-        property real value: 0
-        property real from: 0
-        property real to: 100
-        property real step: 1
-        property int decimals: 0
-        property string suffix: ""
-        signal moved(real v)
-
-        width: parent.width; height: 28
-
-        function nudge(delta) {
-            const v = Math.max(from, Math.min(to, value + delta))
-            moved(Number(v.toFixed(Math.max(decimals, 2))))
-        }
-
-        Text {
-            anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
-            text: st.label
-            color: Theme.textDim
-            font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody; font.letterSpacing: 1
-        }
-
-        Row {
-            anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-            spacing: 8
-
-            SmallButton {
-                width: 28; label: "−"
-                buttonEnabled: st.value > st.from
-                onClicked: st.nudge(-st.step)
-            }
-
-            Text {
-                width: 54
-                anchors.verticalCenter: parent.verticalCenter
-                horizontalAlignment: Text.AlignHCenter
-                text: st.value.toFixed(st.decimals) + st.suffix
-                color: Theme.text
-                font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeGroup
-            }
-
-            SmallButton {
-                width: 28; label: "+"
-                buttonEnabled: st.value < st.to
-                onClicked: st.nudge(st.step)
-            }
-        }
-    }
-
+    // On/off switch as a single button: filled dot + highlight = on.
     component ToggleRow: Item {
         id: tg
         property string label: ""
         property bool checked: false
         signal toggled(bool v)
 
-        width: parent.width; height: 28
-
-        Text {
-            anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
-            text: tg.label
-            color: Theme.textDim
-            font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody; font.letterSpacing: 1
-        }
+        width: parent.cellWidth ?? parent.width
+        height: 26
+        opacity: enabled ? 1.0 : 0.4
 
         SmallButton {
-            anchors.right: parent.right
-            width: 72
-            label: tg.checked ? "ON" : "OFF"
+            width: tg.width; height: tg.height
+            label: (tg.checked ? "● " : "○ ") + tg.label
             current: tg.checked
+            buttonEnabled: tg.enabled
             onClicked: tg.toggled(!tg.checked)
         }
     }
 
-    // Percent slider (0..1) used by the BACKGROUND IMAGE card.
-    // moved = live preview while dragging, committed = release (persist).
-    component PctSlider: Row {
-        id: ps
+    // Label + value on one line, drag track right below.
+    //   moved     = live value while dragging (only emitted when the value actually changes)
+    //   committed = emitted once on release, with the final value (use to persist)
+    component BarSlider: Item {
+        id: sl
         property string label: ""
+        property real from: 0
+        property real to: 1
+        property real step: 1
         property real value: 0
+        property string unit: ""
+        property real displayScale: 1
+        property int decimals: 0
+        property bool dragging: false
         signal moved(real v)
         signal committed(real v)
 
-        width: parent.width; spacing: 8
+        readonly property real ratio: to > from ? Math.max(0, Math.min(1, (value - from) / (to - from))) : 0
+
+        width: parent.cellWidth ?? parent.width
+        height: 34
+        opacity: enabled ? 1.0 : 0.4
 
         Text {
-            width: page.labelWidth
-            anchors.verticalCenter: parent.verticalCenter
-            text: ps.label; color: Theme.text
-            font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
-        }
-
-        Slider {
-            width: parent.width - page.labelWidth - 52 - 16
-            anchors.verticalCenter: parent.verticalCenter
-            label: ""; icon: ""
-            value: ps.value
-            onMoved: value => ps.moved(page.clamp01(value))
-            onCommitted: value => ps.committed(page.round2(page.clamp01(value)))
+            anchors.left: parent.left; anchors.right: valueText.left; anchors.rightMargin: 6
+            y: 0
+            elide: Text.ElideRight
+            text: sl.label
+            color: Theme.textDim
+            font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody; font.letterSpacing: 1
         }
 
         Text {
-            width: 52
-            anchors.verticalCenter: parent.verticalCenter
-            horizontalAlignment: Text.AlignRight
-            text: Math.round(ps.value * 100) + "%"
-            color: Theme.text
-            font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
+            id: valueText
+            anchors.right: parent.right; y: 0
+            text: (sl.value * sl.displayScale).toFixed(sl.decimals) + sl.unit
+            color: Theme.accent2
+            font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeSmall
+        }
+
+        Rectangle {
+            id: track
+            anchors.left: parent.left; anchors.right: parent.right
+            y: 24; height: 4; radius: 2
+            color: Theme.border
+
+            Rectangle {
+                width: knob.x + knob.width / 2
+                height: parent.height; radius: 2
+                color: Theme.accent
+            }
+            Rectangle {
+                id: knob
+                width: 12; height: 12; radius: 6
+                anchors.verticalCenter: parent.verticalCenter
+                x: sl.ratio * (track.width - width)
+                color: Theme.accent
+            }
+        }
+
+        MouseArea {
+            anchors.left: parent.left; anchors.right: parent.right
+            y: 14; height: 20
+            hoverEnabled: true
+            preventStealing: true      // keep the page from scrolling while dragging
+            enabled: sl.enabled
+            cursorShape: Qt.PointingHandCursor
+
+            function apply(mx) {
+                const usable = track.width - knob.width
+                if (usable <= 0) return
+                const r = Math.max(0, Math.min(1, (mx - knob.width / 2) / usable))
+                const raw = sl.from + r * (sl.to - sl.from)
+                const v = sl.step > 0 ? +(Math.round(raw / sl.step) * sl.step).toFixed(4) : raw
+                if (v !== sl.value) sl.moved(v)
+            }
+            onPressed: m => { sl.dragging = true; apply(m.x) }
+            onPositionChanged: m => { if (pressed) apply(m.x) }
+            onReleased: { if (sl.dragging) { sl.dragging = false; sl.committed(sl.value) } }
+            onCanceled: sl.dragging = false
+        }
+    }
+
+    // Label on top, one button per option side by side (wraps after `maxCols`).
+    component BarChoice: Item {
+        id: ch
+        property string label: ""
+        property var options: []
+        property string current: ""
+        property int maxCols: 4
+        property var labels: ({})          // optional id → display text (default: id in upper case)
+        property var disabledOptions: []   // ids shown dimmed and not clickable
+        signal picked(string v)
+
+        readonly property int cols: Math.max(1, Math.min(options.length, maxCols))
+
+        width: parent.cellWidth ?? parent.width
+        height: lbl.implicitHeight + 3 + flow.implicitHeight
+        opacity: enabled ? 1.0 : 0.4
+
+        Text {
+            id: lbl
+            text: ch.label
+            color: Theme.textDim
+            font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody; font.letterSpacing: 1
+        }
+
+        Flow {
+            id: flow
+            y: lbl.implicitHeight + 3
+            width: parent.width
+            spacing: 6
+
+            Repeater {
+                model: ch.options
+                delegate: SmallButton {
+                    required property string modelData
+                    width: Math.floor((ch.width - (ch.cols - 1) * 6) / ch.cols)
+                    label: ch.labels[modelData] ?? modelData.toUpperCase()
+                    current: modelData === ch.current
+                    buttonEnabled: ch.enabled && ch.disabledOptions.indexOf(modelData) < 0
+                    onClicked: ch.picked(modelData)
+                }
+            }
+        }
+    }
+
+    // Header row of a section: title on the left, optional action button on the right.
+    component SectionHeader: Item {
+        id: sh
+        property string title: ""
+        property string actionLabel: ""
+        signal action()
+        width: parent.width
+        height: 22
+
+        SectionTitle {
+            anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
+            text: sh.title
+        }
+        SmallButton {
+            visible: sh.actionLabel !== ""
+            anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+            width: 80; height: 22
+            label: sh.actionLabel
+            onClicked: sh.action()
         }
     }
 
     // ------------------------------------------------------------------
     // UI
+    //
+    // Sections:
+    //   Performance · Windows & gaps · Blur & shadows · Animations · Hub · Background image
     // ------------------------------------------------------------------
 
     Flickable {
@@ -669,143 +743,142 @@ Item {
         Column {
             id: content
             width: flick.width
-            spacing: 14
+            spacing: 8
 
-            Text {
-                text: "APPEARANCE"; color: Theme.text
-                font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeTitle; font.letterSpacing: 3
+            // ---------------- TITLE + QUICK JUMP ----------------
+            Item {
+                width: parent.width; height: 26
+
+                Text {
+                    anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
+                    text: "APPEARANCE"; color: Theme.text
+                    font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeTitle; font.letterSpacing: 3
+                }
             }
 
             Rectangle { width: parent.width; height: 1; color: Theme.border }
 
             // ---------------- PERFORMANCE ----------------
             Column {
-                width: parent.width; spacing: 10
-                topPadding: 6
+                id: secPerf
+                width: parent.width; spacing: 6
+                topPadding: 2
 
                 SectionTitle { text: "PERFORMANCE" }
 
                 Card {
-                    Column {
-                        width: parent.width; spacing: 8
-
-                        Row {
-                            spacing: 10
-                            GroupLabel { text: "ANIMATIONS" }
-                        }
-
-                        OptionRow {
+                    Cols {
+                        BarChoice {
+                            label: "ANIMATIONS"
                             options: page.animationOptions
-                            currentId: page.animationMode
-                            onPicked: id => page.setAnimationMode(id)
+                            current: page.animationMode
+                            onPicked: v => page.setAnimationMode(v)
                         }
-                    }
-                    Column {
-                        width: parent.width; spacing: 8
-
-                        GroupLabel { text: "BLUR & SHADOWS" }
-
-                        OptionRow {
+                        BarChoice {
+                            label: "BLUR & SHADOWS"
                             options: page.effectsOptions
-                            currentId: page.effectsLevel
-                            onPicked: id => page.setEffectsLevel(id)
+                            current: page.effectsLevel
+                            onPicked: v => page.setEffectsLevel(v)
                         }
                     }
-                    Column {
-                        width: parent.width; spacing: 8
 
-                        Row {
-                            spacing: 10
-                            GroupLabel { text: "POWER PROFILE" }
-                        }
-
-                        Row {
-                            id: profRow
-                            width: parent.width; spacing: 8
-
-                            Repeater {
-                                model: page.profiles
-
-                                delegate: SmallButton {
-                                    required property var modelData
-                                    width: (profRow.width - profRow.spacing * (page.profiles.length - 1)) / page.profiles.length
-                                    label: modelData.label
-                                    current: page.currentProfile === modelData.id
-                                    buttonEnabled: page.availableProfiles.indexOf(modelData.id) !== -1
-                                    onClicked: page.setProfile(modelData.id)
-                                }
-                            }
-                        }
+                    BarChoice {
+                        label: "POWER PROFILE"
+                        options: page.profileOptions
+                        labels: page.profileLabels
+                        disabledOptions: page.unavailableProfiles
+                        current: page.currentProfile
+                        onPicked: v => page.setProfile(v)
                     }
                 }
             }
-            // ---------------- LOOK & FEEL ----------------
+
+            // ---------------- WINDOWS & GAPS ----------------
             Column {
-                width: parent.width; spacing: 10
-                topPadding: 6
-                bottomPadding: 6
+                id: secWindows
+                width: parent.width; spacing: 6
+                topPadding: 2
 
-                Item {
-                    width: parent.width; height: 24
-
-                    SectionTitle {
-                        anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
-                        text: "LOOK & FEEL"
-                    }
-
-                    SmallButton {
-                        anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-                        width: 90; height: 24
-                        label: "RESET"
-                        onClicked: page.resetLook()
-                    }
+                SectionHeader {
+                    title: "WINDOWS & GAPS"
+                    actionLabel: "RESET"
+                    onAction: page.resetLook()
                 }
 
-                // ---- Gaps ----
                 Card {
-                    Column {
-                        width: parent.width; spacing: 8
-
-                        GroupLabel { text: "GAPS" }
-
-                        Stepper {
-                            label: "INNER"; value: page.look.gapsIn; from: 0; to: 40
+                    GroupLabel { text: "GAPS" }
+                    Cols {
+                        BarSlider {
+                            label: "INNER"
+                            from: 0; to: 40; step: 1; unit: " px"
+                            value: page.look.gapsIn
                             onMoved: v => page.setLook("gapsIn", v)
                         }
-                        Stepper {
-                            label: "OUTER TOP"; value: page.look.gapsTop; from: 0; to: 60
+                        BarSlider {
+                            label: "OUTER TOP"
+                            from: 0; to: 60; step: 1; unit: " px"
+                            value: page.look.gapsTop
                             onMoved: v => page.setLook("gapsTop", v)
                         }
-                        Stepper {
-                            label: "OUTER RIGHT"; value: page.look.gapsRight; from: 0; to: 60
+                        BarSlider {
+                            label: "OUTER RIGHT"
+                            from: 0; to: 60; step: 1; unit: " px"
+                            value: page.look.gapsRight
                             onMoved: v => page.setLook("gapsRight", v)
                         }
-                        Stepper {
-                            label: "OUTER BOTTOM"; value: page.look.gapsBottom; from: 0; to: 60
+                        BarSlider {
+                            label: "OUTER BOTTOM"
+                            from: 0; to: 60; step: 1; unit: " px"
+                            value: page.look.gapsBottom
                             onMoved: v => page.setLook("gapsBottom", v)
                         }
-                        Stepper {
-                            label: "OUTER LEFT"; value: page.look.gapsLeft; from: 0; to: 60
+                        BarSlider {
+                            label: "OUTER LEFT"
+                            from: 0; to: 60; step: 1; unit: " px"
+                            value: page.look.gapsLeft
                             onMoved: v => page.setLook("gapsLeft", v)
                         }
                     }
-                }
 
-                // ---- Windows ----
-                Card {
-                    Column {
-                        width: parent.width; spacing: 8
+                    Divider {}
 
-                        GroupLabel { text: "WINDOWS" }
-
-                        Stepper {
-                            label: "BORDER SIZE"; value: page.look.borderSize; from: 0; to: 8
+                    GroupLabel { text: "WINDOWS" }
+                    Cols {
+                        BarSlider {
+                            label: "BORDER SIZE"
+                            from: 0; to: 8; step: 1; unit: " px"
+                            value: page.look.borderSize
                             onMoved: v => page.setLook("borderSize", v)
                         }
-                        Stepper {
-                            label: "ROUNDING"; value: page.look.rounding; from: 0; to: 30
+                        BarSlider {
+                            label: "ROUNDING"
+                            from: 0; to: 30; step: 1; unit: " px"
+                            value: page.look.rounding
                             onMoved: v => page.setLook("rounding", v)
                         }
+                        BarSlider {
+                            label: "ACCENT COLOR OPACITY"
+                            from: page.borderOpacityMin; to: page.borderOpacityMax; step: 0.05
+                            unit: "%"; displayScale: 100
+                            value: Theme.borderOpacity
+                            onMoved: v => Theme.borderOpacity = v
+                            onCommitted: v => Theme.setHub("borderOpacity", page.round2(v))
+                        }
+                        BarChoice {
+                            label: "BORDER STYLE"
+                            enabled: page.look.borderSize > 0
+                            options: page.borderStyleOptions
+                            current: Theme.hyprBorderStyle
+                            onPicked: v => Theme.setHub("hyprBorderStyle", v)
+                        }
+                    }
+                    Note {
+                        visible: page.look.borderSize === 0
+                        text: "Set BORDER SIZE above 0 to see the border style and accent opacity."
+                    }
+
+                    Cols {
+                        cols: 3
                         ToggleRow {
                             label: "RESIZE ON BORDER"; checked: page.look.resizeOnBorder
                             onToggled: v => page.setLook("resizeOnBorder", v)
@@ -815,394 +888,281 @@ Item {
                             onToggled: v => page.setLook("allowTearing", v)
                         }
                         ToggleRow {
-                            label: "EXPAND UNDERSIZED TEXTURES"; checked: page.look.expandUndersized
+                            label: "EXPAND TEXTURES"; checked: page.look.expandUndersized
                             onToggled: v => page.setLook("expandUndersized", v)
                         }
                     }
 
-                    Column {
-                        width: parent.width; spacing: 8
-
-                        GroupLabel { text: "LAYOUT" }
-
-                        OptionRow {
-                            options: page.layoutOptions
-                            currentId: page.look.layout
-                            onPicked: id => page.setLook("layout", id)
-                        }
+                    BarChoice {
+                        label: "LAYOUT"
+                        options: page.layoutOptions
+                        current: page.look.layout
+                        onPicked: v => page.setLook("layout", v)
                     }
                 }
+            }
 
-                // ---- Borders (style + global opacity) ----
-                Card {
-                    Column {
-                        width: parent.width; spacing: 8
-
-                        Row {
-                            spacing: 10
-                            GroupLabel { text: "BORDER STYLE" }
-                            Text {
-                                anchors.verticalCenter: parent.verticalCenter
-                                visible: page.look.borderSize === 0
-                                text: "SET BORDER SIZE > 0 TO SEE IT"
-                                color: Theme.textDim
-                                font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeSmall
-                            }
-                        }
-
-                        OptionRow {
-                            options: page.borderStyleOptions
-                            currentId: Theme.hyprBorderStyle
-                            onPicked: id => Theme.setHub("hyprBorderStyle", id)
-                        }
-                    }
-
-                    // ---- global border opacity (Hyprland borders + Theme.accent) ----
-                    Row {
-                        width: parent.width; spacing: 8
-
-                        Text {
-                            width: page.labelWidth
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: "ACCENT COLOR OPACITY"; color: Theme.text
-                            font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
-                        }
-
-                        Slider {
-                            width: parent.width - page.labelWidth - 52 - 16
-                            anchors.verticalCenter: parent.verticalCenter
-                            label: ""; icon: ""
-                            value: page.clamp01((Theme.borderOpacity - page.borderOpacityMin) / (page.borderOpacityMax - page.borderOpacityMin))
-                            onMoved: value => Theme.borderOpacity = page.borderOpacityMin + page.clamp01(value) * (page.borderOpacityMax - page.borderOpacityMin)
-                            onCommitted: value => Theme.setHub("borderOpacity", page.round2(page.borderOpacityMin + page.clamp01(value) * (page.borderOpacityMax - page.borderOpacityMin)))
-                        }
-
-                        Text {
-                            width: 52
-                            anchors.verticalCenter: parent.verticalCenter
-                            horizontalAlignment: Text.AlignRight
-                            text: Math.round(Theme.borderOpacity * 100) + "%"
-                            color: Theme.text
-                            font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
-                        }
-                    }
-                }
-            // ---------------- HUB ----------------
+            // ---------------- BLUR & SHADOWS ----------------
             Column {
-                width: parent.width; spacing: 10
-                topPadding: 6
+                id: secBlur
+                width: parent.width; spacing: 6
+                topPadding: 2
 
-                Item {
-                    width: parent.width;
-                    height: 24
-                    y: -6
-                    SectionTitle {
-                        anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
-                        text: "HUB"
-                    }
+                SectionTitle { text: "BLUR & SHADOWS" }
 
-                    SmallButton {
-                        anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-                        width: 90; height: 24
-                        label: "RESET"
-                        onClicked: Theme.resetHub()
-                    }
+                Note {
+                    visible: page.effectsLevel === "off"
+                    text: "Blur and shadows are switched off in PERFORMANCE; these options apply once they are on."
                 }
 
                 Card {
-                    Column {
-                        width: parent.width; spacing: 6
-                        ToggleRow {
-                            label: "SYNC OPACITY SCRIPT"; checked: page.qsOpacityFollow
-                            onToggled: v => page.setQsOpacityFollow(v)
+                    Cols {
+                        enabled: page.effectsLevel !== "off"
+
+                        BarSlider {
+                            label: "BLUR SIZE"
+                            from: 1; to: 20; step: 1
+                            value: page.look.blurSize
+                            onMoved: v => page.setLook("blurSize", v)
                         }
+                        BarSlider {
+                            label: "BLUR PASSES"
+                            from: 1; to: 6; step: 1
+                            value: page.look.blurPasses
+                            onMoved: v => page.setLook("blurPasses", v)
+                        }
+                        BarSlider {
+                            label: "VIBRANCY"
+                            from: 0; to: 1; step: 0.05; decimals: 2
+                            value: page.look.blurVibrancy
+                            onMoved: v => page.setLook("blurVibrancy", v)
+                        }
+                        BarSlider {
+                            label: "SHADOW RANGE"
+                            from: 0; to: 50; step: 1
+                            value: page.look.shadowRange
+                            onMoved: v => page.setLook("shadowRange", v)
+                        }
+                        BarSlider {
+                            label: "SHADOW POWER"
+                            from: 1; to: 4; step: 1
+                            value: page.look.shadowPower
+                            onMoved: v => page.setLook("shadowPower", v)
+                        }
+                    }
+
+                    Divider {}
+
+                    Cols {
+                        enabled: page.effectsLevel !== "off"
+
                         ToggleRow {
                             label: "BLUR PANELS"; checked: page.look.blurLayers
                             onToggled: v => page.setLook("blurLayers", v)
                         }
-                        Stepper {
-                            label: "PANEL BLUR THRESHOLD"; value: page.effectiveBlurAlpha
+                        BarSlider {
+                            label: "PANEL BLUR THRESHOLD"
+                            enabled: page.look.blurLayers
                             from: 0; to: page.blurAlphaCap; step: 0.05; decimals: 2
+                            value: page.effectiveBlurAlpha
                             onMoved: v => page.setLook("blurLayerAlpha", v)
-                        }
-                        // ---- background opacity ----
-                        Row {
-                            width: parent.width; spacing: 8
-
-                            Text {
-                                width: page.labelWidth
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: "BACKGROUND OPACITY"; color: Theme.text
-                                font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
-                            }
-
-                            Slider {
-                                width: parent.width - page.labelWidth - 52 - 16
-                                anchors.verticalCenter: parent.verticalCenter
-                                label: ""; icon: ""
-                                value: page.clamp01((Theme.bgAlpha - page.opacityMin) / (page.opacityMax - page.opacityMin))
-                                onMoved: value => Theme.bgAlpha = page.opacityMin + page.clamp01(value) * (page.opacityMax - page.opacityMin)
-                                onCommitted: value => Theme.setHub("bgAlpha", page.round2(page.opacityMin + page.clamp01(value) * (page.opacityMax - page.opacityMin)))
-                            }
-
-                            Text {
-                                width: 52
-                                anchors.verticalCenter: parent.verticalCenter
-                                horizontalAlignment: Text.AlignRight
-                                text: Math.round(Theme.bgAlpha * 100) + "%"
-                                color: Theme.text
-                                font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
-                            }
-                        }
-
-                        // ---- corner radius ----
-                        Row {
-                            width: parent.width; spacing: 8
-
-                            Text {
-                                width: page.labelWidth
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: "CORNER RADIUS"; color: Theme.text
-                                font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
-                            }
-
-                            Slider {
-                                width: parent.width - page.labelWidth - 52 - 16
-                                anchors.verticalCenter: parent.verticalCenter
-                                label: ""; icon: ""
-                                value: page.clamp01((Theme.radius - page.radiusMin) / (page.radiusMax - page.radiusMin))
-                                onMoved: value => Theme.radius = Math.round(page.radiusMin + page.clamp01(value) * (page.radiusMax - page.radiusMin))
-                                onCommitted: value => Theme.setHub("radius", Math.round(page.radiusMin + page.clamp01(value) * (page.radiusMax - page.radiusMin)))
-                            }
-
-                            Text {
-                                width: 52
-                                anchors.verticalCenter: parent.verticalCenter
-                                horizontalAlignment: Text.AlignRight
-                                text: Math.round(Theme.radius) + "px"
-                                color: Theme.text
-                                font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
-                            }
-                        }
-
-                        // ---- tilt strength ----
-                        Row {
-                            width: parent.width; spacing: 8
-
-                            Text {
-                                width: page.labelWidth
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: "TILT STRENGTH"; color: Theme.text
-                                font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
-                            }
-
-                            Slider {
-                                width: parent.width - page.labelWidth - 52 - 16
-                                anchors.verticalCenter: parent.verticalCenter
-                                label: ""; icon: ""
-                                value: page.clamp01((Theme.tiltStrength - page.tiltMin) / (page.tiltMax - page.tiltMin))
-                                onMoved: value => Theme.tiltStrength = page.tiltMin + page.clamp01(value) * (page.tiltMax - page.tiltMin)
-                                onCommitted: value => Theme.setHub("tiltStrength", page.round2(page.tiltMin + page.clamp01(value) * (page.tiltMax - page.tiltMin)))
-                            }
-
-                            Text {
-                                width: 52
-                                anchors.verticalCenter: parent.verticalCenter
-                                horizontalAlignment: Text.AlignRight
-                                text: Theme.tiltStrength.toFixed(1)
-                                color: Theme.text
-                                font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
-                            }
-                        }
-
-                        // ---- window scale ----
-                        Row {
-                            width: parent.width; spacing: 8
-
-                            Text {
-                                width: page.labelWidth
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: "WINDOW SCALE"; color: Theme.text
-                                font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
-                            }
-
-                            Slider {
-                                width: parent.width - page.labelWidth - 52 - 16
-                                anchors.verticalCenter: parent.verticalCenter
-                                label: ""; icon: ""
-                                value: page.clamp01((Theme.settingsScale - page.scaleMin) / (page.scaleMax - page.scaleMin))
-                                onMoved: value => Theme.settingsScale = page.round2(page.scaleMin + page.clamp01(value) * (page.scaleMax - page.scaleMin))
-                                onCommitted: value => Theme.setHub("settingsScale", page.round2(page.scaleMin + page.clamp01(value) * (page.scaleMax - page.scaleMin)))
-                            }
-
-                            Text {
-                                width: 52
-                                anchors.verticalCenter: parent.verticalCenter
-                                horizontalAlignment: Text.AlignRight
-                                text: Math.round(Theme.settingsScale * 100) + "%"
-                                color: Theme.text
-                                font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
-                            }
-                        }
-                    }
-                }
-
-                // ---- Background picture ----
-                Card {
-                    Column {
-                        width: parent.width; spacing: 8
-
-                        Row {
-                            spacing: 10
-                            GroupLabel { text: "BACKGROUND IMAGE" }
-                            Text {
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: "LOWER BACKGROUND OPACITY TO SEE IT"
-                                color: Theme.textDim
-                                font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeSmall
-                            }
-                        }
-
-                        ToggleRow {
-                            label: "USE PICTURE"; checked: Theme.bgImageEnabled
-                            onToggled: v => Theme.setHub("bgImageEnabled", v)
-                        }
-
-                        Row {
-                            width: parent.width; spacing: 8
-
-                            Rectangle {
-                                width: parent.width - parent.spacing - browseBtn.width
-                                height: 28; radius: Theme.radius
-                                color: "#00000000"; clip: true
-                                border.width: 1
-                                border.color: pathInput.activeFocus ? Theme.accent : Theme.border
-
-                                TextInput {
-                                    id: pathInput
-                                    anchors.fill: parent; anchors.leftMargin: 8; anchors.rightMargin: 8
-                                    verticalAlignment: TextInput.AlignVCenter
-                                    clip: true; selectByMouse: true
-                                    text: Theme.bgImagePath
-                                    color: Theme.text
-                                    selectionColor: Theme.accent
-                                    font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
-                                    onEditingFinished: Theme.setHub("bgImagePath", page.cleanPath(text))
-                                }
-
-                                Text {
-                                    anchors.fill: parent; anchors.leftMargin: 8
-                                    verticalAlignment: Text.AlignVCenter
-                                    visible: pathInput.text === "" && !pathInput.activeFocus
-                                    text: "/path/to/picture.jpg"
-                                    color: Theme.textFaint
-                                    font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
-                                }
-                            }
-
-                            SmallButton {
-                                id: browseBtn
-                                width: 90
-                                label: "BROWSE"
-                                onClicked: page.pickImage()
-                            }
-                        }
-
-                        PctSlider {
-                            label: "IMAGE OPACITY"; value: Theme.bgImageOpacity
-                            onMoved: v => Theme.bgImageOpacity = v
-                            onCommitted: v => Theme.setHub("bgImageOpacity", v)
-                        }
-                        PctSlider {
-                            label: "IMAGE BLUR"; value: Theme.bgImageBlur
-                            onMoved: v => Theme.bgImageBlur = v
-                            onCommitted: v => Theme.setHub("bgImageBlur", v)
-                        }
-                        PctSlider {
-                            label: "FADE: TOP OPACITY"; value: Theme.bgImageFadeTop
-                            onMoved: v => Theme.bgImageFadeTop = v
-                            onCommitted: v => Theme.setHub("bgImageFadeTop", v)
-                        }
-                        PctSlider {
-                            label: "FADE: BOTTOM OPACITY"; value: Theme.bgImageFadeBottom
-                            onMoved: v => Theme.bgImageFadeBottom = v
-                            onCommitted: v => Theme.setHub("bgImageFadeBottom", v)
                         }
                     }
                 }
             }
-            // ---- Blur & Shadow ----
+
+            // ---------------- ANIMATIONS ----------------
+            Column {
+                id: secAnim
+                width: parent.width; spacing: 6
+                topPadding: 2
+
+                SectionTitle { text: "ANIMATIONS & SPEED" }
+
                 Card {
-                    Column {
-                        width: parent.width; spacing: 8
-
-                        GroupLabel { text: "BLUR" }
-
-                        Stepper {
-                            label: "SIZE"; value: page.look.blurSize; from: 1; to: 20
-                            onMoved: v => page.setLook("blurSize", v)
-                        }
-                        Stepper {
-                            label: "PASSES"; value: page.look.blurPasses; from: 1; to: 6
-                            onMoved: v => page.setLook("blurPasses", v)
-                        }
-                        Stepper {
-                            label: "VIBRANCY"; value: page.look.blurVibrancy; from: 0; to: 1
-                            step: 0.05; decimals: 2
-                            onMoved: v => page.setLook("blurVibrancy", v)
-                        }
-                    }
-
-                    Column {
-                        width: parent.width; spacing: 8
-
-                        GroupLabel { text: "SHADOW" }
-
-                        Stepper {
-                            label: "RANGE"; value: page.look.shadowRange; from: 0; to: 50
-                            onMoved: v => page.setLook("shadowRange", v)
-                        }
-                        Stepper {
-                            label: "RENDER POWER"; value: page.look.shadowPower; from: 1; to: 4
-                            onMoved: v => page.setLook("shadowPower", v)
-                        }
-                    }
-                }
-
-                // ---- Animations ----
-                Card {
-                    Column {
-                        width: parent.width; spacing: 8
-
-                        GroupLabel { text: "ANIMATION SPEED" }
-
-                        Stepper {
-                            label: "WINDOWS"; value: page.look.speedWindows; from: 1; to: 20
+                    Cols {
+                        BarSlider {
+                            label: "WINDOWS"
+                            from: 1; to: 20; step: 1
+                            value: page.look.speedWindows
                             onMoved: v => page.setLook("speedWindows", v)
                         }
-                        Stepper {
-                            label: "BORDER"; value: page.look.speedBorder; from: 1; to: 20
+                        BarSlider {
+                            label: "BORDER"
+                            from: 1; to: 20; step: 1
+                            value: page.look.speedBorder
                             onMoved: v => page.setLook("speedBorder", v)
                         }
-                        Stepper {
-                            label: "FADE"; value: page.look.speedFade; from: 1; to: 20
+                        BarSlider {
+                            label: "FADE"
+                            from: 1; to: 20; step: 1
+                            value: page.look.speedFade
                             onMoved: v => page.setLook("speedFade", v)
                         }
-                        Stepper {
-                            label: "WORKSPACES"; value: page.look.speedWorkspaces; from: 1; to: 20
+                        BarSlider {
+                            label: "WORKSPACES"
+                            from: 1; to: 20; step: 1
+                            value: page.look.speedWorkspaces
                             onMoved: v => page.setLook("speedWorkspaces", v)
                         }
                     }
 
-                    Column {
-                        width: parent.width; spacing: 8
+                    BarChoice {
+                        label: "WORKSPACE STYLE"
+                        options: page.workspaceStyleOptions
+                        labels: page.workspaceStyleLabels
+                        current: page.look.workspaceStyle
+                        onPicked: v => page.setLook("workspaceStyle", v)
+                    }
+                }
+            }
 
-                        GroupLabel { text: "WORKSPACE STYLE" }
+            // ---------------- HUB ----------------
+            Column {
+                id: secHub
+                width: parent.width; spacing: 6
+                topPadding: 2
 
-                        OptionRow {
-                            options: page.workspaceStyleOptions
-                            currentId: page.look.workspaceStyle
-                            onPicked: id => page.setLook("workspaceStyle", id)
+                SectionHeader {
+                    title: "HUB"
+                    actionLabel: "RESET"
+                    onAction: Theme.resetHub()
+                }
+
+                Card {
+                    Cols {
+                        BarSlider {
+                            label: "BACKGROUND OPACITY"
+                            from: page.opacityMin; to: page.opacityMax; step: 0.01
+                            unit: "%"; displayScale: 100
+                            value: Theme.bgAlpha
+                            onMoved: v => Theme.bgAlpha = v
+                            onCommitted: v => Theme.setHub("bgAlpha", page.round2(v))
+                        }
+                        BarSlider {
+                            label: "CORNER RADIUS"
+                            from: page.radiusMin; to: page.radiusMax; step: 1; unit: " px"
+                            value: Theme.radius
+                            onMoved: v => Theme.radius = Math.round(v)
+                            onCommitted: v => Theme.setHub("radius", Math.round(v))
+                        }
+                        BarSlider {
+                            label: "TILT STRENGTH"
+                            from: page.tiltMin; to: page.tiltMax; step: 0.1; decimals: 1
+                            value: Theme.tiltStrength
+                            onMoved: v => Theme.tiltStrength = v
+                            onCommitted: v => Theme.setHub("tiltStrength", page.round2(v))
+                        }
+                        BarSlider {
+                            label: "WINDOW SCALE"
+                            from: page.scaleMin; to: page.scaleMax; step: 0.05
+                            unit: "%"; displayScale: 100
+                            value: Theme.settingsScale
+                            onMoved: v => Theme.settingsScale = page.round2(v)
+                            onCommitted: v => Theme.setHub("settingsScale", page.round2(v))
+                        }
+                    }
+
+                    ToggleRow {
+                        label: "SYNC OPACITY SCRIPT"; checked: page.qsOpacityFollow
+                        onToggled: v => page.setQsOpacityFollow(v)
+                    }
+                }
+            }
+
+            // ---------------- BACKGROUND IMAGE ----------------
+            Column {
+                id: secImage
+                width: parent.width; spacing: 6
+                topPadding: 2
+                bottomPadding: 6
+
+                SectionTitle { text: "BACKGROUND IMAGE" }
+
+                Note {
+                    visible: Theme.bgAlpha > 0.9
+                    text: "Lower BACKGROUND OPACITY in HUB to see the picture."
+                }
+
+                Card {
+                    Row {
+                        width: parent.width; spacing: 6
+
+                        SmallButton {
+                            id: useBtn
+                            width: 110
+                            label: (Theme.bgImageEnabled ? "● " : "○ ") + "USE PICTURE"
+                            current: Theme.bgImageEnabled
+                            onClicked: Theme.setHub("bgImageEnabled", !Theme.bgImageEnabled)
+                        }
+
+                        Rectangle {
+                            width: parent.width - parent.spacing * 2 - useBtn.width - browseBtn.width
+                            height: 26; radius: Theme.radius
+                            color: "#00000000"; clip: true
+                            border.width: 1
+                            border.color: pathInput.activeFocus ? Theme.accent : Theme.border
+
+                            TextInput {
+                                id: pathInput
+                                anchors.fill: parent; anchors.leftMargin: 8; anchors.rightMargin: 8
+                                verticalAlignment: TextInput.AlignVCenter
+                                clip: true; selectByMouse: true
+                                text: Theme.bgImagePath
+                                color: Theme.text
+                                selectionColor: Theme.accent
+                                font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
+                                onEditingFinished: Theme.setHub("bgImagePath", page.cleanPath(text))
+                            }
+
+                            Text {
+                                anchors.fill: parent; anchors.leftMargin: 8
+                                verticalAlignment: Text.AlignVCenter
+                                visible: pathInput.text === "" && !pathInput.activeFocus
+                                text: "/path/to/picture.jpg"
+                                color: Theme.textFaint
+                                font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
+                            }
+                        }
+
+                        SmallButton {
+                            id: browseBtn
+                            width: 80
+                            label: "BROWSE"
+                            onClicked: page.pickImage()
+                        }
+                    }
+
+                    Cols {
+                        enabled: Theme.bgImageEnabled
+
+                        BarSlider {
+                            label: "IMAGE OPACITY"
+                            from: 0; to: 1; step: 0.01; unit: "%"; displayScale: 100
+                            value: Theme.bgImageOpacity
+                            onMoved: v => Theme.bgImageOpacity = v
+                            onCommitted: v => Theme.setHub("bgImageOpacity", page.round2(v))
+                        }
+                        BarSlider {
+                            label: "IMAGE BLUR"
+                            from: 0; to: 1; step: 0.01; unit: "%"; displayScale: 100
+                            value: Theme.bgImageBlur
+                            onMoved: v => Theme.bgImageBlur = v
+                            onCommitted: v => Theme.setHub("bgImageBlur", page.round2(v))
+                        }
+                        BarSlider {
+                            label: "FADE: TOP OPACITY"
+                            from: 0; to: 1; step: 0.01; unit: "%"; displayScale: 100
+                            value: Theme.bgImageFadeTop
+                            onMoved: v => Theme.bgImageFadeTop = v
+                            onCommitted: v => Theme.setHub("bgImageFadeTop", page.round2(v))
+                        }
+                        BarSlider {
+                            label: "FADE: BOTTOM OPACITY"
+                            from: 0; to: 1; step: 0.01; unit: "%"; displayScale: 100
+                            value: Theme.bgImageFadeBottom
+                            onMoved: v => Theme.bgImageFadeBottom = v
+                            onCommitted: v => Theme.setHub("bgImageFadeBottom", page.round2(v))
                         }
                     }
                 }

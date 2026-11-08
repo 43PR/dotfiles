@@ -37,7 +37,19 @@ Item {
     property var palOverrides: ({})     // preset id -> palette array, built from saved toml
     property bool hexTabbing: false     // true while focus is moving between hex fields
 
+    // ── New-theme (duplicate) state ───────────────────────────────────
+    property bool naming: false         // true while the name prompt is open
+    property string createMsg: ""       // error / status line under the prompt
+
+    // ── Delete state ──────────────────────────────────────────────────
+    property bool confirmDelete: false  // true after the first click on DELETE
+    // Only user-created themes can be deleted (never "default" or a built-in preset)
+    readonly property bool editIsCustom: page.editId !== ""
+                                         && page.editId !== "default"
+                                         && page.palettes[page.editId] === undefined
+
     ListModel { id: colorModel }        // roles: key, value, grp
+    ListModel { id: customModel }       // roles: tid  (user-created themes found on disk)
 
     // Order: bg, surface, fg, muted, accent, accent2
     readonly property var palettes: ({
@@ -70,12 +82,11 @@ Item {
         "solarized-light":  ["#fdf6e3", "#eee8d5", "#073642", "#657b83", "#268bd2", "#2aa198"],
         "gruvbox-light":    ["#fbf1c7", "#ebdbb2", "#3c3836", "#7c6f64", "#b57614", "#af3a03"]
     })
-
     function pal(id) {
-        var rev = page.palRev   // dependency so previews refresh after a save
+        var rev = page.palRev
         var c = palOverrides[id] || palettes[id] || palettes["default"]
-        return { bg: c[0], surface: c[1], fg: c[2], muted: c[3],
-                 accent: c[4], accent2: c[5] }
+        if (!c || c.length < 6) c = palettes["default"]
+        return { bg: c[0], surface: c[1], fg: c[2], muted: c[3], accent: c[4], accent2: c[5] }
     }
 
     function runTheme(themeCommand) {
@@ -134,8 +145,10 @@ Item {
     }
 
     // ── Theme file editing ────────────────────────────────────────────
+    readonly property string themesDir: Quickshell.env("HOME") + "/.config/43pr/themes"
+
     function themePath(id) {
-        return Quickshell.env("HOME") + "/.config/43pr/themes/" + id + ".toml"
+        return page.themesDir + "/" + id + ".toml"
     }
 
     function groupOf(key) {
@@ -155,6 +168,7 @@ Item {
     function parseTheme(text) {
         colorModel.clear()
         var sec = ""
+        var lastGrp = ""
         var lines = text.split("\n")
         for (var i = 0; i < lines.length; i++) {
             var line = lines[i]
@@ -169,13 +183,43 @@ Item {
             if (sec !== "colors") continue
 
             var km = line.match(/^\s*([A-Za-z0-9_]+)\s*=\s*"(#[0-9a-fA-F]{6,8})"/)
-            if (km)
-                colorModel.append({ key: km[1], value: km[2].toLowerCase(), grp: groupOf(km[1]) })
+            if (km) {
+                var g = groupOf(km[1])
+                // a header entry starts each group so it can span the full width of the grid
+                if (g !== lastGrp) {
+                    colorModel.append({ key: "", value: "#000000", grp: g, hdr: true })
+                    lastGrp = g
+                }
+                colorModel.append({ key: km[1], value: km[2].toLowerCase(), grp: g, hdr: false })
+            }
         }
+    }
+
+    // [colors] table of a toml text -> { key: "#rrggbb", ... }
+    function colorsFromText(text) {
+        var v = {}
+        var sec = ""
+        var lines = text.split("\n")
+        for (var i = 0; i < lines.length; i++) {
+            var sm = lines[i].match(/^\s*\[([^\]]+)\]/)
+            if (sm) { sec = sm[1]; continue }
+            if (sec !== "colors") continue
+            var km = lines[i].match(/^\s*([A-Za-z0-9_]+)\s*=\s*"(#[0-9a-fA-F]{6,8})"/)
+            if (km) v[km[1]] = km[2].toLowerCase()
+        }
+        return v
+    }
+
+    // Preview palette array from a { key: hex } map. base = fallback palette.
+    function paletteFromValues(v, base) {
+        if (!v.bg) return null
+        return [v.bg, v.bg_track || base[1], v.fg || base[2], v.fg_faint || base[3],
+                v.accent || base[4], v.qs_accent2 || v.highlight || base[5]]
     }
 
     function openEditor(id) {
         page.loadError = ""
+        page.confirmDelete = false
         page.editId = id
         page.editing = true
         themeFile.path = ""
@@ -187,7 +231,61 @@ Item {
     function closeEditor() {
         page.editing = false
         page.loadError = ""
+        page.confirmDelete = false
         page.searchFocusReleased()
+    }
+
+    // ── Delete a custom theme (two-step: click, then confirm) ─────────
+    function requestDelete() {
+        if (!page.editIsCustom || deleter.running) return
+        if (!page.confirmDelete) {
+            page.confirmDelete = true
+            confirmTimer.restart()
+            return
+        }
+        confirmTimer.stop()
+        page.confirmDelete = false
+        deleter.delId = page.editId
+        // $1 = file path (no shell interpolation of the name)
+        deleter.command = [
+            "/bin/sh", "-c",
+            "rm -f -- \"$1\"",
+            "sh", page.themePath(page.editId)
+        ]
+        deleter.running = true
+    }
+
+    // the confirmation expires if you don't click again
+    Timer {
+        id: confirmTimer
+        interval: 3000
+        onTriggered: page.confirmDelete = false
+    }
+
+    Process {
+        id: deleter
+        property string delId: ""
+        onExited: (exitCode, exitStatus) => {
+            if (exitCode === 0) {
+                var o = page.palOverrides
+                delete o[delId]
+                page.palOverrides = o
+                page.palRev++
+
+                // if the deleted theme was the active one, fall back to the default theme
+                if (page.activeId === delId) {
+                    page.activeId = "default"
+                    page.runTheme("default")
+                }
+
+                page.editing = false
+                page.loadError = ""
+                page.scanThemes()
+                page.searchFocusReleased()
+            } else {
+                page.loadError = "Delete failed (exit code " + exitCode + ")."
+            }
+        }
     }
 
     function setColor(key, hex) {
@@ -214,8 +312,13 @@ Item {
     function focusHex(from, dir) {
         var n = colorRepeater.count
         if (n === 0) return
-        var i = ((from + dir) % n + n) % n          // wraps around at both ends
-        var item = colorRepeater.itemAt(i)
+        var i = from
+        var item = null
+        for (var s = 0; s < n; s++) {               // skip group-header entries
+            i = ((i + dir) % n + n) % n             // wraps around at both ends
+            var cand = colorRepeater.itemAt(i)
+            if (cand && !cand.hdr) { item = cand; break }
+        }
         if (!item) return
 
         // forceActiveFocus makes the old field emit editingFinished, which would
@@ -275,10 +378,8 @@ Item {
             var e = colorModel.get(i)
             v[e.key] = e.value
         }
-        if (!v.bg) return
-        var base = page.palettes[id] || page.palettes["default"]
-        var arr = [v.bg, v.bg_track || base[1], v.fg || base[2], v.fg_faint || base[3],
-                   v.accent || base[4], v.qs_accent2 || v.highlight || base[5]]
+        var arr = paletteFromValues(v, page.palettes[id] || page.palettes["default"])
+        if (!arr) return
         var o = page.palOverrides
         o[id] = arr
         page.palOverrides = o
@@ -314,6 +415,108 @@ Item {
         }
         onLoadFailed: page.loadError = "Could not read " + page.themePath(page.editId)
     }
+
+    // ── Custom themes: duplicate the active theme under a new name ────
+    function themeLabel(id) {
+        return id === "default" ? "MONOCHROME" : id.replace(/[-_]+/g, " ").toUpperCase()
+    }
+
+    function openNaming() {
+        page.createMsg = ""
+        page.naming = true
+        nameInput.text = ""
+        nameInput.forceActiveFocus()
+    }
+
+    function closeNaming() {
+        page.naming = false
+        page.createMsg = ""
+        page.searchFocusReleased()
+    }
+
+    function createTheme(rawName) {
+        if (copier.running) return
+        var id = rawName.trim().toLowerCase()
+                        .replace(/[^a-z0-9_-]+/g, "-")
+                        .replace(/^-+|-+$/g, "")
+        if (id === "") {
+            page.createMsg = "Enter a name (letters, numbers, - and _)."
+            return
+        }
+        if (id === "default" || page.palettes[id] !== undefined) {
+            page.createMsg = "\"" + id + "\" is a built-in theme name. Pick another."
+            return
+        }
+        copier.newId = id
+        // args after the script: $1 = source, $2 = destination (no shell interpolation of the name)
+        copier.command = [
+            "/bin/sh", "-c",
+            "[ -f \"$1\" ] || exit 3; [ -e \"$2\" ] && exit 2; cp -- \"$1\" \"$2\"",
+            "sh", page.themePath(page.activeId), page.themePath(id)
+        ]
+        copier.running = true
+    }
+
+    Process {
+        id: copier
+        property string newId: ""
+        onExited: (exitCode, exitStatus) => {
+            if (exitCode === 0) {
+                page.createMsg = ""
+                page.naming = false
+                page.scanThemes()
+                page.searchFocusReleased()
+            } else if (exitCode === 2) {
+                page.createMsg = "A theme named \"" + newId + "\" already exists."
+            } else if (exitCode === 3) {
+                page.createMsg = "No toml file found for \"" + page.activeId + "\" to copy."
+            } else {
+                page.createMsg = "Copy failed (exit code " + exitCode + ")."
+            }
+        }
+    }
+
+    // One shell call lists every *.toml in the themes dir and prints each as
+    //   @@<id>\n<file contents>
+    // so custom themes get their own buttons AND their real preview colors.
+    function scanThemes() {
+        if (scanner.running) return
+        scanner.running = true
+    }
+
+    function parseScan(text) {
+        var parts = text.split("@@")
+        var o = page.palOverrides
+        customModel.clear()
+        for (var i = 1; i < parts.length; i++) {
+            var nl = parts[i].indexOf("\n")
+            if (nl < 0) continue
+            var id = parts[i].substring(0, nl).trim()
+            if (id === "" || id === "default" || page.palettes[id] !== undefined)
+                continue
+            var arr = paletteFromValues(colorsFromText(parts[i].substring(nl + 1)),
+                                        page.palettes["default"])
+            if (arr) o[id] = arr
+            customModel.append({ tid: id })
+        }
+        page.palOverrides = o
+        page.palRev++
+    }
+
+    Process {
+        id: scanner
+        command: [
+            "/bin/sh", "-c",
+            "for f in \"$1\"/*.toml; do [ -f \"$f\" ] || continue; "
+            + "printf '@@%s\\n' \"$(basename \"$f\" .toml)\"; cat \"$f\"; printf '\\n'; done",
+            "sh", page.themesDir
+        ]
+        stdout: StdioCollector {
+            onStreamFinished: page.parseScan(text)
+        }
+    }
+
+    Component.onCompleted: page.scanThemes()
 
     component ToggleButton: Rectangle {
         required property string label
@@ -372,14 +575,22 @@ Item {
 
         Behavior on color { ColorAnimation { duration: 120 } }
 
+        // wraps / elides so long labels still fit in a narrow (4-column) button
         Text {
-            anchors.centerIn: parent
+            anchors.fill: parent
+            anchors.leftMargin: 6
+            anchors.rightMargin: 6
             text: label
             color: (primary || ma.containsMouse) ? Theme.accent : Theme.textDim
             font.family: Theme.fontFamily
             font.pixelSize: Theme.textSizeBody
             font.bold: true
             font.letterSpacing: 1
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+            wrapMode: Text.WordWrap
+            maximumLineCount: 2
+            elide: Text.ElideRight
         }
 
         MouseArea {
@@ -403,7 +614,9 @@ Item {
         readonly property bool active: page.activeId === pid
         readonly property bool hovered: mouse.containsMouse
 
-        width: (parent.width - (parent.columns - 1) * parent.spacing) / parent.columns
+        width: parent && parent.columns
+        ? (parent.width - (parent.columns - 1) * parent.spacing) / parent.columns
+        : 0
         height: 78
         radius: Theme.radius
         color: hovered ? Theme.alpha(Theme.accent, 0.08) : "#00000000"
@@ -584,32 +797,122 @@ Item {
                 spacing: page.sectionSpacing
                 visible: !page.editing
 
+                // Top row: 4 equal columns
                 Row {
+                    id: topRow
                     width: parent.width
                     spacing: page.sectionSpacing
+                    readonly property real cellW: (width - 3 * spacing) / 4
 
                     ToggleButton {
-                        width: (parent.width - parent.spacing) / 2
+                        width: topRow.cellW
                         label: "COLOR GENERATION"
                         checked: page.colorGen
                         onToggled: page.setColorGen(!page.colorGen)
                     }
 
                     ToggleButton {
-                        width: (parent.width - parent.spacing) / 2
+                        width: topRow.cellW
                         label: "MODE"
                         checked: true
                         valueText: page.darkMode ? "DARK" : "LIGHT"
                         onToggled: page.toggleMode()
                     }
+
+                    // Edit the currently active preset (the default theme has no toml)
+                    ActionButton {
+                        width: topRow.cellW
+                        label: "CUSTOMIZE: " + page.themeLabel(page.activeId)
+                        onClicked: page.openEditor(page.activeId)
+                    }
+
+                    // Duplicate the active theme's toml under a new name
+                    ActionButton {
+                        width: topRow.cellW
+                        label: "NEW THEME"
+                        primary: page.naming
+                        onClicked: page.naming ? page.closeNaming() : page.openNaming()
+                    }
                 }
 
-                // Edit the currently active preset (the default theme has no toml)
-                ActionButton {
+                // Name prompt for NEW THEME
+                Column {
                     width: parent.width
-                    label: "CUSTOMIZE COLORS: "
-                           + (page.activeId === "default" ? "MONOCHROME" : page.activeId.toUpperCase())
-                    onClicked: page.openEditor(page.activeId)
+                    spacing: 4
+                    visible: page.naming
+
+                    Text {
+                        text: "COPY OF " + page.themeLabel(page.activeId) + " AS:"
+                        color: Theme.textDim
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.textSizeSmall
+                        font.bold: true
+                        font.letterSpacing: 2
+                    }
+
+                    Row {
+                        id: nameRow
+                        width: parent.width
+                        spacing: page.sectionSpacing
+
+                        Rectangle {
+                            width: nameRow.width - 2 * (topRow.cellW + nameRow.spacing)
+                            height: page.buttonHeight
+                            radius: Theme.radius
+                            color: "#00000000"
+                            border.width: 1
+                            border.color: nameInput.activeFocus ? Theme.accent : Theme.border
+
+                            TextInput {
+                                id: nameInput
+                                anchors.fill: parent
+                                anchors.leftMargin: 10
+                                anchors.rightMargin: 10
+                                verticalAlignment: TextInput.AlignVCenter
+                                color: Theme.text
+                                selectByMouse: true
+                                maximumLength: 40
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.textSizeBody
+                                onAccepted: page.createTheme(text)
+                                onTextChanged: if (page.createMsg !== "") page.createMsg = ""
+
+                                Keys.onEscapePressed: page.closeNaming()
+
+                                Text {
+                                    anchors.fill: parent
+                                    verticalAlignment: Text.AlignVCenter
+                                    visible: nameInput.text === "" && !nameInput.preeditText
+                                    text: "theme name"
+                                    color: Theme.alpha(Theme.textDim, 0.5)
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.textSizeBody
+                                }
+                            }
+                        }
+
+                        ActionButton {
+                            width: topRow.cellW
+                            label: "CREATE"
+                            primary: true
+                            onClicked: page.createTheme(nameInput.text)
+                        }
+                        ActionButton {
+                            width: topRow.cellW
+                            label: "CANCEL"
+                            onClicked: page.closeNaming()
+                        }
+                    }
+
+                    Text {
+                        visible: page.createMsg !== ""
+                        width: parent.width
+                        text: page.createMsg
+                        color: "#ff5555"
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.textSizeBody
+                        wrapMode: Text.WordWrap
+                    }
                 }
 
                 Grid {
@@ -644,6 +947,16 @@ Item {
                     ThemeButton { label: "CATPPUCCIN LATTE"; command: "preset catppuccin-latte" }
                     ThemeButton { label: "SOLARIZED LIGHT"; command: "preset solarized-light" }
                     ThemeButton { label: "GRUVBOX LIGHT"; command: "preset gruvbox-light" }
+
+                    // user-created themes (one button per extra .toml in the themes dir)
+                    Repeater {
+                        model: customModel
+                        delegate: ThemeButton {
+                            required property string tid
+                            label: page.themeLabel(tid)
+                            command: "preset " + tid
+                        }
+                    }
                 }
             }
 
@@ -654,25 +967,37 @@ Item {
                 visible: page.editing
 
                 Row {
+                    id: editBtnRow
                     width: parent.width
                     spacing: page.sectionSpacing
+                    // 4 buttons for custom themes (with DELETE), 3 otherwise
+                    readonly property int btnCount: page.editIsCustom ? 4 : 3
+                    readonly property real cellW: (width - (btnCount - 1) * spacing) / btnCount
 
                     ActionButton {
-                        width: (parent.width - 2 * parent.spacing) / 3
+                        width: editBtnRow.cellW
                         label: "CANCEL"
                         onClicked: page.closeEditor()
                     }
                     ActionButton {
-                        width: (parent.width - 2 * parent.spacing) / 3
+                        width: editBtnRow.cellW
                         label: "SAVE + APPLY"
                         primary: true
                         enabled: colorModel.count > 0
                         onClicked: page.saveAndApply()
                     }
                     ActionButton {
-                        width: (parent.width - 2 * parent.spacing) / 3
+                        width: editBtnRow.cellW
                         label: "RELOAD FILE"
-                        onClicked: { page.loadError = ""; themeFile.reload() }
+                        onClicked: { page.loadError = ""; page.confirmDelete = false; themeFile.reload() }
+                    }
+                    // Only for user-created themes; click twice to confirm
+                    ActionButton {
+                        width: editBtnRow.cellW
+                        visible: page.editIsCustom
+                        label: page.confirmDelete ? "CONFIRM DELETE?" : "DELETE"
+                        primary: page.confirmDelete
+                        onClicked: page.requestDelete()
                     }
                 }
 
@@ -693,125 +1018,137 @@ Item {
                     wrapMode: Text.WordWrap
                 }
 
-                Repeater {
-                    id: colorRepeater
-                    model: colorModel
+                // 3-column grid of colors; group headers span the full width
+                Flow {
+                    id: colorFlow
+                    width: parent.width
+                    spacing: page.sectionSpacing
+                    readonly property real cellW: Math.floor((width - 2 * spacing) / 3)
 
-                    delegate: Column {
-                        id: row
-                        property alias hexField: hexInput
-                        required property int index
-                        required property string key
-                        required property string value
-                        required property string grp
+                    Repeater {
+                        id: colorRepeater
+                        model: colorModel
 
-                        width: content.width
-                        spacing: 6
+                        delegate: Item {
+                            id: row
+                            property alias hexField: hexInput
+                            required property int index
+                            required property string key
+                            required property string value
+                            required property string grp
+                            required property bool hdr
 
-                        readonly property bool newGroup:
-                            index === 0 || colorModel.get(index - 1).grp !== grp
-
-                        Text {
-                            visible: row.newGroup
-                            height: visible ? implicitHeight + 8 : 0
-                            verticalAlignment: Text.AlignBottom
-                            text: row.grp
-                            color: Theme.textDim
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.textSizeSmall
-                            font.bold: true
-                            font.letterSpacing: 2
-                        }
-
-                        Rectangle {
-                            width: parent.width
-                            height: 34
-                            radius: Theme.radius
-                            color: rowHover.containsMouse ? Theme.alpha(Theme.accent, 0.08) : "#00000000"
-                            border.width: 1
-                            border.color: rowHover.containsMouse ? Theme.accent : Theme.border
-
-                            MouseArea {
-                                id: rowHover
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                acceptedButtons: Qt.NoButton
-                            }
-
-                            // swatch -> opens the color picker
-                            Rectangle {
-                                id: swatch
-                                anchors.left: parent.left
-                                anchors.leftMargin: 6
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: 40; height: 22
-                                radius: 3
-                                color: row.value
-                                border.width: 1
-                                border.color: Theme.alpha(Theme.textDim, 0.4)
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: page.pickColor(row.key, row.value)
-                                }
-                            }
+                            width: hdr ? colorFlow.width : colorFlow.cellW
+                            height: hdr ? groupLabel.implicitHeight + 8 : 58
 
                             Text {
-                                anchors.left: swatch.right
-                                anchors.leftMargin: 10
-                                anchors.right: hexBox.left
-                                anchors.rightMargin: 8
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: row.key
-                                color: Theme.text
+                                id: groupLabel
+                                visible: row.hdr
+                                anchors.fill: parent
+                                verticalAlignment: Text.AlignBottom
+                                text: row.grp
+                                color: Theme.textDim
                                 font.family: Theme.fontFamily
-                                font.pixelSize: Theme.textSizeBody
-                                elide: Text.ElideRight
+                                font.pixelSize: Theme.textSizeSmall
+                                font.bold: true
+                                font.letterSpacing: 2
                             }
 
-                            // manual hex entry
                             Rectangle {
-                                id: hexBox
-                                anchors.right: parent.right
-                                anchors.rightMargin: 6
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: 92; height: 24
-                                radius: 3
-                                color: "#00000000"
+                                visible: !row.hdr
+                                anchors.fill: parent
+                                radius: Theme.radius
+                                color: rowHover.containsMouse ? Theme.alpha(Theme.accent, 0.08) : "#00000000"
                                 border.width: 1
-                                border.color: hexInput.activeFocus
-                                              ? Theme.accent
-                                              : (page.isHex(hexInput.text) ? Theme.border : "#ff5555")
+                                border.color: rowHover.containsMouse ? Theme.accent : Theme.border
 
-                                TextInput {
-                                    id: hexInput
+                                MouseArea {
+                                    id: rowHover
                                     anchors.fill: parent
-                                    anchors.leftMargin: 6
-                                    anchors.rightMargin: 6
-                                    verticalAlignment: TextInput.AlignVCenter
-                                    text: row.value
-                                    color: Theme.textDim
-                                    selectByMouse: true
-                                    maximumLength: 9
+                                    hoverEnabled: true
+                                    acceptedButtons: Qt.NoButton
+                                }
+
+                                // key name on top
+                                Text {
+                                    anchors.left: parent.left
+                                    anchors.leftMargin: 8
+                                    anchors.right: parent.right
+                                    anchors.rightMargin: 8
+                                    anchors.top: parent.top
+                                    anchors.topMargin: 6
+                                    text: row.key
+                                    color: Theme.text
                                     font.family: Theme.fontFamily
                                     font.pixelSize: Theme.textSizeBody
-                                    onEditingFinished: {
-                                        if (page.isHex(text)) page.setColor(row.key, text)
-                                        else text = row.value
-                                        // don't hand focus back to the window while tabbing
-                                        if (!page.hexTabbing)
-                                            page.searchFocusReleased()
+                                    elide: Text.ElideRight
+                                }
+
+                                // swatch -> opens the color picker
+                                Rectangle {
+                                    id: swatch
+                                    anchors.left: parent.left
+                                    anchors.leftMargin: 8
+                                    anchors.bottom: parent.bottom
+                                    anchors.bottomMargin: 7
+                                    width: 36; height: 22
+                                    radius: 3
+                                    color: row.value
+                                    border.width: 1
+                                    border.color: Theme.alpha(Theme.textDim, 0.4)
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: page.pickColor(row.key, row.value)
                                     }
+                                }
 
-                                    // Tab / Shift+Tab: next / previous hex field
-                                    Keys.onTabPressed: page.focusHex(row.index, 1)
-                                    Keys.onBacktabPressed: page.focusHex(row.index, -1)
+                                // manual hex entry
+                                Rectangle {
+                                    id: hexBox
+                                    anchors.left: swatch.right
+                                    anchors.leftMargin: 8
+                                    anchors.right: parent.right
+                                    anchors.rightMargin: 8
+                                    anchors.verticalCenter: swatch.verticalCenter
+                                    height: 24
+                                    radius: 3
+                                    color: "#00000000"
+                                    border.width: 1
+                                    border.color: hexInput.activeFocus
+                                                  ? Theme.accent
+                                                  : (page.isHex(hexInput.text) ? Theme.border : "#ff5555")
 
-                                    // Esc: drop the edit and give focus back to the window
-                                    Keys.onEscapePressed: {
-                                        text = row.value
-                                        page.searchFocusReleased()
+                                    TextInput {
+                                        id: hexInput
+                                        anchors.fill: parent
+                                        anchors.leftMargin: 6
+                                        anchors.rightMargin: 6
+                                        verticalAlignment: TextInput.AlignVCenter
+                                        text: row.value
+                                        color: Theme.textDim
+                                        selectByMouse: true
+                                        maximumLength: 9
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.textSizeBody
+                                        onEditingFinished: {
+                                            if (page.isHex(text)) page.setColor(row.key, text)
+                                            else text = row.value
+                                            // don't hand focus back to the window while tabbing
+                                            if (!page.hexTabbing)
+                                                page.searchFocusReleased()
+                                        }
+
+                                        // Tab / Shift+Tab: next / previous hex field
+                                        Keys.onTabPressed: page.focusHex(row.index, 1)
+                                        Keys.onBacktabPressed: page.focusHex(row.index, -1)
+
+                                        // Esc: drop the edit and give focus back to the window
+                                        Keys.onEscapePressed: {
+                                            text = row.value
+                                            page.searchFocusReleased()
+                                        }
                                     }
                                 }
                             }

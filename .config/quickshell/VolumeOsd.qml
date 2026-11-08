@@ -37,6 +37,7 @@ Scope {
         barSpacing:    { min: 0,   max: 30,    def: 3,    step: 1,   unit: "px" },
         barHeight:     { min: 4,   max: 400,   def: 20,   step: 2,   unit: "px" },
         barFps:        { min: 5,   max: 144,   def: 30,   step: 5,   unit: " fps" },
+        barSensitivity:{ min: 20,  max: 300,   def: 100,  step: 10,  unit: "%" },
         mediaTimeout:  { min: 250, max: 60000, def: 3000, step: 250, unit: "s" },
         volTimeout:    { min: 100, max: 30000, def: 1200, step: 100, unit: "s" },
         fadeMs:        { min: 0,   max: 1500,  def: 150,  step: 25,  unit: " ms" },
@@ -65,7 +66,8 @@ Scope {
     property int artSize: numSpec.artSize.def; property int cardRadius: numSpec.cardRadius.def
     property int barCount: numSpec.barCount.def; property int barRadius: numSpec.barRadius.def
     property int barSpacing: numSpec.barSpacing.def; property int barHeight: numSpec.barHeight.def
-    property int barFps: numSpec.barFps.def; property int mediaTimeout: numSpec.mediaTimeout.def
+    property int barFps: numSpec.barFps.def; property int barSensitivity: numSpec.barSensitivity.def
+    property int mediaTimeout: numSpec.mediaTimeout.def
     property int volTimeout: numSpec.volTimeout.def; property int fadeMs: numSpec.fadeMs.def
     property int bgOpacity: numSpec.bgOpacity.def
     property int artOpacity: numSpec.artOpacity.def; property int barOpacity: numSpec.barOpacity.def
@@ -192,7 +194,7 @@ Scope {
         function onMutedChanged() { root.triggerOsd() }
     }
 
-        // ---- scroll to change volume (same behaviour as the bar) ---------------
+    // ---- scroll to change volume (same behaviour as the bar) ---------------
     // Step / max come from the bar's settings file so both stay in sync.
     property int volStep: 2
     property int volMax: 100
@@ -677,6 +679,8 @@ Scope {
                         }
 
                         // visualizer (played part is brighter)
+                        // Bar heights are the cava level (0-100) times the sensitivity setting,
+                        // clamped to the visualizer height.
                         Item {
                             id: visualizer
                             visible: mediaPanel.barShown
@@ -694,7 +698,9 @@ Scope {
                                     color: root.accentBars ? Theme.accent : Theme.text
                                     opacity: (((index + 0.5) / root.barCount) <= root.progress
                                               ? root.barOpacity : root.barDimOpacity) / 100
-                                    height: Math.max(3, ((root.bars[index] ?? 0) / 100) * visualizer.height)
+                                    height: Math.min(visualizer.height,
+                                                     Math.max(3, ((root.bars[index] ?? 0) / 100)
+                                                                 * (root.barSensitivity / 100) * visualizer.height))
                                     y: visualizer.height - height
                                     Behavior on height { NumberAnimation { duration: 60 } }
                                     Behavior on opacity { NumberAnimation { duration: 200 } }
@@ -950,6 +956,7 @@ Scope {
                             SliderRow { key: "barHeight"; label: "Height"; enabled: root.showBar }
                             SliderRow { key: "barRadius"; label: "Round"; enabled: root.showBar }
                             SliderRow { key: "barFps"; label: "Frame rate"; enabled: root.showBar && root.showVisualizer }
+                            SliderRow { key: "barSensitivity"; label: "Sensitivity"; enabled: root.showBar && root.showVisualizer }
                             ToggleRow { key: "accentBars"; label: "Accent colour"; enabled: root.showBar }
                         }
 
