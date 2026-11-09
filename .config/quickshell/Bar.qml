@@ -51,7 +51,7 @@ Scope {
     // Live config object, edited by BarPage (the settings page).
     readonly property var config: cfg
 
-    Component.onCompleted: BluetoothState.init()
+    Component.onCompleted: { BluetoothState.init(); kbProc.running = true }
 
     FileView {
         id: cfgFile
@@ -334,6 +334,7 @@ Scope {
     //   g = glyph, tip = tooltip title, hint = left-click description.
     // Modules without it have a dedicated Component below (see `comps`).
     readonly property var moduleDefs: [
+        { id: "layout",   l: "keyboard layout" },
         { id: "clock",    l: "Clock" },
         { id: "cpu",      l: "CPU" },
         { id: "ram",      l: "RAM" },
@@ -360,7 +361,7 @@ Scope {
     readonly property var defMap: moduleDefs.reduce((m, d) => { m[d.id] = d; return m; }, {})
     readonly property var comps: ({
         cpu: cpuC, ram: ramC, gpu: gpuC, cputemp: cpuTempC, gputemp: gpuTempC,
-        ws: wsC, tasks: tasksC, media: mediaC, volume: volumeC, battery: batteryC, icon: iconC
+        ws: wsC, tasks: tasksC, media: mediaC, volume: volumeC, battery: batteryC, layout: layoutC, icon: iconC
     })
 
     // Old combined modules are migrated in saved configs: "stats" → "cpu" + "ram", "temp" → "cputemp" + "gputemp".
@@ -568,6 +569,39 @@ Scope {
                                      : netState === "ethernet" ? "\uDB80\uDE00" : "\uDB81\uDDAA"
     readonly property string netTip: netState === "wifi" ? "Wi-Fi connected"
                                    : netState === "ethernet" ? "Ethernet connected" : "Disconnected"
+    
+    // ── Keyboard layout ──
+    property string kbLayoutName: ""     // "English (US)" / "Russian"
+    property string kbLayoutCode: "—"    // "EN" / "RU"
+
+    Process {
+            id: kbProc
+        command: ["hyprctl", "devices", "-j"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const d = JSON.parse(text)
+                    const kbs = Array.isArray(d.keyboards) ? d.keyboards : []
+                    let kb = null
+                    for (let i = 0; i < kbs.length; i++) if (kbs[i].main === true) { kb = kbs[i]; break }
+                    if (!kb && kbs.length) kb = kbs[0]
+                    if (kb) {
+                        root.kbLayoutName = String(kb.active_keymap || "")
+                        const codes = String(kb.layout || "").split(",")
+                        const code = codes[kb.active_layout_index] || ""
+                        root.kbLayoutCode = code ? code.toUpperCase() : root.kbLayoutName.slice(0, 2).toUpperCase()
+                    }
+                } catch (e) {}
+            }
+        }
+    }
+
+    Connections {
+        target: Hyprland
+        function onRawEvent(event) {
+            if (event.name === "activelayout") kbProc.running = true
+        }
+    }
 
     // Notification count: the notifications panel persists its history here
     property int notifCount: 0
@@ -1316,6 +1350,20 @@ Scope {
             valueText: root.tempText(root.gpuTemp)
             warning: root.gpuTemp >= cfg.tempWarn
             tip: root.tempTip("GPU", root.gpuTemp)
+        }
+    }
+
+    Component {
+        id: layoutC
+        Mod {
+            baseSize: root.sz.batText
+            bold: true
+            text: root.kbLayoutCode
+            vtext: root.kbLayoutCode
+            yOffset: root.iconYOffset
+            tip: "Keyboard layout: " + (root.kbLayoutName !== "" ? root.kbLayoutName : "unknown")
+            primaryHint: "Switch layout"
+            onPrimary: root.run("hyprctl switchxkblayout current next")
         }
     }
 
