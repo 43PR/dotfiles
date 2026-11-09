@@ -2,7 +2,12 @@
 # Select a screen region, OCR it, copy the text, report via the Quickshell OSD.
 set -uo pipefail
 
-LANGS="${OCR_LANG:-eng}"   # e.g. OCR_LANG=eng+spa
+# Languages: OCR_LANG env wins, then state/ocr.conf (written by Settings > Keybinds),
+# then English. Format of ocr.conf: ocr_lang=eng+spa
+CONF="$HOME/.config/quickshell/state/ocr.conf"
+conf_lang=""
+[ -r "$CONF" ] && conf_lang="$(sed -n 's/^ocr_lang=//p' "$CONF" | head -n1 | tr -cd 'A-Za-z0-9_+')"
+LANGS="${OCR_LANG:-${conf_lang:-eng}}"
 osd() { qs ipc call ocr "$@" >/dev/null 2>&1 || true; }
 
 geom="$(slurp)" || { osd cancelled; exit 0; }

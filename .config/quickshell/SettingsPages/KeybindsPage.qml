@@ -481,6 +481,144 @@ Item {
         saveShot()
     }
 
+    // ---- OCR languages ------------------------------------------------
+
+    // Arch package is tesseract-data-<code>
+    readonly property var ocrCatalog: [
+        { code: "eng", label: "ENGLISH" },      { code: "spa", label: "SPANISH" },
+        { code: "fra", label: "FRENCH" },       { code: "deu", label: "GERMAN" },
+        { code: "ita", label: "ITALIAN" },      { code: "por", label: "PORTUGUESE" },
+        { code: "nld", label: "DUTCH" },        { code: "pol", label: "POLISH" },
+        { code: "rus", label: "RUSSIAN" },      { code: "ukr", label: "UKRAINIAN" },
+        { code: "tur", label: "TURKISH" },      { code: "ara", label: "ARABIC" },
+        { code: "heb", label: "HEBREW" },       { code: "hin", label: "HINDI" },
+        { code: "jpn", label: "JAPANESE" },     { code: "kor", label: "KOREAN" },
+        { code: "chi_sim", label: "CHINESE (SIMPL.)" }, { code: "chi_tra", label: "CHINESE (TRAD.)" },
+        { code: "vie", label: "VIETNAMESE" },   { code: "tha", label: "THAI" },
+        { code: "ind", label: "INDONESIAN" },   { code: "swe", label: "SWEDISH" },
+        { code: "dan", label: "DANISH" },       { code: "nor", label: "NORWEGIAN" },
+        { code: "fin", label: "FINNISH" },      { code: "ces", label: "CZECH" },
+        { code: "hun", label: "HUNGARIAN" },    { code: "ron", label: "ROMANIAN" },
+        { code: "ell", label: "GREEK" },        { code: "cat", label: "CATALAN" },
+        { code: "lat", label: "LATIN" }
+    ]
+
+    property var ocrInstalled: []        // codes reported by `tesseract --list-langs`
+    property var ocrSelected: ["eng"]    // codes used by the OCR bind
+    property string ocrInstalling: ""    // code being installed right now
+    property string ocrError: ""
+    property string ocrQuery: ""
+    readonly property string ocrPath: home + "/.config/quickshell/state/ocr.conf"
+
+    // Catalog plus any installed language that is not in it
+    readonly property var ocrList: {
+        const known = ocrCatalog.map(l => l.code)
+        const extra = ocrInstalled
+            .filter(c => known.indexOf(c) < 0)
+            .map(c => ({ code: c, label: c.toUpperCase() }))
+        const q = ocrQuery.trim().toLowerCase()
+        return ocrCatalog.concat(extra).filter(l =>
+            !q || l.label.toLowerCase().indexOf(q) >= 0 || l.code.indexOf(q) >= 0)
+    }
+
+    function parseOcr(t) {
+        const m = /^\s*ocr_lang\s*=\s*(\S+)/m.exec(t || "")
+        if (!m) return
+        const arr = m[1].split("+").filter(s => /^[A-Za-z0-9_]+$/.test(s))
+        if (arr.length > 0) ocrSelected = arr
+    }
+
+    function saveOcr() {
+        ocrWriter.body = "ocr_lang=" + ocrSelected.join("+") + "\n"
+        ocrWriter.running = false
+        ocrWriter.running = true
+    }
+
+    function refreshOcr() {
+        if (!ocrDetect.running) ocrDetect.running = true
+    }
+
+    function toggleOcrLang(code) {
+        const on = ocrSelected.indexOf(code) >= 0
+        // keep at least one language selected
+        if (on && ocrSelected.length === 1) return
+        ocrSelected = on ? ocrSelected.filter(c => c !== code) : ocrSelected.concat([code])
+        saveOcr()
+    }
+
+    function installOcrLang(code) {
+        if (ocrInstaller.running) return
+        ocrError = ""
+        ocrInstalling = code
+        ocrInstaller.code = code
+        ocrInstaller.running = true
+    }
+
+    function ocrClick(code) {
+        if (ocrInstalling !== "") return
+        if (ocrInstalled.indexOf(code) >= 0) toggleOcrLang(code)
+        else installOcrLang(code)
+    }
+
+    FileView {
+        id: ocrFile
+        path: page.ocrPath
+        printErrors: false
+        onLoaded: page.parseOcr(text())
+    }
+
+    Process {
+        id: ocrWriter
+        property string body: ""
+        command: [
+            "sh", "-c",
+            "mkdir -p -- \"$1\" && printf '%s' \"$2\" > \"$3\"",
+            "ocrwrite",
+            page.home + "/.config/quickshell/state",
+            body,
+            page.ocrPath
+        ]
+        onExited: code => {
+            if (code !== 0)
+                console.warn("KeybindsPage: OCR settings save failed (" + code + ")")
+        }
+    }
+
+    // First line of the output is a header ("List of available languages ...")
+    Process {
+        id: ocrDetect
+        command: ["tesseract", "--list-langs"]
+        stdout: StdioCollector {
+            onStreamFinished: page.ocrInstalled = text.split("\n")
+                .slice(1)
+                .map(s => s.trim())
+                .filter(s => s.length > 0 && s !== "osd")
+        }
+    }
+
+    // Needs root: pkexec shows the polkit prompt (a polkit agent must be running)
+    Process {
+        id: ocrInstaller
+        property string code: ""
+        command: ["pkexec", "pacman", "-S", "--needed", "--noconfirm", "tesseract-data-" + code]
+        onExited: (exitCode, exitStatus) => {
+            const code = ocrInstaller.code
+            page.ocrInstalling = ""
+            if (exitCode === 0) {
+                // newly installed language becomes active right away
+                if (page.ocrSelected.indexOf(code) < 0) {
+                    page.ocrSelected = page.ocrSelected.concat([code])
+                    page.saveOcr()
+                }
+            } else if (exitCode === 126 || exitCode === 127) {
+                page.ocrError = "Authentication cancelled or pkexec not found."
+            } else {
+                page.ocrError = "Could not install tesseract-data-" + code + " (exit " + exitCode + ")."
+            }
+            page.refreshOcr()
+        }
+    }
+
     FileView {
         id: shotFile
         path: page.shotPath
@@ -525,9 +663,9 @@ Item {
             page.refreshBrowser()
         }
     }
-    onVisibleChanged: if (visible) refreshBrowser()
+    onVisibleChanged: if (visible) { refreshBrowser(); refreshOcr() }
 
-    Component.onCompleted: { initBindKeys(); refreshBrowser(); }
+    Component.onCompleted: { initBindKeys(); refreshBrowser(); refreshOcr(); }
 
     // Invisible focus target. While a row is selected, the next real key
     // (Super+Enter, Super+Shift+C, …) is written and Hyprland is reloaded.
@@ -1196,6 +1334,80 @@ Item {
                         HelpText {
                             text: "Screenshots are saved to ~/Pictures/Screenshots. At least one option stays on. "
                                   + "Changes apply to the next screenshot, no reload needed."
+                        }
+                    }
+                }
+            }
+
+            Column {
+                width: parent.width
+                spacing: 10
+                topPadding: 6
+
+                SectionTitle { text: "OCR LANGUAGES" }
+
+                Card {
+                    Column {
+                        width: parent.width
+                        spacing: 10
+
+                        InputField {
+                            width: parent.width
+                            placeholderText: "SEARCH LANGUAGE"
+                            onTextChanged: page.ocrQuery = text
+                            Keys.onEscapePressed: function(event) {
+                                if (text !== "") { text = ""; event.accepted = true }
+                                else { focus = false; page.closeRequested() }
+                            }
+                        }
+
+                        Flow {
+                            id: ocrFlow
+                            width: parent.width
+                            spacing: page.sectionSpacing
+                            readonly property int cols: 4
+
+                            Repeater {
+                                model: page.ocrList
+
+                                delegate: ChoiceButton {
+                                    required property var modelData
+                                    readonly property bool installed: page.ocrInstalled.indexOf(modelData.code) >= 0
+                                    width: (ocrFlow.width - ocrFlow.spacing * (ocrFlow.cols - 1)) / ocrFlow.cols
+                                    label: page.ocrInstalling === modelData.code ? "INSTALLING…"
+                                           : (installed ? modelData.label : "+ " + modelData.label)
+                                    current: installed && page.ocrSelected.indexOf(modelData.code) >= 0
+                                    opacity: installed || page.ocrInstalling === modelData.code ? 1 : 0.55
+                                    onClicked: page.ocrClick(modelData.code)
+                                }
+                            }
+                        }
+
+                        Text {
+                            visible: page.ocrList.length === 0
+                            width: parent.width
+                            text: "NO MATCHES"
+                            color: Theme.textDim
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.textSizeGroup
+                            font.bold: true
+                            font.letterSpacing: 1
+                        }
+
+                        HelpText {
+                            visible: page.ocrError !== ""
+                            text: page.ocrError
+                            color: Theme.accent
+                        }
+
+                        HelpText {
+                            text: "Highlighted languages are used by the text extractor (OCR) bind: "
+                                  + page.ocrSelected.join(" + ") + ". "
+                                  + "Click an installed language to toggle it (at least one stays on). "
+                                  + "Languages marked + are not installed; clicking one installs "
+                                  + "tesseract-data-<code> with pacman (asks for your password via pkexec). "
+                                  + "Using several languages at once can be slower and less accurate. "
+                                  + "Changes apply to the next OCR, no reload needed."
                         }
                     }
                 }
