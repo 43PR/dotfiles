@@ -38,7 +38,7 @@ Item {
         midLeftMods: "ws",
         centerMods: "clock",
         midRightMods: "tasks",
-        endMods: "media,battery,wall,settings,volume,net,power"
+        endMods: "media,battery,wall,settings,volume,bt,net,power"
     })
 
     readonly property var positions: ["top", "right", "bottom", "left"]
@@ -63,6 +63,7 @@ Item {
         { id: "media",    l: "MEDIA" },
         { id: "volume",   l: "VOLUME" },
         { id: "battery",  l: "BATTERY" },
+        { id: "bt",       l: "BLUETOOTH" },
         { id: "net",      l: "NETWORK" },
         { id: "notif",    l: "NOTIFS" },
         { id: "wall",     l: "WALLPAPERS" },

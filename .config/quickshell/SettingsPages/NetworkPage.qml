@@ -5,7 +5,11 @@ import "../"
 Item {
     id: page
 
-    // ── State ────────────────────────────────────────────────────
+    // ── Config ────────────────────────────────────────────────
+    readonly property string mono: "JetBrainsMono Nerd Font"
+    readonly property int rightMargin: 10
+
+    // ── State ─────────────────────────────────────────────────
     property bool wifiEnabled: true
     property var networks: []
     property var savedProfiles: []     // names of saved Wi-Fi profiles
@@ -13,7 +17,7 @@ Item {
     property string statusMsg: ""      // last connect error (empty = none)
     readonly property bool connecting: pConnect.running
 
-    // ── Debug (output: run `qs` in a terminal, or `qs log`) ────────
+    // ── Debug (output: run `qs` in a terminal, or `qs log`) ────
     readonly property bool debug: true
     function dbg(msg) { if (debug) console.log("[net] " + msg) }
 
@@ -24,20 +28,12 @@ Item {
         connection: ""
     })
 
-    // Fonts
-    property string monoFont: "JetBrains Mono"
-
-    property real marginLeft: 0
-    property real marginRight: 10
-    property real marginTop: 0
-    property real marginBottom: 0
-
     // Nerd Font glyphs
     readonly property string icWifi: "\uf1eb"
-    readonly property string icLock: "\uf023"
     readonly property string icEth: "\uf6ff"
     readonly property string icRefresh: "\uf021"
 
+    // ── Helpers ───────────────────────────────────────────────
     // Split an nmcli "terse" (-t) line on unescaped ":" and unescape "\:" / "\\".
     function splitTerse(line) {
         var fields = []
@@ -68,7 +64,167 @@ Item {
         return page.savedProfiles.indexOf(ssid) !== -1
     }
 
-    // ── Ethernet status (device / state / connection name) ─────────
+    function networkSubtitle(net) {
+        var parts = []
+        if (net.connected) parts.push("connected")
+        if (!net.secured) parts.push("open")
+        else if (page.isSaved(net.ssid)) parts.push("saved")
+        else parts.push("secured")
+        return parts.join("  •  ")
+    }
+
+    // Hairline frame with accent corner brackets (same look as SystemPage)
+    function drawFrame(ctx, active) {
+        var w = ctx.canvas.width
+        var h = ctx.canvas.height
+        var L = 12
+        ctx.clearRect(0, 0, w, h)
+
+        ctx.globalAlpha = 0.35
+        ctx.strokeStyle = Theme.border
+        ctx.lineWidth = 1
+        ctx.strokeRect(0.5, 0.5, w - 1, h - 1)
+
+        ctx.globalAlpha = active ? 0.9 : 0.5
+        ctx.strokeStyle = active ? Theme.accent : Theme.textFaint
+        ctx.lineWidth = 1.5
+        ctx.beginPath()
+        ctx.moveTo(0.75, L); ctx.lineTo(0.75, 0.75); ctx.lineTo(L, 0.75)
+        ctx.moveTo(w - L, 0.75); ctx.lineTo(w - 0.75, 0.75); ctx.lineTo(w - 0.75, L)
+        ctx.moveTo(w - 0.75, h - L); ctx.lineTo(w - 0.75, h - 0.75); ctx.lineTo(w - L, h - 0.75)
+        ctx.moveTo(L, h - 0.75); ctx.lineTo(0.75, h - 0.75); ctx.lineTo(0.75, h - L)
+        ctx.stroke()
+        ctx.globalAlpha = 1
+    }
+
+    // ── Components ────────────────────────────────────────────
+    // Painted only on size / state change, never per frame.
+    component Frame: Canvas {
+        property bool active: true
+        anchors.fill: parent
+        onPaint: page.drawFrame(getContext("2d"), active)
+        onActiveChanged: requestPaint()
+        onWidthChanged: requestPaint()
+        onHeightChanged: requestPaint()
+    }
+
+    // Small text button: dim by default, accent on hover.
+    component TextButton: Item {
+        id: btn
+        property string text: ""
+        property color baseColor: Theme.textDim
+        property color hoverColor: Theme.accent
+        property bool clickable: true
+        signal clicked()
+
+        implicitWidth: label.implicitWidth
+        implicitHeight: label.implicitHeight
+        opacity: clickable ? 1.0 : 0.5
+
+        Text {
+            id: label
+            text: btn.text
+            color: area.containsMouse && btn.clickable ? btn.hoverColor : btn.baseColor
+            font.family: page.mono
+            font.pixelSize: Theme.textSizeSmall
+            font.letterSpacing: 2
+        }
+
+        MouseArea {
+            id: area
+            anchors.fill: parent
+            anchors.margins: -6
+            hoverEnabled: true
+            enabled: btn.clickable
+            cursorShape: Qt.PointingHandCursor
+            onClicked: btn.clicked()
+        }
+    }
+
+    // Header layout:  LABEL (left)  ·  info (next to it)  ·  badges (right)
+    component SectionHeader: Item {
+        id: head
+        property string label: ""
+        property string info: ""
+        property var badges: []
+        width: parent.width
+        height: 24
+
+        Text {
+            id: labelText
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            text: head.label
+            color: Theme.textDim
+            font.family: page.mono
+            font.pixelSize: Theme.textSizeGroup
+            font.letterSpacing: 2
+        }
+
+        Text {
+            anchors.left: labelText.right
+            anchors.leftMargin: 20
+            anchors.verticalCenter: parent.verticalCenter
+            // never overlap the badges on the right
+            width: Math.max(0, Math.min(implicitWidth,
+                head.width - labelText.implicitWidth - badgeRow.implicitWidth - 40))
+            text: head.info
+            color: Theme.text
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.textSizeGroup
+            elide: Text.ElideRight
+        }
+
+        Row {
+            id: badgeRow
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 20
+
+            Repeater {
+                model: head.badges
+                Text {
+                    text: modelData
+                    color: Theme.text
+                    font.family: page.mono
+                    font.pixelSize: Theme.textSizeGroup
+                }
+            }
+        }
+    }
+
+    // Centered placeholder (Wi-Fi off / scanning)
+    component EmptyState: Item {
+        id: empty
+        property string icon: ""
+        property string title: ""
+        width: parent.width
+        height: 110
+
+        Column {
+            anchors.centerIn: parent
+            spacing: 8
+
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: empty.icon
+                color: Theme.textDim
+                font.family: Theme.iconFont
+                font.pixelSize: 24
+                visible: empty.icon !== ""
+            }
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: empty.title
+                color: Theme.textDim
+                font.family: page.mono
+                font.pixelSize: Theme.textSizeGroup
+                font.letterSpacing: 2
+            }
+        }
+    }
+
+    // ── Ethernet status (device / state / connection name) ─────
     Process {
         id: pEthernet
         command: ["nmcli", "-t", "-f", "DEVICE,TYPE,STATE,CONNECTION", "device"]
@@ -104,15 +260,16 @@ Item {
         stderr: StdioCollector {}
     }
 
+    // Polled only while the page is visible.
     Timer {
         interval: 3000
-        running: true
+        running: page.visible
         repeat: true
         triggeredOnStart: true
         onTriggered: if (!pEthernet.running) pEthernet.running = true
     }
 
-    // ── Wi-Fi radio ────────────────────────────────────────────────
+    // ── Wi-Fi radio ────────────────────────────────────────────
     Process {
         id: pRadioGet
         command: ["nmcli", "radio", "wifi"]
@@ -139,7 +296,7 @@ Item {
         pRadioSet.running = true
     }
 
-    // ── Saved Wi-Fi profiles ───────────────────────────────────────
+    // ── Saved Wi-Fi profiles ───────────────────────────────────
     // Saved profiles are matched by their real SSID, not their name: NetworkManager often names
     // them "Auto <ssid>", so comparing names misses them.
     Process {
@@ -170,7 +327,7 @@ Item {
         }
     }
 
-    // ── Wi-Fi scan list ────────────────────────────────────────────
+    // ── Wi-Fi scan list ────────────────────────────────────────
     Process {
         id: pList
         command: ["nmcli", "-t", "-f", "IN-USE,SSID,SIGNAL,SECURITY", "device", "wifi", "list"]
@@ -240,7 +397,7 @@ Item {
         pRescan.running = true
     }
 
-    // ── Connect / disconnect ───────────────────────────────────────
+    // ── Connect / disconnect ───────────────────────────────────
     // mode: "open" | "saved" | "password" | "disconnect"
     Process {
         id: pConnect
@@ -372,318 +529,289 @@ Item {
         pEthernet.running = true
     }
 
-    Column {
+    // ── UI ────────────────────────────────────────────────────
+    Flickable {
+        id: scrollArea
         anchors.fill: parent
-        anchors.leftMargin: page.marginLeft; anchors.rightMargin: page.marginRight
-        anchors.topMargin: page.marginTop; anchors.bottomMargin: page.marginBottom
-        spacing: 14
-        Text {
-            text: "NETWORK"; color: Theme.text
-            font.family: page.monoFont; font.pixelSize: Theme.textSizeTitle; font.letterSpacing: 3
-        }
-        Rectangle { width: parent.width; height: 1; color: Theme.border }
+        clip: true
+        contentWidth: width
+        contentHeight: contentColumn.implicitHeight
+        boundsBehavior: Flickable.StopAtBounds
 
-        // ── Wi-Fi toggle + rescan ────────────────────────────────
-        Row {
-            id: controlsRow
-            width: parent.width
-            height: 36
-            spacing: 9
-
-            Rectangle {
-                id: wifiToggle
-                width: parent.width - rescanBtn.width - parent.spacing
-                height: 36
-                radius: Theme.radius
-                color: page.wifiEnabled
-                    ? Theme.alpha(Theme.accent, 0.1)
-                    : Theme.alpha(Theme.textFaint, 0.15)
-                border.width: 1
-                border.color: page.wifiEnabled ? Theme.accent : Theme.textFaint
-
-                Text {
-                    anchors.centerIn: parent
-                    text: page.wifiEnabled ? "WI-FI ON" : "WI-FI OFF"
-                    color: page.wifiEnabled ? Theme.accent : Theme.textFaint
-                    font.family: page.monoFont
-                    font.pixelSize: Theme.textSizeSmall
-                    font.bold: true
-                    font.letterSpacing: 1
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: page.setWifiEnabled(!page.wifiEnabled)
-                }
-            }
-
-            Rectangle {
-                id: rescanBtn
-                width: 36
-                height: 36
-                radius: Theme.radius
-                color: "#00000000"
-                border.width: 1
-                border.color: rescanMouse.containsMouse ? Theme.accent : Theme.border
-                opacity: page.wifiEnabled ? 1.0 : 0.35
-
-                Text {
-                    anchors.centerIn: parent
-                    text: page.icRefresh
-                    color: pRescan.running ? Theme.accent : Theme.textDim
-                    font.family: Theme.iconFont
-                    font.pixelSize: Theme.textSizeGroup
-                }
-
-                MouseArea {
-                    id: rescanMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    enabled: page.wifiEnabled
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: page.rescan()
-                }
+        WheelHandler {
+            onWheel: function(event) {
+                var maxY = Math.max(0, scrollArea.contentHeight - scrollArea.height)
+                scrollArea.contentY = Math.max(0, Math.min(maxY, scrollArea.contentY - event.angleDelta.y))
+                event.accepted = true
             }
         }
 
-        // ── Ethernet status card (always shown) ─────────────────
-        Rectangle {
-            id: ethCard
-            width: parent.width
-            height: 46
-            radius: Theme.radius
-            color: page.ethernet.state === "connected"
-                ? Theme.alpha(Theme.accent2, 0.10)
-                : "#00000000"
-            border.width: 1
-            border.color: page.ethernet.state === "connected" ? Theme.accent2 : Theme.border
+        Column {
+            id: contentColumn
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.rightMargin: page.rightMargin
+            spacing: 14
 
-            Row {
-                anchors.left: parent.left
-                anchors.leftMargin: 14
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: 9
-
-                Text {
-                    text: page.icEth
-                    color: page.ethernet.state === "connected" ? Theme.accent2 : Theme.textDim
-                    font.family: Theme.iconFont
-                    font.pixelSize: Theme.textSizeSection
-                }
-
-                Column {
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: 2
-
-                    Text {
-                        text: "Ethernet"
-                        color: Theme.text
-                        font.family: page.monoFont
-                        font.pixelSize: Theme.textSizeGroup
-                    }
-
-                    Text {
-                        text: page.ethernet.state === "connected"
-                            ? (page.ethernet.connection || page.ethernet.device)
-                            : "Disconnected"
-                        color: Theme.textDim
-                        font.family: page.monoFont
-                        font.pixelSize: Theme.textSizeSmall
-                    }
-                }
-            }
-
+            // top bar: title, scrolls away with the content
             Text {
-                anchors.right: parent.right
-                anchors.rightMargin: 14
-                anchors.verticalCenter: parent.verticalCenter
-                text: page.ethernet.state === "connected" ? "CONNECTED" : "DISCONNECTED"
-                color: page.ethernet.state === "connected" ? Theme.accent2 : Theme.textDim
-                font.family: page.monoFont
+                text: "NETWORK"
+                color: Theme.text
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.textSizeTitle
+                font.letterSpacing: 3
+            }
+
+            Rectangle {
+                width: parent.width
+                height: 1
+                color: Theme.border
+            }
+
+            // ── Wi-Fi toggle + rescan ────────────────────────
+            Item {
+                width: parent.width
+                height: 60
+
+                Frame { active: page.wifiEnabled }
+
+                Row {
+                    anchors.fill: parent
+                    anchors.margins: 12
+                    spacing: 12
+
+                    Rectangle {
+                        id: wifiToggle
+                        width: parent.width - rescanBtn.width - parent.spacing
+                        height: parent.height
+                        radius: Theme.radius
+                        color: page.wifiEnabled
+                            ? Theme.alpha(Theme.accent, 0.1)
+                            : Theme.alpha(Theme.textFaint, 0.15)
+                        border.width: 1
+                        border.color: toggleMouse.containsMouse
+                            ? Theme.accent
+                            : (page.wifiEnabled ? Theme.accent : Theme.textFaint)
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: page.wifiEnabled ? "WI-FI ON" : "WI-FI OFF"
+                            color: page.wifiEnabled ? Theme.accent : Theme.textFaint
+                            font.family: page.mono
+                            font.pixelSize: Theme.textSizeSmall
+                            font.bold: true
+                            font.letterSpacing: 2
+                        }
+
+                        MouseArea {
+                            id: toggleMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: page.setWifiEnabled(!page.wifiEnabled)
+                        }
+                    }
+
+                    Rectangle {
+                        id: rescanBtn
+                        width: parent.height
+                        height: parent.height
+                        radius: Theme.radius
+                        color: "transparent"
+                        border.width: 1
+                        border.color: rescanMouse.containsMouse ? Theme.accent : Theme.border
+                        opacity: page.wifiEnabled ? 1.0 : 0.35
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: page.icRefresh
+                            color: pRescan.running ? Theme.accent : Theme.textDim
+                            font.family: Theme.iconFont
+                            font.pixelSize: Theme.textSizeGroup
+                        }
+
+                        MouseArea {
+                            id: rescanMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            enabled: page.wifiEnabled
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: page.rescan()
+                        }
+                    }
+                }
+            }
+
+            // ── Connect status / error ───────────────────────
+            Text {
+                visible: page.connecting || page.statusMsg.length > 0
+                width: parent.width
+                wrapMode: Text.WordWrap
+                text: page.connecting ? "CONNECTING…" : page.statusMsg
+                color: page.connecting ? Theme.accent : Theme.danger
+                font.family: page.mono
                 font.pixelSize: Theme.textSizeSmall
                 font.letterSpacing: 1
             }
-        }
 
-        // ── Connect status / error ───────────────────────────────
-        Text {
-            visible: page.connecting || page.statusMsg.length > 0
-            width: parent.width
-            wrapMode: Text.WordWrap
-            text: page.connecting ? "CONNECTING…" : page.statusMsg
-            color: page.connecting ? Theme.accent : Theme.danger
-            font.family: page.monoFont
-            font.pixelSize: Theme.textSizeSmall
-            font.letterSpacing: 1
-        }
+            // ── Ethernet ─────────────────────────────────────
+            // One row: Ethernet status on the left, Wi-Fi network count on the right
+            SectionHeader {
+                label: "ETHERNET"
+                info: page.ethernet.state === "connected"
+                    ? (page.ethernet.connection || page.ethernet.device)
+                    : "Disconnected"
+                badges: page.wifiEnabled && page.networks.length > 0
+                    ? ["NETWORKS " + page.networks.length]
+                    : []
+            }
 
-        // ── Wi-Fi network list ───────────────────────────────────
-        Item {
-            id: listContainer
-            width: parent.width
-            height: parent.height - y
+            // ── Wi-Fi networks ───────────────────────────────
 
-            Flickable {
-                anchors.fill: parent
-                clip: true
-                contentWidth: width
-                contentHeight: list.height
+            EmptyState {
+                visible: !page.wifiEnabled
+                icon: page.icWifi
+                title: "WI-FI IS DISABLED"
+            }
 
-                Column {
-                    id: list
-                    width: parent.width
-                    spacing: 6
+            EmptyState {
+                visible: page.wifiEnabled && page.networks.length === 0
+                icon: page.icWifi
+                title: "SCANNING WI-FI NETWORKS..."
+            }
 
-                    Text {
-                        visible: !page.wifiEnabled
-                        width: parent.width
-                        text: "Wi-Fi is disabled"
-                        color: Theme.textDim
-                        font.family: page.monoFont
-                        font.pixelSize: Theme.textSizeGroup
-                        horizontalAlignment: Text.AlignHCenter
-                    }
+            Column {
+                id: list
+                width: parent.width
+                spacing: 10
 
-                    Text {
-                        visible: page.wifiEnabled && !page.networks.length
-                        width: parent.width
-                        text: "Scanning Wi-Fi networks"
-                        color: Theme.textDim
-                        font.family: page.monoFont
-                        font.pixelSize: Theme.textSizeGroup
-                        horizontalAlignment: Text.AlignHCenter
-                    }
+                Repeater {
+                    model: page.networks
 
-                    Repeater {
-                        model: page.networks
+                    delegate: Column {
+                        id: entry
 
-                        delegate: Column {
-                            required property var modelData
-                            width: list.width
-                            spacing: 6
+                        required property var modelData
+                        width: list.width
+                        spacing: 8
 
-                            Rectangle {
-                                width: parent.width
-                                height: 46
-                                radius: Theme.radius
-                                color: modelData.connected
-                                    ? Theme.alpha(Theme.accent, 0.10)
-                                    : "#00000000"
-                                border.width: 1
-                                border.color: modelData.connected ? Theme.accent : Theme.border
+                        Item {
+                            width: parent.width
+                            height: 64
+
+                            Frame { active: entry.modelData.connected }
+
+                            // right side: signal + action
+                            Row {
+                                id: actions
+                                anchors.right: parent.right
+                                anchors.rightMargin: 16
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 20
 
                                 Text {
-                                    id: connectBtn
-                                    anchors.left: parent.left
-                                    anchors.leftMargin: 14
                                     anchors.verticalCenter: parent.verticalCenter
-                                    width: 84
-                                    text: modelData.connected ? "DISCONNECT" : "CONNECT"
-                                    color: modelData.connected ? Theme.danger : Theme.accent
-                                    opacity: page.connecting ? 0.4 : 1.0
-                                    font.family: page.monoFont
-                                    font.pixelSize: Theme.textSizeSmall
-
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        enabled: !page.connecting
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: page.onNetworkClicked(modelData)
-                                    }
+                                    text: entry.modelData.signal + "%"
+                                    color: Theme.text
+                                    font.family: page.mono
+                                    font.pixelSize: Theme.textSizeGroup
                                 }
 
-                                Row {
-                                    anchors.left: connectBtn.right
-                                    anchors.leftMargin: 10
+                                TextButton {
                                     anchors.verticalCenter: parent.verticalCenter
-                                    spacing: 9
-
-                                    Text {
-                                        text: page.icWifi
-                                        color: modelData.connected ? Theme.accent : Theme.textDim
-                                        font.family: Theme.iconFont
-                                        font.pixelSize: Theme.textSizeSection
-                                    }
-
-                                    Text {
-                                        visible: modelData.secured
-                                        text: page.icLock
-                                        color: Theme.textFaint
-                                        font.family: Theme.iconFont
-                                        font.pixelSize: Theme.textSizeSmall
-                                        anchors.verticalCenter: parent.verticalCenter
-                                    }
-
-                                    Text {
-                                        text: modelData.ssid
-                                        color: Theme.text
-                                        font.family: page.monoFont
-                                        font.pixelSize: Theme.textSizeGroup
-                                        elide: Text.ElideRight
-                                        width: Math.min(implicitWidth, list.width - 190)
-                                    }
+                                    text: entry.modelData.connected ? "DISCONNECT" : "CONNECT"
+                                    baseColor: entry.modelData.connected ? Theme.danger : Theme.accent
+                                    hoverColor: baseColor
+                                    clickable: !page.connecting
+                                    onClicked: page.onNetworkClicked(entry.modelData)
                                 }
                             }
 
-                            Row {
-                                visible: page.pendingSsid === modelData.ssid
-                                width: parent.width
+                            // left side: icon + name + subtitle
+                            Text {
+                                id: netIcon
+                                anchors.left: parent.left
+                                anchors.leftMargin: 16
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: page.icWifi
+                                color: entry.modelData.connected ? Theme.accent : Theme.textDim
+                                font.family: Theme.iconFont
+                                font.pixelSize: Theme.textSizeSection
+                            }
+
+                            Column {
+                                anchors.left: netIcon.right
+                                anchors.leftMargin: 14
+                                anchors.right: actions.left
+                                anchors.rightMargin: 20
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 3
+
+                                Text {
+                                    width: parent.width
+                                    text: entry.modelData.ssid
+                                    elide: Text.ElideRight
+                                    color: Theme.text
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.textSizeGroup
+                                }
+
+                                Text {
+                                    width: parent.width
+                                    text: page.networkSubtitle(entry.modelData)
+                                    elide: Text.ElideRight
+                                    color: entry.modelData.connected ? Theme.accent : Theme.textDim
+                                    font.family: page.mono
+                                    font.pixelSize: Theme.textSizeSmall
+                                    font.letterSpacing: 1
+                                }
+                            }
+                        }
+
+                        // password prompt
+                        Row {
+                            visible: page.pendingSsid === entry.modelData.ssid
+                            width: parent.width
+                            height: 32
+                            spacing: 20
+
+                            Rectangle {
+                                width: 220
                                 height: 32
-                                spacing: 10
+                                color: Theme.bgCard
+                                border.color: Theme.accent
+                                border.width: 1
+                                radius: Theme.radius
 
-                                Rectangle {
-                                    width: 220
-                                    height: 32
-                                    color: Theme.bgCard
-                                    border.color: Theme.accent
-                                    border.width: 1
-                                    radius: Theme.radius
+                                TextInput {
+                                    id: pwField
+                                    anchors.fill: parent
+                                    anchors.margins: 8
+                                    color: Theme.text
+                                    font.family: page.mono
+                                    font.pixelSize: Theme.textSizeGroup
+                                    echoMode: TextInput.Password
+                                    focus: page.pendingSsid === entry.modelData.ssid
 
-                                    TextInput {
-                                        id: pwField
-                                        anchors.fill: parent
-                                        anchors.margins: 8
-                                        color: Theme.text
-                                        font.family: page.monoFont
-                                        font.pixelSize: Theme.textSizeGroup
-                                        echoMode: TextInput.Password
-                                        focus: page.pendingSsid === modelData.ssid
-
-                                        Keys.onReturnPressed: page.connectSecured(modelData.ssid, text)
-                                        Keys.onEnterPressed: page.connectSecured(modelData.ssid, text)
-                                        Keys.onEscapePressed: page.pendingSsid = ""
-                                    }
+                                    Keys.onReturnPressed: page.connectSecured(entry.modelData.ssid, text)
+                                    Keys.onEnterPressed: page.connectSecured(entry.modelData.ssid, text)
+                                    Keys.onEscapePressed: page.pendingSsid = ""
                                 }
+                            }
 
-                                Text {
-                                    text: "CONNECT"
-                                    color: Theme.accent2
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.textSizeBody
-                                    anchors.verticalCenter: parent.verticalCenter
+                            TextButton {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "CONNECT"
+                                baseColor: Theme.accent
+                                hoverColor: baseColor
+                                clickable: !page.connecting
+                                onClicked: page.connectSecured(entry.modelData.ssid, pwField.text)
+                            }
 
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        enabled: !page.connecting
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: page.connectSecured(modelData.ssid, pwField.text)
-                                    }
-                                }
-
-                                Text {
-                                    text: "CANCEL"
-                                    color: Theme.textDim
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.textSizeBody
-                                    anchors.verticalCenter: parent.verticalCenter
-
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: page.pendingSsid = ""
-                                    }
-                                }
+                            TextButton {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "CANCEL"
+                                onClicked: page.pendingSsid = ""
                             }
                         }
                     }

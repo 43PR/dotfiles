@@ -77,8 +77,8 @@ Scope {
         menuSize:     { min: 70,  max: 260, def: 100, step: 10, unit: "%" },
         animMs:       { min: 0,   max: 500, def: 200, step: 20, unit: " ms" },
 
-        cardWidth:    { min: 60,  max: 700, def: 284, step: 5,  unit: "px" },
-        itemHeight:   { min: 40,  max: 120, def: 56,  step: 4,  unit: "px" },
+        cardWidth:    { min: 40,  max: 500, def: 284, step: 5,  unit: "px" },
+        itemHeight:   { min: 40,  max: 500, def: 56,  step: 5,  unit: "px" },
         itemSpacing:  { min: 0,   max: 24,  def: 8,   step: 2,  unit: "px" },
         panelPadding: { min: 0,   max: 24,  def: 6,   step: 2,  unit: "px" },
         topGap:       { min: 0,   max: 120, def: 12,  step: 4,  unit: "px" },
@@ -175,6 +175,15 @@ Scope {
         if (devs[i].state === BluetoothDeviceState.Connecting) return true
         return false
     }
+    // true while at least one device is connected
+    readonly property bool btConnected: {
+        const a = Bluetooth.defaultAdapter
+        if (!a || !a.enabled || !a.devices) return false
+        const devs = a.devices.values !== undefined ? a.devices.values : a.devices
+        for (let i = 0; i < devs.length; i++)
+            if (devs[i].state === BluetoothDeviceState.Connected) return true
+        return false
+    }
 
     readonly property int edgeGap: 0
     // how much of the panel must stay on screen when dragged past borders
@@ -242,7 +251,10 @@ Scope {
         switch (name) {
         case "area":   return "\uf125"
         case "wifi":   return wifiOn ? "\udb81\udda9" : "\udb81\uddaa"
-        case "bt":     return btOn ? "\udb80\udcaf" : "\udb80\udcb2"
+        case "bt":
+            if (!btOn) return "\udb80\udcb2"          // bluetooth-off
+            return btConnected ? "\udb80\udcb1"       // bluetooth-connect
+                               : "\udb80\udcaf"       // bluetooth
         case "night":  return "\uf186"                                    // moon
         case "dnd":    return dndOn ? "\udb80\udc9b" : "\udb80\udc9a"
         case "bright": return "\uf185"                                    // sun

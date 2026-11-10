@@ -5,6 +5,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Hyprland
+import Quickshell.Bluetooth
 import Quickshell.Services.Pipewire
 import Quickshell.Services.UPower
 
@@ -39,7 +40,7 @@ Scope {
         midLeftMods: "ws",
         centerMods: "clock",
         midRightMods: "tasks",
-        endMods: "media,battery,wall,settings,volume,net,power"
+        endMods: "media,battery,wall,settings,volume,bt,net,power"
     })
     readonly property var positions: ["top", "right", "bottom", "left"]
     readonly property var styles: ["floating", "joined", "strip", "islands"]
@@ -329,6 +330,42 @@ Scope {
             + (t > 0 ? " · " + fmtTime(t) + (batCharging ? " to full" : " left") : "");
     }
 
+    // ───────────────────────── Bluetooth ─────────────────────────
+    readonly property bool hasBt: Bluetooth.defaultAdapter !== null
+    readonly property bool btOn: Bluetooth.defaultAdapter ? Bluetooth.defaultAdapter.enabled : false
+
+    function btDevices() {
+        const a = Bluetooth.defaultAdapter;
+        if (!a || !a.enabled || !a.devices) return [];
+        return a.devices.values !== undefined ? a.devices.values : a.devices;
+    }
+
+    // "Headphones 80%" for every connected device (battery only when the device reports it)
+    readonly property var btConnectedNames: {
+        const out = [], devs = btDevices();
+        for (let i = 0; i < devs.length; i++) {
+            const d = devs[i];
+            if (d.state !== BluetoothDeviceState.Connected) continue;
+            let n = d.name || d.deviceName || d.address;
+            if (d.batteryAvailable) n += " " + Math.round(d.battery * 100) + "%";
+            out.push(n);
+        }
+        return out;
+    }
+    readonly property bool btConnecting: {
+        const devs = btDevices();
+        for (let i = 0; i < devs.length; i++)
+            if (devs[i].state === BluetoothDeviceState.Connecting) return true;
+        return false;
+    }
+    readonly property string btGlyph: !btOn ? "\uDB80\uDCB2"                           // bluetooth-off
+                                    : btConnectedNames.length > 0 ? "\uDB80\uDCB1"    // bluetooth-connect
+                                    : "\uDB80\uDCAF"                                   // bluetooth
+    readonly property string btTip: !btOn ? "Bluetooth: off"
+        : btConnecting ? "Bluetooth: connecting…"
+        : btConnectedNames.length > 0 ? "Bluetooth: " + btConnectedNames.join(", ")
+        : "Bluetooth: on, no devices connected"
+
     // ───────────────────────── Module registry ─────────────────────────
     // Modules with `cmd` are rendered by the generic iconC component:
     //   g = glyph, tip = tooltip title, hint = left-click description.
@@ -345,8 +382,8 @@ Scope {
         { id: "media",    l: "Media" },
         { id: "volume",   l: "Volume" },
         { id: "battery",  l: "Battery" },
-        { id: "net",      l: "Network",       cmd: "qs ipc call settings network",
-                                              hint: "Open network settings" },
+        { id: "bt",       l: "Bluetooth" },
+        { id: "net",      l: "Network" },
         { id: "notif",    l: "Notifications", cmd: "qs ipc call notifications toggle", g: "\uDB80\uDC9C",
                                               tip: "Notifications", hint: "Toggle notification panel" },
         { id: "wall",     l: "Wallpapers",    cmd: "qs -n -p ~/.config/quickshell/hyprquickpaper", g: "\uDB80\uDEE9",
@@ -360,7 +397,8 @@ Scope {
     readonly property var defMap: moduleDefs.reduce((m, d) => { m[d.id] = d; return m; }, {})
     readonly property var comps: ({
         cpu: cpuC, ram: ramC, gpu: gpuC, cputemp: cpuTempC, gputemp: gpuTempC,
-        ws: wsC, tasks: tasksC, media: mediaC, volume: volumeC, battery: batteryC, icon: iconC
+        ws: wsC, tasks: tasksC, media: mediaC, volume: volumeC, battery: batteryC,
+        bt: btC, net: netC, icon: iconC
     })
 
     // Old combined modules are migrated in saved configs: "stats" → "cpu" + "ram", "temp" → "cputemp" + "gputemp".
@@ -389,6 +427,7 @@ Scope {
         switch (id) {
         case "media":   return Marquee.player !== null && Marquee.title !== "";
         case "battery": return hasBattery;
+        case "bt":      return hasBt;
         default:        return true;
         }
     }
@@ -563,11 +602,38 @@ Scope {
         return v >= 0 ? name + " temperature: " + v + "°C" : name + " temperature: no sensor detected";
     }
 
+    // ───────────────────────── Network ─────────────────────────
+    // netState : "ethernet" | "wifi" | "disconnected"   (what is actually connected)
+    // netName  : name of that connection
+    // wifiOn   : state of the Wi-Fi radio (right click on the module toggles it)
     property string netState: "disconnected"
+    property string netName: ""
+    property bool wifiOn: true
+
+    // Radio deliberately off and nothing else connected → shown dim instead of red.
+    readonly property bool netOff: !wifiOn && netState === "disconnected"
+
     readonly property string netGlyph: netState === "wifi" ? "\uDB81\uDDA9"
                                      : netState === "ethernet" ? "\uDB80\uDE00" : "\uDB81\uDDAA"
-    readonly property string netTip: netState === "wifi" ? "Wi-Fi connected"
-                                   : netState === "ethernet" ? "Ethernet connected" : "Disconnected"
+    readonly property string netTip: {
+        const w = wifiOn ? "" : " · Wi-Fi off";
+        if (netState === "ethernet") return "Ethernet" + (netName !== "" ? ": " + netName : "") + w;
+        if (netState === "wifi") return "Wi-Fi" + (netName !== "" ? ": " + netName : "");
+        return wifiOn ? "Disconnected" : "Wi-Fi: off";
+    }
+
+    function toggleWifi() {
+        wifiOn = !wifiOn;                                    // instant feedback; the recheck confirms it
+        run("nmcli radio wifi " + (wifiOn ? "on" : "off"));
+        netRecheck.restart();
+    }
+
+    function refreshNet() {
+        if (!netProc.running) netProc.running = true;
+        if (!netRadioProc.running) netRadioProc.running = true;
+    }
+
+    Timer { id: netRecheck; interval: 900; onTriggered: root.refreshNet() }
 
     // Notification count: the notifications panel persists its history here
     property int notifCount: 0
@@ -607,24 +673,37 @@ Scope {
         onLoadFailed: root.notifCount = 0
     }
 
+    // Connection state + name. Terse lines look like "wifi:connected:MyNet"; ":" inside the name is escaped.
     Process {
         id: netProc
-        command: ["nmcli", "-t", "-f", "TYPE,STATE", "device"]
+        command: ["nmcli", "-t", "-f", "TYPE,STATE,CONNECTION", "device"]
         stdout: StdioCollector {
             onStreamFinished: {
-                let st = "disconnected";
+                let st = "disconnected", name = "";
                 for (const l of text.split("\n")) {
-                    if (l === "ethernet:connected") { st = "ethernet"; break; }
-                    if (l === "wifi:connected") st = "wifi";
+                    const p = l.split(":");
+                    if (p.length < 2) continue;
+                    const n = p.slice(2).join(":").replace(/\\:/g, ":");
+                    if (p[0] === "ethernet" && p[1] === "connected") { st = "ethernet"; name = n; break; }
+                    if (p[0] === "wifi" && p[1] === "connected") { st = "wifi"; name = n; }
                 }
                 if (st !== root.netState) root.netState = st;
+                if (name !== root.netName) root.netName = name;
             }
+        }
+    }
+
+    Process {
+        id: netRadioProc
+        command: ["nmcli", "radio", "wifi"]
+        stdout: StdioCollector {
+            onStreamFinished: root.wifiOn = text.trim() === "enabled"
         }
     }
 
     Timer {
         interval: 10000; running: root.barVisible; repeat: true; triggeredOnStart: true
-        onTriggered: if (!netProc.running) netProc.running = true
+        onTriggered: root.refreshNet()
     }
 
     PwObjectTracker { objects: [Pipewire.defaultAudioSink] }
@@ -649,6 +728,9 @@ Scope {
     //   Middle click → tertiary action (optional)
     //   Scroll       → adjust a value (optional)
     //   Drag         → move the module (reorder, or drop it in another section)
+    // Connectivity / hardware modules (volume, network, bluetooth) all follow the same pattern:
+    //   Left click   → open that module's page in settings
+    //   Right click  → switch the thing on / off (mute, Wi-Fi radio, Bluetooth power)
     // Hints declared on a module are shown automatically in its tooltip.
     // States: hover · pressed · active (accent) · warning (danger) · disabled.
 
@@ -1198,13 +1280,12 @@ Scope {
     }
 
     // ───────────────────────── Module components ─────────────────────────
-    // Generic icon button: net / notif / wall / settings / power (driven by moduleDefs)
+    // Generic icon button: notif / wall / settings / power (driven by moduleDefs)
     Component {
         id: iconC
         Mod {
             id: ic
             property var def: root.defMap[mid] ?? ({})
-            readonly property bool isNet: mid === "net"
             readonly property bool isNotif: mid === "notif"
             readonly property bool isSettings: mid === "settings"
             // icons 2px smaller; power nudged down so it lines up with volume/battery text
@@ -1212,16 +1293,15 @@ Scope {
             yOffset: mid === "power" ? root.iconYOffset
                    : isNotif && !root.vertical ? root.iconYOffset - 0.5
                    : root.iconYOffset
-                   xOffset: !root.vertical ? 0 : isNet ? -1 : isNotif ? -1 : (mid === "power" || isSettings) ? -1 : 0
-            text: isNet ? root.netGlyph : (isNotif && root.notifDnd ? "\uDB80\uDC9B" : (def.g ?? ""))
-            tip: isNet ? root.netTip : mid === "notif" ? root.notifTip : (def.tip ?? "")
+            xOffset: !root.vertical ? 0 : (isNotif || mid === "power" || isSettings) ? -1 : 0
+            text: isNotif && root.notifDnd ? "\uDB80\uDC9B" : (def.g ?? "")
+            tip: isNotif ? root.notifTip : (def.tip ?? "")
             // The settings button has configurable click binds (see Bar page → Settings button)
             primaryHint: isSettings ? root.actionHint(cfg.settingsPrimary) : (def.hint ?? "")
             secondaryHint: isSettings ? root.actionHint(cfg.settingsSecondary)
                          : isNotif ? (root.notifDnd ? "Turn off Do Not Disturb" : "Turn on Do Not Disturb") : ""
             tertiaryHint: isSettings ? root.actionHint(cfg.settingsTertiary) : ""
             noSecondary: isSettings && cfg.settingsSecondary === "none"
-            warning: isNet && root.netState === "disconnected"
             onPrimary: {
                 if (isSettings) root.doAction(cfg.settingsPrimary);
                 else if (def.cmd) root.run(def.cmd);
@@ -1255,6 +1335,50 @@ Scope {
                     renderType: Text.NativeRendering
                 }
             }
+        }
+    }
+
+    // Network: icon only.
+    //   Left click  → network settings
+    //   Right click → Wi-Fi radio on / off
+    // Dim = Wi-Fi off and nothing connected, red = radio on but not connected, normal = connected.
+    Component {
+        id: netC
+        Mod {
+            glyphSize: root.sz.icon - 2
+            xOffset: root.vertical ? -1 : 0
+            yOffset: root.iconYOffset
+            glyph: root.netGlyph
+            color: root.netOff ? Theme.textDim : Theme.text
+            warning: root.netState === "disconnected" && root.wifiOn
+            tip: root.netTip
+            primaryHint: "Open network settings"
+            secondaryHint: root.wifiOn ? "Turn Wi-Fi off" : "Turn Wi-Fi on"
+            onPrimary: root.run("qs ipc call settings network")
+            onSecondary: root.toggleWifi()
+        }
+    }
+
+    // Bluetooth: icon only.
+    //   Left click  → Bluetooth settings
+    //   Right click → Bluetooth power on / off (shared with the quick actions menu via BluetoothState)
+    // Dim = off, normal = on, accent = at least one device connected.
+    Component {
+        id: btC
+        Mod {
+            glyphSize: root.sz.icon - 2
+            xOffset: root.vertical ? -1 : 0
+            yOffset: root.iconYOffset
+            glyph: root.btGlyph
+            color: !root.btOn ? Theme.textDim
+                 : root.btConnectedNames.length > 0 ? Theme.accent : Theme.text
+            disabled: !root.hasBt
+            disabledReason: "No Bluetooth adapter"
+            tip: root.btTip
+            primaryHint: "Open Bluetooth settings"
+            secondaryHint: root.btOn ? "Turn Bluetooth off" : "Turn Bluetooth on"
+            onPrimary: root.run("qs ipc call settings bluetooth")
+            onSecondary: BluetoothState.togglePower()
         }
     }
 
