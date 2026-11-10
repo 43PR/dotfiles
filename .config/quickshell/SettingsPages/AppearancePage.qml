@@ -80,6 +80,11 @@ Item {
         blurSize: 5,
         blurPasses: 1,
         blurVibrancy: 0.2,
+        blurVariant: "kawase",
+        blurProportional: false,
+        // Per-variant options, keyed "variant.option" (e.g. "drops.speed").
+        // Missing keys fall back to the defaults in variantSpecs.
+        blurOpts: {},
         blurLayers: true,
         blurLayerAlpha: 0.1,
         shadowRange: 4,
@@ -110,6 +115,102 @@ Item {
 
     // Profiles the system can't provide are shown dimmed instead of hidden
     readonly property var unavailableProfiles: profileOptions.filter(p => availableProfiles.indexOf(p) < 0)
+
+    // ------------------------------------------------------------------
+    // Blur variants (Hyprland 0.57+)
+    //
+    // Ranges and defaults come from the Hyprland wiki (config-options, decoration.blur.*).
+    // Colors are stored as "#rrggbbaa" (alpha last, like the wiki defaults).
+    // ------------------------------------------------------------------
+
+    readonly property var blurVariantOptions: [
+        "kawase", "aurora", "drops", "frost",
+        "haze", "heat_shimmer", "ripple", "water"
+    ]
+    readonly property var blurVariantLabels: ({
+        kawase: "KAWASE", aurora: "AURORA", drops: "DROPS",
+        frost: "FROST", haze: "HAZE", heat_shimmer: "HEAT SHIMMER",
+        ripple: "RIPPLE", water: "WATER"
+    })
+    readonly property var variantNotes: ({
+        kawase: "Default Hyprland blur. Uses SIZE, PASSES and VIBRANCY above.",
+        aurora: "Aurora-like light streaks. Animated; speed 0 freezes it.",
+        drops: "Rain on a window pane. Animated; speed 0 disables the animation.",
+        frost: "Cracked ice. No extra options.",
+        haze: "A diffused, pearlescent effect.",
+        heat_shimmer: "A small shimmer with aberration. Animated; speed 0 disables it.",
+        ripple: "Ripple on click. Reacts to clicks only.",
+        water: "Ripple on a heightmap. Reacts to clicks and drags; each click keeps blurred surfaces redrawing for about 12 s."
+    })
+
+    // type "float" -> BarSlider, type "color" -> HexInput.
+    // dec = decimals shown on the slider, unit = suffix.
+    readonly property var variantSpecs: ({
+        kawase: [],
+        frost: [],
+        aurora: [
+            { key: "speed",     label: "SPEED",     type: "float", from: 0, to: 10, step: 0.1,  dec: 1, unit: "", def: 1.0 },
+            { key: "intensity", label: "INTENSITY", type: "float", from: 0, to: 1,  step: 0.01, dec: 2, unit: "", def: 0.35 },
+            { key: "color1",    label: "COLOR 1 (RRGGBBAA)", type: "color", def: "#29f0a0ff" },
+            { key: "color2",    label: "COLOR 2 (RRGGBBAA)", type: "color", def: "#7a4dffff" }
+        ],
+        drops: [
+            { key: "speed", label: "SPEED", type: "float", from: 0, to: 10, step: 0.1, dec: 1, unit: "", def: 3.0 }
+        ],
+        haze: [
+            { key: "intensity",   label: "INTENSITY",   type: "float", from: 0, to: 1, step: 0.01, dec: 2, unit: "", def: 0.35 },
+            { key: "iridescence", label: "IRIDESCENCE", type: "float", from: 0, to: 1, step: 0.01, dec: 2, unit: "", def: 0.7 }
+        ],
+        heat_shimmer: [
+            { key: "speed", label: "SPEED", type: "float", from: 0, to: 10, step: 0.1, dec: 1, unit: "", def: 1.0 }
+        ],
+        ripple: [
+            { key: "strength", label: "STRENGTH", type: "float", from: 0,    to: 32,   step: 1,    dec: 0, unit: " px", def: 30 },
+            { key: "radius",   label: "RADIUS",   type: "float", from: 1,    to: 1000, step: 1,    dec: 0, unit: " px", def: 400 },
+            { key: "width",    label: "WAVE WIDTH", type: "float", from: 1,  to: 200,  step: 1,    dec: 0, unit: " px", def: 32 },
+            { key: "duration", label: "DURATION", type: "float", from: 0.05, to: 5,    step: 0.05, dec: 2, unit: " s",  def: 0.45 }
+        ],
+        water: [
+            { key: "strength", label: "STRENGTH", type: "float", from: 0,   to: 32,   step: 1,    dec: 0, unit: " px", def: 32 },
+            { key: "radius",   label: "RADIUS",   type: "float", from: 1,   to: 1000, step: 1,    dec: 0, unit: " px", def: 20 },
+            { key: "speed",    label: "SPEED",    type: "float", from: 0,   to: 10,   step: 0.01, dec: 2, unit: "",    def: 0.76 },
+            { key: "damping",  label: "DAMPING",  type: "float", from: 0,   to: 1,    step: 0.01, dec: 2, unit: "",    def: 0.95 },
+            { key: "duration", label: "DURATION", type: "float", from: 0.5, to: 60,   step: 0.5,  dec: 1, unit: " s",  def: 12 }
+        ]
+    })
+
+    readonly property var sliderSpecs: (variantSpecs[look.blurVariant] || []).filter(s => s.type !== "color")
+    readonly property var colorSpecs: (variantSpecs[look.blurVariant] || []).filter(s => s.type === "color")
+
+    function optKey(variant, key) { return variant + "." + key }
+
+    function optValue(variant, spec) {
+        const o = look.blurOpts
+        const k = optKey(variant, spec.key)
+        return (o && o[k] !== undefined) ? o[k] : spec.def
+    }
+
+    // Lua sub-table for the active variant, or null when it has no options.
+    function variantTable(variant) {
+        const specs = variantSpecs[variant]
+        if (!specs || specs.length === 0) return null
+        const t = {}
+        for (let i = 0; i < specs.length; i++)
+            t[specs[i].key] = optValue(variant, specs[i])
+        return t
+    }
+
+    // "14EEF5FF", "#14eef5", "0x14eef5ff" -> "#14eef5ff" (6 digits get full alpha). "" if invalid.
+    function normalizeHex(raw) {
+        let s = String(raw).trim().replace(/^#/, "").replace(/^0x/i, "")
+        if (/^[0-9a-fA-F]{6}$/.test(s)) s += "ff"
+        return /^[0-9a-fA-F]{8}$/.test(s) ? "#" + s.toLowerCase() : ""
+    }
+
+    // "#rrggbbaa" -> Qt's "#aarrggbb" for the swatch
+    function hexToQt(h) {
+        return (typeof h === "string" && h.length === 9) ? "#" + h.substring(7, 9) + h.substring(1, 7) : "#00000000"
+    }
 
     // ------------------------------------------------------------------
     // Lua generation
@@ -155,6 +256,18 @@ Item {
         const fxOn = effectsLevel !== "off"
         const high = effectsLevel === "high"
 
+        // Blur table: base options + variant (+ the active variant's own options).
+        const blur = {
+            enabled: true,
+            size: high ? l.blurSize + 4 : l.blurSize,
+            passes: high ? l.blurPasses + 1 : l.blurPasses,
+            vibrancy: l.blurVibrancy,
+            variant: l.blurVariant,
+            proportional: l.blurProportional
+        }
+        const vt = variantTable(l.blurVariant)
+        if (vt) blur[l.blurVariant] = vt
+
         const cfg = {
             general: {
                 gaps_in: l.gapsIn,
@@ -166,9 +279,7 @@ Item {
             },
             decoration: {
                 rounding: l.rounding,
-                blur: fxOn
-                    ? { enabled: true, size: high ? l.blurSize + 4 : l.blurSize, passes: high ? l.blurPasses + 1 : l.blurPasses, vibrancy: l.blurVibrancy }
-                    : { enabled: false },
+                blur: fxOn ? blur : { enabled: false },
                 shadow: fxOn
                     ? { enabled: true, range: high ? l.shadowRange + 12 : l.shadowRange, render_power: l.shadowPower }
                     : { enabled: false }
@@ -176,8 +287,12 @@ Item {
             animations: { enabled: animationsEnabled }
         }
 
+        // Proportional blur needs the shader blur blend path.
+        const blendOn = fxOn && l.blurProportional
+
         const stmts = []
-        stmts.push("hl.config({ render = { expand_undersized_textures = " + (l.expandUndersized ? "true" : "false") + " } })")
+        stmts.push("hl.config({ render = { expand_undersized_textures = " + (l.expandUndersized ? "true" : "false")
+            + (blendOn ? ", use_shader_blur_blend = true" : "") + " } })")
         stmts.push("hl.config(" + luaTable(cfg, 0) + ")")
         stmts.push("hl.curve(\"easeOut\", { type = \"bezier\", points = { {0.05, 0.9}, {0.1, 1.0} } })")
         stmts.push(animLine("windows",    l.speedWindows,    "easeOut"))
@@ -346,12 +461,35 @@ Item {
                 const keys = Object.keys(n)
                 for (let i = 0; i < keys.length; i++) {
                     const k = keys[i]
+                    if (k === "blurOpts") continue   // validated separately below
                     if (saved.look[k] !== undefined && typeof saved.look[k] === typeof n[k])
                         n[k] = saved.look[k]
                 }
                 if (["dwindle", "scrolling", "master"].indexOf(n.layout) === -1) n.layout = lookDefaults.layout
                 if (["slide", "slidefade", "slidevert", "slidefadevert"].indexOf(n.workspaceStyle) === -1)
                     n.workspaceStyle = lookDefaults.workspaceStyle
+                if (blurVariantOptions.indexOf(n.blurVariant) === -1) n.blurVariant = lookDefaults.blurVariant
+
+                // Per-variant options: keep only known keys, clamp numbers, normalize colors.
+                const opts = {}
+                const savedOpts = (saved.look.blurOpts && typeof saved.look.blurOpts === "object") ? saved.look.blurOpts : {}
+                const variants = Object.keys(variantSpecs)
+                for (let vi = 0; vi < variants.length; vi++) {
+                    const specs = variantSpecs[variants[vi]]
+                    for (let si = 0; si < specs.length; si++) {
+                        const s = specs[si]
+                        const ok = optKey(variants[vi], s.key)
+                        const raw = savedOpts[ok]
+                        if (raw === undefined) continue
+                        if (s.type === "color") {
+                            const hex = normalizeHex(raw)
+                            if (hex !== "") opts[ok] = hex
+                        } else if (typeof raw === "number" && isFinite(raw)) {
+                            opts[ok] = Math.max(s.from, Math.min(s.to, raw))
+                        }
+                    }
+                }
+                n.blurOpts = opts
                 look = n
             }
         } catch (error) {
@@ -380,6 +518,19 @@ Item {
         if (look[key] === value) return
         const n = Object.assign({}, look)
         n[key] = value
+        look = n
+        saveTimer.restart()
+        applyTimer.restart()
+    }
+
+    // Sets one option of one blur variant (spec = entry from variantSpecs).
+    function setBlurOpt(variant, spec, value) {
+        const v = typeof value === "number" ? +value.toFixed(4) : value
+        if (optValue(variant, spec) === v) return
+        const opts = Object.assign({}, look.blurOpts)
+        opts[optKey(variant, spec.key)] = v
+        const n = Object.assign({}, look)
+        n.blurOpts = opts
         look = n
         saveTimer.restart()
         applyTimer.restart()
@@ -688,6 +839,74 @@ Item {
         }
     }
 
+    // Label on top; colour swatch + hex text field below.
+    // Accepts RRGGBB or RRGGBBAA (with or without # / 0x); emits "#rrggbbaa" when valid.
+    component HexInput: Item {
+        id: hx
+        property string label: ""
+        property string value: "#ffffffff"
+        signal picked(string v)
+
+        width: parent.cellWidth ?? parent.width
+        height: hxLabel.implicitHeight + 3 + 26
+        opacity: enabled ? 1.0 : 0.4
+
+        // Keep the field in sync when the value changes from elsewhere (reset, variant switch).
+        onValueChanged: hexField.text = hx.value
+
+        Text {
+            id: hxLabel
+            width: parent.width
+            elide: Text.ElideRight
+            text: hx.label
+            color: Theme.textDim
+            font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody; font.letterSpacing: 1
+        }
+
+        Row {
+            y: hxLabel.implicitHeight + 3
+            width: parent.width
+            spacing: 6
+
+            Rectangle {
+                id: swatch
+                width: 26; height: 26; radius: Theme.radius
+                color: page.hexToQt(hx.value)
+                border.width: 1; border.color: Theme.border
+            }
+
+            Rectangle {
+                width: parent.width - swatch.width - parent.spacing
+                height: 26; radius: Theme.radius
+                color: "#00000000"; clip: true
+                border.width: 1
+                border.color: hexField.activeFocus ? Theme.accent : Theme.border
+
+                TextInput {
+                    id: hexField
+                    anchors.fill: parent; anchors.leftMargin: 8; anchors.rightMargin: 8
+                    verticalAlignment: TextInput.AlignVCenter
+                    clip: true; selectByMouse: true
+                    maximumLength: 12
+                    enabled: hx.enabled
+                    text: hx.value
+                    color: Theme.text
+                    selectionColor: Theme.accent
+                    font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
+                    onEditingFinished: {
+                        const n = page.normalizeHex(text)
+                        if (n !== "") {
+                            hx.picked(n)
+                            text = n
+                        } else {
+                            text = hx.value
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // Header row of a section: title on the left, optional action button on the right.
     component SectionHeader: Item {
         id: sh
@@ -948,6 +1167,75 @@ Item {
                             from: 1; to: 4; step: 1
                             value: page.look.shadowPower
                             onMoved: v => page.setLook("shadowPower", v)
+                        }
+                    }
+
+                    Divider {}
+
+                    // ---- Blur variant (Hyprland 0.57+) ----
+                    GroupLabel { text: "BLUR STYLE" }
+
+                    BarChoice {
+                        enabled: page.effectsLevel !== "off"
+                        label: "VARIANT"
+                        options: page.blurVariantOptions
+                        labels: page.blurVariantLabels
+                        maxCols: 4
+                        current: page.look.blurVariant
+                        onPicked: v => page.setLook("blurVariant", v)
+                    }
+
+                    Note {
+                        text: (page.variantNotes[page.look.blurVariant] ?? "")
+                            + (page.look.blurVariant !== "kawase"
+                                ? " Non-default styles can significantly increase GPU and CPU usage, animated ones the most."
+                                : "")
+                    }
+
+                    Cols {
+                        enabled: page.effectsLevel !== "off"
+
+                        ToggleRow {
+                            label: "PROPORTIONAL BLUR"; checked: page.look.blurProportional
+                            onToggled: v => page.setLook("blurProportional", v)
+                        }
+                    }
+                    Note {
+                        visible: page.look.blurProportional
+                        text: "Blur strength follows each pixel's opacity (render:use_shader_blur_blend is enabled for you). It can weaken blur on low-opacity panels, so check PANEL BLUR THRESHOLD below."
+                    }
+
+                    // Sliders for the selected variant
+                    Cols {
+                        visible: page.sliderSpecs.length > 0
+                        enabled: page.effectsLevel !== "off"
+
+                        Repeater {
+                            model: page.sliderSpecs
+                            delegate: BarSlider {
+                                required property var modelData
+                                label: modelData.label
+                                from: modelData.from; to: modelData.to; step: modelData.step
+                                decimals: modelData.dec; unit: modelData.unit
+                                value: page.optValue(page.look.blurVariant, modelData)
+                                onMoved: v => page.setBlurOpt(page.look.blurVariant, modelData, v)
+                            }
+                        }
+                    }
+
+                    // Colour options for the selected variant (hex text input)
+                    Cols {
+                        visible: page.colorSpecs.length > 0
+                        enabled: page.effectsLevel !== "off"
+
+                        Repeater {
+                            model: page.colorSpecs
+                            delegate: HexInput {
+                                required property var modelData
+                                label: modelData.label
+                                value: page.optValue(page.look.blurVariant, modelData)
+                                onPicked: v => page.setBlurOpt(page.look.blurVariant, modelData, v)
+                            }
                         }
                     }
 
