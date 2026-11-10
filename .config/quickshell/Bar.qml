@@ -25,11 +25,11 @@ Scope {
         // modules
         modPad: 18, wsDot: 16, wsGap: 8, wsScroll: true, wsNumbers: true,
         tasksScale: 0.85, tasksGap: 2, tasksColor: "normal",
-        statsPercent: false, statsScale: 0.95, statsBorder: false, statsRadius: 24, statsGap: 1, statsWarn: 85, tempWarn: 85, batLowPct: 15,
+        statsPercent: false, statsIcons: false, statsScale: 0.95, statsBorder: false, statsRadius: 24, statsGap: 1, statsWarn: 85, tempWarn: 85, batLowPct: 15,
         batNumber: false, batPercent: false,
         volStep: 2, volMax: 100, volNumber: false, volPercent: false,
         // clock / calendar
-        clock24: true, clockSeconds: false, clockPadHour: true, clockDate: true, clockDay: false, clockCase: "normal", weekMonday: true,
+        clock24: true, clockSeconds: false, clockPadHour: true, clockDate: true, clockDay: false, clockCase: "normal", dateOrder: "dm", weekMonday: true,
         // clock click binds: "calendar" | "quickactions" | "settings" | "barsettings" | "none"
         clockPrimary: "calendar", clockSecondary: "settings", clockTertiary: "quickactions",
         // settings button click binds: "quickactions" | "settings" | "barsettings" | "none"
@@ -91,6 +91,7 @@ Scope {
             property int tasksGap: root.defaults.tasksGap        // space between open-apps icons
             property string tasksColor: root.defaults.tasksColor // open-apps icon tint: "normal" | "accent"
             property bool statsPercent: root.defaults.statsPercent // show the % / °C symbols on CPU / RAM / GPU / TEMP
+            property bool statsIcons: root.defaults.statsIcons   // glyph instead of the CPU / RAM / GPU / TEMP text label
             property real statsScale: root.defaults.statsScale   // text scale of the CPU / RAM / GPU / TEMP badges
             property bool statsBorder: root.defaults.statsBorder // outline around the stat badges
             property int statsRadius: root.defaults.statsRadius  // badge corner radius (24 = full pill)
@@ -110,6 +111,7 @@ Scope {
             property bool clockDate: root.defaults.clockDate     // minimal date next to the clock, e.g. "Thu, 29/10"
             property bool clockDay: root.defaults.clockDay       // weekday (Mon/Tue) in front of the date
             property string clockCase: root.defaults.clockCase   // day name + AM/PM letters: "normal" | "upper" | "lower"
+            property string dateOrder: root.defaults.dateOrder   // date order: "dm" (29/10) | "md" (10/29)
             property bool weekMonday: root.defaults.weekMonday   // calendar week starts on Monday
             property string clockPrimary: root.defaults.clockPrimary     // clock left click
             property string clockSecondary: root.defaults.clockSecondary // clock right click
@@ -269,20 +271,22 @@ Scope {
         if (!cfg.clock24) parts.push(ampmText(d));
         return parts.join("\n");
     }
-
-    // Date goes to the right of / below the time and starts with a dot.
-    // The calendar popup keeps using clockText() (no date).
     function clockBarText(d) {
         const t = clockText(d);
         if (!cfg.clockDate) return t;
-        return t + "  \u2022  " + (cfg.clockDay ? dayText(d) + ", " : "") + Qt.formatDate(d, "dd/MM");
+        return t + "  \u2022  " + (cfg.clockDay ? dayText(d) + ", " : "")
+        + Qt.formatDate(d, cfg.dateOrder === "md" ? "MM/dd" : "dd/MM");
     }
-    // Vertical: dot, weekday, day and month each on their own line (no "/").
     function clockBarVText(d) {
         const t = clockVText(d);
         if (!cfg.clockDate) return t;
+        const dd = Qt.formatDate(d, "dd"), mm = Qt.formatDate(d, "MM");
         return t + "\n\u2022\n" + (cfg.clockDay ? dayText(d) + "\n" : "")
-                 + Qt.formatDate(d, "dd") + "\n" + Qt.formatDate(d, "MM");
+        + (cfg.dateOrder === "md" ? mm + "\n" + dd : dd + "\n" + mm);
+    }
+    // Full date for the tooltip and the calendar header
+    function longDate(d) {
+        return Qt.formatDate(d, cfg.dateOrder === "md" ? "dddd, MMMM d, yyyy" : "dddd, d MMMM yyyy");
     }
 
     // ───────────────────────── Battery ─────────────────────────
@@ -1022,14 +1026,18 @@ Scope {
 
     // Rounded stat badge (CPU / RAM / GPU / temperatures), informational only.
     // Capsule with label + value ("CPU 12" / stacked on vertical bars).
+    // With the "icons" option on, a glyph replaces the text label.
     // `unit` ("%" or "°C") is appended when the "show unit symbols" option is on.
     component StatBadge: Interactive {
         id: stat
         anchors.verticalCenterOffset: 1
         property string label: ""
+        property string icon: ""          // Nerd Font glyph; used instead of `label` when the option is on
+        property string iconFont: Theme.iconFont   // badges can override this for their glyph
         property string valueText: ""
         property string unit: ""
-        readonly property string shownLabel: label
+        readonly property bool useIcon: cfg.statsIcons && icon !== ""
+        readonly property string shownLabel: useIcon ? icon : label
         readonly property string shownValue: valueText + (cfg.statsPercent ? unit : "")
         readonly property color fg: warning ? Theme.danger : Theme.text
 
@@ -1040,7 +1048,7 @@ Scope {
         readonly property int maxCross: Math.max(8, root.panelThick - (cfg.border ? 2 : 0))
         readonly property int crossPad: root.vertical ? 8 : 6
         readonly property int wantedPx: Math.max(4, Math.round(10 * cfg.statsScale * cfg.scale * cfg.barScale))
-        readonly property int labelWantedPx: Math.max(4, wantedPx - 1)
+        readonly property int labelWantedPx: useIcon ? wantedPx + 2 : Math.max(4, wantedPx - 1)
         // worst-case value ("100" / "100%") so the font does not jump while the numbers change
         readonly property string sampleValue: "100" + (cfg.statsPercent ? "%" : "")
         readonly property real contentCross: root.vertical
@@ -1054,7 +1062,7 @@ Scope {
         TextMetrics {
             id: mLabel
             text: stat.shownLabel
-            font.family: Theme.iconFont
+            font.family: stat.useIcon ? stat.iconFont : Theme.iconFont
             font.pixelSize: stat.labelWantedPx
         }
         TextMetrics {
@@ -1099,15 +1107,15 @@ Scope {
                     Layout.alignment: Qt.AlignCenter
                     text: stat.shownLabel
                     color: Qt.alpha(stat.fg, 0.75)
-                    font.family: Theme.iconFont
-                    font.pixelSize: Math.max(4, stat.fontPx - 1)
+                    font.family: stat.useIcon ? stat.iconFont : Theme.iconFont
+                    font.pixelSize: stat.useIcon ? stat.fontPx + 2 : Math.max(4, stat.fontPx - 1)
                     renderType: Text.NativeRendering
                 }
                 Text {
                     Layout.alignment: Qt.AlignCenter
                     text: stat.shownValue
                     color: stat.fg
-                    font.family: Theme.iconFont
+                    font.family: stat.useIcon ? stat.iconFont : Theme.iconFont
                     font.bold: true
                     font.pixelSize: stat.fontPx
                     renderType: Text.NativeRendering
@@ -1386,7 +1394,7 @@ Scope {
     Component {
         id: cpuC
         StatBadge {
-            label: "CPU"
+            label: "CPU"; icon: "\uEF8E"; iconFont: Theme.tablerFont
             unit: "%"
             valueText: String(root.cpuUsage)
             warning: root.cpuUsage >= cfg.statsWarn
@@ -1398,7 +1406,7 @@ Scope {
     Component {
         id: ramC
         StatBadge {
-            label: "RAM"
+            label: "RAM"; icon: "\uD800\uDEB7"; iconFont: Theme.tablerFont
             unit: "%"
             valueText: String(root.memPercent)
             warning: root.memPercent >= cfg.statsWarn
@@ -1411,7 +1419,7 @@ Scope {
     Component {
         id: gpuC
         StatBadge {
-            label: "GPU"
+            label: "GPU"; icon: "\uD800\uDE99"; iconFont: Theme.tablerFont
             unit: root.gpuHasUsage ? "%" : ""
             valueText: root.gpuHasUsage ? String(root.gpuUsage) : "–"
             warning: root.gpuHasUsage && root.gpuUsage >= cfg.statsWarn
@@ -1423,7 +1431,7 @@ Scope {
     Component {
         id: cpuTempC
         StatBadge {
-            label: "CPUT"
+            label: "CPUT"; icon: "\uEB38"; iconFont: Theme.tablerFont
             unit: root.cpuTemp >= 0 ? "°C" : ""
             valueText: root.tempText(root.cpuTemp)
             warning: root.cpuTemp >= cfg.tempWarn
@@ -1435,7 +1443,7 @@ Scope {
     Component {
         id: gpuTempC
         StatBadge {
-            label: "GPUT"
+            label: "GPUT"; icon: "\uEB38"; iconFont: Theme.tablerFont
             unit: root.gpuTemp >= 0 ? "°C" : ""
             valueText: root.tempText(root.gpuTemp)
             warning: root.gpuTemp >= cfg.tempWarn

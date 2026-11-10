@@ -64,7 +64,6 @@ GENERATED_FILES=(
     "gtk-3.0/settings.ini"
     "gtk-4.0/settings.ini"
     "rofi/colors.rasi"
-    "quickshell/Theme.qml"
 )
 
 # Args to pass along when the script re-runs itself after pulling.

@@ -12,6 +12,11 @@ QtObject {
     property real settingsScale: 1.0
     readonly property string fontFamily: "JetBrains Mono"
     property string iconFont: "JetBrainsMono Nerd Font"
+    property FontLoader tablerLoader: FontLoader {
+    source: "file://" + Quickshell.env("HOME") + "/.config/quickshell/fonts/TablerIconsBar.ttf"
+    onStatusChanged: console.log("[tabler] status:", status, "name:", name)
+    }
+    property string tablerFont: tablerLoader.name
     readonly property int animFast: 120
     readonly property int animMed: 220
     readonly property int animSlow: 380

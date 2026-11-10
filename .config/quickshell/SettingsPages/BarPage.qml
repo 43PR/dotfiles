@@ -27,10 +27,10 @@ Item {
         tooltips: true, tooltipHints: false, tooltipBorder: false, tipDelay: 450,
         modPad: 18, wsDot: 16, wsGap: 8, wsScroll: true, wsNumbers: true,
         tasksScale: 0.85, tasksGap: 2, tasksColor: "normal",
-        statsPercent: false, statsScale: 0.95, statsBorder: false, statsRadius: 24, statsGap: 1, statsWarn: 85, tempWarn: 85, batLowPct: 15,
+        statsPercent: false, statsIcons: false, statsScale: 0.95, statsBorder: false, statsRadius: 24, statsGap: 1, statsWarn: 85, tempWarn: 85, batLowPct: 15,
         batNumber: false, batPercent: false,
         volStep: 2, volMax: 100, volNumber: false, volPercent: false,
-        clock24: true, clockSeconds: false, clockPadHour: true, clockDate: true, clockDay: false, clockCase: "normal", weekMonday: true,
+        clock24: true, clockSeconds: false, clockPadHour: true, clockDate: true, clockDay: false, clockCase: "normal", dateOrder: "dm", weekMonday: true,
         clockPrimary: "calendar", clockSecondary: "settings", clockTertiary: "quickactions",
         settingsPrimary: "settings", settingsSecondary: "barsettings", settingsTertiary: "none",
         hidden: "wall,settings,ram",
@@ -48,6 +48,8 @@ Item {
     readonly property var actionLabels: ({ quickactions: "QUICK ACTIONS", barsettings: "BAR SETTINGS" })
     readonly property var caseOptions: ["normal", "upper", "lower"]
     readonly property var caseLabels: ({ normal: "NORMAL", upper: "UPPERCASE", lower: "LOWERCASE" })
+    readonly property var dateOrderOptions: ["dm", "md"]
+    readonly property var dateOrderLabels: ({ dm: "DAY / MONTH", md: "MONTH / DAY" })
 
     // Module order / section placement is changed by dragging modules on the bar itself.
     // This page only turns modules on and off.
@@ -703,6 +705,12 @@ Item {
                             onPicked: v => page.set("clockCase", v)
                         }
                         CycleChoice {
+                            label: "DATE ORDER"
+                            options: page.dateOrderOptions; labels: page.dateOrderLabels
+                            current: page.val("dateOrder")
+                            onPicked: v => page.set("dateOrder", v)
+                        }
+                        CycleChoice {
                             label: "WEEK STARTS ON"
                             options: ["monday", "sunday"]
                             current: page.val("weekMonday") ? "monday" : "sunday"
@@ -813,6 +821,10 @@ Item {
                     enabled: page.statsOn
 
                     Cols {
+                        ToggleRow {
+                            label: "ICONS/LABELS"; checked: page.val("statsIcons")
+                            onToggled: v => page.set("statsIcons", v)
+                        }
                         ToggleRow {
                             label: "% / °C SYMBOLS"; checked: page.val("statsPercent")
                             onToggled: v => page.set("statsPercent", v)

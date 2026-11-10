@@ -77,7 +77,7 @@ Item {
         allowTearing: false,
         layout: "dwindle",
         rounding: 8,
-        blurSize: 5,
+        blurSize: 4,
         blurPasses: 1,
         blurVibrancy: 0.2,
         blurVariant: "kawase",

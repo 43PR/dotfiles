@@ -581,7 +581,7 @@ Item {
                         color: Theme.textDim
                         font.family: page.mono
                         font.pixelSize: Theme.textSizeGroup
-                        opacity: btnArea.containsMouse ? 0.9 : (hoverArea.containsMouse ? 0.35 : 0.12)
+                        opacity: btnArea.containsMouse ? 0.9 : (hoverArea.containsMouse ? 0.8 : 0.1)
                         Behavior on opacity { NumberAnimation { duration: 150 } }
 
                         MouseArea {
