@@ -63,6 +63,7 @@ Item {
         { id: "ws",       l: "WORKSPACES" },
         { id: "tasks",    l: "OPEN APPS" },
         { id: "media",    l: "MEDIA" },
+        { id: "layout",   l: "LAYOUT" },
         { id: "volume",   l: "VOLUME" },
         { id: "battery",  l: "BATTERY" },
         { id: "bt",       l: "BLUETOOTH" },
