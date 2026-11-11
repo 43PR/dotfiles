@@ -397,6 +397,7 @@ Scope {
 
             Connections {
                 target: card.Window.window
+                enabled: !win.revealBound          // stop listening to every frame once revealed
                 ignoreUnknownSignals: true
                 function onFrameSwapped() {
                     if (win.sized && win.pageReady && !win.revealBound && ++win.warmFrames >= 3)
@@ -413,20 +414,38 @@ Scope {
 
             // ---- Input region ----
             //
-            // While showing, the whole window takes input (the backdrop, which only changes
-            // when the window itself is resized). While hidden/closing the region is empty,
-            // so clicks pass through. The region never depends on the card's geometry, which
-            // is what used to leave it stale (card ignoring the mouse) on some machines.
+            // Only the card takes input; everywhere else the pointer passes through to the
+            // windows underneath. While hidden/closing the region is empty (full click-through).
+            // While dragging/resizing the whole window takes input so the pointer can't leave
+            // the region mid-gesture.
             //
-            // Quickshell's Region does not always update by itself, so changed() is emitted
-            // whenever an input changes, and again shortly after the window is created to
-            // cover first-launch timing (saved state, fonts, page load finishing late).
-            mask: Region {
-                id: inputMask
-                item: (root.showing && win.sized) ? backdrop : null
+            // inputRect tracks the card's TARGET geometry (root.cardX/Y/Width/Height), not the
+            // animated one, so the region is not re-sent to the compositor on every animation
+            // frame. Region does not always update by itself (see Region.changed docs), so
+            // changed() is emitted (coalesced) whenever an input changes, and again shortly
+            // after the window is created to cover first-launch timing.
+            Item {
+                id: inputRect
+                x: Math.round(root.cardX)
+                y: Math.round(root.cardY)
+                width: Math.round(root.cardWidth)
+                height: Math.round(root.cardHeight)
+                onXChanged: win.refreshMask()
+                onYChanged: win.refreshMask()
+                onWidthChanged: win.refreshMask()
+                onHeightChanged: win.refreshMask()
             }
 
-            function refreshMask() { Qt.callLater(function () { inputMask.changed() }) }
+            mask: Region {
+                id: inputMask
+                item: !(root.showing && win.sized) ? null
+                    : (root.dragging || root.resizing) ? backdrop
+                    : inputRect
+            }
+
+            function emitMaskChanged() { inputMask.changed() }
+            // Qt.callLater with the same function reference is coalesced into a single call
+            function refreshMask() { Qt.callLater(win.emitMaskChanged) }
 
             onSizedChanged: refreshMask()
             onRevealChanged: refreshMask()
@@ -436,6 +455,8 @@ Scope {
                 function onShowingChanged() { win.refreshMask() }
                 function onWinWChanged()    { win.refreshMask() }
                 function onWinHChanged()    { win.refreshMask() }
+                function onDraggingChanged() { win.refreshMask() }
+                function onResizingChanged() { win.refreshMask() }
             }
 
             // First-launch safety net: re-assert the region after things have settled.
@@ -496,14 +517,16 @@ Scope {
             }
 
             // Invisible full-window item that holds keyboard focus (Esc / Tab handling).
-            // It has no MouseArea, so clicking outside the card does nothing.
+            // It has no MouseArea, and is outside the input region, so clicking outside
+            // the card goes to the windows underneath.
             Rectangle {
                 id: backdrop
                 anchors.fill: parent
                 color: "transparent"
 
                 focus: root.showing
-                Keys.onEscapePressed: root.hide()
+                // Esc only closes settings while the pointer is over the card
+                Keys.onEscapePressed: if (card.hovered) root.hide()
                 Keys.onPressed: function (event) {
                     if (event.key === Qt.Key_Backtab ||
                     (event.key === Qt.Key_Tab && (event.modifiers & Qt.ShiftModifier))) {
@@ -909,11 +932,12 @@ Scope {
                                                     root.selectedIndex = root.filteredNavItems[0].origIndex
                                             }
 
-                                            // Esc clears the box first; a further Esc closes settings
+                                            // Esc clears the box first; a further Esc closes settings,
+                                            // but only while the pointer is over the card
                                             Keys.onEscapePressed: {
                                                 if (text !== "") {
                                                     root.searchQuery = ""
-                                                } else {
+                                                } else if (card.hovered) {
                                                     focus = false
                                                     root.hide()
                                                 }

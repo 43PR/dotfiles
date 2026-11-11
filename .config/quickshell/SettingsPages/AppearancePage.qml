@@ -80,6 +80,16 @@ Item {
         blurSize: 4,
         blurPasses: 1,
         blurVibrancy: 0.2,
+        // Extra base blur options (defaults match Hyprland's own defaults,
+        // so nothing changes until you touch them).
+        blurNoise: 0.0117,
+        blurContrast: 0.8916,
+        blurBrightness: 1.0,
+        blurVibrancyDarkness: 0.0,
+        blurIgnoreOpacity: true,
+        blurNewOptimizations: true,
+        blurSpecial: false,
+        blurPopups: false,
         blurVariant: "kawase",
         blurProportional: false,
         // Per-variant options, keyed "variant.option" (e.g. "drops.speed").
@@ -121,19 +131,22 @@ Item {
     //
     // Ranges and defaults come from the Hyprland wiki (config-options, decoration.blur.*).
     // Colors are stored as "#rrggbbaa" (alpha last, like the wiki defaults).
+    // A color spec with fmt: "argb" is written to Lua as a 0xAARRGGBB integer literal
+    // instead of a string (used by acrylic.tint).
     // ------------------------------------------------------------------
 
     readonly property var blurVariantOptions: [
-        "kawase", "aurora", "drops", "frost",
+        "kawase", "acrylic", "aurora", "drops", "frost",
         "haze", "heat_shimmer", "ripple", "water"
     ]
     readonly property var blurVariantLabels: ({
-        kawase: "KAWASE", aurora: "AURORA", drops: "DROPS",
+        kawase: "KAWASE", acrylic: "ACRYLIC", aurora: "AURORA", drops: "DROPS",
         frost: "FROST", haze: "HAZE", heat_shimmer: "HEAT SHIMMER",
         ripple: "RIPPLE", water: "WATER"
     })
     readonly property var variantNotes: ({
         kawase: "Default Hyprland blur. Uses SIZE, PASSES and VIBRANCY above.",
+        acrylic: "Frosted acrylic glass with refraction and a colour tint. Still uses the base blur options above.",
         aurora: "Aurora-like light streaks. Animated; speed 0 freezes it.",
         drops: "Rain on a window pane. Animated; speed 0 disables the animation.",
         frost: "Cracked ice. No extra options.",
@@ -148,6 +161,14 @@ Item {
     readonly property var variantSpecs: ({
         kawase: [],
         frost: [],
+        acrylic: [
+            { key: "aberration", label: "ABERRATION", type: "float", from: 0, to: 0.5, step: 0.01, dec: 2, unit: "", def: 0.04 },
+            { key: "bulb",       label: "BULB",       type: "float", from: 0, to: 200, step: 1,    dec: 0, unit: "", def: 48 },
+            { key: "clarity",    label: "CLARITY",    type: "float", from: 0, to: 1,   step: 0.01, dec: 2, unit: "", def: 0.82 },
+            { key: "refraction", label: "REFRACTION", type: "float", from: 0, to: 100, step: 1,    dec: 0, unit: "", def: 24 },
+            // Stored as #rrggbbaa; written to Lua as 0xAARRGGBB (0x20FFFFFF = #ffffff20)
+            { key: "tint", label: "TINT (RRGGBBAA)", type: "color", fmt: "argb", def: "#ffffff20" }
+        ],
         aurora: [
             { key: "speed",     label: "SPEED",     type: "float", from: 0, to: 10, step: 0.1,  dec: 1, unit: "", def: 1.0 },
             { key: "intensity", label: "INTENSITY", type: "float", from: 0, to: 1,  step: 0.01, dec: 2, unit: "", def: 0.35 },
@@ -190,13 +211,22 @@ Item {
         return (o && o[k] !== undefined) ? o[k] : spec.def
     }
 
+    // "#rrggbbaa" -> Lua integer literal "0xAARRGGBB"
+    function argbLiteral(h) {
+        const s = (typeof h === "string" && h.length === 9) ? h : "#ffffffff"
+        return "0x" + (s.substring(7, 9) + s.substring(1, 7)).toUpperCase()
+    }
+
     // Lua sub-table for the active variant, or null when it has no options.
     function variantTable(variant) {
         const specs = variantSpecs[variant]
         if (!specs || specs.length === 0) return null
         const t = {}
-        for (let i = 0; i < specs.length; i++)
-            t[specs[i].key] = optValue(variant, specs[i])
+        for (let i = 0; i < specs.length; i++) {
+            const v = optValue(variant, specs[i])
+            // { __lua: "..." } is emitted verbatim by luaValue (no quotes)
+            t[specs[i].key] = specs[i].fmt === "argb" ? { __lua: argbLiteral(v) } : v
+        }
         return t
     }
 
@@ -224,12 +254,14 @@ Item {
 
     function luaValue(value, depth) {
         if (typeof value === "boolean") return value ? "true" : "false"
-        if (typeof value === "number") return String(Number(value.toFixed(3)))
+        if (typeof value === "number") return String(Number(value.toFixed(4)))
         if (Array.isArray(value)) {
             const items = []
             for (let i = 0; i < value.length; i++) items.push(luaValue(value[i], depth + 1))
             return "{ " + items.join(", ") + " }"
         }
+        // Raw Lua literal, e.g. 0x20FFFFFF
+        if (typeof value === "object" && value !== null && value.__lua !== undefined) return String(value.__lua)
         if (typeof value === "object" && value !== null) return luaTable(value, depth)
         return "\"" + luaString(value) + "\""
     }
@@ -261,7 +293,15 @@ Item {
             enabled: true,
             size: high ? l.blurSize + 4 : l.blurSize,
             passes: high ? l.blurPasses + 1 : l.blurPasses,
+            noise: l.blurNoise,
+            contrast: l.blurContrast,
+            brightness: l.blurBrightness,
             vibrancy: l.blurVibrancy,
+            vibrancy_darkness: l.blurVibrancyDarkness,
+            ignore_opacity: l.blurIgnoreOpacity,
+            new_optimizations: l.blurNewOptimizations,
+            special: l.blurSpecial,
+            popups: l.blurPopups,
             variant: l.blurVariant,
             proportional: l.blurProportional
         }
@@ -1157,6 +1197,30 @@ Item {
                             onMoved: v => page.setLook("blurVibrancy", v)
                         }
                         BarSlider {
+                            label: "VIBRANCY DARKNESS"
+                            from: 0; to: 1; step: 0.05; decimals: 2
+                            value: page.look.blurVibrancyDarkness
+                            onMoved: v => page.setLook("blurVibrancyDarkness", v)
+                        }
+                        BarSlider {
+                            label: "NOISE"
+                            from: 0; to: 1; step: 0.005; decimals: 3
+                            value: page.look.blurNoise
+                            onMoved: v => page.setLook("blurNoise", v)
+                        }
+                        BarSlider {
+                            label: "CONTRAST"
+                            from: 0; to: 2; step: 0.01; decimals: 2
+                            value: page.look.blurContrast
+                            onMoved: v => page.setLook("blurContrast", v)
+                        }
+                        BarSlider {
+                            label: "BRIGHTNESS"
+                            from: 0; to: 2; step: 0.01; decimals: 2
+                            value: page.look.blurBrightness
+                            onMoved: v => page.setLook("blurBrightness", v)
+                        }
+                        BarSlider {
                             label: "SHADOW RANGE"
                             from: 0; to: 50; step: 1
                             value: page.look.shadowRange
@@ -1167,6 +1231,27 @@ Item {
                             from: 1; to: 4; step: 1
                             value: page.look.shadowPower
                             onMoved: v => page.setLook("shadowPower", v)
+                        }
+                    }
+
+                    Cols {
+                        enabled: page.effectsLevel !== "off"
+
+                        ToggleRow {
+                            label: "IGNORE OPACITY"; checked: page.look.blurIgnoreOpacity
+                            onToggled: v => page.setLook("blurIgnoreOpacity", v)
+                        }
+                        ToggleRow {
+                            label: "NEW OPTIMIZATIONS"; checked: page.look.blurNewOptimizations
+                            onToggled: v => page.setLook("blurNewOptimizations", v)
+                        }
+                        ToggleRow {
+                            label: "SPECIAL WORKSPACE"; checked: page.look.blurSpecial
+                            onToggled: v => page.setLook("blurSpecial", v)
+                        }
+                        ToggleRow {
+                            label: "BLUR POPUPS"; checked: page.look.blurPopups
+                            onToggled: v => page.setLook("blurPopups", v)
                         }
                     }
 
