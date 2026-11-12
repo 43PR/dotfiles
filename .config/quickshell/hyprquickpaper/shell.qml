@@ -27,7 +27,7 @@ PanelWindow {
         globalScale:        { min: 0.5,  max: 1.5,  def: 1.0,  step: 0.05, dec: 0, mult: 100, unit: "%" },
         zoomScale:          { min: 0.3,  max: 1.2,  def: 0.4,  step: 0.05, dec: 0, mult: 100, unit: "%" },
         edgeScale:          { min: 0.1,  max: 1.0,  def: 0.7,  step: 0.05, dec: 0, mult: 100, unit: "%" },
-        edgeSpacing:        { min: -200, max: 600,  def: 130,  step: 10,   dec: 0, mult: 1,   unit: " px" },
+        edgeSpacing:        { min: -200, max: 600,  def: 130,  step: 5,   dec: 0, mult: 1,   unit: " px" },
         edgeCurve:          { min: 1,    max: 4,    def: 1,    step: 0.25, dec: 2, mult: 1,   unit: "" },
         baseSpacing:        { min: 0,    max: 100,  def: 0,    step: 2,    dec: 0, mult: 1,   unit: " px" },
         skewFactor:         { min: -0.5, max: 0.5,  def: 0,    step: 0.05, dec: 2, mult: 1,   unit: "" },
@@ -148,6 +148,41 @@ PanelWindow {
     function openSettings() { settingsOpen = true }
     function closeSettings() { settingsOpen = false }
     function toggleSettings() { settingsOpen = !settingsOpen }
+
+    // Keyboard focus follows the settings panel: while it is open the panel's focus
+    // scope owns the keys (so Enter / arrows never act on the carousel behind it),
+    // and when it closes the carousel gets them back. Deferred one tick so the panel
+    // is already visible when it receives focus.
+    onSettingsOpenChanged: Qt.callLater(function () {
+        if (main.settingsOpen) panelScope.forceActiveFocus()
+        else list.forceActiveFocus()
+    })
+
+    // Move keyboard focus to the next / previous Tab-focusable item. Wrapping
+    // onto the window's content item (not focusable) is ignored.
+    function focusStep(item, forward) {
+        var n = item.nextItemInFocusChain(forward)
+        if (n && n.activeFocusOnTab)
+            n.forceActiveFocus(forward ? Qt.TabFocusReason : Qt.BacktabFocusReason)
+    }
+
+    // Scroll the enclosing Flickable (if any) so `item` is fully visible,
+    // with `margin` px of breathing room (shows the section header above it).
+    function ensureVisible(item, margin) {
+        var f = item.parent
+        while (f && !(f.contentY !== undefined && f.contentHeight !== undefined))
+            f = f.parent
+        if (!f)
+            return
+        var p = item.mapToItem(f.contentItem, 0, 0)
+        var top = p.y - margin
+        var bottom = p.y + item.height + margin / 2
+        var maxY = Math.max(0, f.contentHeight - f.height)
+        if (top < f.contentY)
+            f.contentY = Math.max(0, top)
+        else if (bottom > f.contentY + f.height)
+            f.contentY = Math.min(maxY, bottom - f.height)
+    }
 
     function defOf(key) { return key === "tileCount" ? configs.number_of_pictures : numSpec[key].def }
 
@@ -719,6 +754,14 @@ PanelWindow {
 
     // ---- Settings panel (right-click to open) -----------------------------
     // Draggable by its header. Everything under the panel is shielded from the mouse.
+    //
+    // Keyboard: while the panel is open its focus scope (panelScope) owns the keys.
+    // Every slider, toggle, transition row and footer button is Tab-focusable (Qt's
+    // normal focus chain, in visual order). Tab / Shift+Tab or Up / Down move between
+    // controls; Left / Right (PgUp / PgDn for bigger steps, Home / End for min / max,
+    // Backspace / Delete to reset) adjust a focused slider; Left / Right pick a
+    // transition; Space / Enter flips a toggle or presses a button. The panel scrolls
+    // to keep the focused control in view. Esc closes the panel.
     Rectangle {
         id: panel
         readonly property real u: main.menuUi
@@ -732,7 +775,9 @@ PanelWindow {
         border.width: 1
         border.color: main.th.alpha(main.th.text, 0.12)
         opacity: main.settingsOpen ? 1 : 0
-        visible: opacity > 0
+        // visible as soon as it opens (not only once the fade has started) so it
+        // can take keyboard focus right away
+        visible: main.settingsOpen || opacity > 0
         scale: main.settingsOpen ? 1 : 0.96
         transformOrigin: Item.TopRight
         Behavior on opacity { NumberAnimation { duration: main.th.animMed } }
@@ -745,134 +790,166 @@ PanelWindow {
             onWheel: wheel => wheel.accepted = true
         }
 
-        Item {
-            id: head
-            anchors.top: parent.top
-            width: parent.width
-            height: 58 * panel.u
+        FocusScope {
+            id: panelScope
+            anchors.fill: parent
 
-            MouseArea {
-                anchors.fill: parent
-                cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
-                drag.target: panel
-                drag.axis: Drag.XAndYAxis
-                drag.minimumX: 0
-                drag.maximumX: Screen.width - panel.width
-                drag.minimumY: 0
-                drag.maximumY: Screen.height - panel.height
-            }
+            Keys.onEscapePressed: main.closeSettings()
 
-            Text {
-                x: 20 * panel.u; y: 9 * panel.u
-                text: "Wallpaper picker settings"
-                font.family: main.th.fontFamily
-                font.pixelSize: main.th.textSizeSection * panel.u
-                font.bold: true
-                color: main.th.text
-            }
-            Text {
-                x: 20 * panel.u; y: 34 * panel.u
-                text: "Right-click toggles · drag here to move"
-                font.family: main.th.fontFamily
-                font.pixelSize: main.th.textSizeSmall * panel.u
-                color: main.th.textDim
-            }
+            // Fallback keys, only reached when the focused control did not handle the
+            // key (or nothing is focused yet): scrolling. Tab / Shift+Tab are
+            // deliberately NOT handled here so Qt's focus chain moves between controls.
+            Keys.onPressed: function (event) {
+                var maxY = Math.max(0, flick.contentHeight - flick.height)
+                var step = 48 * panel.u
+                var page = flick.height * 0.9
+                var dy = 0
 
-            Text {
-                anchors.right: parent.right
-                anchors.rightMargin: 16 * panel.u
-                y: 8 * panel.u
-                width: 26 * panel.u; height: 26 * panel.u
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
-                text: "×"
-                font.family: main.th.fontFamily
-                font.pixelSize: 22 * panel.u
-                color: closeArea.containsMouse ? main.th.text : main.th.textDim
-                MouseArea { id: closeArea; anchors.fill: parent; hoverEnabled: true; onClicked: main.closeSettings() }
-            }
-        }
-
-        Flickable {
-            id: flick
-            anchors { top: head.bottom; bottom: foot.top; left: parent.left; right: parent.right }
-            contentWidth: width
-            contentHeight: contentCol.height + 16 * panel.u
-            clip: true
-            flickableDirection: Flickable.VerticalFlick
-            boundsBehavior: Flickable.StopAtBounds
-
-            Column {
-                id: contentCol
-                x: 20 * panel.u
-                width: flick.width - 40 * panel.u
-
-                SectionHeader { text: "Layout" }
-                SliderRow { key: "globalScale"; label: "Scale" }
-                SliderRow { key: "tileCount"; label: "Tiles on screen" }
-                SliderRow { key: "zoomScale"; label: "Center tile size" }
-                SliderRow { key: "edgeScale"; label: "Edge tile size" }
-                SliderRow { key: "sizeCurve"; label: "Size falloff curve" }
-                SliderRow { key: "baseSpacing"; label: "Gap between tiles" }
-
-                SectionHeader { text: "Edges" }
-                SliderRow { key: "edgeSpacing"; label: "Edge pull-in" }
-                SliderRow { key: "edgeCurve"; label: "Edge curve" }
-
-                SectionHeader { text: "3D" }
-                SliderRow { key: "tiltAngle"; label: "Tilt at the edges" }
-                SliderRow { key: "tiltDepth"; label: "Perspective depth" }
-                SliderRow { key: "tiltCurve"; label: "Tilt curve" }
-
-                SectionHeader { text: "Style" }
-                SliderRow { key: "skewFactor"; label: "Skew" }
-                SliderRow { key: "activeOpacity"; label: "Selected tile opacity" }
-                SliderRow { key: "inactiveOpacity"; label: "Other tiles opacity" }
-                ToggleRow { key: "shadowEnabled"; label: "Shadow" }
-                SliderRow { key: "shadowOpacity"; label: "Shadow opacity"; enabled: main.shadowEnabled }
-
-                SectionHeader { text: "Behavior" }
-                SliderRow { key: "animDuration"; label: "Scroll animation" }
-
-                SectionHeader { text: "Wallpaper change" }
-                ChoiceRow {
-                    label: "Transition"
-                    options: main.transitions
-                    current: main.transition
-                    onPicked: v => { main.transition = v; main.saveState() }
+                switch (event.key) {
+                case Qt.Key_Down:     dy = step;  break
+                case Qt.Key_Up:       dy = -step; break
+                case Qt.Key_PageDown: dy = page;  break
+                case Qt.Key_PageUp:   dy = -page; break
+                case Qt.Key_Home:     flick.contentY = 0;    event.accepted = true; return
+                case Qt.Key_End:      flick.contentY = maxY; event.accepted = true; return
+                default: return   // Tab, Escape etc. are handled elsewhere
                 }
-                SliderRow { key: "transitionDuration"; label: "Transition duration" }
-            }
-        }
-
-        Item {
-            id: foot
-            anchors.bottom: parent.bottom
-            width: parent.width
-            height: 58 * panel.u
-
-            Rectangle { width: parent.width; height: 1; color: main.th.alpha(main.th.text, 0.08) }
-
-            ActionButton {
-                x: 20 * panel.u
-                anchors.verticalCenter: parent.verticalCenter
-                label: "Reset all"
-                enabled: main.modified
-                onClicked: main.resetAll()
+                flick.contentY = Math.max(0, Math.min(maxY, flick.contentY + dy))
+                event.accepted = true
             }
 
-            ActionButton {
-                anchors.right: parent.right
-                anchors.rightMargin: 20 * panel.u
-                anchors.verticalCenter: parent.verticalCenter
-                label: "Done"
-                primary: true
-                onClicked: main.closeSettings()
+            Item {
+                id: head
+                anchors.top: parent.top
+                width: parent.width
+                height: 58 * panel.u
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+                    drag.target: panel
+                    drag.axis: Drag.XAndYAxis
+                    drag.minimumX: 0
+                    drag.maximumX: Screen.width - panel.width
+                    drag.minimumY: 0
+                    drag.maximumY: Screen.height - panel.height
+                }
+
+                Text {
+                    x: 20 * panel.u; y: 9 * panel.u
+                    text: "Wallpaper picker settings"
+                    font.family: main.th.fontFamily
+                    font.pixelSize: main.th.textSizeSection * panel.u
+                    font.bold: true
+                    color: main.th.text
+                }
+                Text {
+                    x: 20 * panel.u; y: 34 * panel.u
+                    text: "Drag to move · Tab to navigate"
+                    font.family: main.th.fontFamily
+                    font.pixelSize: main.th.textSizeSmall * panel.u
+                    color: main.th.textDim
+                }
+
+                Text {
+                    anchors.right: parent.right
+                    anchors.rightMargin: 16 * panel.u
+                    y: 8 * panel.u
+                    width: 26 * panel.u; height: 26 * panel.u
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                    text: "×"
+                    font.family: main.th.fontFamily
+                    font.pixelSize: 22 * panel.u
+                    color: closeArea.containsMouse ? main.th.text : main.th.textDim
+                    MouseArea { id: closeArea; anchors.fill: parent; hoverEnabled: true; onClicked: main.closeSettings() }
+                }
+            }
+
+            Flickable {
+                id: flick
+                anchors { top: head.bottom; bottom: foot.top; left: parent.left; right: parent.right }
+                contentWidth: width
+                contentHeight: contentCol.height + 16 * panel.u
+                clip: true
+                flickableDirection: Flickable.VerticalFlick
+                boundsBehavior: Flickable.StopAtBounds
+
+                Column {
+                    id: contentCol
+                    x: 20 * panel.u
+                    width: flick.width - 40 * panel.u
+
+                    SectionHeader { text: "Layout" }
+                    SliderRow { key: "globalScale"; label: "Scale" }
+                    SliderRow { key: "tileCount"; label: "Tiles on screen" }
+                    SliderRow { key: "zoomScale"; label: "Center tile size" }
+                    SliderRow { key: "edgeScale"; label: "Edge tile size" }
+                    SliderRow { key: "sizeCurve"; label: "Size falloff curve" }
+                    SliderRow { key: "baseSpacing"; label: "Gap between tiles" }
+
+                    SectionHeader { text: "Edges" }
+                    SliderRow { key: "edgeSpacing"; label: "Edge pull-in" }
+                    SliderRow { key: "edgeCurve"; label: "Edge curve" }
+
+                    SectionHeader { text: "3D" }
+                    SliderRow { key: "tiltAngle"; label: "Tilt at the edges" }
+                    SliderRow { key: "tiltDepth"; label: "Perspective depth" }
+                    SliderRow { key: "tiltCurve"; label: "Tilt curve" }
+
+                    SectionHeader { text: "Style" }
+                    SliderRow { key: "skewFactor"; label: "Skew" }
+                    SliderRow { key: "activeOpacity"; label: "Selected tile opacity" }
+                    SliderRow { key: "inactiveOpacity"; label: "Other tiles opacity" }
+                    ToggleRow { key: "shadowEnabled"; label: "Shadow" }
+                    SliderRow { key: "shadowOpacity"; label: "Shadow opacity"; enabled: main.shadowEnabled }
+
+                    SectionHeader { text: "Behavior" }
+                    SliderRow { key: "animDuration"; label: "Scroll animation" }
+
+                    SectionHeader { text: "Wallpaper change" }
+                    ChoiceRow {
+                        label: "Transition"
+                        options: main.transitions
+                        current: main.transition
+                        onPicked: v => { main.transition = v; main.saveState() }
+                    }
+                    SliderRow { key: "transitionDuration"; label: "Transition duration" }
+                }
+            }
+
+            Item {
+                id: foot
+                anchors.bottom: parent.bottom
+                width: parent.width
+                height: 58 * panel.u
+
+                Rectangle { width: parent.width; height: 1; color: main.th.alpha(main.th.text, 0.08) }
+
+                ActionButton {
+                    x: 20 * panel.u
+                    anchors.verticalCenter: parent.verticalCenter
+                    label: "Reset all"
+                    enabled: main.modified
+                    onClicked: main.resetAll()
+                }
+
+                ActionButton {
+                    anchors.right: parent.right
+                    anchors.rightMargin: 20 * panel.u
+                    anchors.verticalCenter: parent.verticalCenter
+                    label: "Done"
+                    primary: true
+                    onClicked: main.closeSettings()
+                }
             }
         }
     }
 
     // ---- Reusable components ----------------------------------------------
+    // ActionButton, ToggleRow, ChoiceRow and SliderRow are Tab-focusable
+    // (activeFocusOnTab) and draw an accent ring while they hold keyboard focus.
+    // Disabled controls are skipped by Tab automatically.
     component ActionButton: Rectangle {
         id: ab
         property var host: main
@@ -882,13 +959,35 @@ PanelWindow {
         readonly property QtObject th: host.th
         signal clicked()
 
+        activeFocusOnTab: true
+
         implicitWidth: abText.implicitWidth + 28 * u
         width: implicitWidth
         height: 30 * u
         radius: Math.min(height / 2, ab.th.radius * u)
         opacity: enabled ? 1 : 0.4
         color: primary ? ab.th.accent : ab.th.alpha(ab.th.text, abArea.containsMouse && enabled ? 0.18 : 0.1)
+        border.width: ab.activeFocus ? Math.max(1, Math.round(2 * u)) : 0
+        border.color: ab.primary ? ab.th.text : ab.th.accent
         Behavior on color { ColorAnimation { duration: ab.th.animFast } }
+
+        onActiveFocusChanged: if (activeFocus) ab.host.ensureVisible(ab, 32 * u)
+
+        Keys.onPressed: function (event) {
+            if (event.key === Qt.Key_Space
+                    || event.key === Qt.Key_Return
+                    || event.key === Qt.Key_Enter) {
+                if (ab.enabled)
+                    ab.clicked()
+                event.accepted = true
+            } else if (event.key === Qt.Key_Left || event.key === Qt.Key_Up) {
+                ab.host.focusStep(ab, false)
+                event.accepted = true
+            } else if (event.key === Qt.Key_Right || event.key === Qt.Key_Down) {
+                ab.host.focusStep(ab, true)
+                event.accepted = true
+            }
+        }
 
         Text {
             id: abText
@@ -900,7 +999,16 @@ PanelWindow {
             color: ab.primary ? ab.th.bgPanel : ab.th.text
         }
 
-        MouseArea { id: abArea; anchors.fill: parent; hoverEnabled: true; enabled: ab.enabled; onClicked: ab.clicked() }
+        MouseArea {
+            id: abArea
+            anchors.fill: parent
+            hoverEnabled: true
+            enabled: ab.enabled
+            onClicked: {
+                ab.forceActiveFocus()
+                ab.clicked()
+            }
+        }
     }
 
     component SectionHeader: Item {
@@ -926,6 +1034,7 @@ PanelWindow {
         }
     }
 
+    // Keyboard: Space / Enter toggles, Up / Down move focus.
     component ToggleRow: Item {
         id: tr
         property var host: main
@@ -935,16 +1044,38 @@ PanelWindow {
         readonly property real u: host.menuUi
         readonly property QtObject th: host.th
 
+        activeFocusOnTab: true
+
         width: parent?.width ?? 0
         height: 34 * u
         opacity: enabled ? 1 : 0.4
+
+        onActiveFocusChanged: if (activeFocus) tr.host.ensureVisible(tr, 32 * u)
+
+        Keys.onPressed: function (event) {
+            if (event.key === Qt.Key_Space
+                    || event.key === Qt.Key_Return
+                    || event.key === Qt.Key_Enter) {
+                tr.host.toggleSetting(tr.key)
+                event.accepted = true
+            } else if (event.key === Qt.Key_Down) {
+                tr.host.focusStep(tr, true)
+                event.accepted = true
+            } else if (event.key === Qt.Key_Up) {
+                tr.host.focusStep(tr, false)
+                event.accepted = true
+            }
+        }
 
         Rectangle {
             anchors.fill: parent
             anchors.leftMargin: -8 * tr.u
             anchors.rightMargin: -8 * tr.u
             radius: Math.min(8 * tr.u, tr.th.radius * tr.u)
-            color: trArea.containsMouse && tr.enabled ? tr.th.alpha(tr.th.text, 0.06) : "transparent"
+            color: (trArea.containsMouse || tr.activeFocus) && tr.enabled
+                ? tr.th.alpha(tr.th.text, 0.06) : "transparent"
+            border.width: tr.activeFocus ? Math.max(1, Math.round(tr.u)) : 0
+            border.color: tr.th.accent
         }
 
         Text {
@@ -979,10 +1110,21 @@ PanelWindow {
             }
         }
 
-        MouseArea { id: trArea; anchors.fill: parent; hoverEnabled: true; enabled: tr.enabled; onClicked: tr.host.toggleSetting(tr.key) }
+        MouseArea {
+            id: trArea
+            anchors.fill: parent
+            hoverEnabled: true
+            enabled: tr.enabled
+            onClicked: {
+                tr.forceActiveFocus()
+                tr.host.toggleSetting(tr.key)
+            }
+        }
     }
 
     // Row of selectable chips (one choice out of a list of strings).
+    // Keyboard: Left / Right pick the previous / next option, Home / End the
+    // first / last, Up / Down move focus.
     component ChoiceRow: Item {
         id: cr
         property var host: main
@@ -993,9 +1135,43 @@ PanelWindow {
         readonly property QtObject th: host.th
         signal picked(string value)
 
+        activeFocusOnTab: true
+
         width: parent?.width ?? 0
         height: 28 * u + flow.implicitHeight + 8 * u
         opacity: enabled ? 1 : 0.4
+
+        onActiveFocusChanged: if (activeFocus) cr.host.ensureVisible(cr, 32 * u)
+
+        function pickAt(i) {
+            if (cr.options.length === 0) return
+            var j = Math.max(0, Math.min(cr.options.length - 1, i))
+            cr.picked(cr.options[j])
+        }
+
+        Keys.onPressed: function (event) {
+            var i = cr.options.indexOf(cr.current)
+            switch (event.key) {
+            case Qt.Key_Left:  cr.pickAt(i - 1); break
+            case Qt.Key_Right: cr.pickAt(i + 1); break
+            case Qt.Key_Home:  cr.pickAt(0); break
+            case Qt.Key_End:   cr.pickAt(cr.options.length - 1); break
+            case Qt.Key_Down:  cr.host.focusStep(cr, true);  break
+            case Qt.Key_Up:    cr.host.focusStep(cr, false); break
+            default: return
+            }
+            event.accepted = true
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: -4 * cr.u
+            radius: Math.min(8 * cr.u, cr.th.radius * cr.u)
+            color: "transparent"
+            visible: cr.activeFocus
+            border.width: Math.max(1, Math.round(cr.u))
+            border.color: cr.th.accent
+        }
 
         Text {
             y: 6 * cr.u
@@ -1038,7 +1214,10 @@ PanelWindow {
                         id: chipArea
                         anchors.fill: parent
                         hoverEnabled: true
-                        onClicked: cr.picked(chip.modelData)
+                        onClicked: {
+                            cr.forceActiveFocus()
+                            cr.picked(chip.modelData)
+                        }
                     }
                 }
             }
@@ -1046,6 +1225,8 @@ PanelWindow {
     }
 
     // Slider bound to a numSpec entry; saves on release, double-click resets that value.
+    // Keyboard: Left / Right = one step, PgUp / PgDn = five steps, Home / End = min / max,
+    // Backspace / Delete = reset to default, Up / Down move focus.
     component SliderRow: Item {
         id: sr
         property var host: main
@@ -1057,9 +1238,49 @@ PanelWindow {
         readonly property var spec: host.numSpec[key]
         readonly property real ratio: Math.max(0, Math.min(1, (host[key] - spec.min) / (spec.max - spec.min)))
 
+        activeFocusOnTab: true
+
         width: parent?.width ?? 0
         height: 46 * u
         opacity: enabled ? 1 : 0.4
+
+        onActiveFocusChanged: if (activeFocus) sr.host.ensureVisible(sr, 32 * u)
+
+        function nudge(delta) {
+            sr.host.setNumber(sr.key, sr.host[sr.key] + delta)
+            sr.host.saveState()
+        }
+
+        Keys.onPressed: function (event) {
+            var st = sr.spec.step
+            switch (event.key) {
+            case Qt.Key_Left:     sr.nudge(-st);     break
+            case Qt.Key_Right:    sr.nudge(st);      break
+            case Qt.Key_PageDown: sr.nudge(-st * 5); break
+            case Qt.Key_PageUp:   sr.nudge(st * 5);  break
+            case Qt.Key_Home:
+                sr.host.setNumber(sr.key, sr.spec.min); sr.host.saveState(); break
+            case Qt.Key_End:
+                sr.host.setNumber(sr.key, sr.spec.max); sr.host.saveState(); break
+            case Qt.Key_Backspace:
+            case Qt.Key_Delete:
+                sr.host.setNumber(sr.key, sr.host.defOf(sr.key)); sr.host.saveState(); break
+            case Qt.Key_Down:     sr.host.focusStep(sr, true);  break
+            case Qt.Key_Up:       sr.host.focusStep(sr, false); break
+            default: return
+            }
+            event.accepted = true
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: -3 * sr.u
+            radius: Math.min(8 * sr.u, sr.th.radius * sr.u)
+            color: "transparent"
+            visible: sr.activeFocus
+            border.width: Math.max(1, Math.round(sr.u))
+            border.color: sr.th.accent
+        }
 
         Text {
             anchors.left: parent.left; y: 6 * sr.u
@@ -1110,7 +1331,10 @@ PanelWindow {
                 sr.host.setNumber(sr.key, s.min + r * (s.max - s.min))
             }
 
-            onPressed: mouse => apply(mouse.x)
+            onPressed: mouse => {
+                sr.forceActiveFocus()
+                apply(mouse.x)
+            }
             onPositionChanged: mouse => { if (pressed) apply(mouse.x) }
             onReleased: sr.host.saveState()
             onDoubleClicked: { sr.host.setNumber(sr.key, sr.host.defOf(sr.key)); sr.host.saveState() }

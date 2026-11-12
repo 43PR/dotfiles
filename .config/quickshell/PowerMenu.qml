@@ -82,8 +82,8 @@ Scope {
 
     // ---- settings specs (numbers) ----------------------------------------
     readonly property var numSpec: ({
-        menuSize:     { min: 70,  max: 260, def: 100, step: 10, unit: "%" },
-        animMs:       { min: 0,   max: 500, def: 200, step: 20, unit: " ms" },
+        menuSize:     { min: 70,  max: 260, def: 100, step: 5, unit: "%" },
+        animMs:       { min: 0,   max: 500, def: 200, step: 10, unit: " ms" },
 
         cardWidth:    { min: 60, max: 700, def: 284, step: 5, unit: "px" },
         itemHeight:   { min: 40,  max: 120, def: 56,  step: 4,  unit: "px" },
@@ -209,8 +209,13 @@ Scope {
         { keys: "Super + Grave",          desc: "Power menu" },
         { keys: "Esc / Click outside",    desc: "Close menu / settings" },
         { keys: "↑ ↓ ← → Tab",            desc: "Move selection" },
+        { keys: "Shift + Tab",            desc: "Move selection back" },
+        { keys: "Home / End",             desc: "First / last action" },
         { keys: "Enter / Space / LMB",    desc: "Run selected action" },
         { keys: "C / RMB (any button)",   desc: "Open settings" },
+        { keys: "Tab / Shift + Tab",      desc: "Settings: next / previous control" },
+        { keys: "← → / PgUp PgDn",        desc: "Settings: adjust slider" },
+        { keys: "Space / Enter",          desc: "Settings: toggle / press" },
         { keys: "Drag handle",            desc: "Move the menu" }
     ]
     readonly property var keybindActionKeys: actions.map(function (a) {
@@ -237,6 +242,33 @@ Scope {
 
     function clamp(v, lo, hi) {
         return Math.max(lo, Math.min(hi, Math.round(v)))
+    }
+
+    // ---- keyboard focus helpers (settings window) ---------------------------
+    // Move keyboard focus to the next / previous Tab-focusable item. Wrapping
+    // onto the window's content item (not focusable) is ignored.
+    function focusStep(item, forward) {
+        var n = item.nextItemInFocusChain(forward)
+        if (n && n.activeFocusOnTab)
+            n.forceActiveFocus(forward ? Qt.TabFocusReason : Qt.BacktabFocusReason)
+    }
+
+    // Scroll the enclosing Flickable (if any) so `item` is fully visible,
+    // with `margin` px of breathing room (shows the section header above it).
+    function ensureVisible(item, margin) {
+        var f = item.parent
+        while (f && !(f.contentY !== undefined && f.contentHeight !== undefined))
+            f = f.parent
+        if (!f)
+            return
+        var p = item.mapToItem(f.contentItem, 0, 0)
+        var top = p.y - margin
+        var bottom = p.y + item.height + margin / 2
+        var maxY = Math.max(0, f.contentHeight - f.height)
+        if (top < f.contentY)
+            f.contentY = Math.max(0, top)
+        else if (bottom > f.contentY + f.height)
+            f.contentY = Math.min(maxY, bottom - f.height)
     }
 
     function runAction(a) {
@@ -467,6 +499,7 @@ Scope {
                 Keys.onPressed: function (event) {
                     if (!root.showing) return
                     var t = event.text.toLowerCase()
+                    var shift = (event.modifiers & Qt.ShiftModifier) !== 0
 
                     if (root.settingsOpen) {
                         if (event.key === Qt.Key_Escape || t === "c")
@@ -479,17 +512,31 @@ Scope {
                         event.accepted = true
                         return
                     }
-                    if (event.key === Qt.Key_Down
-                            || event.key === Qt.Key_Right
-                            || event.key === Qt.Key_Tab) {
+
+                    // Shift+Tab: some platforms send Key_Tab + Shift, others Key_Backtab.
+                    // Checked before plain Tab so it is never read as "forward".
+                    if (event.key === Qt.Key_Backtab
+                            || (event.key === Qt.Key_Tab && shift)
+                            || event.key === Qt.Key_Up
+                            || event.key === Qt.Key_Left) {
+                        root.moveSelection(-1)
+                        event.accepted = true
+                        return
+                    }
+                    if (event.key === Qt.Key_Tab
+                            || event.key === Qt.Key_Down
+                            || event.key === Qt.Key_Right) {
                         root.moveSelection(1)
                         event.accepted = true
                         return
                     }
-                    if (event.key === Qt.Key_Up
-                            || event.key === Qt.Key_Left
-                            || event.key === Qt.Key_Backtab) {
-                        root.moveSelection(-1)
+                    if (event.key === Qt.Key_Home) {
+                        root.currentIndex = 0
+                        event.accepted = true
+                        return
+                    }
+                    if (event.key === Qt.Key_End) {
+                        root.currentIndex = Math.max(0, root.visibleActions.length - 1)
                         event.accepted = true
                         return
                     }
@@ -806,6 +853,13 @@ Scope {
     //
     // Compact layout: sliders and toggles sit in plain `Grid`s (2 columns, 3 for
     // the key list), so the whole page needs far less scrolling.
+    //
+    // Keyboard: every toggle, slider and footer button is Tab-focusable (Qt's
+    // normal focus chain, in visual order). Tab / Shift+Tab or Up / Down move
+    // between controls, Left / Right (PgUp / PgDn for bigger steps, Home / End
+    // for min / max) adjust a focused slider, Space / Enter flips a toggle or
+    // presses a button, and the page auto-scrolls to keep the focused control
+    // in view. Esc or C closes the window.
     LazyLoader {
         active: root.settingsOpen
 
@@ -836,6 +890,30 @@ Scope {
                 focus: true
                 Keys.onEscapePressed: root.closeSettings()
 
+                // Fallback keys, only reached when the focused control did not
+                // handle the key (or nothing is focused yet): scrolling and C.
+                // Tab / Shift+Tab are deliberately NOT handled here so Qt's focus
+                // chain moves between controls.
+                Keys.onPressed: function (event) {
+                    var maxY = Math.max(0, flick.contentHeight - flick.height)
+                    var step = 48 * settingsWin.u
+                    var page = flick.height * 0.9
+                    var dy = 0
+
+                    switch (event.key) {
+                    case Qt.Key_Down:     dy = step;  break
+                    case Qt.Key_Up:       dy = -step; break
+                    case Qt.Key_PageDown: dy = page;  break
+                    case Qt.Key_PageUp:   dy = -page; break
+                    case Qt.Key_Home:     flick.contentY = 0;    event.accepted = true; return
+                    case Qt.Key_End:      flick.contentY = maxY; event.accepted = true; return
+                    case Qt.Key_C:        root.closeSettings();  event.accepted = true; return
+                    default: return   // Tab, Escape etc. are handled elsewhere
+                    }
+                    flick.contentY = Math.max(0, Math.min(maxY, flick.contentY + dy))
+                    event.accepted = true
+                }
+
                 // header
                 Item {
                     id: head
@@ -853,7 +931,7 @@ Scope {
                     }
                     Text {
                         x: 20 * settingsWin.u; y: 30 * settingsWin.u
-                        text: "Drag the handle to move."
+                        text: "Drag the handle to move. Tab to navigate."
                         font.family: root.th.fontFamily
                         font.pixelSize: root.th.textSizeSmall * settingsWin.u
                         color: Theme.textDim
@@ -1232,6 +1310,10 @@ Scope {
     //
     // Sliders, toggles and key rows size themselves from their parent: inside a
     // multi-column `Grid` they take one cell (see cellW() on the root), anywhere else the full width.
+    //
+    // ActionButton, ToggleRow and SliderRow are Tab-focusable (activeFocusOnTab)
+    // and draw an accent ring while they hold keyboard focus. Disabled controls
+    // are skipped by Tab automatically.
 
     component ActionButton: Rectangle {
         id: ab
@@ -1245,6 +1327,8 @@ Scope {
         readonly property QtObject th: host.th
         signal clicked()
 
+        activeFocusOnTab: true
+
         implicitWidth: abText.implicitWidth + 28 * u
         width: implicitWidth
         height: 28 * u
@@ -1254,7 +1338,25 @@ Scope {
         color: primary
             ? Theme.accent
             : Theme.alpha(Theme.text, abArea.containsMouse && enabled ? 0.18 : 0.1)
+        border.width: ab.activeFocus ? Math.max(1, Math.round(2 * u)) : 0
+        border.color: ab.primary ? Theme.text : Theme.accent
         Behavior on color { ColorAnimation { duration: ab.th.animFast } }
+
+        Keys.onPressed: function (event) {
+            if (event.key === Qt.Key_Space
+                    || event.key === Qt.Key_Return
+                    || event.key === Qt.Key_Enter) {
+                if (ab.enabled)
+                    ab.clicked()
+                event.accepted = true
+            } else if (event.key === Qt.Key_Left || event.key === Qt.Key_Up) {
+                ab.host.focusStep(ab, false)
+                event.accepted = true
+            } else if (event.key === Qt.Key_Right || event.key === Qt.Key_Down) {
+                ab.host.focusStep(ab, true)
+                event.accepted = true
+            }
+        }
 
         Text {
             id: abText
@@ -1271,7 +1373,10 @@ Scope {
             anchors.fill: parent
             hoverEnabled: true
             enabled: ab.enabled
-            onClicked: ab.clicked()
+            onClicked: {
+                ab.forceActiveFocus()
+                ab.clicked()
+            }
         }
 
         Tip {
@@ -1355,6 +1460,7 @@ Scope {
 
     // Toggle row. With a `key` it flips that boolean setting on the host;
     // without one it just emits `toggled()` (used for the action list).
+    // Keyboard: Space / Enter toggles, Up / Down move focus.
     component ToggleRow: Item {
         id: tr
         property var host
@@ -1366,17 +1472,46 @@ Scope {
         readonly property QtObject th: host.th
         signal toggled()
 
+        activeFocusOnTab: true
+
         width: host.cellW(parent)
         height: 28 * u
         z: trTip.shown ? 100 : 0
         opacity: enabled ? 1 : 0.4
+
+        function activate() {
+            if (tr.key !== "")
+                tr.host.toggleSetting(tr.key)
+            else
+                tr.toggled()
+        }
+
+        onActiveFocusChanged: if (activeFocus) tr.host.ensureVisible(tr, 32 * u)
+
+        Keys.onPressed: function (event) {
+            if (event.key === Qt.Key_Space
+                    || event.key === Qt.Key_Return
+                    || event.key === Qt.Key_Enter) {
+                tr.activate()
+                event.accepted = true
+            } else if (event.key === Qt.Key_Down) {
+                tr.host.focusStep(tr, true)
+                event.accepted = true
+            } else if (event.key === Qt.Key_Up) {
+                tr.host.focusStep(tr, false)
+                event.accepted = true
+            }
+        }
 
         Rectangle {
             anchors.fill: parent
             anchors.leftMargin: -6 * tr.u
             anchors.rightMargin: -6 * tr.u
             radius: Math.min(8 * tr.u, tr.th.radius * tr.u)
-            color: trArea.containsMouse && tr.enabled ? Theme.alpha(Theme.text, 0.06) : "transparent"
+            color: (trArea.containsMouse || tr.activeFocus) && tr.enabled
+                ? Theme.alpha(Theme.text, 0.06) : "transparent"
+            border.width: tr.activeFocus ? Math.max(1, Math.round(tr.u)) : 0
+            border.color: Theme.accent
         }
 
         Text {
@@ -1417,10 +1552,8 @@ Scope {
             hoverEnabled: true
             enabled: tr.enabled
             onClicked: {
-                if (tr.key !== "")
-                    tr.host.toggleSetting(tr.key)
-                else
-                    tr.toggled()
+                tr.forceActiveFocus()
+                tr.activate()
             }
         }
 
@@ -1437,6 +1570,8 @@ Scope {
 
     // Self-contained minimal slider. Reads/writes a numSpec entry on the
     // host and saves on release. Label and value share the top line.
+    // Keyboard: Left / Right = one step, PgUp / PgDn = five steps,
+    // Home / End = min / max, Up / Down move focus.
     component SliderRow: Item {
         id: sr
         property var host
@@ -1450,10 +1585,47 @@ Scope {
         readonly property real ratio: Math.max(0, Math.min(1,
             (host[key] - spec.min) / (spec.max - spec.min)))
 
+        activeFocusOnTab: true
+
         width: host.cellW(parent)
         height: 38 * u
         z: srTip.shown ? 100 : 0
         opacity: enabled ? 1 : 0.4
+
+        onActiveFocusChanged: if (activeFocus) sr.host.ensureVisible(sr, 32 * u)
+
+        function nudge(delta) {
+            sr.host.setNumber(sr.key, sr.host[sr.key] + delta)
+            sr.host.saveState()
+        }
+
+        Keys.onPressed: function (event) {
+            var st = sr.spec.step
+            switch (event.key) {
+            case Qt.Key_Left:     sr.nudge(-st);     break
+            case Qt.Key_Right:    sr.nudge(st);      break
+            case Qt.Key_PageDown: sr.nudge(-st * 5); break
+            case Qt.Key_PageUp:   sr.nudge(st * 5);  break
+            case Qt.Key_Home:
+                sr.host.setNumber(sr.key, sr.spec.min); sr.host.saveState(); break
+            case Qt.Key_End:
+                sr.host.setNumber(sr.key, sr.spec.max); sr.host.saveState(); break
+            case Qt.Key_Down:     sr.host.focusStep(sr, true);  break
+            case Qt.Key_Up:       sr.host.focusStep(sr, false); break
+            default: return
+            }
+            event.accepted = true
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: -3 * sr.u
+            radius: Math.min(8 * sr.u, sr.th.radius * sr.u)
+            color: "transparent"
+            visible: sr.activeFocus
+            border.width: Math.max(1, Math.round(sr.u))
+            border.color: Theme.accent
+        }
 
         Text {
             anchors.left: parent.left
@@ -1523,7 +1695,10 @@ Scope {
                     s.min + Math.round(r * (s.max - s.min) / s.step) * s.step)
             }
 
-            onPressed: mouse => apply(mouse.x)
+            onPressed: mouse => {
+                sr.forceActiveFocus()
+                apply(mouse.x)
+            }
             onPositionChanged: mouse => { if (pressed) apply(mouse.x) }
             onReleased: sr.host.saveState()
         }
