@@ -1476,9 +1476,9 @@ Scope {
                                                       : root.wsBoxPx
                         radius: root.wsBoxPx / 2
                         color: modelData.urgent ? Theme.danger
-                             : modelData.focused ? Qt.alpha(Theme.accent2, 0.4)
-                             : dotMa.containsMouse ? Theme.accent2
-                             : Qt.alpha(Theme.textFaint, 0.5)
+                        : modelData.focused ? Qt.alpha(Theme.accent2, 0.5)
+                        : dotMa.containsMouse ? Theme.accent2
+                        : Qt.alpha(Theme.text, 0.2)
 
                         Behavior on implicitWidth { NumberAnimation { duration: Theme.animMed; easing.type: Easing.OutQuad } }
                         Behavior on implicitHeight { NumberAnimation { duration: Theme.animMed; easing.type: Easing.OutQuad } }
@@ -1572,7 +1572,7 @@ Scope {
                         source: appIcon
                         colorization: cfg.tasksColor === "accent" ? 1.0 : 0.0
                         colorizationColor: task.modelData.activated ? Theme.accent2 : Theme.text
-                        opacity: task.modelData.activated ? 1 : 0.75
+                        opacity: task.modelData.activated ? 1 : 0.5
                     }
                 }
             }

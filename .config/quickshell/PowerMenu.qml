@@ -48,7 +48,8 @@ Scope {
     // ---- settings window look (same properties as the wallpaper picker) ----
     // Font, text sizes, radius and the menu scale are the same values the wallpaper
     // picker's settings menu uses; scale / radius come from the same hub.json.
-    // Colours still come from the Theme singleton, as before.
+    // Colours still come from the Theme singleton; the "Colors" settings sections
+    // only choose WHICH Theme colour is used for each element (see themeColor).
     //   ui     : resolution scale (1.0 at 1080p height)
     //   menuUi : ui * hub "settingsScale"; multiply every settings-window size by it
     readonly property QtObject th: QtObject {
@@ -97,11 +98,22 @@ Scope {
         iconSize:     { min: 12,  max: 56,  def: 20,  step: 2,  unit: "px" },
         labelSize:    { min: 9,   max: 22,  def: 11,  step: 1,  unit: "px" },
         borderWidth:  { min: 0,   max: 4,   def: 1,   step: 1,  unit: "px" },
+        inactiveBorderWidth: { min: 0, max: 4, def: 1, step: 1, unit: "px" },
 
         panelOpacity: { min: 0,   max: 100, def: 0,   step: 5,  unit: "%" },
         itemOpacity:  { min: 0,   max: 100, def: Math.round((Theme.bg.a ?? 1) * 20) * 5, step: 5, unit: "%" },
         hoverBoost:   { min: 0,   max: 40,  def: 12,  step: 2,  unit: "%" },
-        dimOpacity:   { min: 0,   max: 100,  def: 0,   step: 5,  unit: "%" }
+        dimOpacity:   { min: 0,   max: 100,  def: 0,   step: 5,  unit: "%" },
+
+        // per-element opacity (inactive / active)
+        labelOpacity:          { min: 0, max: 100, def: 100, step: 5, unit: "%" },
+        labelActiveOpacity:    { min: 0, max: 100, def: 100, step: 5, unit: "%" },
+        iconOpacity:           { min: 0, max: 100, def: 100, step: 5, unit: "%" },
+        iconActiveOpacity:     { min: 0, max: 100, def: 100, step: 5, unit: "%" },
+        borderOpacity:         { min: 0, max: 100, def: 100, step: 5, unit: "%" },
+        inactiveBorderOpacity: { min: 0, max: 100, def: 0,   step: 5, unit: "%" },
+        keyHintOpacity:        { min: 0, max: 100, def: 100, step: 5, unit: "%" },
+        keyHintBgOpacity:      { min: 0, max: 100, def: 8,   step: 2, unit: "%" }
     })
     readonly property var numKeys: Object.keys(numSpec)
 
@@ -121,6 +133,44 @@ Scope {
 
     readonly property var posKeys: ["offsetX", "offsetY"]
 
+    // which Theme colour is used as the highlight colour: accent | accent2 | text
+    readonly property var accentChoices: [
+        { id: "accent",  label: "Accent" },
+        { id: "accent2", label: "Accent 2" },
+        { id: "text",    label: "Text" }
+    ]
+
+    // ---- per-element colour sources ------------------------------------------
+    // Every element can use any of these. "highlight" follows the Highlight color
+    // chosen in settings > Colors (accentSource).
+    readonly property var colorChoices: [
+        { id: "highlight", label: "Highlight" },
+        { id: "text",      label: "Text" },
+        { id: "textDim",   label: "Dim text" },
+        { id: "accent",    label: "Accent" },
+        { id: "accent2",   label: "Accent 2" },
+        { id: "bg",        label: "Background" },
+        { id: "black",     label: "Black" },
+        { id: "white",     label: "White" }
+    ]
+
+    readonly property var colorDefaults: ({
+        panelBgColor:        "bg",
+        itemBgColor:         "bg",
+        itemBgActiveColor:   "bg",
+        borderColor:         "highlight",
+        inactiveBorderColor: "text",
+        labelColor:          "text",
+        labelActiveColor:    "text",
+        iconColor:           "text",
+        iconActiveColor:     "text",
+        keyHintColor:        "textDim",
+        keyHintBgColor:      "text",
+        pendingColor:        "highlight",
+        pendingBorderColor:  "text"
+    })
+    readonly property var colorKeys: Object.keys(colorDefaults)
+
     property real offsetX: 0
     property real offsetY: 0
 
@@ -137,10 +187,20 @@ Scope {
     property int iconSize: numSpec.iconSize.def
     property int labelSize: numSpec.labelSize.def
     property int borderWidth: numSpec.borderWidth.def
+    property int inactiveBorderWidth: numSpec.inactiveBorderWidth.def
     property int panelOpacity: numSpec.panelOpacity.def
     property int itemOpacity: numSpec.itemOpacity.def
     property int hoverBoost: numSpec.hoverBoost.def
     property int dimOpacity: numSpec.dimOpacity.def
+
+    property int labelOpacity: numSpec.labelOpacity.def
+    property int labelActiveOpacity: numSpec.labelActiveOpacity.def
+    property int iconOpacity: numSpec.iconOpacity.def
+    property int iconActiveOpacity: numSpec.iconActiveOpacity.def
+    property int borderOpacity: numSpec.borderOpacity.def
+    property int inactiveBorderOpacity: numSpec.inactiveBorderOpacity.def
+    property int keyHintOpacity: numSpec.keyHintOpacity.def
+    property int keyHintBgOpacity: numSpec.keyHintBgOpacity.def
 
     property bool showTooltips: boolDefaults.showTooltips
     property bool horizontal: boolDefaults.horizontal
@@ -153,11 +213,91 @@ Scope {
     property bool hoverSelect: boolDefaults.hoverSelect
     property bool closeOnOutside: boolDefaults.closeOnOutside
 
+    property string accentSource: "accent"
+
+    property string panelBgColor: colorDefaults.panelBgColor
+    property string itemBgColor: colorDefaults.itemBgColor
+    property string itemBgActiveColor: colorDefaults.itemBgActiveColor
+    property string borderColor: colorDefaults.borderColor
+    property string inactiveBorderColor: colorDefaults.inactiveBorderColor
+    property string labelColor: colorDefaults.labelColor
+    property string labelActiveColor: colorDefaults.labelActiveColor
+    property string iconColor: colorDefaults.iconColor
+    property string iconActiveColor: colorDefaults.iconActiveColor
+    property string keyHintColor: colorDefaults.keyHintColor
+    property string keyHintBgColor: colorDefaults.keyHintBgColor
+    property string pendingColor: colorDefaults.pendingColor
+    property string pendingBorderColor: colorDefaults.pendingBorderColor
+
     property bool settingsOpen: false
     property bool dragging: false
     property int currentIndex: 0
     property string confirmName: ""
     property var hiddenNames: []
+
+    // ---- highlight colour ---------------------------------------------------
+    // cAccent is the "Highlight" colour: toggles, sliders, focus rings, and
+    // (by default) the selection border and the confirm prompt. It is one of
+    // the three Theme colours, picked in settings > Colors.
+    readonly property color themeAccent: Theme.accent
+    readonly property color themeAccent2: Theme.accent2 !== undefined ? Theme.accent2 : Theme.accent
+    readonly property color themeText: Theme.text
+
+    function accentColorOf(id) {
+        switch (id) {
+        case "accent2": return themeAccent2
+        case "text":    return themeText
+        }
+        return themeAccent
+    }
+
+    readonly property color cAccent: accentColorOf(accentSource)
+
+    function cycleAccent(dir) {
+        var n = accentChoices.length
+        var i = accentChoices.findIndex(function (c) { return c.id === accentSource })
+        if (i < 0) i = 0
+        accentSource = accentChoices[((i + dir) % n + n) % n].id
+        saveState()
+    }
+
+    // ---- per-element colour helpers ------------------------------------------
+    // themeColor: resolves a colour-choice id to an actual colour.
+    function themeColor(id) {
+        switch (id) {
+        case "highlight": return cAccent
+        case "accent":    return themeAccent
+        case "accent2":   return themeAccent2
+        case "text":      return themeText
+        case "textDim":   return Theme.textDim
+        case "bg":        return Theme.bg
+        case "black":     return Qt.rgba(0, 0, 0, 1)
+        case "white":     return Qt.rgba(1, 1, 1, 1)
+        }
+        return themeText
+    }
+
+    function colorLabel(id) {
+        var c = colorChoices.find(function (x) { return x.id === id })
+        return c ? c.label : id
+    }
+
+    function cycleColor(key, dir) {
+        var n = colorChoices.length
+        var i = colorChoices.findIndex(function (c) { return c.id === root[key] })
+        if (i < 0) i = 0
+        root[key] = colorChoices[((i + dir) % n + n) % n].id
+        saveState()
+    }
+
+    // solid: backgrounds, alpha = pct (ignores the source colour's own alpha)
+    function solid(c, pct) {
+        return Qt.rgba(c.r, c.g, c.b, Math.max(0, Math.min(1, pct / 100)))
+    }
+    // fade: foreground, source alpha scaled by pct
+    function fade(c, pct) {
+        return Qt.rgba(c.r, c.g, c.b, c.a * Math.max(0, Math.min(1, pct / 100)))
+    }
 
     readonly property int edgeGap: 0
     // how much of the panel must stay on screen when dragged past borders
@@ -166,11 +306,11 @@ Scope {
     // box around the icon glyph = icon size + 12px
     readonly property int iconBox: showIcons ? iconSize + 12 : 0
 
-    // colours derived from the theme + opacity settings
-    readonly property color panelColor: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, panelOpacity / 100)
-    readonly property color itemColor: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, itemOpacity / 100)
-    readonly property color itemHoverColor: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b,
-                                                    Math.min(1, itemOpacity / 100 + hoverBoost / 100))
+    // colours derived from the theme + colour/opacity settings
+    readonly property color panelColor: solid(themeColor(panelBgColor), panelOpacity)
+    readonly property color itemColor: solid(themeColor(itemBgColor), itemOpacity)
+    readonly property color itemHoverColor: solid(themeColor(itemBgActiveColor),
+                                                  Math.min(100, itemOpacity + hoverBoost))
 
     readonly property bool movedFromDefault: posKeys.some(k => root[k] !== 0)
 
@@ -178,6 +318,8 @@ Scope {
         posKeys.some(k => root[k] !== 0)
         || numKeys.some(k => root[k] !== numSpec[k].def)
         || boolKeys.some(k => root[k] !== boolDefaults[k])
+        || colorKeys.some(k => root[k] !== colorDefaults[k])
+        || accentSource !== "accent"
         || hiddenNames.length > 0
 
     readonly property string statePath: Quickshell.env("HOME") + "/.config/quickshell/state/powermenu-state.json"
@@ -185,7 +327,7 @@ Scope {
     onCurrentIndexChanged: confirmName = ""
 
     // ---- actions ----------------------------------------------------------
-    // `glyph` is a Nerd Font icon drawn in the Theme.text colour.
+    // `glyph` is a Nerd Font icon drawn in the chosen icon colour.
     //   shutdown  nf-md-power          U+F0425
     //   reboot                         U+F0450
     //   suspend   nf-fa-moon_o         U+F186
@@ -215,6 +357,7 @@ Scope {
         { keys: "C / RMB (any button)",   desc: "Open settings" },
         { keys: "Tab / Shift + Tab",      desc: "Settings: next / previous control" },
         { keys: "← → / PgUp PgDn",        desc: "Settings: adjust slider" },
+        { keys: "← → / Space",            desc: "Settings: cycle color" },
         { keys: "Space / Enter",          desc: "Settings: toggle / press" },
         { keys: "Drag handle",            desc: "Move the menu" }
     ]
@@ -376,6 +519,8 @@ Scope {
         posKeys.forEach(function (k) { root[k] = 0 })
         numKeys.forEach(function (k) { root[k] = numSpec[k].def })
         boolKeys.forEach(function (k) { root[k] = boolDefaults[k] })
+        colorKeys.forEach(function (k) { root[k] = colorDefaults[k] })
+        root.accentSource = "accent"
         root.hiddenNames = []
         root.currentIndex = 0
         reclamp()
@@ -383,10 +528,11 @@ Scope {
     }
 
     function saveState() {
-        var s = { hidden: root.hiddenNames }
+        var s = { hidden: root.hiddenNames, accentSource: root.accentSource }
         posKeys.forEach(function (k) { s[k] = root[k] })
         numKeys.forEach(function (k) { s[k] = root[k] })
         boolKeys.forEach(function (k) { s[k] = root[k] })
+        colorKeys.forEach(function (k) { s[k] = root[k] })
         stateFile.setText(JSON.stringify(s))
     }
 
@@ -447,6 +593,14 @@ Scope {
                     if (typeof s[k] === "boolean")
                         root[k] = s[k]
                 })
+                root.colorKeys.forEach(function (k) {
+                    if (typeof s[k] === "string"
+                            && root.colorChoices.some(function (c) { return c.id === s[k] }))
+                        root[k] = s[k]
+                })
+                if (typeof s.accentSource === "string"
+                        && root.accentChoices.some(function (c) { return c.id === s.accentSource }))
+                    root.accentSource = s.accentSource
             } catch (e) {
                 console.warn("powermenu: could not read saved state:", e)
             }
@@ -708,17 +862,35 @@ Scope {
                                     readonly property bool pending: root.confirmName === modelData.name
                                     readonly property int count: root.visibleActions.length
 
+                                    // "active" = selected, hovered or pressed; everything else is "inactive"
+                                    readonly property bool active: entryArea.pressed || entryArea.containsMouse || entry.focused
+
+                                    readonly property color labelCol: entry.pending
+                                        ? root.themeColor(root.pendingColor)
+                                        : (entry.active
+                                            ? root.fade(root.themeColor(root.labelActiveColor), root.labelActiveOpacity)
+                                            : root.fade(root.themeColor(root.labelColor), root.labelOpacity))
+                                    readonly property color iconCol: entry.pending
+                                        ? root.themeColor(root.pendingColor)
+                                        : (entry.active
+                                            ? root.fade(root.themeColor(root.iconActiveColor), root.iconActiveOpacity)
+                                            : root.fade(root.themeColor(root.iconColor), root.iconOpacity))
+
                                     z: entryTip.shown ? 100 : 0
                                     width: root.horizontal
                                         ? Math.max(0, (actionGrid.width - root.itemSpacing * (count - 1)) / count)
                                         : actionGrid.width
                                     height: root.itemHeight
                                     radius: root.itemRadius
-                                    color: entryArea.pressed || entryArea.containsMouse || entry.focused
+                                    color: entry.active
                                         ? root.itemHoverColor
                                         : root.itemColor
-                                    border.width: entry.focused ? root.borderWidth : 0
-                                    border.color: entry.pending ? Theme.text : Theme.accent
+                                    border.width: entry.focused ? root.borderWidth : root.inactiveBorderWidth
+                                    border.color: entry.pending
+                                        ? root.themeColor(root.pendingBorderColor)
+                                        : (entry.focused
+                                            ? root.fade(root.themeColor(root.borderColor), root.borderOpacity)
+                                            : root.fade(root.themeColor(root.inactiveBorderColor), root.inactiveBorderOpacity))
                                     Behavior on color { ColorAnimation { duration: 120 } }
 
                                     Item {
@@ -731,7 +903,7 @@ Scope {
                                             ? (entry.height - height - eLabel.implicitHeight - 2) / 2
                                             : (entry.height - height) / 2
 
-                                        // Font icon, coloured by the theme text colour
+                                        // Font icon, coloured by the icon colour settings
                                         Text {
                                             anchors.horizontalCenter: parent.horizontalCenter
                                             anchors.horizontalCenterOffset: root.horizontal ? 0 : root.iconOffsetOf(entry.modelData.name)
@@ -739,7 +911,7 @@ Scope {
                                             text: entry.modelData.glyph
                                             font.family: "Symbols Nerd Font"
                                             font.pixelSize: Math.round(root.iconSize * root.iconScaleOf(entry.modelData.name))
-                                            color: entry.pending ? Theme.accent : Theme.text
+                                            color: entry.iconCol
                                             Behavior on color { ColorAnimation { duration: 120 } }
                                         }
                                     }
@@ -750,7 +922,8 @@ Scope {
                                         text: entry.pending ? entry.modelData.label + "?" : entry.modelData.label
                                         font.pixelSize: root.labelSize
                                         font.bold: true
-                                        color: entry.pending ? Theme.accent : Theme.text
+                                        color: entry.labelCol
+                                        Behavior on color { ColorAnimation { duration: 120 } }
                                         elide: Text.ElideRight
                                         horizontalAlignment: root.horizontal ? Text.AlignHCenter : Text.AlignLeft
                                         x: root.horizontal
@@ -772,14 +945,14 @@ Scope {
                                         anchors.rightMargin: 10
                                         anchors.verticalCenter: parent.verticalCenter
                                         width: 20; height: 20; radius: 6
-                                        color: Theme.alpha(Theme.text, 0.08)
+                                        color: root.fade(root.themeColor(root.keyHintBgColor), root.keyHintBgOpacity)
 
                                         Text {
                                             anchors.centerIn: parent
                                             text: entry.modelData.key.toUpperCase()
                                             font.pixelSize: 9
                                             font.bold: true
-                                            color: Theme.textDim
+                                            color: root.fade(root.themeColor(root.keyHintColor), root.keyHintOpacity)
                                         }
                                     }
 
@@ -821,6 +994,7 @@ Scope {
 
                             FooterButton {
                                 id: footBtn
+                                host: root
                                 anchors.right: parent.right
                                 anchors.verticalCenter: parent.verticalCenter
                                 label: "\udb81\udc93"
@@ -851,15 +1025,15 @@ Scope {
     // No custom layer namespace is set here (the picker sets none either), so the
     // compositor's layer rules, e.g. blur, apply to this window the same way.
     //
-    // Compact layout: sliders and toggles sit in plain `Grid`s (2 columns, 3 for
-    // the key list), so the whole page needs far less scrolling.
+    // Compact layout: sliders, colour pickers and toggles sit in plain `Grid`s
+    // (2 columns, 3 for the key list), so the whole page needs far less scrolling.
     //
-    // Keyboard: every toggle, slider and footer button is Tab-focusable (Qt's
-    // normal focus chain, in visual order). Tab / Shift+Tab or Up / Down move
-    // between controls, Left / Right (PgUp / PgDn for bigger steps, Home / End
-    // for min / max) adjust a focused slider, Space / Enter flips a toggle or
-    // presses a button, and the page auto-scrolls to keep the focused control
-    // in view. Esc or C closes the window.
+    // Keyboard: every toggle, slider, colour picker and footer button is
+    // Tab-focusable (Qt's normal focus chain, in visual order). Tab / Shift+Tab or
+    // Up / Down move between controls, Left / Right (PgUp / PgDn for bigger
+    // steps, Home / End for min / max) adjust a focused slider or cycle a colour,
+    // Space / Enter flips a toggle or presses a button, and the page auto-scrolls
+    // to keep the focused control in view. Esc or C closes the window.
     LazyLoader {
         active: root.settingsOpen
 
@@ -1036,11 +1210,180 @@ Scope {
                             SliderRow { host: root; key: "itemRadius"; label: "Item roundness" }
                             SliderRow { host: root; key: "iconSize"; label: "Icon size"; enabled: root.showIcons }
                             SliderRow { host: root; key: "labelSize"; label: "Label size"; enabled: root.showLabels }
-                            SliderRow { host: root; key: "borderWidth"; label: "Selection border" }
+                            SliderRow { host: root; key: "borderWidth"; label: "Active border"; tip: "Border width of the selected item" }
+                            SliderRow { host: root; key: "inactiveBorderWidth"; label: "Inactive border"; tip: "Border width of the other items. 0 = none" }
                             SliderRow { host: root; key: "panelOpacity"; label: "Panel opacity"; tip: "Panel background opacity" }
-                            SliderRow { host: root; key: "itemOpacity"; label: "Item opacity"; tip: "Item background opacity" }
-                            SliderRow { host: root; key: "hoverBoost"; label: "Hover highlight"; tip: "Extra opacity on hovered / selected items" }
                             SliderRow { host: root; key: "dimOpacity"; label: "Screen dim"; tip: "Dim the screen behind the menu" }
+                        }
+
+                        // ---------------- COLORS ----------------
+                        SectionHeader { host: root; text: "Colors" }
+                        Item {
+                            id: acRow
+                            width: contentCol.width
+                            height: 50 * settingsWin.u
+                            activeFocusOnTab: true
+                            z: acTip.shown ? 100 : 0
+
+                            onActiveFocusChanged: if (activeFocus) root.ensureVisible(acRow, 32 * settingsWin.u)
+
+                            Keys.onPressed: function (event) {
+                                if (event.key === Qt.Key_Left) {
+                                    root.cycleAccent(-1)
+                                } else if (event.key === Qt.Key_Right
+                                        || event.key === Qt.Key_Space
+                                        || event.key === Qt.Key_Return
+                                        || event.key === Qt.Key_Enter) {
+                                    root.cycleAccent(1)
+                                } else if (event.key === Qt.Key_Down) {
+                                    root.focusStep(acRow, true)
+                                } else if (event.key === Qt.Key_Up) {
+                                    root.focusStep(acRow, false)
+                                } else {
+                                    return
+                                }
+                                event.accepted = true
+                            }
+
+                            Rectangle {
+                                anchors.fill: parent
+                                anchors.margins: -3 * settingsWin.u
+                                radius: Math.min(8 * settingsWin.u, root.th.radius * settingsWin.u)
+                                color: "transparent"
+                                visible: acRow.activeFocus
+                                border.width: Math.max(1, Math.round(settingsWin.u))
+                                border.color: root.cAccent
+                            }
+
+                            Text {
+                                y: 4 * settingsWin.u
+                                text: "Highlight color"
+                                font.family: root.th.fontFamily
+                                font.pixelSize: root.th.textSizeGroup * settingsWin.u
+                                font.bold: true
+                                color: Theme.text
+                            }
+
+                            Row {
+                                id: acSegs
+                                y: 22 * settingsWin.u
+                                width: parent.width
+                                spacing: 6 * settingsWin.u
+
+                                Repeater {
+                                    model: root.accentChoices
+                                    delegate: Rectangle {
+                                        id: seg
+                                        required property var modelData
+                                        readonly property bool picked: root.accentSource === modelData.id
+                                        width: (acSegs.width - 2 * acSegs.spacing) / 3
+                                        height: 24 * settingsWin.u
+                                        radius: Math.min(8 * settingsWin.u, root.th.radius * settingsWin.u)
+                                        color: seg.picked
+                                            ? Theme.alpha(root.accentColorOf(modelData.id), 0.18)
+                                            : (segArea.containsMouse ? Theme.alpha(Theme.text, 0.08) : "transparent")
+                                        border.width: 1
+                                        border.color: seg.picked
+                                            ? root.accentColorOf(modelData.id)
+                                            : Theme.alpha(Theme.text, 0.2)
+
+                                        // swatch of the Theme colour this choice maps to
+                                        Rectangle {
+                                            id: dot
+                                            anchors.left: parent.left
+                                            anchors.leftMargin: 8 * settingsWin.u
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            width: 10 * settingsWin.u
+                                            height: 10 * settingsWin.u
+                                            radius: width / 2
+                                            color: root.accentColorOf(seg.modelData.id)
+                                        }
+                                        Text {
+                                            anchors.left: dot.right
+                                            anchors.leftMargin: 6 * settingsWin.u
+                                            anchors.right: parent.right
+                                            anchors.rightMargin: 4 * settingsWin.u
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            elide: Text.ElideRight
+                                            text: seg.modelData.label
+                                            font.family: root.th.fontFamily
+                                            font.pixelSize: root.th.textSizeBody * settingsWin.u
+                                            font.bold: seg.picked
+                                            color: seg.picked ? Theme.text : Theme.textDim
+                                        }
+                                        MouseArea {
+                                            id: segArea
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            onClicked: {
+                                                acRow.forceActiveFocus()
+                                                root.accentSource = seg.modelData.id
+                                                root.saveState()
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            MouseArea {
+                                id: acHover
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                acceptedButtons: Qt.NoButton
+                            }
+                            Tip {
+                                id: acTip
+                                allowed: root.showTooltips
+                                hovered: acHover.containsMouse
+                                side: "belowStart"
+                                text: "The \"Highlight\" Theme color: used by toggles, sliders, focus rings and, by default, the active border and confirm prompt. Left / Right to change"
+                                u: settingsWin.u
+                                family: root.th.fontFamily
+                            }
+                        }
+                        Grid {
+                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                            ToggleRow { host: root; colorKey: "panelBgColor"; label: "Panel background"; tip: "Color of the panel behind the items (opacity: Appearance > Panel opacity). Click: next, right-click: previous" }
+                        }
+
+                        // ---------------- INACTIVE ITEMS ----------------
+                        SectionHeader { host: root; text: "Inactive items" }
+                        Grid {
+                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                            ToggleRow { host: root; colorKey: "itemBgColor"; label: "Background"; tip: "Background of items that are not selected or hovered" }
+                            SliderRow { host: root; key: "itemOpacity"; label: "Background opacity"; tip: "Item background opacity" }
+                            ToggleRow { host: root; colorKey: "labelColor"; label: "Label color"; enabled: root.showLabels }
+                            SliderRow { host: root; key: "labelOpacity"; label: "Label opacity"; enabled: root.showLabels }
+                            ToggleRow { host: root; colorKey: "iconColor"; label: "Icon color"; enabled: root.showIcons }
+                            SliderRow { host: root; key: "iconOpacity"; label: "Icon opacity"; enabled: root.showIcons }
+                            ToggleRow { host: root; colorKey: "inactiveBorderColor"; label: "Border color"; tip: "Needs Appearance > Inactive border above 0" }
+                            SliderRow { host: root; key: "inactiveBorderOpacity"; label: "Border opacity" }
+                        }
+
+                        // ---------------- ACTIVE ITEMS ----------------
+                        SectionHeader { host: root; text: "Active items" }
+                        Grid {
+                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                            ToggleRow { host: root; colorKey: "itemBgActiveColor"; label: "Background"; tip: "Background of the selected / hovered item" }
+                            SliderRow { host: root; key: "hoverBoost"; label: "Background boost"; tip: "Extra opacity added to the item background when active" }
+                            ToggleRow { host: root; colorKey: "labelActiveColor"; label: "Label color"; enabled: root.showLabels }
+                            SliderRow { host: root; key: "labelActiveOpacity"; label: "Label opacity"; enabled: root.showLabels }
+                            ToggleRow { host: root; colorKey: "iconActiveColor"; label: "Icon color"; enabled: root.showIcons }
+                            SliderRow { host: root; key: "iconActiveOpacity"; label: "Icon opacity"; enabled: root.showIcons }
+                            ToggleRow { host: root; colorKey: "borderColor"; label: "Border color"; tip: "Needs Appearance > Active border above 0" }
+                            SliderRow { host: root; key: "borderOpacity"; label: "Border opacity" }
+                        }
+
+                        // ---------------- KEY HINTS & CONFIRM ----------------
+                        SectionHeader { host: root; text: "Key hints & confirm" }
+                        Grid {
+                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                            ToggleRow { host: root; colorKey: "keyHintColor"; label: "Hint text color"; enabled: !root.horizontal && root.showKeyHints }
+                            SliderRow { host: root; key: "keyHintOpacity"; label: "Hint text opacity"; enabled: !root.horizontal && root.showKeyHints }
+                            ToggleRow { host: root; colorKey: "keyHintBgColor"; label: "Hint badge color"; enabled: !root.horizontal && root.showKeyHints }
+                            SliderRow { host: root; key: "keyHintBgOpacity"; label: "Hint badge opacity"; enabled: !root.horizontal && root.showKeyHints }
+                            ToggleRow { host: root; colorKey: "pendingColor"; label: "Confirm text / icon"; tip: "Label and icon color while waiting for confirmation" }
+                            ToggleRow { host: root; colorKey: "pendingBorderColor"; label: "Confirm border"; tip: "Border color while waiting for confirmation" }
                         }
 
                         // ---------------- BEHAVIOR ----------------
@@ -1065,31 +1408,6 @@ Scope {
                                     label: modelData.label + " (" + modelData.key.toUpperCase() + ")"
                                     checked: root.hiddenNames.indexOf(modelData.name) < 0
                                     onToggled: root.toggleAction(modelData.name)
-                                }
-                            }
-                        }
-
-                        // ---------------- KEYBINDS ----------------
-                        SectionHeader { host: root; text: "Keybinds" }
-                        Repeater {
-                            model: root.keybindGeneral
-                            delegate: KeyRow {
-                                required property var modelData
-                                host: root
-                                keys: modelData.keys
-                                desc: modelData.desc
-                            }
-                        }
-                        Item { width: 1; height: 4 * settingsWin.u }
-                        Grid {
-                            width: parent.width; columns: 3; columnSpacing: 18 * settingsWin.u
-                            Repeater {
-                                model: root.keybindActionKeys
-                                delegate: KeyRow {
-                                    required property var modelData
-                                    host: root
-                                    keys: modelData.keys
-                                    desc: modelData.desc
                                 }
                             }
                         }
@@ -1269,9 +1587,11 @@ Scope {
 
     component FooterButton: Rectangle {
         id: fb
+        property var host: null
         property string label: ""
         property int fontSize: 11
         property bool active: false
+        readonly property color cAccent: host ? host.cAccent : Theme.accent
         property color textColor: Theme.textDim
         readonly property bool hovered: fbArea.containsMouse
         signal clicked()
@@ -1288,7 +1608,7 @@ Scope {
             font.family: "Symbols Nerd Font"
             font.pixelSize: fb.fontSize
             font.bold: true
-            color: fb.active ? Theme.accent : (fb.hovered ? Theme.text : fb.textColor)
+            color: fb.active ? fb.cAccent : (fb.hovered ? Theme.text : fb.textColor)
         }
 
         MouseArea {
@@ -1308,12 +1628,13 @@ Scope {
     // Settings-window components below take `host` (the root Scope) and read the
     // shared scale / font / sizes from host.menuUi and host.th, like the picker's.
     //
-    // Sliders, toggles and key rows size themselves from their parent: inside a
-    // multi-column `Grid` they take one cell (see cellW() on the root), anywhere else the full width.
+    // Sliders, colour rows, toggles and key rows size themselves from their parent:
+    // inside a multi-column `Grid` they take one cell (see cellW() on the root),
+    // anywhere else the full width.
     //
-    // ActionButton, ToggleRow and SliderRow are Tab-focusable (activeFocusOnTab)
-    // and draw an accent ring while they hold keyboard focus. Disabled controls
-    // are skipped by Tab automatically.
+    // ActionButton, ToggleRow and SliderRow are Tab-focusable
+    // (activeFocusOnTab) and draw a highlight-colour ring while they hold keyboard
+    // focus. Disabled controls are skipped by Tab automatically.
 
     component ActionButton: Rectangle {
         id: ab
@@ -1325,6 +1646,7 @@ Scope {
         property string tipSide: "belowStart"
         readonly property real u: host.menuUi
         readonly property QtObject th: host.th
+        readonly property color cAccent: host.cAccent
         signal clicked()
 
         activeFocusOnTab: true
@@ -1336,10 +1658,10 @@ Scope {
         z: abTip.shown ? 100 : 0
         opacity: enabled ? 1 : 0.4
         color: primary
-            ? Theme.accent
+            ? ab.cAccent
             : Theme.alpha(Theme.text, abArea.containsMouse && enabled ? 0.18 : 0.1)
         border.width: ab.activeFocus ? Math.max(1, Math.round(2 * u)) : 0
-        border.color: ab.primary ? Theme.text : Theme.accent
+        border.color: ab.primary ? Theme.text : ab.cAccent
         Behavior on color { ColorAnimation { duration: ab.th.animFast } }
 
         Keys.onPressed: function (event) {
@@ -1468,19 +1790,24 @@ Scope {
         property string label: ""
         property string tip: ""
         property bool checked: false
+        // when set, the row is a colour picker for that host property instead of a switch
+        property string colorKey: ""
         readonly property real u: host.menuUi
         readonly property QtObject th: host.th
+        readonly property color cAccent: host.cAccent
         signal toggled()
 
         activeFocusOnTab: true
 
         width: host.cellW(parent)
-        height: 28 * u
+        height: (colorKey !== "" ? 38 : 28) * u
         z: trTip.shown ? 100 : 0
         opacity: enabled ? 1 : 0.4
 
         function activate() {
-            if (tr.key !== "")
+            if (tr.colorKey !== "")
+                tr.host.cycleColor(tr.colorKey, 1)
+            else if (tr.key !== "")
                 tr.host.toggleSetting(tr.key)
             else
                 tr.toggled()
@@ -1492,6 +1819,12 @@ Scope {
             if (event.key === Qt.Key_Space
                     || event.key === Qt.Key_Return
                     || event.key === Qt.Key_Enter) {
+                tr.activate()
+                event.accepted = true
+            } else if (tr.colorKey !== "" && event.key === Qt.Key_Left) {
+                tr.host.cycleColor(tr.colorKey, -1)
+                event.accepted = true
+            } else if (tr.colorKey !== "" && event.key === Qt.Key_Right) {
                 tr.activate()
                 event.accepted = true
             } else if (event.key === Qt.Key_Down) {
@@ -1511,12 +1844,12 @@ Scope {
             color: (trArea.containsMouse || tr.activeFocus) && tr.enabled
                 ? Theme.alpha(Theme.text, 0.06) : "transparent"
             border.width: tr.activeFocus ? Math.max(1, Math.round(tr.u)) : 0
-            border.color: Theme.accent
+            border.color: tr.cAccent
         }
 
         Text {
             anchors.left: parent.left
-            anchors.right: sw.left
+            anchors.right: tr.colorKey !== "" ? chip.left : sw.left
             anchors.rightMargin: 8 * tr.u
             anchors.verticalCenter: parent.verticalCenter
             text: tr.label
@@ -1529,12 +1862,13 @@ Scope {
 
         Rectangle {
             id: sw
+            visible: tr.colorKey === ""
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             width: 32 * tr.u; height: 18 * tr.u; radius: height / 2
-            color: tr.checked ? Theme.accent : "transparent"
+            color: tr.checked ? tr.cAccent : "transparent"
             border.width: 1
-            border.color: tr.checked ? Theme.accent : Theme.alpha(Theme.text, 0.3)
+            border.color: tr.checked ? tr.cAccent : Theme.alpha(Theme.text, 0.3)
             Behavior on color { ColorAnimation { duration: tr.th.animMed } }
 
             Rectangle {
@@ -1546,14 +1880,58 @@ Scope {
             }
         }
 
+        // colour chip (only when colorKey is set): swatch + colour name
+        Rectangle {
+            id: chip
+            visible: tr.colorKey !== ""
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            width: 96 * tr.u
+            height: 24 * tr.u
+            radius: Math.min(8 * tr.u, tr.th.radius * tr.u)
+            color: "transparent"
+            border.width: 1
+            border.color: Theme.alpha(Theme.text, 0.2)
+
+            Rectangle {
+                id: chipDot
+                anchors.left: parent.left
+                anchors.leftMargin: 8 * tr.u
+                anchors.verticalCenter: parent.verticalCenter
+                width: 10 * tr.u
+                height: 10 * tr.u
+                radius: width / 2
+                color: tr.colorKey !== "" ? tr.host.themeColor(tr.host[tr.colorKey]) : "transparent"
+                border.width: 1
+                border.color: Theme.alpha(Theme.text, 0.3)
+            }
+
+            Text {
+                anchors.left: chipDot.right
+                anchors.leftMargin: 6 * tr.u
+                anchors.right: parent.right
+                anchors.rightMargin: 4 * tr.u
+                anchors.verticalCenter: parent.verticalCenter
+                elide: Text.ElideRight
+                text: tr.colorKey !== "" ? tr.host.colorLabel(tr.host[tr.colorKey]) : ""
+                font.family: tr.th.fontFamily
+                font.pixelSize: tr.th.textSizeBody * tr.u
+                color: Theme.text
+            }
+        }
+
         MouseArea {
             id: trArea
             anchors.fill: parent
             hoverEnabled: true
             enabled: tr.enabled
-            onClicked: {
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            onClicked: mouse => {
                 tr.forceActiveFocus()
-                tr.activate()
+                if (tr.colorKey !== "" && mouse.button === Qt.RightButton)
+                    tr.host.cycleColor(tr.colorKey, -1)
+                else
+                    tr.activate()
             }
         }
 
@@ -1580,6 +1958,7 @@ Scope {
         property string tip: ""
         readonly property real u: host.menuUi
         readonly property QtObject th: host.th
+        readonly property color cAccent: host.cAccent
 
         readonly property var spec: host.numSpec[key]
         readonly property real ratio: Math.max(0, Math.min(1,
@@ -1624,7 +2003,7 @@ Scope {
             color: "transparent"
             visible: sr.activeFocus
             border.width: Math.max(1, Math.round(sr.u))
-            border.color: Theme.accent
+            border.color: sr.cAccent
         }
 
         Text {
@@ -1663,7 +2042,7 @@ Scope {
                 width: knob.x + knob.width / 2
                 height: parent.height
                 radius: parent.radius
-                color: Theme.accent
+                color: sr.cAccent
             }
 
             Rectangle {
