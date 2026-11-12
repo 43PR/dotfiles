@@ -19,7 +19,7 @@ Scope {
         position: "left", style: "joined", thickness: 20, margin: 4,
         reserveSpace: true, allScreens: true, dragModules: true,
         // appearance
-        scale: 1.0, barScale: 0.9, bgOpacity: 0.35, border: false, radius: 16, calRadius: 15, calScale: 0.9,
+        scale: 1.0, barScale: 0.9, bgOpacity: 0.35, border: false, borderOpacity: 1.0, radius: 16, calRadius: 15, calScale: 0.9, 
         // tooltips
         tooltips: true, tooltipHints: false, tooltipBorder: false, tipDelay: 450,
         // modules
@@ -75,6 +75,7 @@ Scope {
             property real barScale: root.defaults.barScale           // whole-bar scale (thickness, margins, padding, dots, text)
             property real bgOpacity: root.defaults.bgOpacity
             property bool border: root.defaults.border
+            property real borderOpacity: root.defaults.borderOpacity // border alpha (0–1)
             property int radius: root.defaults.radius            // bar corner radius
             property int calRadius: root.defaults.calRadius      // calendar popup corner radius
             property real calScale: root.defaults.calScale       // calendar popup scale
@@ -151,7 +152,7 @@ Scope {
     readonly property int wsBoxPx: wsDotPx
     readonly property real barRadius: strip ? 0 : cfg.radius
     readonly property color bgColor: Qt.alpha(Theme.bg, cfg.bgOpacity)
-    readonly property color borderColor: Theme.accent
+    readonly property color borderColor: Qt.alpha(Theme.accent, cfg.borderOpacity)
 
     function s(n) { return Math.round(n * cfg.scale * cfg.barScale); }
     function cs(n) { return Math.round(n * cfg.scale * cfg.calScale); }   // calendar text sizes
@@ -910,7 +911,7 @@ Scope {
             anchors.verticalCenterOffset: 3
             radius: Theme.radius
             color: ma.pressed && it.interactive && !it.disabled ? Qt.alpha(Theme.accent, 0.35)
-                 : it.active ? Qt.alpha(Theme.accent, 0.22)
+                 : it.active ? Qt.alpha(Theme.accent, 0)
                  : it.warning ? Qt.alpha(Theme.danger, 0.16)
                  : "transparent"
             Behavior on color { ColorAnimation { duration: 100 } }
@@ -1475,7 +1476,7 @@ Scope {
                                                       : root.wsBoxPx
                         radius: root.wsBoxPx / 2
                         color: modelData.urgent ? Theme.danger
-                             : modelData.focused ? Qt.alpha(Theme.accent, 0.2)
+                             : modelData.focused ? Qt.alpha(Theme.accent2, 0.4)
                              : dotMa.containsMouse ? Theme.accent2
                              : Qt.alpha(Theme.textFaint, 0.5)
 
@@ -1488,7 +1489,7 @@ Scope {
                             active: cfg.wsNumbers
                             sourceComponent: Text {
                                 text: dot.modelData.id
-                                color: dot.modelData.focused ? Theme.accent : Theme.text
+                                color: Theme.text
                                 font.family: Theme.iconFont
                                 font.pixelSize: Math.round(root.wsBoxPx * 0.62)
                                 font.bold: dot.modelData.focused

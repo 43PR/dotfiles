@@ -23,7 +23,7 @@ Item {
     readonly property var defaults: ({
         position: "left", style: "joined", thickness: 20, margin: 4,
         reserveSpace: true, allScreens: true, dragModules: true,
-        scale: 1.0, barScale: 0.9, bgOpacity: 0.35, border: false, radius: 16, calRadius: 15, calScale: 0.9,
+        scale: 1.0, barScale: 0.9, bgOpacity: 0.35, border: false, borderOpacity: 1.0, radius: 16, calRadius: 15, calScale: 0.9,
         tooltips: true, tooltipHints: false, tooltipBorder: false, tipDelay: 450,
         modPad: 18, wsDot: 16, wsGap: 8, wsScroll: true, wsNumbers: true,
         tasksScale: 0.85, tasksGap: 2, tasksColor: "normal",
@@ -579,6 +579,13 @@ Item {
                             from: 0; to: 1; step: 0.05; unit: "%"; displayScale: 100
                             value: page.val("bgOpacity")
                             onMoved: v => page.set("bgOpacity", v)
+                        }
+                        BarSlider {
+                            label: "BORDER OPACITY"
+                            enabled: page.val("border")
+                            from: 0; to: 1; step: 0.05; unit: "%"; displayScale: 100
+                            value: page.val("borderOpacity")
+                            onMoved: v => page.set("borderOpacity", v)
                         }
                         BarSlider {
                             label: "CORNER RADIUS"

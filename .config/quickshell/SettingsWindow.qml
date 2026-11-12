@@ -133,12 +133,16 @@ Scope {
     }
 
     // ---- card geometry (persisted snap state) ----------------------------
-    property real cardMargin: 40
-    property real dragMargin: 8
+    property real cardMargin: 40      // gap used by the snap presets only (top/bottom/left/right)
+    property real dragMargin: 0       // gap to screen edge while dragging/resizing: 0 = touch every edge/corner
+    // The visible card is scaled by Theme.settingsScale around its center, so clamp on the
+    // VISIBLE edges: sc = scale, k = (1+sc)/2 (distance from card origin to visible far edge factor).
+    readonly property real sc: Theme.settingsScale > 0 ? Theme.settingsScale : 1
+    readonly property real k: (1 + sc) / 2
     property bool dragging: false
     property bool resizing: false
 
-    property real cardHeightCenter: Math.min(640, root.winH - cardMargin * 2)
+    property real cardHeightCenter: Math.min(680, root.winH - cardMargin * 2)
     property real cardHeightSnapped: cardHeightCenter * 0.6
     property real cardWidthCenter: Math.min(980, root.winW - cardMargin * 2)
     property real cardWidthSnapped: cardWidthCenter * 0.85
@@ -184,11 +188,13 @@ Scope {
     }
 
     function clampX(v) {
-        return Math.max(dragMargin, Math.min(root.winW - cardWidth - dragMargin, v))
+        var inset = cardWidth * (1 - sc) / 2
+        return Math.max(dragMargin - inset, Math.min(root.winW - cardWidth - dragMargin + inset, v))
     }
 
     function clampY(v) {
-        return Math.max(dragMargin, Math.min(root.winH - cardHeight - dragMargin, v))
+        var inset = cardHeight * (1 - sc) / 2
+        return Math.max(dragMargin - inset, Math.min(root.winH - cardHeight - dragMargin + inset, v))
     }
 
     function clampRange(v, lo, hi) {
@@ -224,10 +230,10 @@ Scope {
         case "free":
             cardWidth = clampRange(freeW > 0 ? freeW : cardWidthCenter,
                                    Math.min(minCardWidth, root.winW - 2 * dragMargin),
-                                   Math.min(maxCardWidth, root.winW - 2 * dragMargin))
+                                   Math.min(maxCardWidth, (root.winW - 2 * dragMargin) / sc))
             cardHeight = clampRange(freeH > 0 ? freeH : cardHeightCenter,
                                     Math.min(minCardHeight, root.winH - 2 * dragMargin),
-                                    Math.min(maxCardHeight, root.winH - 2 * dragMargin))
+                                    Math.min(maxCardHeight, (root.winH - 2 * dragMargin) / sc))
             cardX = clampX(freeX)
             cardY = clampY(freeY)
             break
@@ -265,29 +271,29 @@ Scope {
     function resizeCard(corner, sx, sy, sw, sh, dx, dy) {
         var onLeft = corner.charAt(1) === "l"
         var onTop  = corner.charAt(0) === "t"
-        var maxW = Math.min(maxCardWidth,  root.winW - 2 * dragMargin)
-        var maxH = Math.min(maxCardHeight, root.winH - 2 * dragMargin)
+        var maxW = Math.min(maxCardWidth,  (root.winW - 2 * dragMargin) / sc)
+        var maxH = Math.min(maxCardHeight, (root.winH - 2 * dragMargin) / sc)
         var w, h, x, y, lo, hi
 
         if (onLeft) {
-            hi = Math.min(maxW, sx + sw - dragMargin)
+            hi = Math.min(maxW, (sx + sw - dragMargin) / k)
             lo = Math.min(minCardWidth, hi)
             w = clampRange(sw - dx, lo, hi)
             x = sx + sw - w
         } else {
-            hi = Math.min(maxW, root.winW - dragMargin - sx)
+            hi = Math.min(maxW, (root.winW - dragMargin - sx) / k)
             lo = Math.min(minCardWidth, hi)
             w = clampRange(sw + dx, lo, hi)
             x = sx
         }
 
         if (onTop) {
-            hi = Math.min(maxH, sy + sh - dragMargin)
+            hi = Math.min(maxH, (sy + sh - dragMargin) / k)
             lo = Math.min(minCardHeight, hi)
             h = clampRange(sh - dy, lo, hi)
             y = sy + sh - h
         } else {
-            hi = Math.min(maxH, root.winH - dragMargin - sy)
+            hi = Math.min(maxH, (root.winH - dragMargin - sy) / k)
             lo = Math.min(minCardHeight, hi)
             h = clampRange(sh + dy, lo, hi)
             y = sy
