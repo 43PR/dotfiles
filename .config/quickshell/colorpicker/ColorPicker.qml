@@ -11,10 +11,20 @@ Scope {
     id: root
 
     // ───────── Configuration ─────────
-    readonly property bool swapped: hist.swapped
-    readonly property string leftClick: swapped ? "copy-close" : "copy-edit"
-    readonly property string middleClick: swapped ? "copy-edit" : "copy-close"
-    readonly property string rightClick: "cancel"
+    // Selectable actions for each mouse button (persisted in the history file)
+    readonly property var actions: [
+        { id: "copy-edit",  label: "Copy + edit" },
+        { id: "copy-close", label: "Copy" },
+        { id: "cancel",     label: "Cancel" }
+    ]
+    readonly property string leftClick: hist.left
+    readonly property string middleClick: hist.middle
+    readonly property string rightClick: hist.right
+    readonly property bool actionsHidden: hist.actionsHidden
+    readonly property string hintText:
+        "LMB " + actionLabel(leftClick).toLowerCase()
+        + "  ·  MMB " + actionLabel(middleClick).toLowerCase()
+        + "  ·  RMB " + actionLabel(rightClick).toLowerCase()
     readonly property int historyLimit: 20
     property string copyFormat: "hex"          // hex | rgb | hsl  (Tab cycles while picking)
 
@@ -87,7 +97,21 @@ Scope {
     }
 
     function clearHistory() { hist.items = []; store.writeAdapter(); }
-    function toggleSwap() { hist.swapped = !hist.swapped; store.writeAdapter(); }
+    function actionLabel(id) {
+        for (var i = 0; i < actions.length; i++)
+            if (actions[i].id === id) return actions[i].label;
+        return id;
+    }
+
+    function toggleActionsHidden() { hist.actionsHidden = !hist.actionsHidden; store.writeAdapter(); }
+
+    // button: "left" | "middle" | "right"
+    function setAction(button, id) {
+        if (button === "left") hist.left = id;
+        else if (button === "middle") hist.middle = id;
+        else hist.right = id;
+        store.writeAdapter();
+    }
 
     function zoomIn()  { zoomIndex = Math.min(zoomLevels.length - 1, zoomIndex + 1); }
     function zoomOut() { zoomIndex = Math.max(0, zoomIndex - 1); }
@@ -129,7 +153,10 @@ Scope {
         adapter: JsonAdapter {
             id: hist
             property list<string> items: []
-            property bool swapped: false
+            property string left: "copy-edit"
+            property string middle: "copy-close"
+            property string right: "cancel"
+            property bool actionsHidden: false
         }
     }
 

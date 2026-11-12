@@ -170,8 +170,8 @@ PanelWindow {
                 id: hint
                 anchors.centerIn: parent
                 color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: 12
-                text: (ctl.swapped ? "LMB copy  ·  MMB copy + edit" : "LMB copy + edit  ·  MMB copy")
-                      + "  ·  RMB/Esc cancel  ·  scroll zoom  ·  arrows nudge  ·  Tab: copy as " + ctl.copyFormat.toUpperCase()
+                text: ctl.hintText
+                      + "  ·  Esc cancel  ·  scroll zoom  ·  arrows nudge  ·  Tab: copy as " + ctl.copyFormat.toUpperCase()
             }
         }
     }
