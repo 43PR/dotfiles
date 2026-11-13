@@ -2,6 +2,7 @@
 * {
     bg:          {{bg|alpha=70}};
     border-color: {{border_strong}};
+    border-line:  {{border_strong|borderalpha}};
     bg-alt:      {{bg|alpha=00}};
     bg-hover:    {{bg_hover|alpha=ff}};
     bg-selected: {{accent|alpha=00}};

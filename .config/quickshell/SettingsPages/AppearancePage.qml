@@ -421,6 +421,14 @@ Item {
         id: stateDirProcess
         command: ["mkdir", "-p", page.stateDir]
     }
+    Process {
+        id: rofiSync
+        command: ["python3", Quickshell.env("HOME") + "/.config/43pr/bin/theme.py", "apply"]
+    }
+    function syncRofiBorder(v) {
+        rofiSync.environment = ({ BORDER_OPACITY: String(round2(v)) })
+        if (!rofiSync.running) rofiSync.running = true
+    }
 
     Process {
         id: hyprApply
@@ -1121,7 +1129,7 @@ Item {
                             unit: "%"; displayScale: 100
                             value: Theme.borderOpacity
                             onMoved: v => Theme.borderOpacity = v
-                            onCommitted: v => Theme.setHub("borderOpacity", page.round2(v))
+                            onCommitted: v => { Theme.setHub("borderOpacity", page.round2(v)); page.syncRofiBorder(v) }
                         }
                         BarChoice {
                             label: "BORDER STYLE"

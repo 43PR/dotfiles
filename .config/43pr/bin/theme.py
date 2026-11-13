@@ -400,6 +400,20 @@ def reload_gtk(dark=None):
     except Exception as e:
         warn(f"gtk reload failed: {e}")
 
+def border_alpha_hex():
+    """Hyprland border opacity (0..1) from the hub slider, as two hex digits."""
+    raw = os.environ.get("BORDER_OPACITY")
+    if raw is None:
+        try:
+            hub = CFG / "quickshell" / "state" / "hub.json"
+            raw = json.loads(hub.read_text()).get("borderOpacity")
+        except Exception:
+            raw = None
+    try:
+        o = max(0.0, min(1.0, float(raw)))
+    except (TypeError, ValueError):
+        o = 1.0
+    return format(round(o * 255), "02x")
 
 # ---------- rendering ----------
 
@@ -416,6 +430,8 @@ def render(text, pal, where):
             elif fname == "alpha" and arg:
                 v = v.lstrip("#")[:6]
                 v = "#" + v + arg.lower()
+            elif fname == "borderalpha":
+                v = "#" + v.lstrip("#")[:6] + border_alpha_hex()
             elif fname == "rgb":
                 h = v.lstrip("#")[:6]
                 v = ", ".join(str(int(h[i:i + 2], 16)) for i in (0, 2, 4))

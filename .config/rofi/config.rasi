@@ -43,7 +43,7 @@ window {
     height: 290px;
     background-color: @bg;
     border: 1px;
-    border-color: @border-color;
+    border-color: @border-line;
     border-radius: 10px;
     padding: 10;
 }
@@ -138,7 +138,7 @@ element selected.normal,
 element selected.active {
     background-color: @bg-selected;
     border: 1px;
-    border-color: @border-color;
+    border-color: @border-line;
     text-color: @border-color;
 }
 
@@ -170,7 +170,7 @@ button {
     background-color: @bg-alt;
     text-color: @fg-muted;
     border: 1px;
-    border-color: @border-color;
+    border-color: @border-line;
     border-radius: 10px;
     padding: 10px 14px;
     margin: 2px;
