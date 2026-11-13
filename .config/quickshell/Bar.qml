@@ -28,6 +28,7 @@ Scope {
         statsPercent: false, statsIcons: false, statsScale: 0.95, statsBorder: false, statsRadius: 24, statsGap: 1, statsWarn: 85, tempWarn: 85, batLowPct: 15,
         batNumber: false, batPercent: false,
         volStep: 2, volMax: 100, volNumber: false, volPercent: false,
+        lightIcons: "normal", brightStep: 5, nightStep: 100, 
         // clock / calendar
         clock24: true, clockSeconds: false, clockPadHour: true, clockDate: true, clockDay: false, clockCase: "normal", dateOrder: "dm", weekMonday: true,
         // clock click binds: "calendar" | "quickactions" | "settings" | "barsettings" | "none"
@@ -40,7 +41,7 @@ Scope {
         midLeftMods: "ws",
         centerMods: "clock",
         midRightMods: "tasks",
-        endMods: "media,battery,wall,settings,volume,bt,net,power"
+        endMods: "media,battery,wall,settings,bright,night,volume,bt,net,power"
     })
     readonly property var positions: ["top", "right", "bottom", "left"]
     readonly property var styles: ["floating", "joined", "strip", "islands"]
@@ -106,6 +107,9 @@ Scope {
             property int volMax: root.defaults.volMax            // max volume %
             property bool volNumber: root.defaults.volNumber     // show the volume level next to the icon
             property bool volPercent: root.defaults.volPercent   // add the % symbol to the volume number
+            property int brightStep: root.defaults.brightStep      // % per scroll notch
+            property int nightStep: root.defaults.nightStep        // K per scroll notch
+            property string lightIcons: root.defaults.lightIcons   // "normal" (sun + moon) | "star" | "bar"
             property bool clock24: root.defaults.clock24
             property bool clockSeconds: root.defaults.clockSeconds
             property bool clockPadHour: root.defaults.clockPadHour // leading zero on the hour: 02:20 vs 2:20
@@ -386,6 +390,8 @@ Scope {
         { id: "tasks",    l: "Open apps" },
         { id: "media",    l: "Media" },
         { id: "volume",   l: "Volume" },
+        { id: "bright",   l: "Brightness" },
+        { id: "night",    l: "Night light" },
         { id: "battery",  l: "Battery" },
         { id: "bt",       l: "Bluetooth" },
         { id: "net",      l: "Network" },
@@ -402,7 +408,8 @@ Scope {
     readonly property var defMap: moduleDefs.reduce((m, d) => { m[d.id] = d; return m; }, {})
     readonly property var comps: ({
         cpu: cpuC, ram: ramC, gpu: gpuC, cputemp: cpuTempC, gputemp: gpuTempC,
-        ws: wsC, tasks: tasksC, media: mediaC, volume: volumeC, battery: batteryC,
+        ws: wsC, tasks: tasksC, media: mediaC, volume: volumeC,
+        bright: brightC, night: nightC, battery: batteryC,
         bt: btC, net: netC, icon: iconC
     })
 
@@ -411,9 +418,10 @@ Scope {
         if (str === "") return [];
         const out = [];
         for (const x of str.split(","))
-            x === "stats" ? out.push("cpu", "ram")
-          : x === "temp"  ? out.push("cputemp", "gputemp")
-          : out.push(x);
+        x === "stats" ? out.push("cpu", "ram")
+        : x === "temp"  ? out.push("cputemp", "gputemp")
+        : x === "light" ? out.push("bright", "night")
+        : out.push(x);
         return out;
     }
     function valid(id) { return moduleIds.indexOf(id) >= 0; }
@@ -710,7 +718,92 @@ Scope {
         interval: 10000; running: root.barVisible; repeat: true; triggeredOnStart: true
         onTriggered: root.refreshNet()
     }
+// ───────────────────────── Brightness & night light ─────────────────────────
+property real brightness: -1          // 0..1, -1 = no backlight device
+property bool nightOn: false
+property int nightTemp: 4500
+readonly property bool hasBacklight: brightness >= 0
+readonly property int brightPct: Math.round(Math.max(0, brightness) * 100)
 
+readonly property string brightTip: hasBacklight ? "Brightness: " + brightPct + "%"
+                                                 : "Brightness: no backlight detected"
+readonly property string nightTip: "Night light: " + (nightOn ? "on" : "off") + " · " + nightTemp + " K"
+readonly property string lightTip: (hasBacklight ? "Brightness " + brightPct + "% · " : "")
+                                   + "Night light " + (nightOn ? "on" : "off") + " (" + nightTemp + " K)"
+
+function qa(args) { Quickshell.execDetached(["qs", "ipc", "call", "qa"].concat(args)); }
+
+// Brightness is read/written with brightnessctl; absolute values, floor of 1%.
+Process {
+    id: brightProc
+    command: ["brightnessctl", "-m"]
+    stdout: StdioCollector {
+        onStreamFinished: {
+            const p = text.trim().split(",");
+            if (p.length >= 4) {
+                const v = parseInt(p[3]);
+                if (!isNaN(v)) root.brightness = v / 100;
+            }
+        }
+    }
+}
+function refreshBright() { if (!brightProc.running) brightProc.running = true; }
+Timer { id: brightRecheck; interval: 400; onTriggered: root.refreshBright() }
+Timer {
+    interval: 5000; repeat: true; triggeredOnStart: true
+    running: root.barVisible && root.isOn("bright")
+    onTriggered: root.refreshBright()
+}
+
+function brightAdjust(dir) {
+    if (!hasBacklight) return;
+    const step = Math.max(1, cfg.brightStep);
+    const cur = Math.round(brightness * 100);
+    // snap to the step grid, never below 1% so the screen can't go black
+    const next = Math.max(1, Math.min(100, dir > 0 ? (Math.floor(cur / step) + 1) * step
+                                                    : (Math.ceil(cur / step) - 1) * step));
+    brightness = next / 100;                                   // instant feedback
+    Quickshell.execDetached(["brightnessctl", "set", next + "%"]);
+    brightRecheck.restart();
+}// Night light is owned by Quick Actions; the bar sends IPC and reads its state file.
+function toggleNight() { nightOn = !nightOn; qa(["nightToggle"]); }
+function nightAdjust(dir) {
+    const delta = dir * Math.max(50, cfg.nightStep);
+    nightTemp = Math.max(2500, Math.min(6500, nightTemp + delta));
+    qa(["nightAdjust", String(delta)]);
+}
+
+FileView {
+    path: Quickshell.env("HOME") + "/.config/quickshell/state/quickactions-state.json"
+    printErrors: false
+    watchChanges: true
+    onFileChanged: reload()
+    onLoaded: {
+        try {
+            const j = JSON.parse(text());
+            root.nightOn = j.night === true;
+            if (typeof j.nightTemp === "number") root.nightTemp = j.nightTemp;
+        } catch (e) {}
+    }
+}
+
+// one step per wheel notch, also for smooth-scroll devices
+property real brightAcc: 0
+property real nightAcc: 0
+function brightWheel(delta) {
+    brightAcc += delta;
+    if (Math.abs(brightAcc) < 120) return;
+    const dir = brightAcc > 0 ? 1 : -1;
+    brightAcc = 0;
+    brightAdjust(dir);
+}
+function nightWheel(delta) {
+    nightAcc += delta;
+    if (Math.abs(nightAcc) < 120) return;
+    const dir = nightAcc > 0 ? 1 : -1;
+    nightAcc = 0;
+    nightAdjust(dir);
+}
     PwObjectTracker { objects: [Pipewire.defaultAudioSink] }
 
     Process { id: runner }
@@ -1124,7 +1217,32 @@ Scope {
             }
         }
     }
-
+    // Tiny level pill. Lies across the bar on vertical bars, stands upright on horizontal ones.
+    component MiniBar: Item {
+        id: mb
+        property real level: 0                 // 0..1
+        property color col: Theme.text
+        readonly property int len: Math.round(root.sz.icon * 0.8)
+        readonly property int thick: Math.max(3, Math.round(root.sz.icon * 0.3))
+        implicitWidth: root.vertical ? len : thick
+        implicitHeight: root.vertical ? thick : len
+        Rectangle {
+            id: track
+            anchors.fill: parent
+            radius: Math.min(width, height) / 2
+            color: Qt.alpha(mb.col, 0.25)
+            }
+        Rectangle {
+            readonly property int fill: mb.level > 0
+            ? Math.max(mb.thick, Math.round(mb.len * Math.min(1, mb.level))) : 0
+            width: root.vertical ? fill : track.width
+            height: root.vertical ? track.height : fill
+            x: 0
+            y: root.vertical ? 0 : track.height - height
+            radius: Math.min(width, height) / 2
+            color: mb.col
+        }
+    }
     // Container for one module. Also owns the drag state while the module is being dragged:
     // the module follows the pointer visually (transform only, layout is untouched) and,
     // on release, `droppedAt` tells the bar where it was dropped.
@@ -1770,7 +1888,63 @@ Scope {
             }
         }
     }
+// Brightness: sun / star / level bar. Scroll adjusts the backlight.
+Component {
+    id: brightC
+    Mod {
+        id: br
+        readonly property string look: cfg.lightIcons
+        glyph: look === "star" ? "\u2726" : look === "bar" ? "" : "\uf185"
+        iconComp: look === "bar" ? brBar : null
+        glyphSize: look === "star" ? root.sz.icon - 4 : root.sz.icon - 2
+        xOffset: root.vertical ? -1 : 0
+        yOffset: look === "bar" ? 0 : root.iconYOffset
+        disabled: !root.hasBacklight
+        disabledReason: "No backlight detected"
+        tip: root.brightTip
+        primaryHint: "Quick actions"
+        secondaryHint: "Bar settings"
+        scrollHint: "Adjust brightness"
+        onPrimary: root.qa(["toggle"])
+        onSecondary: root.openSettings()
+        onScrolled: delta => root.brightWheel(delta)
 
+        Component {
+            id: brBar
+            MiniBar { level: root.hasBacklight ? root.brightness : 0; col: br.fg }
+        }
+    }
+}
+
+// Night light: moon / star / warmth bar. Left click toggles, scroll adjusts temperature.
+Component {
+    id: nightC
+    Mod {
+        id: ng
+        readonly property string look: cfg.lightIcons
+        glyph: look === "star" ? "\u2727" : look === "bar" ? "" : "\uf186"
+        iconComp: look === "bar" ? ngBar : null
+        glyphSize: look === "star" ? root.sz.icon - 4 : root.sz.icon - 2
+        xOffset: root.vertical ? -1 : 0
+        yOffset: look === "bar" ? 0 : root.iconYOffset
+        active: root.nightOn
+        tip: root.nightTip
+        primaryHint: root.nightOn ? "Turn night light off" : "Turn night light on"
+        secondaryHint: "Quick actions"
+        scrollHint: "Adjust temperature"
+        onPrimary: root.toggleNight()
+        onSecondary: root.qa(["toggle"])
+        onScrolled: delta => root.nightWheel(delta)
+
+        Component {
+            id: ngBar
+            MiniBar {
+                level: root.nightOn ? (6500 - root.nightTemp) / 4000 : 0
+                col: ng.fg
+            }
+        }
+    }
+}
     // ───────────────────────── The bar ─────────────────────────
     Variants {
         model: root.barLive

@@ -30,6 +30,7 @@ Item {
         statsPercent: false, statsIcons: false, statsScale: 0.95, statsBorder: false, statsRadius: 24, statsGap: 1, statsWarn: 85, tempWarn: 85, batLowPct: 15,
         batNumber: false, batPercent: false,
         volStep: 2, volMax: 100, volNumber: false, volPercent: false,
+        lightIcons: "normal", brightStep: 5, nightStep: 100,
         clock24: true, clockSeconds: false, clockPadHour: true, clockDate: true, clockDay: false, clockCase: "normal", dateOrder: "dm", weekMonday: true,
         clockPrimary: "calendar", clockSecondary: "settings", clockTertiary: "quickactions",
         settingsPrimary: "settings", settingsSecondary: "barsettings", settingsTertiary: "none",
@@ -38,7 +39,7 @@ Item {
         midLeftMods: "ws",
         centerMods: "clock",
         midRightMods: "tasks",
-        endMods: "media,battery,wall,settings,volume,bt,net,power"
+        endMods: "media,battery,wall,settings,bright,night,volume,bt,net,power"
     })
 
     readonly property var positions: ["top", "right", "bottom", "left"]
@@ -64,6 +65,8 @@ Item {
         { id: "tasks",    l: "OPEN APPS" },
         { id: "media",    l: "MEDIA" },
         { id: "volume",   l: "VOLUME" },
+        { id: "bright",   l: "BRIGHTNESS" },
+        { id: "night",    l: "NIGHT LIGHT" },
         { id: "battery",  l: "BATTERY" },
         { id: "bt",       l: "BLUETOOTH" },
         { id: "net",      l: "NETWORK" },
@@ -944,7 +947,46 @@ Item {
                     }
                 }
             }
+            Column {
+                id: secLight
+                width: parent.width; spacing: 6
+                topPadding: 2
 
+                SectionTitle { text: "BRIGHTNESS & NIGHT LIGHT" }
+
+                Note {
+                    visible: !page.isOn("bright") && !page.isOn("night")
+                    text: "Turn on BRIGHTNESS or NIGHT LIGHT in MODULES to use these options."
+                }
+
+                Card {
+                    BarChoice {
+                        label: "ICONS"
+                        enabled: page.isOn("bright") || page.isOn("night")
+                        options: ["normal", "star", "bar"]
+                        labels: ({ normal: "SUN / MOON", star: "STARS", bar: "LEVEL BARS" })
+                        maxCols: 3
+                        current: page.val("lightIcons")
+                        onPicked: v => page.set("lightIcons", v)
+                    }
+                    Cols {
+                        BarSlider {
+                            label: "BRIGHTNESS STEP"
+                            enabled: page.isOn("bright")
+                            from: 1; to: 20; step: 1; unit: "%"
+                            value: page.val("brightStep")
+                            onMoved: v => page.set("brightStep", v)
+                        }
+                        BarSlider {
+                            label: "NIGHT STEP"
+                            enabled: page.isOn("night")
+                            from: 50; to: 500; step: 50; unit: " K"
+                            value: page.val("nightStep")
+                            onMoved: v => page.set("nightStep", v)
+                        }
+                    }
+                }
+            }
             // ---------------- TOOLTIPS ----------------
             Column {
                 id: secTooltips

@@ -607,18 +607,18 @@ Scope {
         + "pkill -x gammastep; "
         + "i=0; while pgrep -x gammastep >/dev/null && [ $i -lt 40 ]; do sleep 0.05; i=$((i+1)); done; "
         + "pkill -9 -x gammastep 2>/dev/null; "
-        + "sleep 0.15; "
+        + "sleep \"${2:-0.15}\"; "
         + "[ \"$1\" = off ] && exit 0; "
         + "setsid -f gammastep -O \"$1\" 9>&- >/dev/null 2>&1"
 
     function applyNight() {
-        // nothing to do if it is off and was already off (e.g. only the
-        // temperature slider moved)
         if (!root.nightOn && !root.nightWasOn)
-            return
+        return
+        const tempOnly = root.nightOn && root.nightWasOn
         Quickshell.execDetached({
             command: ["sh", "-c", root.nightScript, "sh",
-                      root.nightOn ? String(root.nightTemp) : "off"]
+            root.nightOn ? String(root.nightTemp) : "off",
+            tempOnly ? "0.03" : "0.15"]
         })
         root.nightWasOn = root.nightOn
         nightSettleTimer.restart()
@@ -632,7 +632,12 @@ Scope {
             root.saveState()
         }
     }
-
+    // Toggling applies quickly; temperature scrolling waits until the scrolling stops,
+    // so a whole scroll gesture causes a single restart instead of one per notch.
+    function queueNight(tempChange) {
+        nightApplyTimer.interval = (tempChange && root.nightOn && root.nightWasOn) ? 450 : 150
+        nightApplyTimer.restart()
+    }
     // keeps nightCheck from overriding the state while the script is running
     Timer {
         id: nightSettleTimer
@@ -646,7 +651,7 @@ Scope {
         var s = root.numSpec.nightTemp
         root.nightTemp = root.clamp(k, s.min, s.max)
         root.nightRetries = 0
-        nightApplyTimer.restart()
+        root.queueNight(true)    
     }
 
     function adjustNight(deltaK) {
@@ -673,12 +678,12 @@ Scope {
             toggleBluetooth()
             break
         case "night":
-            bootApplyTimer.stop()
-            root.nightOn = !root.nightOn
-            root.nightRetries = 0
-            nightSettleTimer.restart()
-            nightApplyTimer.restart()
-            break
+        bootApplyTimer.stop()
+        root.nightOn = !root.nightOn
+        root.nightRetries = 0
+        nightSettleTimer.restart()
+        root.queueNight(false)         // was: nightApplyTimer.restart()
+        break
         case "dnd":
             Quickshell.execDetached({ command: ["qs", "ipc", "call", "notifications", "dnd"] })
             root.dndOn = !root.dndOn
@@ -833,13 +838,14 @@ Scope {
     }
 
     // ---- always-on services (cheap) --------------------------------------
-    // target stays "wheel" so existing keybinds (qs ipc call wheel toggle) keep working
     IpcHandler {
         target: "qa"
         function toggle(): void { root.toggleMenu() }
         function show(): void { root.openMenu() }
         function hide(): void { root.closeMenu() }
         function settings(): void { root.openSettings() }
+        function nightToggle(): void { root.toggleItem("night") }
+        function nightAdjust(delta: int): void { root.adjustNight(delta) }
         function confirm(): void {
             if (!root.showing) return
             var a = root.visibleActions[root.currentIndex]
