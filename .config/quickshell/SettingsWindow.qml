@@ -68,11 +68,11 @@ Scope {
         { name: "System", icon: "󰒓", page: "SystemPage" },
         { name: "Audio", icon: "󰕾", page: "AudioPage" },
         { name: "Display", icon: "󰍹", page: "DisplayPage" },
-        { name: "Keybinds", icon: "󰧮",  page: "KeybindsPage" },
+        { name: "Keybinds", icon: "\ue612",  page: "KeybindsPage" },
         { name: "Appearance", icon: "󰏘", page: "AppearancePage" },
         { name: "Themes", icon: "󰉼",  page: "ThemesPage" },
         { name: "Bar", icon: "\ue690",  page: "BarPage" },
-        { name: "Side Panel", icon: "\uec01",  page: "SidePanelPage" },
+        { name: "Side Panel", icon: "\uec02",  page: "SidePanelPage" },
         { name: "Input", icon: "\udb83\udfb0", page: "InputPage" },
         { name: "Network", icon: "󰖩", page: "NetworkPage" },
         { name: "Bluetooth", icon: "\uf293", page: "BluetoothPage" },
@@ -350,8 +350,8 @@ Scope {
         function toggleSidebar(): void { root.toggleSidebar() }
         function resetSidebarWidth(): void { root.resetSidebarWidth() }
         function sound(): void { root.selectedIndex = 1, root.show() }
-        function network(): void { root.selectedIndex = 8, root.show() }
-        function bluetooth(): void { root.selectedIndex = 9, root.show() }   // <- set the right index
+        function network(): void { root.selectedIndex = 9, root.show() }
+        function bluetooth(): void { root.selectedIndex = 10, root.show() }   // <- set the right index
         function bar(): void { root.selectedIndex = 6, root.show() }
         function snapTop(): void { root.snapTop() }
         function snapCenter(): void { root.snapCenter() }

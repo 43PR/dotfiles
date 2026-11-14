@@ -93,7 +93,7 @@ Item {
     // state/custom_binds.lua (the Lua file is what Hyprland reads)
     property var customBinds: []
     property bool formOpen: false
-    property bool helpOpen: true
+    property bool helpOpen: false
     property string formId: ""      // "" = creating, otherwise editing that id
     property string formName: ""
     property string formCmd: ""

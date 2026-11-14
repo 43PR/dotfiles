@@ -13,19 +13,19 @@ Scope {
     readonly property string home: Quickshell.env("HOME")
     // ───────────────────────── Settings (the important ones) ─────────────────────────
     readonly property var numSpec: ({
-        uiScale:        { min: 70,   max: 160,  def: 95,  step: 5,   unit: "%" },
-        textSize:       { min: 70,   max: 160,  def: 80,  step: 5,   unit: "%" },
-        panelWidth:     { min: 280,  max: 520,  def: 330,  step: 10,  unit: "px" },
+        uiScale:        { min: 70,   max: 160,  def: 90,   step: 5,   unit: "%" },
+        textSize:       { min: 70,   max: 160,  def: 80,   step: 5,   unit: "%" },
+        panelWidth:     { min: 280,  max: 520,  def: 340,  step: 5,   unit: "px" },
         panelHeight:    { min: 30,   max: 100,  def: 100,  step: 5,   unit: "%" },
-        notifsHeight:   { min: 0,    max: 800,  def: 700,    step: 20,  unit: "px" },
+        notifsHeight:   { min: 0,    max: 800,  def: 775,  step: 5,   unit: "px" },
         cornerRadius:   { min: 0,    max: 40,   def: 16,   step: 2,   unit: "px" },
-        bgOpacity:      { min: 0,    max: 100,  def: 40,   step: 5,   unit: "%" },
-        borderOpacity:  { min: 0,    max: 100,  def: 10,  step: 5,   unit: "%" },
+        bgOpacity:      { min: 0,    max: 100,  def: 70,   step: 5,   unit: "%" },
+        borderOpacity:  { min: 0,    max: 100,  def: 100,  step: 5,   unit: "%" },
         animMs:         { min: 0,    max: 500,  def: 200,  step: 20,  unit: " ms" },
         groupLimit:     { min: 2,    max: 8,    def: 3,    step: 1,   unit: "" },
-        notifBgOpacity: { min: 0,    max: 100,  def: 35,   step: 5,   unit: "%" },
+        notifBgOpacity: { min: 0,    max: 100,  def: 30,   step: 5,   unit: "%" },
         brightnessStep: { min: 1,    max: 20,   def: 5,    step: 1,   unit: "%" },
-        nightTemp:      { min: 2500, max: 6500, def: 5600, step: 100, unit: " K" },
+        nightTemp:      { min: 2500, max: 6500, def: 4800, step: 100, unit: " K" },
         nightStep:      { min: 50,   max: 500,  def: 100,  step: 50,  unit: " K" },
         tiltStrength:   { min: 0,    max: 15,   def: 1,    step: 1,   unit: "" }
     })
@@ -34,13 +34,15 @@ Scope {
         showCalendar: true,
         showQuick: true,
         showNotifs: true,
-        border: true,
+        showTileLabels: false,
+        border: false,
         weekMonday: true,
         clock24: true,
         clockSeconds: false,
         toasts: true,
         soundEnabled: true,
-        notifBgEnabled: true
+        notifBgEnabled: false,
+        syncOpacity: true
     })
     readonly property var boolKeys: Object.keys(boolDefaults)
 
@@ -63,6 +65,7 @@ Scope {
     property bool showCalendar: boolDefaults.showCalendar
     property bool showQuick: boolDefaults.showQuick
     property bool showNotifs: boolDefaults.showNotifs
+    property bool showTileLabels: boolDefaults.showTileLabels
     property bool border: boolDefaults.border
     property bool weekMonday: boolDefaults.weekMonday
     property bool clock24: boolDefaults.clock24
@@ -70,8 +73,9 @@ Scope {
     property bool toasts: boolDefaults.toasts
     property bool soundEnabled: boolDefaults.soundEnabled
     property bool notifBgEnabled: boolDefaults.notifBgEnabled
+    property bool syncOpacity: boolDefaults.syncOpacity
     // background picture shown centered behind the notification list
-    readonly property string defaultNotifBg: home + "/Pictures/sigil.png"
+    readonly property string defaultNotifBg: ""
     property string notifBgPath: defaultNotifBg
     property bool toastSet: false
     property real toastFx: 0.5
@@ -94,6 +98,8 @@ Scope {
     readonly property color cAccent: accentColorOf(accentSource)
     readonly property color cText: Theme.text
     readonly property color cDim: Theme.textDim
+    readonly property real bgFrac: (syncOpacity && Theme.bgAlpha !== undefined)
+                                   ? Theme.bgAlpha : bgOpacity / 100
 
     // quick actions that can be shown / hidden
     readonly property var allActions: [
@@ -417,7 +423,7 @@ Scope {
         case "wifi":  return wifiOn ? "\udb81\udda9" : "\udb81\uddaa"
         case "bt":    return !btOn ? "\udb80\udcb2" : (btConnected ? "\udb80\udcb1" : "\udb80\udcaf")
         case "night": return "\uf186"
-        case "dnd":   return dnd ? "\uec08" : "\ueaa2"
+        case "dnd":   return "\udb80\udf77" 
         case "bright": return "\uf185"
         }
         return ""
@@ -497,7 +503,7 @@ Scope {
     Process {
         id: sessionProbe
         command: ["sh", "-c",
-            "m=\"${XDG_RUNTIME_DIR:-/tmp}/qa-night-restored\"; "
+            "m=\"${XDG_RUNTIME_DIR:-/tmp}/qa-night-restored-${HYPRLAND_INSTANCE_SIGNATURE:-nosig}\"; "
             + "if [ -e \"$m\" ]; then echo reload; else : > \"$m\"; echo fresh; fi"]
         stdout: StdioCollector {
             onStreamFinished: {
@@ -524,7 +530,23 @@ Scope {
             if (count >= 2) stop()
         }
     }
-
+    Timer {
+        id: monitorReapplyTimer
+        interval: 1200
+        onTriggered: {
+            if (!root.nightOn) return
+            root.nightWasOn = false
+            root.nightRetries = 0
+            root.applyNight()
+        }
+    }
+    Connections {
+        target: Hyprland
+        function onRawEvent(event) {
+            if (event.name === "monitoradded" || event.name === "monitoraddedv2")
+                monitorReapplyTimer.restart()
+        }
+    }
     // gammastep: changes are debounced, the apply script runs under flock, kills the old
     // gammastep and WAITS until it is gone before starting a new one.
     readonly property string nightScript:
@@ -994,7 +1016,7 @@ Scope {
             anchors { top: true; bottom: true; left: true; right: true }
             color: "transparent"
             exclusionMode: ExclusionMode.Ignore
-            WlrLayershell.layer: WlrLayer.Overlay
+            WlrLayershell.layer: WlrLayer.Top
             WlrLayershell.namespace: "sidepanel"
             // keyboard focus only while the mouse is over the panel
             WlrLayershell.keyboardFocus: (root.panelOpen && panelClip.hovered)
@@ -1151,7 +1173,7 @@ Scope {
                                 width: parent.width
                                 height: Math.max(root.px(64), content.implicitHeight + root.px(24))
                                 radius: Math.min(root.cornerRadius, root.px(16))
-                                color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, Math.max(0.5, root.bgOpacity / 100))
+                                color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, Math.max(0.5, root.bgFrac))
                                 border.width: wrapper.critical ? 1 : 0
                                 border.color: root.cAccent
                                 opacity: wrapper.shown ? 1 : 0
@@ -1325,7 +1347,7 @@ Scope {
                         anchors.fill: parent
 
                         radius: root.cornerRadius
-                        color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, root.bgOpacity / 100)
+                        color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, root.bgFrac)
                         border.width: root.border ? 1 : 0
                         border.color: Theme.alpha(root.cAccent, root.borderOpacity / 100)
                         clip: true
@@ -2042,7 +2064,7 @@ Scope {
         signal clicked()
         signal scrolled(int dir)
         activeFocusOnTab: true
-        height: root.px(52)
+        height: root.px(root.showTileLabels ? 52 : 40)
         radius: root.px(12)
         color: Theme.alpha(Theme.text, tlArea.pressed ? 0.16 : (tlArea.containsMouse || tl.activeFocus) ? 0.1 : 0.06)
         border.width: tl.activeFocus ? 1 : 0
@@ -2073,7 +2095,7 @@ Scope {
                 color: tl.on ? root.cAccent : Theme.text
             }
             Lbl {
-                visible: tl.sub !== ""
+                visible: tl.sub !== "" && root.showTileLabels
                 width: tl.width - root.px(8)
                 horizontalAlignment: Text.AlignHCenter
                 sz: 9

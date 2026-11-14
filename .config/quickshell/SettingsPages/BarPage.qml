@@ -19,28 +19,26 @@ Item {
     // The bar watches that file, so every change here applies instantly.
     // Keep `defaults` in sync with Bar.qml.
     // ------------------------------------------------------------------
-
     readonly property var defaults: ({
-        position: "left", style: "joined", thickness: 20, margin: 4,
+        position: "left", style: "islands", thickness: 22, margin: 4,
         reserveSpace: true, allScreens: true, dragModules: true,
-        scale: 1.0, barScale: 0.9, bgOpacity: 0.35, border: false, borderOpacity: 1.0, radius: 16, calRadius: 15, calScale: 0.9,
-        tooltips: true, tooltipHints: false, tooltipBorder: false, tipDelay: 450, tooltipScale: 0.9,
-        modPad: 18, wsDot: 16, wsGap: 8, wsScroll: true, wsNumbers: true,
-        tasksScale: 0.85, tasksGap: 2, tasksColor: "normal",
-        statsRing: true, statsNumbers: true, statsPercent: false, statsIcons: false, statsScale: 0.95, statsBorder: false, statsRadius: 24, statsGap: 1, statsWarn: 85, tempWarn: 85, batLowPct: 15,
-        batNumber: false, batPercent: false,
-        volStep: 2, volMax: 100, volNumber: false, volPercent: false,
-        lightIcons: "normal", brightStep: 5, nightStep: 100,
-        clock24: true, clockSeconds: false, clockPadHour: true, clockDate: true, clockDay: false, clockCase: "normal", dateOrder: "dm", weekMonday: true,
-        // "calendar" opens SidePanel (calendar + quick actions + notifications)
-        clockPrimary: "calendar", clockSecondary: "settings", clockTertiary: "quickactions",
+        scale: 1, barScale: 0.75, bgOpacity: 0.2, border: true, borderOpacity: 0.15, radius: 34, calRadius: 15, calScale: 0.9,
+        tooltips: true, tooltipHints: false, tooltipBorder: true, tipDelay: 450, tooltipScale: 0.85,
+        modPad: 6, wsDot: 16, wsGap: 10, wsScroll: true, wsNumbers: true,
+        tasksScale: 0.75, tasksGap: 2, tasksColor: "accent",
+        statsRing: true, statsNumbers: false, statsPercent: false, statsIcons: false, statsScale: 1, statsBorder: false, statsRadius: 24, statsGap: 2, statsWarn: 85, tempWarn: 85, batLowPct: 15,
+        batNumber: false, batPercent: false, batRing: true, batLabel: false,
+        volStep: 5, volMax: 100, volNumber: false, volPercent: false, volRing: true, volLabel: false,
+        lightIcons: "normal", brightStep: 5, nightStep: 100, brightRing: true, nightRing: true,
+        clock24: true, clockSeconds: false, clockPadHour: true, clockDate: true, clockDay: false, clockCase: "normal", dateOrder: "md", weekMonday: true,
+        clockPrimary: "calendar", clockSecondary: "settings", clockTertiary: "barsettings",
         settingsPrimary: "settings", settingsSecondary: "barsettings", settingsTertiary: "none",
-        hidden: "wall,settings,ram",
-        startMods: "notif,cpu,ram,gpu,cputemp,gputemp",
-        midLeftMods: "ws",
+        hidden: "wall,settings,bright,ws,tasks,gputemp,gpu,night",
+        startMods: "notif,cpu,tasks,gpu,gputemp,ram,cputemp,ws",
+        midLeftMods: "",
         centerMods: "clock",
-        midRightMods: "tasks",
-        endMods: "media,battery,wall,settings,bright,night,volume,bt,net,power"
+        midRightMods: "",
+        endMods: "media,night,bright,volume,battery,wall,settings,bt,net,power"
     })
 
     readonly property var positions: ["top", "right", "bottom", "left"]
@@ -480,27 +478,30 @@ Item {
 
     Flickable {
         id: flick
-        anchors.fill: parent
-        anchors.leftMargin: page.marginLeft; anchors.rightMargin: page.marginRight
-        anchors.topMargin: page.marginTop; anchors.bottomMargin: page.marginBottom
+        anchors.fill: parent 
+        anchors.leftMargin: page.marginLeft
+        anchors.rightMargin: 0    
+        anchors.topMargin: page.marginTop
+        anchors.bottomMargin: page.marginBottom
         contentWidth: width
         contentHeight: content.implicitHeight
         clip: true
         boundsBehavior: Flickable.StopAtBounds
-
+        
         ScrollBar.vertical: ScrollBar {
             id: scrollBar
-
-            background: Rectangle {
-                color: "transparent"
-                radius: width / 2
-            }
+            implicitWidth: 8
+            leftPadding: 4
+            rightPadding: 0
+            topPadding: 35
+            bottomPadding: 8
+            background: Rectangle { color: "transparent" }
             contentItem: Rectangle {
-                color: "transparent"
+                implicitWidth: 4
                 radius: width / 2
+                color: Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.3)
             }
         }
-
         Column {
             id: content
             width: flick.width
@@ -554,16 +555,28 @@ Item {
 
                     Cols {
                         BarSlider {
+                            label: "BAR SCALE"
+                            from: 0.6; to: 1.5; step: 0.05; unit: "×"; decimals: 2
+                            value: page.val("barScale")
+                            onMoved: v => page.set("barScale", v)
+                        }
+                        BarSlider {
+                            label: "BG OPACITY"
+                            from: 0; to: 1; step: 0.05; unit: "%"; displayScale: 100
+                            value: page.val("bgOpacity")
+                            onMoved: v => page.set("bgOpacity", v)
+                        }
+                        BarSlider {
                             label: "THICKNESS"
                             from: 16; to: 40; step: 1; unit: " px"
                             value: page.val("thickness")
                             onMoved: v => page.set("thickness", v)
                         }
                         BarSlider {
-                            label: "BAR SCALE"
-                            from: 0.6; to: 1.5; step: 0.05; unit: "×"; decimals: 2
-                            value: page.val("barScale")
-                            onMoved: v => page.set("barScale", v)
+                            label: "MODULE PADDING"
+                            from: 0; to: 40; step: 2; unit: " px"
+                            value: page.val("modPad")
+                            onMoved: v => page.set("modPad", v)
                         }
                         BarSlider {
                             label: "EDGE MARGIN"
@@ -573,16 +586,17 @@ Item {
                             onMoved: v => page.set("margin", v)
                         }
                         BarSlider {
-                            label: "MODULE PADDING"
-                            from: 0; to: 40; step: 2; unit: " px"
-                            value: page.val("modPad")
-                            onMoved: v => page.set("modPad", v)
+                            label: "TEXT SCALE"
+                            from: 0.8; to: 1.5; step: 0.05; unit: "×"; decimals: 2
+                            value: page.val("scale")
+                            onMoved: v => page.set("scale", v)
                         }
                         BarSlider {
-                            label: "BG OPACITY"
-                            from: 0; to: 1; step: 0.05; unit: "%"; displayScale: 100
-                            value: page.val("bgOpacity")
-                            onMoved: v => page.set("bgOpacity", v)
+                            label: "CORNER RADIUS"
+                            enabled: !page.strip
+                            from: 0; to: 40; step: 1; unit: " px"
+                            value: page.val("radius")
+                            onMoved: v => page.set("radius", v)
                         }
                         BarSlider {
                             label: "BORDER OPACITY"
@@ -590,19 +604,6 @@ Item {
                             from: 0; to: 1; step: 0.05; unit: "%"; displayScale: 100
                             value: page.val("borderOpacity")
                             onMoved: v => page.set("borderOpacity", v)
-                        }
-                        BarSlider {
-                            label: "CORNER RADIUS"
-                            enabled: !page.strip
-                            from: 0; to: 30; step: 1; unit: " px"
-                            value: page.val("radius")
-                            onMoved: v => page.set("radius", v)
-                        }
-                        BarSlider {
-                            label: "TEXT SCALE"
-                            from: 0.8; to: 1.5; step: 0.05; unit: "×"; decimals: 2
-                            value: page.val("scale")
-                            onMoved: v => page.set("scale", v)
                         }
                     }
 
@@ -847,7 +848,7 @@ Item {
                         }
                         BarSlider {
                             label: "CORNER RADIUS"
-                            from: 0; to: 24; step: 1; unit: " px"
+                            from: 0; to: 40; step: 1; unit: " px"
                             value: page.val("statsRadius")
                             onMoved: v => page.set("statsRadius", v)
                         }
@@ -889,6 +890,16 @@ Item {
 
                             GroupLabel { text: "BATTERY" }
                             ToggleRow {
+                                label: "RING GAUGE"; checked: page.val("batRing")
+                                enabled: page.isOn("battery")
+                                onToggled: v => page.set("batRing", v)
+                            }
+                            ToggleRow {
+                                label: "TEXT LABEL"; checked: page.val("batLabel")
+                                enabled: page.isOn("battery") && !page.val("batRing")
+                                onToggled: v => page.set("batLabel", v)
+                            }
+                            ToggleRow {
                                 label: "NUMBER"; checked: page.val("batNumber")
                                 enabled: page.isOn("battery")
                                 onToggled: v => page.set("batNumber", v)
@@ -912,6 +923,16 @@ Item {
                             spacing: 6
 
                             GroupLabel { text: "VOLUME" }
+                            ToggleRow {
+                                label: "RING GAUGE"; checked: page.val("volRing")
+                                enabled: page.isOn("volume")
+                                onToggled: v => page.set("volRing", v)
+                            }
+                            ToggleRow {
+                                label: "TEXT LABEL"; checked: page.val("volLabel")
+                                enabled: page.isOn("volume") && !page.val("volRing")
+                                onToggled: v => page.set("volLabel", v)
+                            }
                             ToggleRow {
                                 label: "NUMBER"; checked: page.val("volNumber")
                                 enabled: page.isOn("volume")
@@ -956,11 +977,23 @@ Item {
                     BarChoice {
                         label: "ICONS"
                         enabled: page.isOn("bright") || page.isOn("night")
-                        options: ["normal", "star", "bar"]
-                        labels: ({ normal: "SUN / MOON", star: "STARS", bar: "LEVEL BARS" })
-                        maxCols: 3
+                        options: ["normal", "star"]
+                        labels: ({ normal: "SUN / MOON", star: "STARS"})
+                        maxCols: 2
                         current: page.val("lightIcons")
                         onPicked: v => page.set("lightIcons", v)
+                    }
+                    Cols {
+                        ToggleRow {
+                            label: "BRIGHTNESS RING"; checked: page.val("brightRing")
+                            enabled: page.isOn("bright")
+                            onToggled: v => page.set("brightRing", v)    
+                        }
+                        ToggleRow {
+                            label: "NIGHT RING"; checked: page.val("nightRing")
+                            enabled: page.isOn("night")
+                            onToggled: v => page.set("nightRing", v)
+                        }
                     }
                     Cols {
                         BarSlider {

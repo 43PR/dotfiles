@@ -976,46 +976,41 @@ Item {
             onClicked: sh.action()
         }
     }
-
-    // ------------------------------------------------------------------
     // UI
-    //
-    // Sections:
-    //   Performance · Windows & gaps · Blur & shadows · Animations · Hub · Background image
-    // ------------------------------------------------------------------
-
     Flickable {
         id: flick
-        anchors.fill: parent
-        anchors.leftMargin: page.marginLeft; anchors.rightMargin: page.marginRight
-        anchors.topMargin: page.marginTop; anchors.bottomMargin: page.marginBottom
+        anchors.fill: parent 
+        anchors.leftMargin: page.marginLeft
+        anchors.rightMargin: 0    
+        anchors.topMargin: page.marginTop
+        anchors.bottomMargin: page.marginBottom
         contentWidth: width
         contentHeight: content.implicitHeight
         clip: true
         boundsBehavior: Flickable.StopAtBounds
-
+        
         ScrollBar.vertical: ScrollBar {
             id: scrollBar
-
-            background: Rectangle {
-                color: "transparent"
-                radius: width / 2
-            }
+            implicitWidth: 8
+            leftPadding: 4
+            rightPadding: 0
+            topPadding: 35
+            bottomPadding: 8
+            background: Rectangle { color: "transparent" }
             contentItem: Rectangle {
-                color: "transparent"
+                implicitWidth: 4
                 radius: width / 2
+                color: Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.3)
             }
         }
-
         Column {
             id: content
-            width: flick.width
+            width: flick.width - page.marginRight
             spacing: 8
 
             // ---------------- TITLE + QUICK JUMP ----------------
             Item {
                 width: parent.width; height: 26
-
                 Text {
                     anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
                     text: "APPEARANCE"; color: Theme.text
@@ -1445,7 +1440,7 @@ Item {
                     }
 
                     ToggleRow {
-                        label: "SYNC OPACITY SCRIPT"; checked: page.qsOpacityFollow
+                        label: "SYNC OPACITY"; checked: page.qsOpacityFollow
                         onToggled: v => page.setQsOpacityFollow(v)
                     }
                 }

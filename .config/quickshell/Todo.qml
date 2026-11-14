@@ -163,15 +163,6 @@ Scope {
         root.offsetY = Math.max(minY, Math.min(maxY, y))
     }
 
-    // double-click on the drag handle: back to defaults (position, scale, text size)
-    function resetPosition() {
-        root.offsetX = 0
-        root.offsetY = 0
-        root.menuSize = root.defaultSize
-        root.textSize = root.defaultText
-        saveTimer.restart()
-    }
-
     function saveNow() {
         if (!root.ready) return
         var out = []
@@ -648,7 +639,7 @@ Scope {
                                     visible: input.text === "" && !input.inputMethodComposing
                                     width: parent.width
                                     wrapMode: Text.WordWrap
-                                    text: "Enter: Save | Shift+Enter: New line | Ctrl+Scroll: Text size | Shift+Scroll: Scale"
+                                    text: "Enter: Save | Shift+Enter: New line | Ctrl+Scroll/Shift+Scroll"
                                     font.pixelSize: root.fpx(11)
                                     color: Theme.textDim
                                     opacity: 0.7
@@ -669,7 +660,6 @@ Scope {
                     }
 
                     // drag strip: invisible, runs along the whole top edge of the panel.
-                    // Double-click resets position and scale, as before.
                     MouseArea {
                         id: dragArea
                         anchors.top: parent.top
@@ -711,8 +701,6 @@ Scope {
                             root.dragging = false
                             saveTimer.restart()
                         }
-
-                        onDoubleClicked: root.resetPosition()
                     }
 
                     // Topmost overlay for wheel shortcuts (see root.handleWheel).
@@ -1076,7 +1064,8 @@ Scope {
                                         TextInput {
                                             id: titleEdit
                                             width: content.width
-                                            visible: !entry.collapsed || entry.heading !== "" || titleEdit.activeFocus
+                                            visible: entry.heading !== "" || !entry.collapsed
+                                            enabled: !entry.collapsed 
                                             font.pixelSize: root.fpx(12)
                                             font.bold: true
                                             font.strikeout: entry.done
@@ -1288,7 +1277,7 @@ Scope {
                                         anchors.rightMargin: root.px(10)
                                         anchors.top: parent.top
                                         anchors.topMargin: root.px(8)
-                                        spacing: 0
+                                        spacing: 5
                                         Item {
                                             id: collapseBtn
                                             width: root.px(22)
@@ -1342,7 +1331,7 @@ Scope {
                                             id: delBtn
                                             width: root.px(22)
                                             height: width
-
+                                            visible: !entry.collapsed   
                                             Text {
                                                 anchors.centerIn: parent
                                                 text: "✕"
@@ -1362,8 +1351,6 @@ Scope {
                                     }
 
                                     // Right-click + drag: reorder this note (works across columns).
-                                    // Last child = topmost; only reacts to the right button,
-                                    // so left-clicks still reach the checkbox, text, buttons.
                                     MouseArea {
                                         id: reorderArea
                                         anchors.fill: parent

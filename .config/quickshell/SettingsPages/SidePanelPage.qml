@@ -23,34 +23,36 @@ Item {
     // ------------------------------------------------------------------
 
     readonly property var numSpec: ({
-        uiScale:        { min: 70,   max: 160,  def: 100,  step: 5,   unit: "%" },
-        textSize:       { min: 70,   max: 160,  def: 100,  step: 5,   unit: "%" },
-        panelWidth:     { min: 280,  max: 520,  def: 340,  step: 10,  unit: "px" },
+        uiScale:        { min: 70,   max: 160,  def: 90,   step: 5,   unit: "%" },
+        textSize:       { min: 70,   max: 160,  def: 80,   step: 5,   unit: "%" },
+        panelWidth:     { min: 280,  max: 520,  def: 340,  step: 5,   unit: "px" },
         panelHeight:    { min: 30,   max: 100,  def: 100,  step: 5,   unit: "%" },
-        notifsHeight:   { min: 0,    max: 800,  def: 0,    step: 20,  unit: "px" },
+        notifsHeight:   { min: 0,    max: 800,  def: 775,  step: 5,   unit: "px" },
         cornerRadius:   { min: 0,    max: 40,   def: 16,   step: 2,   unit: "px" },
         bgOpacity:      { min: 0,    max: 100,  def: 70,   step: 5,   unit: "%" },
-        borderOpacity: { min: 0, max: 100, def: 100, step: 5, unit: "%" },
+        borderOpacity:  { min: 0,    max: 100,  def: 100,  step: 5,   unit: "%" },
         animMs:         { min: 0,    max: 500,  def: 200,  step: 20,  unit: " ms" },
         groupLimit:     { min: 2,    max: 8,    def: 3,    step: 1,   unit: "" },
         notifBgOpacity: { min: 0,    max: 100,  def: 30,   step: 5,   unit: "%" },
         brightnessStep: { min: 1,    max: 20,   def: 5,    step: 1,   unit: "%" },
         nightStep:      { min: 50,   max: 500,  def: 100,  step: 50,  unit: " K" },
-        tiltStrength:   { min: 0, max: 15, def: 1, step: 1, unit: "" }
+        tiltStrength:   { min: 0,    max: 15,   def: 1,    step: 1,   unit: "" }
     })
     readonly property var numKeys: Object.keys(numSpec)
-
     readonly property var boolDefaults: ({
         showCalendar: true,
         showQuick: true,
+        showNotifs: true,
+        showTileLabels: false,
         border: false,
+        syncOpacity: true,
         weekMonday: true,
         clock24: true,
         clockSeconds: false,
         toasts: true,
         soundEnabled: true,
         notifBgEnabled: false
-        })
+    })
     readonly property var boolKeys: Object.keys(boolDefaults)
 
     readonly property var accentChoices: [
@@ -82,6 +84,7 @@ Item {
     readonly property var sectionBoolKey: ({
         calendar: "showCalendar",
         quick: "showQuick",
+        notifs: "showNotifs"
     })
 
     readonly property var defaults: {
@@ -513,26 +516,33 @@ Item {
             }
         }
     }
-
-    // ------------------------------------------------------------------
     // UI
-    // ------------------------------------------------------------------
-
     Flickable {
         id: flick
-        anchors.fill: parent
-        anchors.leftMargin: page.marginLeft; anchors.rightMargin: page.marginRight
-        anchors.topMargin: page.marginTop; anchors.bottomMargin: page.marginBottom
+        anchors.fill: parent 
+        anchors.leftMargin: page.marginLeft
+        anchors.rightMargin: 0    
+        anchors.topMargin: page.marginTop
+        anchors.bottomMargin: page.marginBottom
         contentWidth: width
         contentHeight: content.implicitHeight
         clip: true
         boundsBehavior: Flickable.StopAtBounds
-
+        
         ScrollBar.vertical: ScrollBar {
-            background: Rectangle { color: "transparent"; radius: width / 2 }
-            contentItem: Rectangle { color: "transparent"; radius: width / 2 }
+            id: scrollBar
+            implicitWidth: 8
+            leftPadding: 4
+            rightPadding: 0
+            topPadding: 35
+            bottomPadding: 8
+            background: Rectangle { color: "transparent" }
+            contentItem: Rectangle {
+                implicitWidth: 4
+                radius: width / 2
+                color: Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.3)
+            }
         }
-
         Column {
             id: content
             width: flick.width
@@ -603,6 +613,7 @@ Item {
                             onMoved: v => page.set("cornerRadius", v)
                         }
                         BarSlider {
+                            enabled: !page.val("syncOpacity")
                             label: "BG OPACITY"
                             from: page.numSpec.bgOpacity.min; to: page.numSpec.bgOpacity.max
                             step: page.numSpec.bgOpacity.step; unit: page.numSpec.bgOpacity.unit
@@ -640,6 +651,10 @@ Item {
                         ToggleRow {
                             label: "BORDER"; checked: page.val("border")
                             onToggled: v => page.set("border", v)
+                        }
+                        ToggleRow {
+                            label: "SYNC OPACITY"; checked: page.val("syncOpacity")
+                            onToggled: v => page.set("syncOpacity", v)
                         }
                         CycleChoice {
                             label: "HIGHLIGHT COLOR"
@@ -827,7 +842,12 @@ Item {
                             onMoved: v => page.set("nightStep", v)
                         }
                     }
-
+                    Cols {
+                        ToggleRow {
+                            label: "SHOW TILE LABELS"; checked: page.val("showTileLabels")
+                            onToggled: v => page.set("showTileLabels", v)
+                        }
+                    }
                     Divider {}
 
                     GroupLabel { text: "VISIBLE TILES" }

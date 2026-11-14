@@ -9,299 +9,200 @@ import Quickshell.Hyprland
 import Quickshell.Bluetooth
 import Quickshell.Services.Pipewire
 import Quickshell.Services.UPower
-
 Scope {
     id: root
-    // ───────────────────────── Config ─────────────────────────
-    // Single source of truth for defaults (used by the adapter AND reset).
     readonly property var defaults: ({
-        // layout
-        position: "left", style: "joined", thickness: 20, margin: 4,
+        position: "left", style: "islands", thickness: 22, margin: 4,
         reserveSpace: true, allScreens: true, dragModules: true,
-        // appearance
-        scale: 1.0, barScale: 0.9, bgOpacity: 0.35, border: false, borderOpacity: 1.0, radius: 16, calRadius: 15, calScale: 0.9, 
-        // tooltips
-        tooltips: true, tooltipHints: false, tooltipBorder: false, tipDelay: 450, tooltipScale: 0.9,
-        modPad: 18, wsDot: 16, wsGap: 8, wsScroll: true, wsNumbers: true,
-        tasksScale: 0.85, tasksGap: 2, tasksColor: "normal",
-        statsRing: true, statsNumbers: true, statsPercent: false, statsIcons: false, statsScale: 0.95, statsBorder: false, statsRadius: 24, statsGap: 1, statsWarn: 85, tempWarn: 85, batLowPct: 15, 
-        batNumber: false, batPercent: false,
-        volStep: 2, volMax: 100, volNumber: false, volPercent: false,
-        lightIcons: "normal", brightStep: 5, nightStep: 100, 
-        // clock / calendar
-        clock24: true, clockSeconds: false, clockPadHour: true, clockDate: true, clockDay: false, clockCase: "normal", dateOrder: "dm", weekMonday: true,
-        // clock click binds: "calendar" (opens SidePanel) | "quickactions" | "settings" | "barsettings" | "none"
-        clockPrimary: "calendar", clockSecondary: "settings", clockTertiary: "quickactions",
-        // settings button click binds: "quickactions" | "settings" | "barsettings" | "none"
+        scale: 1, barScale: 0.75, bgOpacity: 0.2, border: true, borderOpacity: 0.15, radius: 34, calRadius: 15, calScale: 0.9,
+        tooltips: true, tooltipHints: false, tooltipBorder: true, tipDelay: 450, tooltipScale: 0.85,
+        modPad: 6, wsDot: 16, wsGap: 10, wsScroll: true, wsNumbers: true,
+        tasksScale: 0.75, tasksGap: 2, tasksColor: "accent",
+        statsRing: true, statsNumbers: false, statsPercent: false, statsIcons: false, statsScale: 1, statsBorder: false, statsRadius: 24, statsGap: 2, statsWarn: 85, tempWarn: 85, batLowPct: 15,
+        batNumber: false, batPercent: false, batRing: true, batLabel: false,
+        volStep: 5, volMax: 100, volNumber: false, volPercent: false, volRing: true, volLabel: false,
+        lightIcons: "normal", brightStep: 5, nightStep: 100, brightRing: true, nightRing: true,
+        clock24: true, clockSeconds: false, clockPadHour: true, clockDate: true, clockDay: false, clockCase: "normal", dateOrder: "md", weekMonday: true,
+        clockPrimary: "calendar", clockSecondary: "settings", clockTertiary: "barsettings",
         settingsPrimary: "settings", settingsSecondary: "barsettings", settingsTertiary: "none",
-        // module placement
-        hidden: "wall,settings,ram",
-        startMods: "notif,cpu,ram,gpu,cputemp,gputemp",
-        midLeftMods: "ws",
+        hidden: "wall,settings,bright,ws,tasks,gputemp,gpu,night",
+        startMods: "notif,cpu,tasks,gpu,gputemp,ram,cputemp,ws",
+        midLeftMods: "",
         centerMods: "clock",
-        midRightMods: "tasks",
-        endMods: "media,battery,wall,settings,bright,night,volume,bt,net,power"
+        midRightMods: "",
+        endMods: "media,night,bright,volume,battery,wall,settings,bt,net,power"
     })
     readonly property var positions: ["top", "right", "bottom", "left"]
     readonly property var styles: ["floating", "joined", "strip", "islands"]
-    // Five zones along the bar: start · midLeft · center · midRight · end
-    //   midLeft  is centered between the start zone and the center zone
-    //   midRight is centered between the center zone and the end zone
     readonly property var sections: ["start", "midLeft", "center", "midRight", "end"]
-
-    // Live config object, edited by BarPage (the settings page).
-    readonly property var config: cfg
-
-    Component.onCompleted: BluetoothState.init()
-
+    readonly property var config: cfg; Component.onCompleted: BluetoothState.init()
     FileView {
-        id: cfgFile
-        path: Quickshell.env("HOME") + "/.config/quickshell/state/bar-state.json"
-        printErrors: false
-        watchChanges: true                 // BarPage writes this file; pick its changes up live
-        onFileChanged: reload()
+        id: cfgFile; path: Quickshell.env("HOME") + "/.config/quickshell/state/bar-state.json"; printErrors: false
+        watchChanges: true; onFileChanged: reload()
         onLoadFailed: error => { if (error === FileViewError.FileNotFound) writeAdapter(); }
-
         adapter: JsonAdapter {
-            id: cfg
-            property string position: root.defaults.position
-            property string style: root.defaults.style
-            property int thickness: root.defaults.thickness
-            property int margin: root.defaults.margin
-            property bool reserveSpace: root.defaults.reserveSpace   // push windows away from the bar
-            property bool allScreens: root.defaults.allScreens       // false → first screen only
-            property bool dragModules: root.defaults.dragModules     // drag modules on the bar to reorder / move them
-            property real scale: root.defaults.scale                 // text scale
-            property real barScale: root.defaults.barScale           // whole-bar scale (thickness, margins, padding, dots, text)
-            property real bgOpacity: root.defaults.bgOpacity
-            property bool border: root.defaults.border
-            property real borderOpacity: root.defaults.borderOpacity // border alpha (0–1)
-            property int radius: root.defaults.radius            // bar corner radius
-            property int calRadius: root.defaults.calRadius      // calendar popup corner radius
-            property real calScale: root.defaults.calScale       // calendar popup scale
-            property bool tooltips: root.defaults.tooltips
-            property bool tooltipHints: root.defaults.tooltipHints // show "Left click: ..." lines in tooltips
-            property bool tooltipBorder: root.defaults.tooltipBorder // outline around tooltips
-            property int tipDelay: root.defaults.tipDelay        // ms before a tooltip appears
-            property real tooltipScale: root.defaults.tooltipScale 
-            property int modPad: root.defaults.modPad            // horizontal padding of text modules
-            property int wsDot: root.defaults.wsDot              // workspace dot size
-            property int wsGap: root.defaults.wsGap              // gap between workspace dots
-            property bool wsScroll: root.defaults.wsScroll       // scroll on workspaces to switch
-            property bool wsNumbers: root.defaults.wsNumbers     // show the workspace number inside each dot
-            property real tasksScale: root.defaults.tasksScale   // open-apps icon scale
-            property int tasksGap: root.defaults.tasksGap        // space between open-apps icons
-            property string tasksColor: root.defaults.tasksColor // open-apps icon tint: "normal" | "accent"
-            property bool statsRing: root.defaults.statsRing
+            id: cfg; property string position: root.defaults.position; property string style: root.defaults.style
+            property int thickness: root.defaults.thickness; property int margin: root.defaults.margin
+            property bool reserveSpace: root.defaults.reserveSpace; property bool allScreens: root.defaults.allScreens
+            property bool dragModules: root.defaults.dragModules; property real scale: root.defaults.scale
+            property real barScale: root.defaults.barScale; property real bgOpacity: root.defaults.bgOpacity
+            property bool border: root.defaults.border; property real borderOpacity: root.defaults.borderOpacity
+            property int radius: root.defaults.radius; property int calRadius: root.defaults.calRadius
+            property real calScale: root.defaults.calScale; property bool tooltips: root.defaults.tooltips
+            property bool tooltipHints: root.defaults.tooltipHints
+            property bool tooltipBorder: root.defaults.tooltipBorder; property int tipDelay: root.defaults.tipDelay
+            property real tooltipScale: root.defaults.tooltipScale; property int modPad: root.defaults.modPad
+            property int wsDot: root.defaults.wsDot; property int wsGap: root.defaults.wsGap
+            property bool wsScroll: root.defaults.wsScroll; property bool wsNumbers: root.defaults.wsNumbers
+            property real tasksScale: root.defaults.tasksScale; property int tasksGap: root.defaults.tasksGap
+            property string tasksColor: root.defaults.tasksColor; property bool statsRing: root.defaults.statsRing
             property bool statsNumbers: root.defaults.statsNumbers
-            property bool statsPercent: root.defaults.statsPercent // show the % / °C symbols on CPU / RAM / GPU / TEMP
-            property bool statsIcons: root.defaults.statsIcons   // glyph instead of the CPU / RAM / GPU / TEMP text label
-            property real statsScale: root.defaults.statsScale   // text scale of the CPU / RAM / GPU / TEMP badges
-            property bool statsBorder: root.defaults.statsBorder // outline around the stat badges
-            property int statsRadius: root.defaults.statsRadius  // badge corner radius (24 = full pill)
-            property int statsGap: root.defaults.statsGap        // space between neighbouring stat badges
-            property int statsWarn: root.defaults.statsWarn      // CPU/RAM/GPU % that turns red
-            property int tempWarn: root.defaults.tempWarn        // CPU/GPU °C that turns red
-            property int batLowPct: root.defaults.batLowPct      // battery % that turns red
-            property bool batNumber: root.defaults.batNumber     // show the battery percentage next to the icon
-            property bool batPercent: root.defaults.batPercent   // add the % symbol to the battery number
-            property int volStep: root.defaults.volStep          // % per scroll notch
-            property int volMax: root.defaults.volMax            // max volume %
-            property bool volNumber: root.defaults.volNumber     // show the volume level next to the icon
-            property bool volPercent: root.defaults.volPercent   // add the % symbol to the volume number
-            property int brightStep: root.defaults.brightStep      // % per scroll notch
-            property int nightStep: root.defaults.nightStep        // K per scroll notch
-            property string lightIcons: root.defaults.lightIcons   // "normal" (sun + moon) | "star" | "bar"
-            property bool clock24: root.defaults.clock24
-            property bool clockSeconds: root.defaults.clockSeconds
-            property bool clockPadHour: root.defaults.clockPadHour // leading zero on the hour: 02:20 vs 2:20
-            property bool clockDate: root.defaults.clockDate     // minimal date next to the clock, e.g. "Thu, 29/10"
-            property bool clockDay: root.defaults.clockDay       // weekday (Mon/Tue) in front of the date
-            property string clockCase: root.defaults.clockCase   // day name + AM/PM letters: "normal" | "upper" | "lower"
-            property string dateOrder: root.defaults.dateOrder   // date order: "dm" (29/10) | "md" (10/29)
-            property bool weekMonday: root.defaults.weekMonday   // calendar week starts on Monday
-            property string clockPrimary: root.defaults.clockPrimary     // clock left click
-            property string clockSecondary: root.defaults.clockSecondary // clock right click
-            property string clockTertiary: root.defaults.clockTertiary   // clock middle click
-            property string settingsPrimary: root.defaults.settingsPrimary     // settings button left click
-            property string settingsSecondary: root.defaults.settingsSecondary // settings button right click
-            property string settingsTertiary: root.defaults.settingsTertiary   // settings button middle click
-            property string hidden: root.defaults.hidden         // comma list of disabled modules
-            property string startMods: root.defaults.startMods
+            property bool statsPercent: root.defaults.statsPercent; property bool statsIcons: root.defaults.statsIcons
+            property real statsScale: root.defaults.statsScale; property bool statsBorder: root.defaults.statsBorder
+            property int statsRadius: root.defaults.statsRadius; property int statsGap: root.defaults.statsGap
+            property int statsWarn: root.defaults.statsWarn; property int tempWarn: root.defaults.tempWarn
+            property int batLowPct: root.defaults.batLowPct; property bool batNumber: root.defaults.batNumber
+            property bool batPercent: root.defaults.batPercent; property bool batRing: root.defaults.batRing
+            property bool batLabel: root.defaults.batLabel; property bool volRing: root.defaults.volRing
+            property bool volLabel: root.defaults.volLabel; property int volStep: root.defaults.volStep
+            property int volMax: root.defaults.volMax; property bool volNumber: root.defaults.volNumber
+            property bool volPercent: root.defaults.volPercent; property int brightStep: root.defaults.brightStep
+            property int nightStep: root.defaults.nightStep; property bool brightRing: root.defaults.brightRing
+            property bool nightRing: root.defaults.nightRing; property string lightIcons: root.defaults.lightIcons
+            property bool clock24: root.defaults.clock24; property bool clockSeconds: root.defaults.clockSeconds
+            property bool clockPadHour: root.defaults.clockPadHour; property bool clockDate: root.defaults.clockDate
+            property bool clockDay: root.defaults.clockDay; property string clockCase: root.defaults.clockCase
+            property string dateOrder: root.defaults.dateOrder; property bool weekMonday: root.defaults.weekMonday
+            property string clockPrimary: root.defaults.clockPrimary
+            property string clockSecondary: root.defaults.clockSecondary
+            property string clockTertiary: root.defaults.clockTertiary
+            property string settingsPrimary: root.defaults.settingsPrimary
+            property string settingsSecondary: root.defaults.settingsSecondary
+            property string settingsTertiary: root.defaults.settingsTertiary
+            property string hidden: root.defaults.hidden; property string startMods: root.defaults.startMods
             property string midLeftMods: root.defaults.midLeftMods
             property string centerMods: root.defaults.centerMods
-            property string midRightMods: root.defaults.midRightMods
-            property string endMods: root.defaults.endMods
+            property string midRightMods: root.defaults.midRightMods; property string endMods: root.defaults.endMods
         }
     }
-
-    // Only the bar's own changes (IPC / drag & drop) are saved from here; BarPage saves its own.
     Timer { id: saveTimer; interval: 300; onTriggered: cfgFile.writeAdapter() }
     function save() { saveTimer.restart(); }
-
     function resetSettings() { for (const k in defaults) cfg[k] = defaults[k]; }
     readonly property bool modified: Object.keys(defaults).some(k => cfg[k] !== defaults[k])
-
-    // ───────────────────────── Derived layout ─────────────────────────
     readonly property bool vertical: cfg.position === "left" || cfg.position === "right"
-    readonly property bool strip: cfg.style === "strip"
-    readonly property bool islands: cfg.style === "islands"
+    readonly property bool strip: cfg.style === "strip"; readonly property bool islands: cfg.style === "islands"
     readonly property bool joined: cfg.style === "joined" || cfg.style === "strip"
     readonly property real bs: cfg.barScale
     readonly property int panelThick: Math.round((vertical ? cfg.thickness + 12 : cfg.thickness) * bs)
     readonly property int effEdge: strip ? 0 : Math.round(cfg.margin * bs)
     readonly property int effGap: strip ? 0 : Math.round(6 * bs)
     readonly property int modPadPx: Math.round(cfg.modPad * bs)
-    readonly property int wsDotPx: Math.max(3, Math.round(cfg.wsDot * bs))
+    readonly property int wsBoxPx: Math.max(3, Math.round(cfg.wsDot * bs))
     readonly property int wsGapPx: Math.round(cfg.wsGap * bs)
-    // the dot size slider drives the box in both modes; with numbers on, the digit scales with it
-    readonly property int wsBoxPx: wsDotPx
     readonly property real barRadius: strip ? 0 : cfg.radius
     readonly property color bgColor: Qt.alpha(Theme.bg, cfg.bgOpacity)
     readonly property color borderColor: Qt.alpha(Theme.accent, cfg.borderOpacity)
-
     function s(n) { return Math.round(n * cfg.scale * cfg.barScale); }
-    function cs(n) { return Math.round(n * cfg.scale * cfg.calScale); }   // calendar text sizes
-    function cl(n) { return Math.round(n * cfg.calScale); }               // calendar layout sizes
-
     readonly property var sz: ({
         stat: s(12), clock: s(12), marquee: s(11),
-        icon: s(16), batIcon: s(13), batText: s(12), power: s(16),
-        taskIcon: s(18),
-        calTime: cs(30), calDate: cs(12), calMonth: cs(13), calArrow: cs(16),
-        calWeekday: cs(11), calDay: cs(12)
+        icon: s(16), batText: s(12), power: s(16), taskIcon: s(18)
     })
-    readonly property int sizeIconGap: Math.round(12 * bs)
-    readonly property int iconYOffset: 1
-
-    // Open-apps icon size: the base size times the user's scale, never larger than the bar itself.
+    readonly property int sizeIconGap: Math.round(12 * bs); readonly property int iconYOffset: 1
     readonly property int taskIconPx: Math.max(8, Math.min(Math.round(sz.taskIcon * cfg.tasksScale), panelThick - 2))
     readonly property int taskGapPx: Math.round(cfg.tasksGap * bs)
-
-    // margin for one side of the bar frame
     function edgeMargin(side) {
         if (cfg.position === side) return effEdge;
         const alongBar = vertical ? (side === "top" || side === "bottom")
                                   : (side === "left" || side === "right");
         return alongBar ? effGap : 0;
     }
-
-    // ───────────────────────── App icon resolution ─────────────────────────
-    // Resolves an icon for ANY window (rofi, Steam, Electron apps, XWayland
-    // classes, Flatpaks, reverse-DNS app ids, absolute icon paths, ...).
-    // Tries many candidates and returns the first that actually exists.
+    function snapStep(cur, step, dir) {
+        return dir > 0 ? (Math.floor(cur / step) + 1) * step : (Math.ceil(cur / step) - 1) * step;
+    }
+    function desktopEntry(appId) {
+        const id = appId ?? "";
+        try {
+            return DesktopEntries.heuristicLookup(id)
+                ?? DesktopEntries.heuristicLookup(id.toLowerCase())
+                ?? DesktopEntries.byId(id)
+                ?? DesktopEntries.byId(id.toLowerCase());
+        } catch (e) { return null; }
+    }
     function iconFor(appId) {
         const id = appId ?? "";
         const low = id.toLowerCase();
         const cands = [];
-        const add = c => { if (c && c !== "" && cands.indexOf(c) < 0) cands.push(c); };
-
-        // 1) desktop entry (matches StartupWMClass, id, name, ...)
-        let entry = null;
-        try {
-            entry = DesktopEntries.heuristicLookup(id)
-                 ?? DesktopEntries.heuristicLookup(low)
-                 ?? DesktopEntries.byId(id)
-                 ?? DesktopEntries.byId(low);
-        } catch (e) { entry = null; }
+        const add = c => { if (c && cands.indexOf(c) < 0) cands.push(c); };
+        const entry = desktopEntry(id);
         if (entry) {
             add(entry.icon);
             add(entry.id);
             add((entry.id ?? "").toLowerCase());
         }
-
-        // 2) the app id itself, in several spellings
         add(id);
         add(low);
         add(low.replace(/\s+/g, "-"));
         add(low.replace(/[._\s]+/g, "-"));
         const parts = low.split(".");
         if (parts.length > 1) {
-            add(parts[parts.length - 1]);          // org.gnome.Nautilus → nautilus
+            add(parts[parts.length - 1]);
             add(parts.slice(-2).join("-"));
         }
         const dash = low.split("-");
-        if (dash.length > 1) add(dash[0]);         // google-chrome-stable → google
-
-        // 3) first candidate that resolves wins
+        if (dash.length > 1) add(dash[0]);
         for (const c of cands) {
-            if (c.startsWith("/")) return "file://" + c;      // absolute path in .desktop
+            if (c.startsWith("/")) return "file://" + c;
             if (c.startsWith("file://") || c.startsWith("image://")) return c;
-            const p = Quickshell.iconPath(c, true);            // true → "" when missing
+            const p = Quickshell.iconPath(c, true);
             if (p !== "") return p;
         }
-
-        // 4) generic fallbacks
         return Quickshell.iconPath("application-x-executable", true)
             || Quickshell.iconPath("application-default-icon", true)
             || Quickshell.iconPath("image-missing");
     }
-
-    // Short, friendly app name for the open-apps tooltip (desktop entry name, else the app id).
     function appName(appId) {
-        const id = appId ?? "";
-        let entry = null;
-        try {
-            entry = DesktopEntries.heuristicLookup(id) ?? DesktopEntries.heuristicLookup(id.toLowerCase());
-        } catch (e) { entry = null; }
-        return entry && entry.name ? entry.name : id;
+        const entry = desktopEntry(appId);
+        return entry && entry.name ? entry.name : (appId ?? "");
     }
-
-    // ───────────────────────── Clock formatting ─────────────────────────
     function pad2(n) { return String(n).padStart(2, "0"); }
-
-    // hour with or without a leading zero (02:20 / 2:20), 24h or 12h
+    function applyCase(v) {
+        return cfg.clockCase === "upper" ? v.toUpperCase()
+             : cfg.clockCase === "lower" ? v.toLowerCase() : v;
+    }
     function hourText(d) {
         const h = cfg.clock24 ? d.getHours() : (d.getHours() % 12 || 12);
         return cfg.clockPadHour ? pad2(h) : String(h);
     }
-    // AM/PM: "normal" and "lower" → pm / am, "upper" → PM / AM
-    function ampmText(d) {
-        const v = d.getHours() >= 12 ? "PM" : "AM";
-        return cfg.clockCase === "upper" ? v : v.toLowerCase();
+    function ampmText(d) { return applyCase(d.getHours() >= 12 ? "PM" : "AM"); }
+    function dayText(d) { return applyCase(Qt.formatDate(d, "ddd")); }
+    function clockParts(d) {
+        const p = [hourText(d), pad2(d.getMinutes())];
+        if (cfg.clockSeconds) p.push(pad2(d.getSeconds()));
+        return p;
     }
-    // short weekday: normal → Tue, upper → TUE, lower → tue
-    function dayText(d) {
-        const v = Qt.formatDate(d, "ddd");
-        return cfg.clockCase === "upper" ? v.toUpperCase()
-             : cfg.clockCase === "lower" ? v.toLowerCase() : v;
-    }
-
     function clockText(d) {
-        let t = hourText(d) + ":" + pad2(d.getMinutes());
-        if (cfg.clockSeconds) t += ":" + pad2(d.getSeconds());
+        const t = clockParts(d).join(":");
         return cfg.clock24 ? t : t + " " + ampmText(d);
     }
     function clockVText(d) {
-        const parts = [hourText(d), pad2(d.getMinutes())];
-        if (cfg.clockSeconds) parts.push(pad2(d.getSeconds()));
-        if (!cfg.clock24) parts.push(ampmText(d));
-        return parts.join("\n");
+        const p = clockParts(d);
+        if (!cfg.clock24) p.push(ampmText(d));
+        return p.join("\n");
     }
     function clockBarText(d) {
         const t = clockText(d);
         if (!cfg.clockDate) return t;
         return t + "  \u2022  " + (cfg.clockDay ? dayText(d) + ", " : "")
-        + Qt.formatDate(d, cfg.dateOrder === "md" ? "MM/dd" : "dd/MM");
+             + Qt.formatDate(d, cfg.dateOrder === "md" ? "MM/dd" : "dd/MM");
     }
     function clockBarVText(d) {
         const t = clockVText(d);
         if (!cfg.clockDate) return t;
         const dd = Qt.formatDate(d, "dd"), mm = Qt.formatDate(d, "MM");
         return t + "\n\u2022\n" + (cfg.clockDay ? dayText(d) + "\n" : "")
-        + (cfg.dateOrder === "md" ? mm + "\n" + dd : dd + "\n" + mm);
+             + (cfg.dateOrder === "md" ? mm + "\n" + dd : dd + "\n" + mm);
     }
-    // Full date for the tooltip and the calendar header
-    function longDate(d) {
-        return Qt.formatDate(d, cfg.dateOrder === "md" ? "dddd, MMMM d, yyyy" : "dddd, d MMMM yyyy");
-    }
-
-    // ───────────────────────── Battery ─────────────────────────
-    // ── TEST MODE ──
-    property bool batTest: false
-    property int batTestPct: 60
-    property bool batTestCharging: false
-
+    property bool batTest: false; property int batTestPct: 60; property bool batTestCharging: false
     readonly property var battery: UPower.devices.values.find(d => d.isLaptopBattery)
         ?? (UPower.displayDevice && UPower.displayDevice.isPresent
             && UPower.displayDevice.type === UPowerDeviceType.Battery
@@ -315,21 +216,15 @@ Scope {
               || battery.state === UPowerDeviceState.PendingCharge
               || battery.state === UPowerDeviceState.FullyCharged)
     readonly property bool batLow: hasBattery && !batCharging && batPct <= cfg.batLowPct
-
-    // Vertical battery glyphs, used on horizontal bars (top / bottom):
-    //   nf-md-battery_outline (f008e), nf-md-battery_10 … _90 (f007a … f0082), nf-md-battery (f0079 = full).
-    // Index = charge rounded to the nearest 10 %.
     readonly property var batGlyphsV: [
         "\uDB80\uDC8E", "\uDB80\uDC7A", "\uDB80\uDC7B", "\uDB80\uDC7C", "\uDB80\uDC7D", "\uDB80\uDC7E",
         "\uDB80\uDC7F", "\uDB80\uDC80", "\uDB80\uDC81", "\uDB80\uDC82", "\uDB80\uDC79"
     ]
     readonly property string batGlyphV: batGlyphsV[Math.max(0, Math.min(10, Math.round(batPct / 10)))]
-
     function fmtTime(sec) {
         const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
         return h > 0 ? h + "h " + m + "m" : m + "m";
     }
-
     readonly property string batTip: {
         if (batTest)
             return "Battery " + batPct + "% · " + (batCharging ? "charging" : "on battery") + " · test mode";
@@ -340,22 +235,16 @@ Scope {
         return "Battery " + batPct + "% · " + st
             + (t > 0 ? " · " + fmtTime(t) + (batCharging ? " to full" : " left") : "");
     }
-
-    // ───────────────────────── Bluetooth ─────────────────────────
     readonly property bool hasBt: Bluetooth.defaultAdapter !== null
     readonly property bool btOn: Bluetooth.defaultAdapter ? Bluetooth.defaultAdapter.enabled : false
-
     function btDevices() {
         const a = Bluetooth.defaultAdapter;
         if (!a || !a.enabled || !a.devices) return [];
         return a.devices.values !== undefined ? a.devices.values : a.devices;
     }
-
-    // "Headphones 80%" for every connected device (battery only when the device reports it)
     readonly property var btConnectedNames: {
-        const out = [], devs = btDevices();
-        for (let i = 0; i < devs.length; i++) {
-            const d = devs[i];
+        const out = [];
+        for (const d of btDevices()) {
             if (d.state !== BluetoothDeviceState.Connected) continue;
             let n = d.name || d.deviceName || d.address;
             if (d.batteryAvailable) n += " " + Math.round(d.battery * 100) + "%";
@@ -363,24 +252,14 @@ Scope {
         }
         return out;
     }
-    readonly property bool btConnecting: {
-        const devs = btDevices();
-        for (let i = 0; i < devs.length; i++)
-            if (devs[i].state === BluetoothDeviceState.Connecting) return true;
-        return false;
-    }
-    readonly property string btGlyph: !btOn ? "\uDB80\uDCB2"                           // bluetooth-off
-                                    : btConnectedNames.length > 0 ? "\uDB80\uDCB1"    // bluetooth-connect
-                                    : "\uDB80\uDCAF"                                   // bluetooth
+    readonly property bool btConnecting: btDevices().some(d => d.state === BluetoothDeviceState.Connecting)
+    readonly property string btGlyph: !btOn ? "\uf294"
+    : btConnectedNames.length > 0 ? "\uDB80\uDCB1"
+    : "\uf294"
     readonly property string btTip: !btOn ? "Bluetooth: off"
-        : btConnecting ? "Bluetooth: connecting…"
-        : btConnectedNames.length > 0 ? "Bluetooth: " + btConnectedNames.join(", ")
-        : "Bluetooth: on, no devices connected"
-
-    // ───────────────────────── Module registry ─────────────────────────
-    // Modules with `cmd` are rendered by the generic iconC component:
-    //   g = glyph, tip = tooltip title, hint = left-click description.
-    // Modules without it have a dedicated Component below (see `comps`).
+    : btConnecting ? "Bluetooth: connecting…"
+    : btConnectedNames.length > 0 ? "Bluetooth: " + btConnectedNames.join(", ")
+    : "Bluetooth: on, no devices connected"
     readonly property var moduleDefs: [
         { id: "clock",    l: "Clock" },
         { id: "cpu",      l: "CPU" },
@@ -412,23 +291,19 @@ Scope {
         cpu: cpuC, ram: ramC, gpu: gpuC, cputemp: cpuTempC, gputemp: gpuTempC,
         ws: wsC, tasks: tasksC, media: mediaC, volume: volumeC,
         bright: brightC, night: nightC, battery: batteryC,
-        bt: btC, net: netC, icon: iconC
+        bt: btC, net: netC, clock: clockC, icon: iconC
     })
-
-    // Old combined modules are migrated in saved configs: "stats" → "cpu" + "ram", "temp" → "cputemp" + "gputemp".
     function csv(str) {
         if (str === "") return [];
         const out = [];
         for (const x of str.split(","))
-        x === "stats" ? out.push("cpu", "ram")
-        : x === "temp"  ? out.push("cputemp", "gputemp")
-        : x === "light" ? out.push("bright", "night")
-        : out.push(x);
+            x === "stats" ? out.push("cpu", "ram")
+          : x === "temp"  ? out.push("cputemp", "gputemp")
+          : x === "light" ? out.push("bright", "night")
+          : out.push(x);
         return out;
     }
     function valid(id) { return moduleIds.indexOf(id) >= 0; }
-
-    // enable / disable
     readonly property var hiddenList: csv(cfg.hidden)
     function isOn(id) { return hiddenList.indexOf(id) < 0; }
     function setOn(id, on) {
@@ -436,7 +311,6 @@ Scope {
         if (!on) h.push(id);
         cfg.hidden = h.join(",");
     }
-
     function modVisible(id) {
         if (!isOn(id)) return false;
         switch (id) {
@@ -446,45 +320,31 @@ Scope {
         default:        return true;
         }
     }
-
-    // sections
     readonly property var startList: csv(cfg.startMods).filter(valid)
     readonly property var midLeftList: csv(cfg.midLeftMods).filter(valid)
-    readonly property var centerList: {
-        // The clock is a regular module now: it may live in any section (or be hidden),
-        // so the center section can be empty.
-        return csv(cfg.centerMods).filter(valid);
-    }
+    readonly property var centerList: csv(cfg.centerMods).filter(valid)
     readonly property var midRightList: csv(cfg.midRightMods).filter(valid)
     readonly property var endList: {
-        // Modules that are not placed anywhere (e.g. newly added ones) fall back to the end section.
         const a = csv(cfg.endMods).filter(valid);
         return a.concat(moduleIds.filter(x =>
             startList.indexOf(x) < 0 && midLeftList.indexOf(x) < 0 && centerList.indexOf(x) < 0
             && midRightList.indexOf(x) < 0 && a.indexOf(x) < 0));
     }
-
     function listOf(sec) {
         return (sec === "start" ? startList
               : sec === "midLeft" ? midLeftList
               : sec === "center" ? centerList
               : sec === "midRight" ? midRightList : endList).slice();
     }
-    // config keys: startMods · midLeftMods · centerMods · midRightMods · endMods
     function setList(sec, a) { cfg[sec + "Mods"] = a.join(","); }
     function sectionOf(id) { return sections.find(k => listOf(k).indexOf(id) >= 0) ?? "end"; }
-
-    // Modules that share one island. Anything not listed gets its own island.
     readonly property var statIds: ["cpu", "ram", "gpu", "cputemp", "gputemp"]
-
-    // Splits a section's module list into island groups.
-    // Without the islands style the whole section is one group, so nothing changes.
     function groupsOf(ids) {
         if (!islands) return [ids];
         const out = [];
         let last = "";
         for (const id of ids) {
-            if (!isOn(id)) continue;                      // disabled modules never split a group
+            if (!isOn(id)) continue;
             const key = statIds.indexOf(id) >= 0 ? "stats" : id;
             if (out.length > 0 && key === last) out[out.length - 1].push(id);
             else out.push([id]);
@@ -492,16 +352,6 @@ Scope {
         }
         return out;
     }
-
-    function moveTo(id, sec) {
-        const next = {};
-        for (const k of sections) next[k] = listOf(k).filter(x => x !== id);
-        next[sec].push(id);
-        for (const k of sections) setList(k, next[k]);
-    }
-
-    // Move a module to a specific position of a section (used by drag & drop).
-    // `idx` is an index into the section's list *before* the module is removed from it.
     function moveToIndex(id, sec, idx) {
         const next = {};
         for (const k of sections) next[k] = listOf(k);
@@ -512,20 +362,13 @@ Scope {
         next[sec].splice(idx, 0, id);
         for (const k of sections) setList(k, next[k]);
     }
-
-    function canShift(id, d) {
-        const a = listOf(sectionOf(id)), j = a.indexOf(id) + d;
-        return j >= 0 && j < a.length;
-    }
-
+    function moveTo(id, sec) { moveToIndex(id, sec, listOf(sec).length); }
     function shiftBy(id, d) {
-        if (!canShift(id, d)) return;
         const sec = sectionOf(id), a = listOf(sec), i = a.indexOf(id), j = i + d;
+        if (j < 0 || j >= a.length) return;
         [a[i], a[j]] = [a[j], a[i]];
         setList(sec, a);
     }
-
-    // Walks up from any bar element to the Slot (module container) that owns it.
     function slotOf(item) {
         let p = item;
         while (p) {
@@ -534,11 +377,7 @@ Scope {
         }
         return null;
     }
-
-    // ───────────────────────── State / IPC ─────────────────────────
-    property bool barVisible: true
-    property bool barLive: true
-
+    property bool barVisible: true; property bool barLive: true
     function rebuildBar() { barLive = false; rebuildTimer.restart(); }
     Timer { id: rebuildTimer; interval: 80; onTriggered: root.barLive = true }
     Connections {
@@ -546,13 +385,7 @@ Scope {
         function onPositionChanged() { root.rebuildBar(); }
         function onStyleChanged() { root.rebuildBar(); }
     }
-
-    // Bar settings now live on the BarPage of the settings app.
-    // Adjust the IPC call below if your settings app names the page differently.
     function openSettings() { run("qs ipc call settings bar"); }
-
-    // Shared click actions (clock + settings button binds)
-    // "calendar" | "settings" | "barsettings" | "quickactions" | "none"
     function actionHint(a) {
         return a === "calendar" ? "Side panel"
              : a === "settings" ? "Settings"
@@ -565,30 +398,20 @@ Scope {
         else if (a === "barsettings") openSettings();
         else if (a === "quickactions") run("qs ipc call qa toggle");
     }
-
-    // Open SidePanel next to a bar module (normally the clock). Falls back to a
-    // plain toggle when no item is given (e.g. keybind / IPC).
-    // Args match SidePanel's `toggleAt <screen> <position> <along> <edge>`.
     function openSidepanelAt(item) {
-        if (!item) {
-            Quickshell.execDetached(["qs", "ipc", "call", "sidepanel", "toggle"]);
-            return;
-        }
-        const win = item.QsWindow ? item.QsWindow.window : null;
+        const win = item && item.QsWindow ? item.QsWindow.window : null;
         if (!win || !win.screen) {
             Quickshell.execDetached(["qs", "ipc", "call", "sidepanel", "toggle"]);
             return;
         }
         const c = item.mapToItem(win.contentItem, item.width / 2, item.height / 2);
         const along = Math.round(root.vertical ? c.y : c.x);
-        // distance from screen edge to the bar's inner edge (matches SidePanel.barEdge)
         const edge = root.panelThick + root.effEdge;
         Quickshell.execDetached([
             "qs", "ipc", "call", "sidepanel", "toggleAt",
             win.screen.name, cfg.position, String(along), String(edge)
         ]);
     }
-
     IpcHandler {
         target: "bar"
         function toggle(): void { root.barVisible = !root.barVisible; }
@@ -605,54 +428,31 @@ Scope {
             if (root.styles.indexOf(st) >= 0) { cfg.style = st; root.save(); }
         }
         function customize(): void { root.openSettings(); }
-        // section: start | midLeft | center | midRight | end
         function moveModule(id: string, section: string): void {
             if (root.valid(id) && root.sections.indexOf(section) >= 0) { root.moveTo(id, section); root.save(); }
         }
         function shiftModule(id: string, delta: int): void {
             if (root.valid(id)) { root.shiftBy(id, delta); root.save(); }
         }
-
-        // Battery test mode (not saved to the config file)
         function batteryTest(on: bool): void { root.batTest = on; }
         function batteryLevel(pct: int): void { root.batTestPct = Math.max(0, Math.min(100, pct)); }
         function batteryCharging(on: bool): void { root.batTestCharging = on; }
     }
-
-    // ───────────────────────── System stats ─────────────────────────
-    // CPU / memory / GPU / temperatures come from the shared SystemStats singleton
-    // (the settings page reads the same one). The bar only says what it needs;
-    // polling for a reading runs only while a module that shows it is enabled.
     StatsSubscription { active: root.barVisible && root.isOn("cpu");  keys: ["cpu"] }
     StatsSubscription { active: root.barVisible && root.isOn("ram");  keys: ["mem"] }
     StatsSubscription { active: root.barVisible && root.isOn("gpu");  keys: ["gpu"] }
     StatsSubscription { active: root.barVisible && (root.isOn("cputemp") || root.isOn("gputemp")); keys: ["temp"] }
-
     readonly property int cpuUsage: Math.round(SystemStats.cpuUsage)
     readonly property int memPercent: Math.round(SystemStats.memPercent)
-    readonly property real memUsedG: SystemStats.memUsedG
-    readonly property real memTotalG: SystemStats.memTotalG
-    readonly property int gpuUsage: SystemStats.gpuUsage
-    readonly property bool gpuHasUsage: SystemStats.gpuHasUsage
-    readonly property int cpuTemp: SystemStats.cpuTemp      // -1 = unavailable
-    readonly property int gpuTemp: SystemStats.gpuTemp      // -1 = no sensor (e.g. Intel iGPU) → shown as "–"
-
+    readonly property real memUsedG: SystemStats.memUsedG; readonly property real memTotalG: SystemStats.memTotalG
+    readonly property int gpuUsage: SystemStats.gpuUsage; readonly property bool gpuHasUsage: SystemStats.gpuHasUsage
+    readonly property int cpuTemp: SystemStats.cpuTemp; readonly property int gpuTemp: SystemStats.gpuTemp
     function tempText(v) { return v >= 0 ? v + "" : "–"; }
     function tempTip(name, v) {
-        return v >= 0 ? name + " temperature: " + v + "°C" : name + " temperature: no sensor detected";
+        return name + " temperature: " + (v >= 0 ? v + "°C" : "no sensor detected");
     }
-
-    // ───────────────────────── Network ─────────────────────────
-    // netState : "ethernet" | "wifi" | "disconnected"   (what is actually connected)
-    // netName  : name of that connection
-    // wifiOn   : state of the Wi-Fi radio (right click on the module toggles it)
-    property string netState: "disconnected"
-    property string netName: ""
-    property bool wifiOn: true
-
-    // Radio deliberately off and nothing else connected → shown dim instead of red.
+    property string netState: "disconnected"; property string netName: ""; property bool wifiOn: true
     readonly property bool netOff: !wifiOn && netState === "disconnected"
-
     readonly property string netGlyph: netState === "wifi" ? "\uDB81\uDDA9"
                                      : netState === "ethernet" ? "\uDB80\uDE00" : "\uDB81\uDDAA"
     readonly property string netTip: {
@@ -661,62 +461,18 @@ Scope {
         if (netState === "wifi") return "Wi-Fi" + (netName !== "" ? ": " + netName : "");
         return wifiOn ? "Disconnected" : "Wi-Fi: off";
     }
-
     function toggleWifi() {
-        wifiOn = !wifiOn;                                    // instant feedback; the recheck confirms it
+        wifiOn = !wifiOn;
         run("nmcli radio wifi " + (wifiOn ? "on" : "off"));
         netRecheck.restart();
     }
-
     function refreshNet() {
         if (!netProc.running) netProc.running = true;
         if (!netRadioProc.running) netRadioProc.running = true;
     }
-
     Timer { id: netRecheck; interval: 900; onTriggered: root.refreshNet() }
-
-    // Notification count: the notifications panel persists its history here
-    property int notifCount: 0
-    readonly property string notifTip: (notifCount > 0 ? "Notifications: " + notifCount : "No notifications")
-                                       + (notifDnd ? " · Do Not Disturb" : "")
-
-    // Do Not Disturb: owned by SidePanel, which persists it in sidepanel-state.json.
-    // The bar only reads it (to show the state) and toggles it over IPC (right click on the bell).
-    property bool notifDnd: false
-    FileView {
-        id: notifStateFile
-        path: Quickshell.env("HOME") + "/.config/quickshell/state/sidepanel-state.json"
-        printErrors: false
-        watchChanges: true
-        onFileChanged: reload()
-        onLoaded: {
-            try { root.notifDnd = JSON.parse(text()).dnd === true; }
-            catch (e) { root.notifDnd = false; }
-        }
-        onLoadFailed: root.notifDnd = false
-    }
-    function toggleDnd() {
-        notifDnd = !notifDnd;                       // instant feedback; the state file confirms it
-        run("qs ipc call notifications dnd");
-    }
-
-    FileView {
-        id: notifFile
-        path: Quickshell.env("HOME") + "/.cache/43pr/notifications.json"
-        printErrors: false
-        watchChanges: true
-        onFileChanged: reload()
-        onLoaded: {
-            try { root.notifCount = JSON.parse(text()).length; }
-            catch (e) { root.notifCount = 0; }
-        }
-        onLoadFailed: root.notifCount = 0
-    }
-
-    // Connection state + name. Terse lines look like "wifi:connected:MyNet"; ":" inside the name is escaped.
     Process {
-        id: netProc
-        command: ["nmcli", "-t", "-f", "TYPE,STATE,CONNECTION", "device"]
+        id: netProc; command: ["nmcli", "-t", "-f", "TYPE,STATE,CONNECTION", "device"]
         stdout: StdioCollector {
             onStreamFinished: {
                 let st = "disconnected", name = "";
@@ -732,110 +488,93 @@ Scope {
             }
         }
     }
-
     Process {
-        id: netRadioProc
-        command: ["nmcli", "radio", "wifi"]
+        id: netRadioProc; command: ["nmcli", "radio", "wifi"]
         stdout: StdioCollector {
             onStreamFinished: root.wifiOn = text.trim() === "enabled"
         }
     }
-
     Timer {
         interval: 10000; running: root.barVisible; repeat: true; triggeredOnStart: true
         onTriggered: root.refreshNet()
     }
-// ───────────────────────── Brightness & night light ─────────────────────────
-property real brightness: -1          // 0..1, -1 = no backlight device
-property bool nightOn: false
-property int nightTemp: 4500
-readonly property bool hasBacklight: brightness >= 0
-readonly property int brightPct: Math.round(Math.max(0, brightness) * 100)
-
-readonly property string brightTip: hasBacklight ? "Brightness: " + brightPct + "%"
-                                                 : "Brightness: no backlight detected"
-readonly property string nightTip: "Night light: " + (nightOn ? "on" : "off") + " · " + nightTemp + " K"
-readonly property string lightTip: (hasBacklight ? "Brightness " + brightPct + "% · " : "")
-                                   + "Night light " + (nightOn ? "on" : "off") + " (" + nightTemp + " K)"
-
-function qa(args) { Quickshell.execDetached(["qs", "ipc", "call", "qa"].concat(args)); }
-
-// Brightness is read/written with brightnessctl; absolute values, floor of 1%.
-Process {
-    id: brightProc
-    command: ["brightnessctl", "-m"]
-    stdout: StdioCollector {
-        onStreamFinished: {
-            const p = text.trim().split(",");
-            if (p.length >= 4) {
-                const v = parseInt(p[3]);
+    property int notifCount: 0; property bool notifDnd: false
+    readonly property string notifTip: (notifCount > 0 ? "Notifications: " + notifCount : "No notifications")
+                                       + (notifDnd ? " · Do Not Disturb" : "")
+    FileView {
+        path: Quickshell.env("HOME") + "/.cache/43pr/notifications.json"; printErrors: false; watchChanges: true
+        onFileChanged: reload()
+        onLoaded: {
+            try { root.notifCount = JSON.parse(text()).length; }
+            catch (e) { root.notifCount = 0; }
+        }
+        onLoadFailed: root.notifCount = 0
+    }
+    FileView {
+        path: Quickshell.env("HOME") + "/.config/quickshell/state/sidepanel-state.json"; printErrors: false
+        watchChanges: true; onFileChanged: reload()
+        onLoaded: {
+            try {
+                const j = JSON.parse(text());
+                root.notifDnd = j.dnd === true;
+                root.nightOn = j.night === true;
+                if (typeof j.nightTemp === "number") root.nightTemp = j.nightTemp;
+            } catch (e) { root.notifDnd = false; }
+        }
+        onLoadFailed: root.notifDnd = false
+    }
+    function toggleDnd() {
+        notifDnd = !notifDnd;
+        run("qs ipc call notifications dnd");
+    }
+    property real brightness: -1; property bool nightOn: false; property int nightTemp: 4500
+    readonly property bool hasBacklight: brightness >= 0
+    readonly property int brightPct: Math.round(Math.max(0, brightness) * 100)
+    readonly property real brightLevel: hasBacklight ? brightness : 0
+    readonly property real nightLevel: nightOn ? (6500 - nightTemp) / 4000 : 0
+    readonly property string brightTip: hasBacklight ? "Brightness: " + brightPct + "%"
+                                                     : "Brightness: no backlight detected"
+    readonly property string nightTip: "Night light: " + (nightOn ? "on" : "off") + " · " + nightTemp + " K"
+    function qa(args) { Quickshell.execDetached(["qs", "ipc", "call", "qa"].concat(args)); }
+    Process {
+        id: brightProc; command: ["brightnessctl", "-m"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const v = parseInt(text.trim().split(",")[3]);
                 if (!isNaN(v)) root.brightness = v / 100;
             }
         }
     }
-}
-function refreshBright() { if (!brightProc.running) brightProc.running = true; }
-Timer { id: brightRecheck; interval: 400; onTriggered: root.refreshBright() }
-Timer {
-    interval: 5000; repeat: true; triggeredOnStart: true
-    running: root.barVisible && root.isOn("bright")
-    onTriggered: root.refreshBright()
-}
-
-function brightAdjust(dir) {
-    if (!hasBacklight) return;
-    const step = Math.max(1, cfg.brightStep);
-    const cur = Math.round(brightness * 100);
-    // snap to the step grid, never below 1% so the screen can't go black
-    const next = Math.max(1, Math.min(100, dir > 0 ? (Math.floor(cur / step) + 1) * step
-                                                    : (Math.ceil(cur / step) - 1) * step));
-    brightness = next / 100;                                   // instant feedback
-    Quickshell.execDetached(["brightnessctl", "set", next + "%"]);
-    brightRecheck.restart();
-}// Night light is owned by SidePanel; the bar sends IPC and reads its state file.
-function toggleNight() { nightOn = !nightOn; qa(["nightToggle"]); }
-function nightAdjust(dir) {
-    const delta = dir * Math.max(50, cfg.nightStep);
-    nightTemp = Math.max(2500, Math.min(6500, nightTemp + delta));
-    qa(["nightAdjust", String(delta)]);
-}
-
-FileView {
-    path: Quickshell.env("HOME") + "/.config/quickshell/state/sidepanel-state.json"
-    printErrors: false
-    watchChanges: true
-    onFileChanged: reload()
-    onLoaded: {
-        try {
-            const j = JSON.parse(text());
-            root.nightOn = j.night === true;
-            if (typeof j.nightTemp === "number") root.nightTemp = j.nightTemp;
-        } catch (e) {}
+    function refreshBright() { if (!brightProc.running) brightProc.running = true; }
+    Timer { id: brightRecheck; interval: 400; onTriggered: root.refreshBright() }
+    Timer {
+        interval: 5000; repeat: true; triggeredOnStart: true; running: root.barVisible && root.isOn("bright")
+        onTriggered: root.refreshBright()
     }
-}
-
-// one step per wheel notch, also for smooth-scroll devices
-property real brightAcc: 0
-property real nightAcc: 0
-function brightWheel(delta) {
-    brightAcc += delta;
-    if (Math.abs(brightAcc) < 120) return;
-    const dir = brightAcc > 0 ? 1 : -1;
-    brightAcc = 0;
-    brightAdjust(dir);
-}
-function nightWheel(delta) {
-    nightAcc += delta;
-    if (Math.abs(nightAcc) < 120) return;
-    const dir = nightAcc > 0 ? 1 : -1;
-    nightAcc = 0;
-    nightAdjust(dir);
-}
+    function brightAdjust(dir) {
+        if (!hasBacklight) return;
+        const step = Math.max(1, cfg.brightStep);
+        const next = Math.max(1, Math.min(100, snapStep(Math.round(brightness * 100), step, dir)));
+        brightness = next / 100;
+        Quickshell.execDetached(["brightnessctl", "set", next + "%"]);
+        brightRecheck.restart();
+    }
+    function toggleNight() { nightOn = !nightOn; qa(["nightToggle"]); }
+    function nightAdjust(dir) {
+        const delta = dir * Math.max(50, cfg.nightStep);
+        nightTemp = Math.max(2500, Math.min(6500, nightTemp + delta));
+        qa(["nightAdjust", String(delta)]);
+    }
+    property var wheelAcc: ({})
+    function notch(key, delta) {
+        const a = (wheelAcc[key] ?? 0) + delta;
+        if (Math.abs(a) < 120) { wheelAcc[key] = a; return 0; }
+        wheelAcc[key] = 0;
+        return a > 0 ? 1 : -1;
+    }
     PwObjectTracker { objects: [Pipewire.defaultAudioSink] }
-
     Process { id: runner }
     function run(cmd) { runner.command = ["sh", "-c", cmd]; runner.running = true; }
-
     function mediaAct(kind) {
         const p = Marquee.player;
         if (!p) return;
@@ -843,40 +582,14 @@ function nightWheel(delta) {
         else if (kind === "next") p.next();
         else p.previous();
     }
-
     readonly property string wsHints: "Left click: Switch to workspace\nRight click: Quick actions\nScroll: Previous / next workspace"
-
-    // ───────────────────────── Interaction model ─────────────────────────
-    // Convention used by every bar module:
-    //   Left click   → primary action
-    //   Right click  → secondary action (falls back to "Bar settings" if the module has none)
-    //   Middle click → tertiary action (optional)
-    //   Scroll       → adjust a value (optional)
-    //   Drag         → move the module (reorder, or drop it in another section)
-    // Connectivity / hardware modules (volume, network, bluetooth) all follow the same pattern:
-    //   Left click   → open that module's page in settings
-    //   Right click  → switch the thing on / off (mute, Wi-Fi radio, Bluetooth power)
-    // Hints declared on a module are shown automatically in its tooltip.
-    // States: hover · pressed · active (accent) · warning (danger) · disabled.
-
     component Lane: GridLayout {
-        property int gap: 0
-        flow: root.vertical ? GridLayout.TopToBottom : GridLayout.LeftToRight
-        rowSpacing: gap
+        property int gap: 0; flow: root.vertical ? GridLayout.TopToBottom : GridLayout.LeftToRight; rowSpacing: gap
         columnSpacing: gap
     }
-
-    // MouseArea that also lets the user drag the whole module (its Slot) along the bar.
-    // A press that moves further than a small threshold along the bar axis starts a drag;
-    // the click that would normally follow the release is suppressed (see `suppressClick`).
-    // Handlers using this must check `suppressClick` in onClicked.
     component DMouseArea: MouseArea {
-        id: dm
-        property bool suppressClick: false
-        property bool dragging: false
-        property point startScene: Qt.point(0, 0)
-        property var owner: null
-
+        id: dm; property bool suppressClick: false; property bool dragging: false
+        property point startScene: Qt.point(0, 0); property var owner: null
         onPressed: mouse => {
             suppressClick = false;
             dragging = false;
@@ -908,37 +621,20 @@ function nightWheel(delta) {
             if (owner !== null) owner.cancelDrag();
         }
     }
-
-    // Hover tooltip, anchored next to `target` on the side facing away from the bar edge.
     component Tip: Item {
-        id: tp
-        property Item target: parent
-        property bool hot: false
-        property string title: ""
-        property string hints: ""
-        property bool shown: false
-        property bool suppressed: false   // set on click; cleared when the pointer leaves
-        readonly property bool usable: cfg.tooltips && !suppressed && (title !== "" || hints !== "")
-
-        width: 0
-        height: 0
-        onHotChanged: if (!hot) { shown = false; suppressed = false; }
-
+        id: tp; property Item target: parent; property bool hot: false; property string title: ""
+        property string hints: ""; property bool shown: false; property bool suppressed: false
+        readonly property bool usable: cfg.tooltips && !suppressed && (title !== "" || hints !== ""); width: 0
+        height: 0; onHotChanged: if (!hot) { shown = false; suppressed = false; }
+        function dismiss() { suppressed = true; shown = false; }
         Timer {
-            interval: cfg.tipDelay
-            running: tp.hot && tp.usable && !tp.shown
-            onTriggered: tp.shown = true
+            interval: cfg.tipDelay; running: tp.hot && tp.usable && !tp.shown; onTriggered: tp.shown = true
         }
-
         LazyLoader {
             active: tp.shown && tp.usable
-
             PopupWindow {
-                readonly property real k: cfg.tooltipScale
-                readonly property var win: tp.target.QsWindow.window
-                readonly property point p: win.contentItem.mapFromItem(tp.target, 0, 0)
-
-                anchor.window: win
+                readonly property real k: cfg.tooltipScale; readonly property var win: tp.target.QsWindow.window
+                readonly property point p: win.contentItem.mapFromItem(tp.target, 0, 0); anchor.window: win
                 anchor.adjustment: PopupAdjustment.Slide
                 anchor.rect.x: root.vertical
                     ? (cfg.position === "left" ? p.x + tp.target.width + 6 : p.x - implicitWidth - 6)
@@ -947,63 +643,35 @@ function nightWheel(delta) {
                     ? p.y + (tp.target.height - implicitHeight) / 2
                     : (cfg.position === "top" ? p.y + tp.target.height + 6 : p.y - implicitHeight - 6)
                 implicitWidth: tcol.implicitWidth + Math.round(20 * k)
-                implicitHeight: tcol.implicitHeight + Math.round(14 * k)
-                color: "transparent"
-                visible: true
-
+                implicitHeight: tcol.implicitHeight + Math.round(14 * k); color: "transparent"; visible: true
                 Rectangle {
-                    anchors.fill: parent
-                    radius: Math.min(cfg.radius, height / 2)
-                    color: root.bgColor
-                    border.width: cfg.tooltipBorder ? 1 : 0
-                    border.color: root.borderColor
-
+                    anchors.fill: parent; radius: Math.min(cfg.radius, height / 2); color: root.bgColor
+                    border.width: cfg.tooltipBorder ? 1 : 0; border.color: root.borderColor
                     Column {
-                        id: tcol
-                        anchors.centerIn: parent
-                        spacing: Math.round(3 * k)
+                        id: tcol; anchors.centerIn: parent; spacing: Math.round(3 * k)
                         Text {
-                            visible: tp.title !== ""
-                            text: tp.title
-                            color: Theme.text
-                            font.family: Theme.iconFont
-                            font.pixelSize: Math.max(6, Math.round(12 * k))
-                            font.bold: true
+                            visible: tp.title !== ""; text: tp.title; color: Theme.text; font.family: Theme.iconFont
+                            font.pixelSize: Math.max(6, Math.round(12 * k)); font.bold: true
                         }
                         Text {
-                            visible: tp.hints !== ""
-                            text: tp.hints
-                            color: Theme.textDim
-                            font.family: Theme.iconFont
-                            font.pixelSize: Math.max(6, Math.round(11 * k))
+                            visible: tp.hints !== ""; text: tp.hints; color: Theme.textDim
+                            font.family: Theme.iconFont; font.pixelSize: Math.max(6, Math.round(11 * k))
                         }
                     }
                 }
             }
         }
     }
-
-    // Behaviour + visual states shared by every interactive bar element.
     component Interactive: Item {
-        id: it
-        property string tip: ""
-        property string primaryHint: ""
-        property string secondaryHint: ""      // empty → right click opens bar settings
-        property string tertiaryHint: ""
-        property string scrollHint: ""
-        property string disabledReason: ""
-        property bool active: false            // accent tint (e.g. calendar open)
-        property bool warning: false           // danger tint (e.g. low battery, muted)
-        property bool disabled: false          // dimmed, ignores input, tooltip explains why
-        property bool interactive: true        // false → informational only (no hover tint / pointer)
-        property bool noTip: false             // never show a tooltip for this element
-        property bool noSecondary: false       // right click does nothing (and is not listed in the tooltip)
-        property bool noHints: false           // never list click / scroll hints in the tooltip (title only)
+        id: it; property string mid: ""; property string tip: ""; property string primaryHint: ""
+        property string secondaryHint: ""; property string tertiaryHint: ""; property string scrollHint: ""
+        property string disabledReason: ""; property bool active: false; property bool warning: false
+        property bool disabled: false; property bool interactive: true; property bool noTip: false
+        property bool noSecondary: false; property bool noHints: false
         signal primary()
         signal secondary()
         signal tertiary()
         signal scrolled(real delta)
-
         readonly property bool hovered: ma.containsMouse && !disabled
         readonly property string hintText: {
             if (disabled) return disabledReason;
@@ -1015,36 +683,26 @@ function nightWheel(delta) {
             if (scrollHint !== "") l.push("Scroll: " + scrollHint);
             return l.join("\n");
         }
-
         function secondaryAction() {
             if (noSecondary) return;
             if (secondaryHint !== "") secondary();
             else root.openSettings();
         }
-
         opacity: disabled ? 0.4 : 1
         Behavior on opacity { NumberAnimation { duration: 120 } }
-
-        // state layer: pressed / active / warning only — hover background always transparent
         Rectangle {
-            anchors.fill: parent
-            anchors.margins: 1
-            anchors.verticalCenterOffset: 3
-            radius: Theme.radius
-            color: ma.pressed && it.interactive && !it.disabled ? Qt.alpha(Theme.accent, 0.35)
-                 : it.active ? Qt.alpha(Theme.accent, 0)
-                 : it.warning ? Qt.alpha(Theme.danger, 0.16)
+            anchors.fill: parent; anchors.margins: 1; anchors.verticalCenterOffset: 3; radius: Theme.radius
+            color: ma.pressed && it.interactive && !it.disabled ? IconTune.color(it.mid, "pressed")
+                 : it.active ? IconTune.color(it.mid, "activeBg")
+                 : it.warning ? IconTune.color(it.mid, "warnBg")
                  : "transparent"
             Behavior on color { ColorAnimation { duration: 100 } }
         }
-
         DMouseArea {
-            id: ma
-            anchors.fill: parent
-            hoverEnabled: true
+            id: ma; anchors.fill: parent; hoverEnabled: true
             acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
             cursorShape: it.interactive && !it.disabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-            onPressed: { tipper.suppressed = true; tipper.shown = false; }
+            onPressed: tipper.dismiss()
             onClicked: mouse => {
                 if (it.disabled || ma.suppressClick) return;
                 if (mouse.button === Qt.LeftButton) it.primary();
@@ -1056,370 +714,236 @@ function nightWheel(delta) {
                 if (wheel.accepted) it.scrolled(wheel.angleDelta.y);
             }
         }
-
         Tip {
-            id: tipper
-            target: it
-            hot: !it.noTip && ma.containsMouse
-            title: it.tip
-            hints: it.hintText
+            id: tipper; target: it; hot: !it.noTip && ma.containsMouse; title: it.tip; hints: it.hintText
         }
     }
-
-    // Icon / text module built on Interactive.
-    //
-    // ── Positioning ─────────────────────────────────────────────────────────
-    // Four independent nudges (px, positive x = right, positive y = down). None of them
-    // changes the module's size, so nothing else on the bar moves:
-    //   xOffset / yOffset  → icon AND text together   (yOffset is ignored on vertical bars)
-    //   iconX   / iconY    → ONLY the icon (glyph or custom-drawn icon)
-    //   textX   / textY    → ONLY the text
-    // Because icon and text are nudged separately, moving the icon never drags its text along.
+    component RingGauge: Item {
+        id: rg; property real level: 0; property string glyph: ""; property string glyphFont: Theme.iconFont
+        property string mid: ""; property color fg: IconTune.color(mid, "normal"); property bool warning: false
+        property int size: 0; property real strokeRatio: 0.09; property real minStroke: 1.5
+        readonly property int diameter: size > 0 ? size
+            : Math.max(10, Math.min(root.panelThick - 4, Math.round(root.sz.icon * 1.5)))
+        readonly property real stroke: Math.max(minStroke, diameter * strokeRatio)
+        property real shownLevel: Math.max(0, Math.min(1, level))
+        Behavior on shownLevel { NumberAnimation { duration: 250; easing.type: Easing.OutQuad } }
+        implicitWidth: diameter; implicitHeight: diameter
+        Shape {
+            anchors.fill: parent; preferredRendererType: Shape.CurveRenderer; layer.enabled: true; layer.samples: 4
+            ShapePath {
+                strokeColor: IconTune.color(rg.mid, "ringTrack"); strokeWidth: rg.stroke; fillColor: "transparent"
+                PathAngleArc {
+                    centerX: rg.width / 2; centerY: rg.height / 2; radiusX: (rg.width - rg.stroke) / 2
+                    radiusY: (rg.height - rg.stroke) / 2; startAngle: -90; sweepAngle: 360
+                }
+            }
+            ShapePath {
+                strokeColor: rg.shownLevel <= 0 ? "transparent"
+                           : rg.warning ? IconTune.color(rg.mid, "ringWarn")
+                                        : IconTune.color(rg.mid, "ringArc")
+                strokeWidth: rg.stroke; fillColor: "transparent"; capStyle: ShapePath.RoundCap
+                PathAngleArc {
+                    centerX: rg.width / 2; centerY: rg.height / 2; radiusX: (rg.width - rg.stroke) / 2
+                    radiusY: (rg.height - rg.stroke) / 2; startAngle: -90
+                    sweepAngle: Math.min(359.9, 360 * rg.shownLevel)
+                }
+            }
+        }
+        Text {
+            anchors.centerIn: parent; text: rg.glyph; color: rg.fg; font.family: rg.glyphFont
+            font.pixelSize: Math.round(rg.diameter * 0.5); renderType: Text.NativeRendering
+        }
+    }
     component Mod: Interactive {
-        id: mod
-        property string mid: ""          // set by Slot; used by generic icon modules
-        property string text: ""
-        property string vtext: text
-        property string glyph: ""
-        property string vglyph: glyph
-        property Component iconComp: null   // optional custom-drawn icon (e.g. the battery), shown before the glyph
-        property real glyphSize: 16
-        property real baseSize: 11
-        property color color: Theme.text
-        property bool bold: false
-        property real xOffset: 0         // icon + text together (negative → left)
-        property real yOffset: 0         // icon + text together, horizontal bars only
-        property real iconX: 0           // icon only
-        property real iconY: 0
-        property real textX: 0           // text only
-        property real textY: 0
-        property int spacing: root.sizeIconGap
-        property int padX: root.modPadPx
-
-        readonly property color fg: warning ? Theme.danger : active ? Theme.accent : color
-        readonly property string shown: root.vertical ? vtext : text
-        readonly property string shownGlyph: root.vertical ? vglyph : glyph
-
+        id: mod; property string text: ""; property string vtext: text; property string glyph: ""
+        property string vglyph: glyph; property Component iconComp: null; property bool meter: false
+        property bool ringOn: false; property bool labelOn: false; property string labelText: ""
+        property string numText: ""; property real ringLevel: 0; property string ringGlyph: ""
+        property string plainGlyph: ""; property Component plainIcon: null
+        readonly property bool asLabel: meter && labelOn && !ringOn
+        property real glyphSize: meter ? root.sz.icon - 2 : 16; property real baseSize: meter ? root.sz.batText : 11
+        property string tone: "normal"; property bool bold: false; property real xOffset: 0; property real yOffset: 0
+        property real iconX: 0; property real iconY: 0; property real textX: 0; property real textY: 0
+        property real glyphXScale: 1; property int spacing: meter ? Math.round(4 * root.bs) : root.sizeIconGap
+        property int padX: root.modPadPx; property string variant: ""
+        readonly property var tn: IconTune.resolve(mid, root.vertical, variant)
+        readonly property real iconYEff: meter && ringOn && tn.ringIconY !== null ? tn.ringIconY : tn.iconY
+        readonly property real padEff: padX + tn.pad
+        readonly property color fg: IconTune.color(mid, warning ? "warning" : active ? "active" : tone)
+        readonly property string shown: !meter ? (root.vertical ? vtext : text)
+            : asLabel ? (numText !== "" ? labelText + (root.vertical ? "\n" : " ") + numText : labelText)
+            : numText
+        readonly property string shownGlyph: !meter ? (root.vertical ? vglyph : glyph)
+            : (ringOn || asLabel ? "" : plainGlyph)
+        readonly property Component shownIcon: !meter ? iconComp : ringOn ? ringC : asLabel ? null : plainIcon
+        Component {
+            id: ringC
+            RingGauge {
+                size: mod.tn.ringSize !== 0
+                      ? Math.max(10, Math.min(root.panelThick - 4, Math.round(root.sz.icon * 1.5) + mod.tn.ringSize))
+                      : 0
+                mid: mod.mid; level: mod.ringLevel; glyph: mod.ringGlyph; fg: mod.fg; warning: mod.warning
+            }
+        }
         Layout.alignment: Qt.AlignCenter
-        implicitWidth: root.vertical ? root.panelThick : content.implicitWidth + padX
-        implicitHeight: root.vertical ? Math.max(20, content.implicitHeight + Math.round(padX * 0.4))
+        implicitWidth: root.vertical ? root.panelThick : content.implicitWidth + padEff
+        implicitHeight: root.vertical ? Math.max(20, content.implicitHeight + Math.round(padEff * 0.4))
                                       : Math.max(root.panelThick - 2, content.implicitHeight)
         GridLayout {
-            id: content
-            anchors.centerIn: parent
-            anchors.verticalCenterOffset: root.vertical ? 0 : mod.yOffset
-            anchors.horizontalCenterOffset: mod.xOffset
-            flow: root.vertical ? GridLayout.TopToBottom : GridLayout.LeftToRight
-            rowSpacing: 2
-            columnSpacing: mod.spacing
-
+            id: content; anchors.centerIn: parent
+            anchors.verticalCenterOffset: root.vertical ? mod.tn.y : mod.yOffset + mod.tn.y
+            anchors.horizontalCenterOffset: mod.xOffset + mod.tn.x
+            flow: root.vertical ? GridLayout.TopToBottom : GridLayout.LeftToRight; rowSpacing: 2
+            columnSpacing: mod.spacing + mod.tn.spacing
             Loader {
-                active: mod.iconComp !== null
-                visible: active
-                Layout.alignment: Qt.AlignCenter
-                sourceComponent: mod.iconComp
-                transform: Translate { x: mod.iconX; y: mod.iconY }
+                id: iconLoader; active: mod.shownIcon !== null; visible: active; Layout.alignment: Qt.AlignCenter
+                sourceComponent: mod.shownIcon
+                transform: [
+                    Translate { x: mod.iconX + mod.tn.iconX; y: mod.iconY + mod.iconYEff },
+                    Scale {
+                        xScale: mod.tn.scaleX; yScale: mod.tn.scaleY; origin.x: iconLoader.width / 2
+                        origin.y: iconLoader.height / 2
+                    },
+                    Rotation {
+                        angle: mod.tn.rotation; origin.x: iconLoader.width / 2; origin.y: iconLoader.height / 2
+                    }
+                ]
             }
             Text {
-                visible: mod.shownGlyph !== ""
-                Layout.alignment: Qt.AlignCenter
-                horizontalAlignment: Text.AlignHCenter
-                text: mod.shownGlyph
-                color: mod.fg
-                font.family: Theme.iconFont
-                font.pixelSize: mod.glyphSize
+                id: glyphText; visible: mod.shownGlyph !== ""; Layout.alignment: Qt.AlignCenter
+                horizontalAlignment: Text.AlignHCenter; text: mod.shownGlyph; color: mod.fg
+                font.family: Theme.iconFont; font.pixelSize: mod.glyphSize + mod.tn.glyphSize
                 renderType: Text.NativeRendering
-                transform: Translate { x: mod.iconX; y: mod.iconY }
+                transform: [
+                    Translate { x: mod.iconX + mod.tn.iconX; y: mod.iconY + mod.iconYEff },
+                    Scale {
+                        xScale: mod.glyphXScale * mod.tn.scaleX; yScale: mod.tn.scaleY; origin.x: glyphText.width / 2
+                        origin.y: glyphText.height / 2
+                    },
+                    Rotation {
+                        angle: mod.tn.rotation; origin.x: glyphText.width / 2; origin.y: glyphText.height / 2
+                    }
+                ]
             }
             Text {
-                visible: mod.shown !== ""
-                Layout.alignment: Qt.AlignCenter
-                horizontalAlignment: Text.AlignHCenter
-                text: mod.shown
-                color: mod.fg
-                font.family: Theme.iconFont
-                font.bold: mod.bold
-                font.pixelSize: mod.baseSize
-                renderType: Text.NativeRendering
-                transform: Translate { x: mod.textX; y: mod.textY }
+                visible: mod.shown !== ""; Layout.alignment: Qt.AlignCenter; horizontalAlignment: Text.AlignHCenter
+                text: mod.shown; color: mod.fg; font.family: Theme.iconFont; font.bold: mod.bold
+                font.pixelSize: mod.baseSize + mod.tn.textSize; renderType: Text.NativeRendering
+                transform: Translate { x: mod.textX + mod.tn.textX; y: mod.textY + mod.tn.textY }
             }
         }
     }
-component StatBadge: Interactive {
-    id: stat
-    anchors.verticalCenterOffset: 1
-    property string label: ""
-    property string icon: ""
-    property string iconFont: Theme.iconFont
-    property string valueText: ""
-    property string unit: ""
-    property real level: 0                      // 0..1, drives the ring arc
-
-    readonly property bool ring: cfg.statsRing && icon !== ""
-    readonly property bool useIcon: cfg.statsIcons && icon !== ""
-    readonly property string shownLabel: useIcon ? icon : label
-    readonly property string shownValue: valueText + (cfg.statsPercent ? unit : "")
-    readonly property color fg: warning ? Theme.danger : Theme.text
-
-    readonly property int maxCross: Math.max(8, root.panelThick - (cfg.border ? 2 : 0))
-    readonly property int crossPad: root.vertical ? 8 : 6
-    readonly property int wantedPx: Math.max(4, Math.round(10 * cfg.statsScale * cfg.scale * cfg.barScale))
-    readonly property int labelWantedPx: useIcon ? wantedPx + 2 : Math.max(4, wantedPx - 1)
-    readonly property string sampleValue: "100" + (cfg.statsPercent ? "%" : "")
-    readonly property real contentCross: root.vertical
-        ? Math.max(mLabel.width, mValue.width)
-        : Math.max(mLabel.height, mValue.height)
-    readonly property int fontPx: contentCross + crossPad > maxCross
-        ? Math.max(4, Math.floor(wantedPx * (maxCross - crossPad) / contentCross))
-        : wantedPx
-
-    // ── ring geometry (always clamped to the bar thickness) ──
-    readonly property int ringPx: Math.max(10, Math.min(maxCross - 2, Math.round(wantedPx * 2.3)))
-    readonly property real ringStroke: Math.max(1.2, ringPx * 0.08)
-    property real shownLevel: Math.max(0, Math.min(1, level))
-    Behavior on shownLevel { NumberAnimation { duration: 250; easing.type: Easing.OutQuad } }
-
-    TextMetrics {
-        id: mLabel
-        text: stat.shownLabel
-        font.family: stat.useIcon ? stat.iconFont : Theme.iconFont
-        font.pixelSize: stat.labelWantedPx
-    }
-    TextMetrics {
-        id: mValue
-        text: cfg.statsNumbers ? stat.sampleValue : ""
-        font.family: Theme.iconFont
-        font.bold: true
-        font.pixelSize: stat.wantedPx
-    }
-
-    Layout.alignment: Qt.AlignCenter
-    implicitWidth: root.vertical ? root.panelThick : badge.width + cfg.statsGap
-    implicitHeight: root.vertical ? badge.height + cfg.statsGap
-                                  : Math.min(root.panelThick, Math.max(root.panelThick - 2, badge.height + 4))
-    interactive: false
-
-    Rectangle {
-        id: badge
-        anchors.centerIn: parent
-        width: root.vertical
-               ? Math.min(stat.maxCross, statRow.implicitWidth + 8)
-               : statRow.implicitWidth + 12
-        height: root.vertical
-                ? statRow.implicitHeight + 8
-                : Math.min(stat.maxCross, statRow.implicitHeight + 4)
-        clip: true
-        radius: Math.min(cfg.statsRadius, Math.min(width, height) / 2)
-        color: "transparent"
-        border.width: cfg.statsBorder ? 1 : 0
-        border.color: Qt.alpha(stat.fg, 0.18)
-
-        GridLayout {
-            id: statRow
-            anchors.centerIn: parent
-            flow: root.vertical ? GridLayout.TopToBottom : GridLayout.LeftToRight
-            rowSpacing: stat.ring ? 2 : 0
-            columnSpacing: stat.ring ? 4 : 3
-
-            // ── ring gauge with the icon inside ──
-            Item {
-                id: ringItem
-                visible: stat.ring
-                Layout.alignment: Qt.AlignCenter
-                implicitWidth: stat.ringPx
-                implicitHeight: stat.ringPx
-
-                Shape {
-                    anchors.fill: parent
-                    preferredRendererType: Shape.CurveRenderer
-                    layer.enabled: true
-                    layer.samples: 4
-
-                    // track
-                    ShapePath {
-                        strokeColor: Qt.alpha(Theme.accent2, 0.2)
-                        strokeWidth: stat.ringStroke
-                        fillColor: "transparent"
-                        PathAngleArc {
-                            centerX: ringItem.width / 2; centerY: ringItem.height / 2
-                            radiusX: (ringItem.width - stat.ringStroke) / 2
-                            radiusY: (ringItem.height - stat.ringStroke) / 2
-                            startAngle: -90; sweepAngle: 360
-                        }
-                    }
-                    // usage arc (starts at 12 o'clock, clockwise)
-                    ShapePath {
-                        strokeColor: stat.shownLevel <= 0 ? "transparent"
-                                   : stat.warning ? Theme.danger : Theme.accent2
-                        strokeWidth: stat.ringStroke
-                        fillColor: "transparent"
-                        capStyle: ShapePath.RoundCap
-                        PathAngleArc {
-                            centerX: ringItem.width / 2; centerY: ringItem.height / 2
-                            radiusX: (ringItem.width - stat.ringStroke) / 2
-                            radiusY: (ringItem.height - stat.ringStroke) / 2
-                            startAngle: -90
-                            sweepAngle: Math.min(359.9, 360 * stat.shownLevel)
-                        }
-                    }
+    component StatBadge: Interactive {
+        id: stat; anchors.verticalCenterOffset: 1; property string label: ""; property string icon: ""
+        property string iconFont: Theme.iconFont; property int pct: 0; property bool known: true
+        property bool isTemp: false; property string valueText: known ? String(pct) : "–"
+        property string unit: known ? (isTemp ? "°C" : "%") : ""; property real level: known ? pct / 100 : 0
+        warning: known && pct >= (isTemp ? cfg.tempWarn : cfg.statsWarn)
+        readonly property bool ring: cfg.statsRing && icon !== ""
+        readonly property bool useIcon: cfg.statsIcons && icon !== ""
+        readonly property string shownLabel: useIcon ? icon : label
+        readonly property string shownValue: valueText + (cfg.statsPercent ? unit : "")
+        readonly property color fg: IconTune.color(mid, warning ? "warning" : "normal")
+        readonly property int maxCross: Math.max(8, root.panelThick - (cfg.border ? 2 : 0))
+        readonly property int crossPad: root.vertical ? 8 : 6
+        readonly property int wantedPx: Math.max(4, Math.round(10 * cfg.statsScale * cfg.scale * cfg.barScale))
+        readonly property int labelWantedPx: useIcon ? wantedPx + 2 : Math.max(4, wantedPx - 1)
+        readonly property string sampleValue: "100" + (cfg.statsPercent ? "%" : "")
+        readonly property real contentCross: root.vertical
+            ? Math.max(mLabel.width, mValue.width)
+            : Math.max(mLabel.height, mValue.height)
+        readonly property int fontPx: contentCross + crossPad > maxCross
+            ? Math.max(4, Math.floor(wantedPx * (maxCross - crossPad) / contentCross))
+            : wantedPx
+        readonly property int ringPx: Math.max(10, Math.min(maxCross - 2, Math.round(wantedPx * 2.3)))
+        TextMetrics {
+            id: mLabel; text: stat.shownLabel; font.family: stat.useIcon ? stat.iconFont : Theme.iconFont
+            font.pixelSize: stat.labelWantedPx
+        }
+        TextMetrics {
+            id: mValue; text: cfg.statsNumbers ? stat.sampleValue : ""; font.family: Theme.iconFont; font.bold: true
+            font.pixelSize: stat.wantedPx
+        }
+        Layout.alignment: Qt.AlignCenter; implicitWidth: root.vertical ? root.panelThick : badge.width + cfg.statsGap
+        implicitHeight: root.vertical ? badge.height + cfg.statsGap
+                                      : Math.min(root.panelThick, Math.max(root.panelThick - 2, badge.height + 4))
+        interactive: false
+        Rectangle {
+            id: badge; anchors.centerIn: parent
+            width: root.vertical
+                   ? Math.min(stat.maxCross, statRow.implicitWidth + 8)
+                   : statRow.implicitWidth + 12
+            height: root.vertical
+                    ? statRow.implicitHeight + 8
+                    : Math.min(stat.maxCross, statRow.implicitHeight + 4)
+            clip: true; radius: Math.min(cfg.statsRadius, Math.min(width, height) / 2); color: "transparent"
+            border.width: cfg.statsBorder ? 1 : 0; border.color: Qt.alpha(stat.fg, 0.18)
+            GridLayout {
+                id: statRow; anchors.centerIn: parent
+                flow: root.vertical ? GridLayout.TopToBottom : GridLayout.LeftToRight; rowSpacing: stat.ring ? 2 : 0
+                columnSpacing: stat.ring ? 4 : 3
+                RingGauge {
+                    mid: stat.mid; visible: stat.ring; Layout.alignment: Qt.AlignCenter; size: stat.ringPx
+                    strokeRatio: 0.08; minStroke: 1.2; level: stat.level; glyph: stat.icon; glyphFont: stat.iconFont
+                    fg: stat.fg; warning: stat.warning
                 }
                 Text {
-                    anchors.centerIn: parent
-                    text: stat.icon
-                    color: stat.fg
-                    font.family: stat.iconFont
-                    font.pixelSize: Math.round(stat.ringPx * 0.5)
+                    visible: !stat.ring; Layout.alignment: Qt.AlignCenter; text: stat.shownLabel
+                    color: Qt.alpha(stat.fg, 0.75); font.family: stat.useIcon ? stat.iconFont : Theme.iconFont
+                    font.pixelSize: stat.useIcon ? stat.fontPx + 2 : Math.max(4, stat.fontPx - 1)
+                    renderType: Text.NativeRendering
+                }
+                Text {
+                    visible: cfg.statsNumbers; Layout.alignment: Qt.AlignCenter; text: stat.shownValue; color: stat.fg
+                    font.family: Theme.iconFont; font.bold: true; font.pixelSize: stat.fontPx
                     renderType: Text.NativeRendering
                 }
             }
-            // classic text label (only when the ring is off
-            Text {
-                visible: !stat.ring
-                Layout.alignment: Qt.AlignCenter
-                text: stat.shownLabel
-                color: Qt.alpha(stat.fg, 0.75)
-                font.family: stat.useIcon ? stat.iconFont : Theme.iconFont
-                font.pixelSize: stat.useIcon ? stat.fontPx + 2 : Math.max(4, stat.fontPx - 1)
-                renderType: Text.NativeRendering
-            }
-            // number (hidden when the NUMBERS option is off)
-            Text {
-                visible: cfg.statsNumbers
-                Layout.alignment: Qt.AlignCenter
-                text: stat.shownValue
-                color: stat.fg
-                font.family: Theme.iconFont
-                font.bold: true
-                font.pixelSize: stat.fontPx
-                renderType: Text.NativeRendering
-            }
         }
     }
-}
-    // Tiny level pill. Lies across the bar on vertical bars, stands upright on horizontal ones.
-    component MiniBar: Item {
-        id: mb
-        property real level: 0                 // 0..1
-        property color col: Theme.text
-        readonly property int len: Math.round(root.sz.icon * 0.8)
-        readonly property int thick: Math.max(3, Math.round(root.sz.icon * 0.3))
-        implicitWidth: root.vertical ? len : thick
-        implicitHeight: root.vertical ? thick : len
-        Rectangle {
-            id: track
-            anchors.fill: parent
-            radius: Math.min(width, height) / 2
-            color: Qt.alpha(mb.col, 0.25)
-            }
-        Rectangle {
-            readonly property int fill: mb.level > 0
-            ? Math.max(mb.thick, Math.round(mb.len * Math.min(1, mb.level))) : 0
-            width: root.vertical ? fill : track.width
-            height: root.vertical ? track.height : fill
-            x: 0
-            y: root.vertical ? 0 : track.height - height
-            radius: Math.min(width, height) / 2
-            color: mb.col
-        }
-    }
-    // Container for one module. Also owns the drag state while the module is being dragged:
-    // the module follows the pointer visually (transform only, layout is untouched) and,
-    // on release, `droppedAt` tells the bar where it was dropped.
     component Slot: Loader {
         id: slot
         required property string modelData
-        property Component clockComp: null
-
-        readonly property bool isSlot: true
-        readonly property bool dragAllowed: cfg.dragModules
-        property bool dragging: false
-        property real dragDx: 0
-        property real dragDy: 0
+        readonly property bool isSlot: true; readonly property bool dragAllowed: cfg.dragModules
+        property bool dragging: false; property real dragDx: 0; property real dragDy: 0
         signal droppedAt(real sx, real sy)
-
-        function finishDrag(sx, sy) {
-            dragging = false;
-            dragDx = 0;
-            dragDy = 0;
-            droppedAt(sx, sy);
-        }
-        function cancelDrag() {
-            dragging = false;
-            dragDx = 0;
-            dragDy = 0;
-        }
-
-        visible: root.modVisible(modelData)
-        Layout.alignment: Qt.AlignCenter
-        z: dragging ? 100 : 0
-        opacity: dragging ? 0.75 : 1
-        transform: Translate { x: slot.dragDx; y: slot.dragDy }
-        sourceComponent: modelData === "clock" ? clockComp : (root.comps[modelData] ?? root.comps.icon)
+        function cancelDrag() { dragging = false; dragDx = 0; dragDy = 0; }
+        function finishDrag(sx, sy) { cancelDrag(); droppedAt(sx, sy); }
+        visible: root.modVisible(modelData); Layout.alignment: Qt.AlignCenter; z: dragging ? 100 : 0
+        opacity: dragging ? 0.75 : 1; transform: Translate { x: slot.dragDx; y: slot.dragDy }
+        sourceComponent: root.comps[modelData] ?? root.comps.icon
         onLoaded: if (item.mid !== undefined) item.mid = modelData
     }
-
-    // One of the five bar sections: a panel holding a Lane of islands.
-    // Outside the islands style there is a single, invisible island that wraps the whole section.
     component Panel: Rectangle {
-        id: panel
-        property var model: []
-        property Component clockComp: null
-        property bool dragActive: false          // a module of this panel is being dragged
-        readonly property Item lane: laneItem
+        id: panel; property var model: []; property bool dragActive: false; readonly property Item lane: laneItem
         signal dropped(string modId, real sx, real sy)
-
-        // Visibility must NOT depend on the lane's implicit size: an invisible panel never
-        // re-polishes its layout, so the size would stay 0 and the panel could never come back
-        // (e.g. re-enabling the clock in an otherwise empty section).
-        readonly property bool hasVisible: model.some(id => root.modVisible(id))
-        visible: hasVisible
+        readonly property bool hasVisible: model.some(id => root.modVisible(id)); visible: hasVisible
         z: dragActive ? 100 : 0
         width: root.vertical ? root.panelThick : laneItem.implicitWidth + (root.islands ? 0 : 4)
         height: root.vertical ? laneItem.implicitHeight + (root.islands ? 0 : 4) : root.panelThick
-        radius: root.barRadius
-        color: root.joined || root.islands ? "transparent" : root.bgColor
-        border.width: cfg.border && !root.joined && !root.islands ? 1 : 0
-        border.color: root.borderColor
-
+        radius: root.barRadius; color: root.joined || root.islands ? "transparent" : root.bgColor
+        border.width: cfg.border && !root.joined && !root.islands ? 1 : 0; border.color: root.borderColor
         Lane {
-            id: laneItem
-            anchors.centerIn: parent
-            gap: root.islands ? root.effGap : 0
-
+            id: laneItem; anchors.centerIn: parent; gap: root.islands ? root.effGap : 0
             Repeater {
                 model: root.groupsOf(panel.model)
-
-                // One island: a rounded background holding one or more Slots.
                 delegate: Rectangle {
                     id: isl
                     required property var modelData
-                    readonly property Item lane: islLane
-                    readonly property int pad: root.islands ? 4 : 0
-                    property bool dragActive: false
-
-                    // Must not depend on the lane's size (see the note above).
-                    visible: modelData.some(id => root.modVisible(id))
-                    z: dragActive ? 100 : 0
-                    Layout.alignment: Qt.AlignCenter
+                    readonly property Item lane: islLane; readonly property int pad: root.islands ? 4 : 0
+                    property bool dragActive: false; visible: modelData.some(id => root.modVisible(id))
+                    z: dragActive ? 100 : 0; Layout.alignment: Qt.AlignCenter
                     implicitWidth: root.vertical ? root.panelThick : islLane.implicitWidth + pad
                     implicitHeight: root.vertical ? islLane.implicitHeight + pad : root.panelThick
-                    radius: root.barRadius
-                    color: root.islands ? root.bgColor : "transparent"
-                    border.width: root.islands && cfg.border ? 1 : 0
-                    border.color: root.borderColor
-
+                    radius: root.barRadius; color: root.islands ? root.bgColor : "transparent"
+                    border.width: root.islands && cfg.border ? 1 : 0; border.color: root.borderColor
                     onDragActiveChanged: panel.dragActive = dragActive
-
                     Lane {
-                        id: islLane
-                        anchors.centerIn: parent
-
+                        id: islLane; anchors.centerIn: parent
                         Repeater {
                             model: isl.modelData
                             delegate: Slot {
-                                id: slotD
-                                clockComp: panel.clockComp
-                                onDroppedAt: (sx, sy) => panel.dropped(slotD.modelData, sx, sy)
+                                id: slotD; onDroppedAt: (sx, sy) => panel.dropped(slotD.modelData, sx, sy)
                                 onDraggingChanged: isl.dragActive = dragging
                             }
                         }
@@ -1428,54 +952,18 @@ component StatBadge: Interactive {
             }
         }
     }
-
-    // ───────────────────────── Bar helper components ─────────────────────────
-    component Rule: Rectangle {
-        height: 1
-        color: Qt.alpha(Theme.text, 0.12)
-    }
-
-    component Arrow: Item {
-        id: ar
-        property string glyph: ""
-        signal clicked()
-        width: root.cl(28)
-        height: root.cl(26)
-        Text {
-            anchors.centerIn: parent
-            text: ar.glyph
-            color: arMa.containsMouse ? Theme.accent : Theme.text
-            font.family: Theme.iconFont
-            font.pixelSize: root.sz.calArrow
-        }
-        MouseArea {
-            id: arMa
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: ar.clicked()
-        }
-    }
-
-    // Scrolling now-playing text. Rotated 90° by its parent on vertical bars.
     component MarqueeStrip: Item {
         clip: true
         Row {
-            x: Marquee.animating ? Marquee.x : 0
-            spacing: Marquee.gap
-            anchors.verticalCenter: parent.verticalCenter
+            x: Marquee.animating ? Marquee.x : 0; spacing: Marquee.gap; anchors.verticalCenter: parent.verticalCenter
             anchors.verticalCenterOffset: root.vertical ? 0 : root.iconYOffset
-
             Repeater {
                 model: Marquee.animating ? 2 : 1
                 delegate: Text {
                     required property int index
-                    text: Marquee.text
-                    color: Theme.text
-                    font.family: Theme.iconFont
+                    text: Marquee.text; color: Theme.text; font.family: Theme.iconFont
                     font.pixelSize: root.sz.marquee
                     renderType: root.vertical ? Text.QtRendering : Text.NativeRendering
-                    // first copy is width-limited/elided when not scrolling
                     width: index === 0 ? (Marquee.animating ? Marquee.textW
                                                             : Math.min(Marquee.textW, Marquee.maxW))
                                        : implicitWidth
@@ -1484,25 +972,13 @@ component StatBadge: Interactive {
             }
         }
     }
-
-    // ───────────────────────── Module components ─────────────────────────
-    // Generic icon button: notif / wall / settings / power (driven by moduleDefs)
     Component {
         id: iconC
         Mod {
-            id: ic
-            property var def: root.defMap[mid] ?? ({})
-            readonly property bool isNotif: mid === "notif"
+            id: ic; property var def: root.defMap[mid] ?? ({}); readonly property bool isNotif: mid === "notif"
             readonly property bool isSettings: mid === "settings"
-            // icons 2px smaller; power nudged down so it lines up with volume/battery text
             baseSize: mid === "power" ? root.sz.power - 3 : root.sz.icon - 2
-            yOffset: mid === "power" ? root.iconYOffset
-                   : isNotif && !root.vertical ? root.iconYOffset - 0.5
-                   : root.iconYOffset
-            xOffset: !root.vertical ? 0 : (isNotif || mid === "power" || isSettings) ? -1 : 0
-            text: isNotif && root.notifDnd ? "\uec08" : (def.g ?? "")
-            tip: isNotif ? root.notifTip : (def.tip ?? "")
-            // The settings button has configurable click binds (see Bar page → Settings button)
+            text: isNotif && root.notifDnd ? "\uec08" : (def.g ?? ""); tip: isNotif ? root.notifTip : (def.tip ?? "")
             primaryHint: isSettings ? root.actionHint(cfg.settingsPrimary) : (def.hint ?? "")
             secondaryHint: isSettings ? root.actionHint(cfg.settingsSecondary)
                          : isNotif ? (root.notifDnd ? "Turn off Do Not Disturb" : "Turn on Do Not Disturb") : ""
@@ -1517,205 +993,137 @@ component StatBadge: Interactive {
                 else if (isNotif) root.toggleDnd();
             }
             onTertiary: if (isSettings) root.doAction(cfg.settingsTertiary)
-
-            // Notification count badge (top-right of the icon)
             Rectangle {
-                visible: ic.isNotif && root.notifCount > 0
-                anchors.horizontalCenter: parent.horizontalCenter
+                visible: ic.isNotif && root.notifCount > 0; anchors.horizontalCenter: parent.horizontalCenter
                 anchors.verticalCenter: parent.verticalCenter
                 anchors.horizontalCenterOffset: Math.round(root.sz.icon / 2)
                 anchors.verticalCenterOffset: -Math.round(root.sz.icon / 2) + 1
                 width: Math.max(height, badgeText.implicitWidth + 6)
-                height: Math.max(11, badgeText.implicitHeight + 1)
-                radius: height / 2
+                height: Math.max(11, badgeText.implicitHeight + 1); radius: height / 2
                 color: Qt.alpha(Theme.bg, cfg.bgOpacity)
-
                 Text {
-                    id: badgeText
-                    anchors.centerIn: parent
-                    text: root.notifCount > 9 ? "9+" : root.notifCount
-                    color: Theme.text
-                    font.family: Theme.iconFont
-                    font.pixelSize: Math.max(8, root.s(8))
-                    font.bold: true
-                    renderType: Text.NativeRendering
+                    id: badgeText; anchors.centerIn: parent; text: root.notifCount > 9 ? "9+" : root.notifCount
+                    color: Theme.text; font.family: Theme.iconFont; font.pixelSize: Math.max(8, root.s(8))
+                    font.bold: true; renderType: Text.NativeRendering
                 }
             }
         }
     }
-
-    // Network: icon only.
-    //   Left click  → network settings
-    //   Right click → Wi-Fi radio on / off
-    // Dim = Wi-Fi off and nothing connected, red = radio on but not connected, normal = connected.
+    Component {
+        id: clockC
+        Mod {
+            id: clockMod
+            function act(a) {
+                if (a === "calendar") root.openSidepanelAt(clockMod);
+                else root.doAction(a);
+            }
+            bold: true; baseSize: root.sz.clock; text: root.clockBarText(clk.date)
+            vtext: root.clockBarVText(clk.date); tip: Qt.formatDate(clk.date, "dddd, d MMMM yyyy")
+            primaryHint: root.actionHint(cfg.clockPrimary); secondaryHint: root.actionHint(cfg.clockSecondary)
+            tertiaryHint: root.actionHint(cfg.clockTertiary); noSecondary: secondaryHint === ""
+            onPrimary: act(cfg.clockPrimary); onSecondary: act(cfg.clockSecondary); onTertiary: act(cfg.clockTertiary)
+        }
+    }
+    SystemClock {
+        id: clk; enabled: root.isOn("clock"); precision: cfg.clockSeconds ? SystemClock.Seconds : SystemClock.Minutes
+    }
     Component {
         id: netC
         Mod {
-            glyphSize: root.sz.icon - 2
-            xOffset: root.vertical ? -1 : 0
-            yOffset: root.iconYOffset
-            glyph: root.netGlyph
-            color: root.netOff ? Theme.textDim : Theme.text
-            warning: root.netState === "disconnected" && root.wifiOn
-            tip: root.netTip
-            primaryHint: "Open network settings"
-            secondaryHint: root.wifiOn ? "Turn Wi-Fi off" : "Turn Wi-Fi on"
-            onPrimary: root.run("qs ipc call settings network")
-            onSecondary: root.toggleWifi()
+            glyphSize: root.sz.icon - 2; glyph: root.netGlyph; tone: root.netOff ? "off" : "ok"
+            warning: root.netState === "disconnected" && root.wifiOn; tip: root.netTip
+            primaryHint: "Open network settings"; secondaryHint: root.wifiOn ? "Turn Wi-Fi off" : "Turn Wi-Fi on"
+            onPrimary: root.run("qs ipc call settings network"); onSecondary: root.toggleWifi()
         }
     }
-
-    // Bluetooth: icon only.
-    //   Left click  → Bluetooth settings
-    //   Right click → Bluetooth power on / off (shared with the quick actions menu via BluetoothState)
-    // Dim = off, normal = on, accent = at least one device connected.
     Component {
         id: btC
         Mod {
-            glyphSize: root.sz.icon - 2
-            xOffset: root.vertical ? -1 : 0
-            yOffset: root.iconYOffset
-            glyph: root.btGlyph
-            color: !root.btOn ? Theme.textDim
-                 : root.btConnectedNames.length > 0 ? Theme.accent : Theme.text
-            disabled: !root.hasBt
-            disabledReason: "No Bluetooth adapter"
-            tip: root.btTip
-            primaryHint: "Open Bluetooth settings"
+            glyphSize: root.sz.icon - 2; glyph: root.btGlyph
+            tone: !root.btOn ? "off" : root.btConnectedNames.length > 0 ? "connected" : "idle"; disabled: !root.hasBt
+            disabledReason: "No Bluetooth adapter"; tip: root.btTip; primaryHint: "Open Bluetooth settings"
             secondaryHint: root.btOn ? "Turn Bluetooth off" : "Turn Bluetooth on"
-            onPrimary: root.run("qs ipc call settings bluetooth")
-            onSecondary: BluetoothState.togglePower()
+            onPrimary: root.run("qs ipc call settings bluetooth"); onSecondary: BluetoothState.togglePower()
         }
     }
-
-    // CPU usage
     Component {
         id: cpuC
         StatBadge {
-            label: "CPU"; icon: "\uEF8E"; iconFont: Theme.tablerFont
-            unit: "%"
-            valueText: String(root.cpuUsage)
-            level: root.cpuUsage / 100
-            warning: root.cpuUsage >= cfg.statsWarn
+            label: "CPU"; icon: "\uEF8E"; iconFont: Theme.tablerFont; pct: root.cpuUsage
             tip: "CPU usage: " + root.cpuUsage + "%"
         }
     }
-
-    // RAM usage
     Component {
         id: ramC
         StatBadge {
-            label: "RAM"; icon: "\uD800\uDEB7"; iconFont: Theme.tablerFont
-            unit: "%"
-            valueText: String(root.memPercent)
-            level: root.memPercent / 100
-            warning: root.memPercent >= cfg.statsWarn
+            label: "RAM"; icon: "\uD800\uDEB7"; iconFont: Theme.tablerFont; pct: root.memPercent
             tip: "Memory: " + root.memUsedG.toFixed(1) + " / " + root.memTotalG.toFixed(1)
                  + " GiB (" + root.memPercent + "%)"
         }
     }
-
-    // GPU usage
     Component {
         id: gpuC
         StatBadge {
-            label: "GPU"; icon: "\uD800\uDE99"; iconFont: Theme.tablerFont
-            unit: root.gpuHasUsage ? "%" : ""
-            valueText: root.gpuHasUsage ? String(root.gpuUsage) : "–"
-            level: root.gpuHasUsage ? root.gpuUsage / 100 : 0
-            warning: root.gpuHasUsage && root.gpuUsage >= cfg.statsWarn
-            tip: root.gpuHasUsage ? "GPU usage: " + root.gpuUsage + "%" : "GPU usage: unavailable"
+            label: "GPU"; icon: "\uD800\uDE99"; iconFont: Theme.tablerFont; known: root.gpuHasUsage
+            pct: root.gpuUsage; tip: root.gpuHasUsage ? "GPU usage: " + root.gpuUsage + "%" : "GPU usage: unavailable"
         }
     }
-
-    // CPU temperature. The unit is "°C" when the symbols option is on.
     Component {
         id: cpuTempC
         StatBadge {
             label: "CPUT"; icon: "\uEB38"; iconFont: Theme.tablerFont
-            unit: root.cpuTemp >= 0 ? "°C" : ""
-            valueText: root.tempText(root.cpuTemp)
-            level: root.cpuTemp >= 0 ? root.cpuTemp / 100 : 0
-            warning: root.cpuTemp >= cfg.tempWarn
-            tip: root.tempTip("CPU", root.cpuTemp)
+            isTemp: true; known: root.cpuTemp >= 0; pct: root.cpuTemp; tip: root.tempTip("CPU", root.cpuTemp)
         }
     }
-
-    // GPU temperature ("–" + "no sensor detected" when the GPU has no sensor, e.g. Intel iGPUs).
     Component {
         id: gpuTempC
         StatBadge {
             label: "GPUT"; icon: "\uEB38"; iconFont: Theme.tablerFont
-            unit: root.gpuTemp >= 0 ? "°C" : ""
-            valueText: root.tempText(root.gpuTemp)
-            level: root.gpuTemp >= 0 ? root.gpuTemp / 100 : 0
-            warning: root.gpuTemp >= cfg.tempWarn
-            tip: root.tempTip("GPU", root.gpuTemp)
+            isTemp: true; known: root.gpuTemp >= 0; pct: root.gpuTemp; tip: root.tempTip("GPU", root.gpuTemp)
         }
     }
-
     Component {
         id: wsC
         Item {
             implicitWidth: root.vertical ? root.panelThick : wsLane.implicitWidth + 12
             implicitHeight: wsLane.implicitHeight + (root.vertical ? 12 : 0)
-
             Lane {
-                id: wsLane
-                anchors.centerIn: parent
-                gap: root.wsGapPx
-
+                id: wsLane; anchors.centerIn: parent; gap: root.wsGapPx
                 Repeater {
                     model: Hyprland.workspaces
                     delegate: Rectangle {
                         id: dot
                         required property var modelData
-                        visible: modelData.id > 0
+                        readonly property bool wide: modelData.focused && !cfg.wsNumbers; visible: modelData.id > 0
                         Layout.alignment: Qt.AlignCenter
-                        implicitWidth: root.vertical ? root.wsBoxPx
-                                     : (modelData.focused && !cfg.wsNumbers ? Math.round(root.wsBoxPx * 3.2) : root.wsBoxPx)
-                        implicitHeight: root.vertical ? (modelData.focused && !cfg.wsNumbers ? Math.round(root.wsBoxPx * 2.4) : root.wsBoxPx)
-                                                      : root.wsBoxPx
+                        implicitWidth: !root.vertical && wide ? Math.round(root.wsBoxPx * 3.2) : root.wsBoxPx
+                        implicitHeight: root.vertical && wide ? Math.round(root.wsBoxPx * 2.4) : root.wsBoxPx
                         radius: root.wsBoxPx / 2
                         color: modelData.urgent ? Theme.danger
-                        : modelData.focused ? Qt.alpha(Theme.accent2, 0.5)
-                        : dotMa.containsMouse ? Theme.accent2
-                        : Qt.alpha(Theme.text, 0.2)
-
+                             : modelData.focused ? Qt.alpha(Theme.accent2, 0.5)
+                             : dotMa.containsMouse ? Theme.accent2
+                             : Qt.alpha(Theme.text, 0.2)
                         Behavior on implicitWidth { NumberAnimation { duration: Theme.animMed; easing.type: Easing.OutQuad } }
                         Behavior on implicitHeight { NumberAnimation { duration: Theme.animMed; easing.type: Easing.OutQuad } }
-
-                        // workspace number (only instantiated while the option is on)
                         Loader {
-                            anchors.centerIn: parent
-                            active: cfg.wsNumbers
+                            anchors.centerIn: parent; active: cfg.wsNumbers
                             sourceComponent: Text {
-                                text: dot.modelData.id
-                                color: Theme.text
-                                font.family: Theme.iconFont
-                                font.pixelSize: Math.round(root.wsBoxPx * 0.62)
-                                font.bold: dot.modelData.focused
+                                text: dot.modelData.id; color: Theme.text; font.family: Theme.iconFont
+                                font.pixelSize: Math.round(root.wsBoxPx * 0.62); font.bold: dot.modelData.focused
                                 renderType: Text.NativeRendering
                             }
                         }
-
                         DMouseArea {
-                            id: dotMa
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            acceptedButtons: Qt.LeftButton | Qt.RightButton
-                            onPressed: { dotTip.suppressed = true; dotTip.shown = false; }
+                            id: dotMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                            acceptedButtons: Qt.LeftButton | Qt.RightButton; onPressed: dotTip.dismiss()
                             onClicked: mouse => {
                                 if (dotMa.suppressClick) return;
                                 if (mouse.button === Qt.RightButton) root.openSettings();
                                 else Hyprland.dispatch("hl.dsp.focus({ workspace = " + dot.modelData.id + " })");
                             }
                         }
-
                         Tip {
-                            id: dotTip
-                            hot: dotMa.containsMouse
+                            id: dotTip; hot: dotMa.containsMouse
                             title: "Workspace " + dot.modelData.id
                                    + (dot.modelData.urgent ? " · urgent" : dot.modelData.focused ? " · focused" : "")
                             hints: cfg.tooltipHints ? root.wsHints : ""
@@ -1723,18 +1131,13 @@ component StatBadge: Interactive {
                     }
                 }
             }
-
             WheelHandler {
-                enabled: cfg.wsScroll
-                acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                enabled: cfg.wsScroll; acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
                 onWheel: e => root.run("hyprctl dispatch 'hl.dsp.focus({workspace=\"e"
                                        + (e.angleDelta.y > 0 ? "+1" : "-1") + "\"})'")
             }
         }
     }
-
-    // Open apps — icons resolved by root.iconFor() so every app gets one.
-    // Options (Bar page → Open apps): icon scale, spacing, normal / accent colour.
     Component {
         id: tasksC
         Lane {
@@ -1748,32 +1151,17 @@ component StatBadge: Interactive {
                     implicitWidth: root.vertical ? root.panelThick : root.taskIconPx + 10
                     implicitHeight: root.vertical ? root.taskIconPx + 10
                                                   : Math.max(root.panelThick - 2, root.taskIconPx + 6)
-                    active: modelData.activated
-                    // minimal tooltip: just the app name, no hint lines
-                    tip: root.appName(modelData.appId)
-                    noHints: true
-                    primaryHint: "Focus window"
-                    tertiaryHint: "Close window"
-                    onPrimary: modelData.activate()
+                    mid: "tasks"; active: modelData.activated; tip: root.appName(modelData.appId); noHints: true
+                    primaryHint: "Focus window"; tertiaryHint: "Close window"; onPrimary: modelData.activate()
                     onTertiary: modelData.close()
                     Image {
-                        id: appIcon
-                        anchors.centerIn: parent
-                        width: root.taskIconPx
-                        height: root.taskIconPx
-                        sourceSize: Qt.size(width, height)
-                        asynchronous: true
-                        smooth: true
-                        visible: false          // rendered through the tint effect below
+                        id: appIcon; anchors.centerIn: parent; width: root.taskIconPx; height: root.taskIconPx
+                        sourceSize: Qt.size(width, height); asynchronous: true; smooth: true; visible: false
                         source: root.iconFor(task.modelData.appId)
                     }
-                    // "normal": the app's own icon colours.
-                    // "accent": flat monochrome icon in Theme.text (accent2 when the window is focused).
                     MultiEffect {
-                        anchors.fill: appIcon
-                        source: appIcon
-                        colorization: cfg.tasksColor === "accent" ? 1.0 : 0.0
-                        colorizationColor: task.modelData.activated ? Theme.accent2 : Theme.text
+                        anchors.fill: appIcon; source: appIcon; colorization: cfg.tasksColor === "accent" ? 1.0 : 0.0
+                        colorizationColor: IconTune.color("tasks", task.modelData.activated ? "taskActive" : "normal")
                         opacity: task.modelData.activated ? 1 : 0.5
                     }
                 }
@@ -1784,279 +1172,121 @@ component StatBadge: Interactive {
         id: mediaC
         Interactive {
             readonly property bool playing: Marquee.player !== null && Marquee.player.isPlaying === true
-            readonly property real len: Math.min(Marquee.textW, Marquee.maxW)   // visible text length
-
-            implicitWidth: root.vertical ? root.panelThick : len + 20
-            implicitHeight: root.vertical ? len + 20 : 18
-
-            tip: Marquee.text
-            primaryHint: playing ? "Pause" : "Play"
-            secondaryHint: "Next track"
-            tertiaryHint: "Previous track"
-            onPrimary: root.mediaAct("toggle")
-            onSecondary: root.mediaAct("next")
+            readonly property real len: Math.min(Marquee.textW, Marquee.maxW)
+            implicitWidth: root.vertical ? root.panelThick : len + 20; implicitHeight: root.vertical ? len + 20 : 18
+            tip: Marquee.text; primaryHint: playing ? "Pause" : "Play"; secondaryHint: "Next track"
+            tertiaryHint: "Previous track"; onPrimary: root.mediaAct("toggle"); onSecondary: root.mediaAct("next")
             onTertiary: root.mediaAct("prev")
-
-            // On vertical bars the same marquee is rotated: reads bottom→top on the left, top→bottom on the right.
             MarqueeStrip {
-                anchors.centerIn: parent
-                width: parent.len
-                height: 18
+                anchors.centerIn: parent; width: parent.len; height: 18
                 rotation: root.vertical ? (cfg.position === "left" ? -90 : 90) : 0
             }
         }
     }
-
-    // Volume: speaker glyph + optional level text.
     Component {
         id: volumeC
         Mod {
-            id: vol
-            readonly property var sink: Pipewire.defaultAudioSink
+            id: vol; meter: true; readonly property var sink: Pipewire.defaultAudioSink
             readonly property bool ready: !!(sink && sink.audio)
             readonly property real level: ready ? sink.audio.volume : 0
             readonly property bool muted: ready ? sink.audio.muted : false
-
-            // ── Alignment: one set of numbers per bar layout ─────────────────────
-            //   x / y         → icon + text together (y only has an effect on horizontal bars)
-            //   iconX / iconY → icon only
-            //   textX / textY → text only (the icon stays where it is)
-            readonly property var tune: root.vertical
-                ? ({ x: -1, y: 0,                         iconX: 0, iconY: 0, textX: 0, textY: -1 })   // left / right bar
-                : ({ x: 0,  y: root.iconYOffset + 0.25,   iconX: 0, iconY: 0, textX: 0, textY: -1 })   // top / bottom bar
-            xOffset: tune.x
-            yOffset: tune.y
-            iconX: tune.iconX
-            iconY: tune.iconY
-            textX: tune.textX
-            textY: tune.textY
-
-            glyphSize: root.sz.icon - 2
-            baseSize: root.sz.batText
-            spacing: Math.round(4 * root.bs)
-            // muted / silent → speaker with a slash (nf-md-volume_off); otherwise nf-md-volume_high
-            glyph: muted || level <= 0 ? "\uDB81\uDD81" : "\uDB81\uDD7E"
-            // optional level next to the icon (+ "%" when the symbol option is on)
-            text: cfg.volNumber && ready
-                  ? String(muted ? 0 : Math.round(level * 100)) + (cfg.volPercent ? "%" : "")
-                  : ""
-            warning: muted
-            disabled: !ready
+            readonly property string speaker: muted || level <= 0 ? "\uDB81\uDD81" : "\uDB81\uDD7E"
+            ringOn: cfg.volRing; labelOn: cfg.volLabel; labelText: "VOL"
+            numText: cfg.volNumber && ready
+                ? String(muted ? 0 : Math.round(level * 100)) + (cfg.volPercent ? "%" : "") : ""
+            ringLevel: muted ? 0 : level; ringGlyph: speaker; plainGlyph: speaker; warning: muted; disabled: !ready
             disabledReason: "No audio output available"
             tip: !ready ? "Volume" : muted ? "Volume: muted" : "Volume: " + Math.round(level * 100) + "%"
-            primaryHint: "Open sound settings"
-            secondaryHint: "Mute / unmute"
-            scrollHint: "Adjust volume"
-
+            primaryHint: "Open sound settings"; secondaryHint: "Mute / unmute"; scrollHint: "Adjust volume"
             onPrimary: root.run("qs ipc call settings sound")
             onSecondary: root.run("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle")
-            property real wheelAcc: 0
             onScrolled: delta => {
                 if (!ready) return;
-                // accumulate so smooth-scroll devices still give exactly one step per notch
-                wheelAcc += delta;
-                if (Math.abs(wheelAcc) < 120) return;
-                const dir = wheelAcc > 0 ? 1 : -1;
-                wheelAcc = 0;
-                const step = Math.max(1, cfg.volStep);
-                const max = cfg.volMax;
-                const cur = Math.round(sink.audio.volume * 100);
-                // snap to the step grid: 0, 3, 6, 9 ... (not 0, 3, 7, 11 ...)
-                let next = dir > 0 ? (Math.floor(cur / step) + 1) * step
-                                   : (Math.ceil(cur / step) - 1) * step;
-                next = Math.max(0, Math.min(max, next));
-                sink.audio.volume = next / 100;
+                const dir = root.notch("vol", delta);
+                if (dir === 0) return;
+                const next = root.snapStep(Math.round(sink.audio.volume * 100), Math.max(1, cfg.volStep), dir);
+                sink.audio.volume = Math.max(0, Math.min(cfg.volMax, next)) / 100;
             }
         }
     }
-
-    // Battery: two looks, chosen by the bar layout.
-    //   vertical bar   (left / right) → a drawn HORIZONTAL battery whose fill bar follows the charge
-    //   horizontal bar (top / bottom) → a VERTICAL battery glyph (nf-md-battery_10 … _90)
-    // The icon item is as tall as the volume glyph, so the optional percentage text sits
-    // on exactly the same line as the volume text.
     Component {
         id: batteryC
         Mod {
-            id: bat
-
-            // ── Alignment: one set of numbers per bar layout ─────────────────────
-            //   x / y         → icon + text together (y only has an effect on horizontal bars)
-            //   iconX / iconY → icon only
-            //   textX / textY → text only (the icon stays where it is)
-            // Positive x = right, positive y = down. Moving an icon never moves its text.
-            readonly property var tune: root.vertical
-                // left / right bar → drawn horizontal battery
-                ? ({ x: 0, y: 0,                        iconX: 0, iconY: 0, textX: 0, textY: -1 })
-                // top / bottom bar → vertical battery glyph
-                // (y stays at the shared baseline so the text doesn't move; only iconY lifts the glyph)
-                : ({ x: 0, y: root.iconYOffset + 0.25,  iconX: 0, iconY: -1.25, textX: 0, textY: -1 })
-            xOffset: tune.x
-            yOffset: tune.y
-            iconX: tune.iconX
-            iconY: tune.iconY
-            textX: tune.textX
-            textY: tune.textY
-
-            glyphSize: root.sz.icon - 2
-            baseSize: root.sz.batText
-            spacing: Math.round(4 * root.bs)
-
-            // horizontal bar → vertical glyph; vertical bar → drawn icon below
-            glyph: root.vertical ? "" : root.batGlyphV
-            iconComp: root.vertical ? batHoriz : null
-
-            // optional percentage next to the icon (+ "%" when the symbol option is on)
-            text: cfg.batNumber ? String(root.batPct) + (cfg.batPercent ? "%" : "") : ""
-            warning: root.batLow
-            tip: root.batTip
-
+            id: bat; meter: true; ringOn: cfg.batRing; labelOn: cfg.batLabel; labelText: "BAT"
+            numText: cfg.batNumber ? String(root.batPct) + (cfg.batPercent ? "%" : "") : ""
+            ringLevel: root.batPct / 100; ringGlyph: "\uDB80\uDC79"; plainGlyph: root.vertical ? "" : root.batGlyphV
+            plainIcon: root.vertical ? batHoriz : null; warning: root.batLow; tip: root.batTip
             Component {
                 id: batHoriz
                 Item {
                     id: ico
                     transform: Scale {
-                        xScale: 0.9
-                        yScale: 1.0
-                        origin.x: ico.width / 2
-                        origin.y: ico.height / 2
+                        xScale: 0.9; yScale: 1.0; origin.x: ico.width / 2; origin.y: ico.height / 2
                     }
                     readonly property int bodyW: Math.round(bat.glyphSize * 1.25)
-                    readonly property int bodyH: Math.round(bat.glyphSize * 0.68)
-                    readonly property int nubW: 2
-
-                    // same line height as the volume icon glyph
+                    readonly property int bodyH: Math.round(bat.glyphSize * 0.68); readonly property int nubW: 2
                     TextMetrics {
-                        id: refGlyph
-                        text: "\uDB81\uDD7E"
-                        font.family: Theme.iconFont
-                        font.pixelSize: bat.glyphSize
+                        id: refGlyph; text: "\uDB81\uDD7E"; font.family: Theme.iconFont; font.pixelSize: bat.glyphSize
                     }
-
-                    implicitWidth: bodyW + nubW
-                    implicitHeight: Math.max(refGlyph.height, bodyH)
-
-                    // shell
+                    implicitWidth: bodyW + nubW; implicitHeight: Math.max(refGlyph.height, bodyH)
                     Rectangle {
-                        x: 0
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: ico.bodyW
-                        height: ico.bodyH
-                        radius: 2
-                        color: "transparent"
-                        border.width: 1
-                        border.color: Qt.alpha(bat.fg, 0.9)
-
-                        // level bar
+                        anchors.verticalCenter: parent.verticalCenter; width: ico.bodyW; height: ico.bodyH; radius: 2
+                        color: "transparent"; border.width: 1; border.color: Qt.alpha(bat.fg, 0.9)
                         Rectangle {
-                            x: 2; y: 2
-                            height: parent.height - 4
+                            x: 2; y: 2; height: parent.height - 4
                             width: root.batPct > 0
                                    ? Math.max(1, Math.round((parent.width - 4) * Math.min(100, root.batPct) / 100))
                                    : 0
-                            radius: 1
-                            color: bat.fg
+                            radius: 1; color: bat.fg
                         }
                     }
-
-                    // terminal nub
                     Rectangle {
-                        x: ico.bodyW
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: ico.nubW
-                        height: Math.round(ico.bodyH * 0.4)
-                        radius: 1
-                        color: Qt.alpha(bat.fg, 0.9)
+                        x: ico.bodyW; anchors.verticalCenter: parent.verticalCenter; width: ico.nubW
+                        height: Math.round(ico.bodyH * 0.4); radius: 1; color: Qt.alpha(bat.fg, 0.9)
                     }
                 }
             }
         }
     }
-// Brightness: sun / star / level bar. Scroll adjusts the backlight.
-Component {
-    id: brightC
-    Mod {
-        id: br
-        readonly property string look: cfg.lightIcons
-        glyph: look === "star" ? "\u2726" : look === "bar" ? "" : "\uf185"
-        iconComp: look === "bar" ? brBar : null
-        glyphSize: look === "star" ? root.sz.icon - 4 : root.sz.icon - 2
-        xOffset: root.vertical ? -1 : 0
-        yOffset: look === "bar" ? 0 : root.iconYOffset
-        disabled: !root.hasBacklight
-        disabledReason: "No backlight detected"
-        tip: root.brightTip
-        primaryHint: "Quick actions"
-        secondaryHint: "Bar settings"
-        scrollHint: "Adjust brightness"
-        onPrimary: root.qa(["toggle"])
-        onSecondary: root.openSettings()
-        onScrolled: delta => root.brightWheel(delta)
-
-        Component {
-            id: brBar
-            MiniBar { level: root.hasBacklight ? root.brightness : 0; col: br.fg }
+    Component {
+        id: brightC
+        Mod {
+            id: br; meter: true; readonly property string look: cfg.lightIcons === "star" ? "star" : "normal"
+            ringOn: cfg.brightRing; ringLevel: root.brightLevel; ringGlyph: look === "star" ? "\u2726" : "\uf185"
+            plainGlyph: ringGlyph; variant: look; disabled: !root.hasBacklight
+            disabledReason: "No backlight detected"; tip: root.brightTip; primaryHint: "Quick actions"
+            secondaryHint: "Bar settings"; scrollHint: "Adjust brightness"; onPrimary: root.qa(["toggle"])
+            onSecondary: root.openSettings()
+            onScrolled: delta => { const d = root.notch("bright", delta); if (d !== 0) root.brightAdjust(d); }
         }
     }
-}
-
-// Night light: moon / star / warmth bar. Left click toggles, scroll adjusts temperature.
-Component {
-    id: nightC
-    Mod {
-        id: ng
-        readonly property string look: cfg.lightIcons
-        glyph: look === "star" ? "\u2727" : look === "bar" ? "" : "\uf186"
-        iconComp: look === "bar" ? ngBar : null
-        glyphSize: look === "star" ? root.sz.icon - 4 : root.sz.icon - 2
-        xOffset: root.vertical ? -1 : 0
-        yOffset: look === "bar" ? 0 : root.iconYOffset
-        active: root.nightOn
-        tip: root.nightTip
-        primaryHint: root.nightOn ? "Turn night light off" : "Turn night light on"
-        secondaryHint: "Quick actions"
-        scrollHint: "Adjust temperature"
-        onPrimary: root.toggleNight()
-        onSecondary: root.qa(["toggle"])
-        onScrolled: delta => root.nightWheel(delta)
-
-        Component {
-            id: ngBar
-            MiniBar {
-                level: root.nightOn ? (6500 - root.nightTemp) / 4000 : 0
-                col: ng.fg
-            }
+    Component {
+        id: nightC
+        Mod {
+            id: ng; meter: true; readonly property string look: cfg.lightIcons === "star" ? "star" : "normal"
+            ringOn: cfg.nightRing; ringLevel: root.nightLevel; ringGlyph: look === "star" ? "\u2727" : "\uf186"
+            plainGlyph: ringGlyph; variant: look; active: root.nightOn; tip: root.nightTip
+            primaryHint: root.nightOn ? "Turn night light off" : "Turn night light on"; secondaryHint: "Quick actions"
+            scrollHint: "Adjust temperature"; onPrimary: root.toggleNight(); onSecondary: root.qa(["toggle"])
+            onScrolled: delta => { const d = root.notch("night", delta); if (d !== 0) root.nightAdjust(d); }
         }
     }
-}
-    // ───────────────────────── The bar ─────────────────────────
     Variants {
         model: root.barLive
             ? (cfg.allScreens ? Quickshell.screens : Quickshell.screens.slice(0, 1))
             : []
-
         PanelWindow {
             id: bar
             required property var modelData
             screen: modelData
-
             anchors {
-                top: cfg.position !== "bottom"
-                bottom: cfg.position !== "top"
-                left: cfg.position !== "right"
+                top: cfg.position !== "bottom"; bottom: cfg.position !== "top"; left: cfg.position !== "right"
                 right: cfg.position !== "left"
             }
             implicitWidth: root.vertical ? root.panelThick + root.effEdge : 0
             implicitHeight: root.vertical ? 0 : root.panelThick + root.effEdge
-            exclusionMode: cfg.reserveSpace ? ExclusionMode.Auto : ExclusionMode.Ignore
-            color: "transparent"
+            exclusionMode: cfg.reserveSpace ? ExclusionMode.Auto : ExclusionMode.Ignore; color: "transparent"
             visible: root.barVisible
-
-            // Drag & drop: (sx, sy) is the pointer position in window coordinates at release.
-            // Section: if the pointer landed on a visible panel, that panel's section wins.
-            // Otherwise the nearest of the five zones (start · midLeft · center · midRight · end)
-            // is used, so empty zones are still valid drop targets. The position inside the
-            // section is the slot after the last visible module whose centre lies before the pointer.
             function dropModule(modId, sx, sy) {
                 const pt = frame.mapFromItem(null, sx, sy);
                 const pos = root.vertical ? pt.y : pt.x;
@@ -2064,7 +1294,6 @@ Component {
                     start: startPanel, midLeft: midLeftPanel, center: clockPanel,
                     midRight: midRightPanel, end: endPanel
                 };
-
                 let sec = null;
                 for (const k of root.sections) {
                     const p = panels[k];
@@ -2073,13 +1302,11 @@ Component {
                     const b = a + (root.vertical ? p.height : p.width);
                     if (pos >= a && pos <= b) { sec = k; break; }
                 }
-
                 if (sec === null) {
-                    const mid = frame.axisLen / 2;
                     const targets = {
                         start: startPanel.visible ? (frame.startBeg + frame.startEnd) / 2 : 0,
                         midLeft: frame.midLeftC,
-                        center: mid,
+                        center: frame.axisLen / 2,
                         midRight: frame.midRightC,
                         end: endPanel.visible ? (frame.endBeg + frame.endFin) / 2 : frame.axisLen
                     };
@@ -2089,18 +1316,14 @@ Component {
                         if (d < best) { best = d; sec = k; }
                     }
                 }
-
                 const panel = panels[sec];
                 const list = root.listOf(sec);
-
-                // Slots now sit one level deeper: panel lane → island → island lane → Slot
                 const slots = {};
                 for (const isl of panel.lane.children) {
-                    if (!isl.lane) continue;                       // skip the Repeater
+                    if (!isl.lane) continue;
                     for (const ch of isl.lane.children)
                         if (ch.isSlot === true) slots[ch.modelData] = ch;
                 }
-
                 let idx = 0;
                 for (let i = 0; i < list.length; i++) {
                     const sl = slots[list[i]];
@@ -2108,26 +1331,15 @@ Component {
                     const c = sl.mapToItem(frame, sl.width / 2, sl.height / 2);
                     if ((root.vertical ? c.y : c.x) < pos) idx = i + 1;
                 }
-
                 root.moveToIndex(modId, sec, idx);
                 root.save();
             }
-
             Item {
                 id: frame
                 anchors {
-                    fill: parent
-                    topMargin: root.edgeMargin("top")
-                    bottomMargin: root.edgeMargin("bottom")
-                    leftMargin: root.edgeMargin("left")
-                    rightMargin: root.edgeMargin("right")
+                    fill: parent; topMargin: root.edgeMargin("top"); bottomMargin: root.edgeMargin("bottom")
+                    leftMargin: root.edgeMargin("left"); rightMargin: root.edgeMargin("right")
                 }
-
-                // ── Geometry along the bar axis (x on horizontal bars, y on vertical ones) ──
-                // The two middle zones sit centered in the gap between their neighbours:
-                //   midLeft  → between the end of the start panel and the start of the center panel
-                //   midRight → between the end of the center panel and the start of the end panel
-                // Hidden (empty) neighbours fall back to the bar's start / middle / end.
                 readonly property real axisLen: root.vertical ? height : width
                 readonly property real startBeg: root.vertical ? startPanel.y : startPanel.x
                 readonly property real startEnd: startPanel.visible
@@ -2141,103 +1353,40 @@ Component {
                 readonly property real endFin: root.vertical ? endPanel.y + endPanel.height : endPanel.x + endPanel.width
                 readonly property real midLeftC: (startEnd + centerBeg) / 2
                 readonly property real midRightC: (centerFin + endBeg) / 2
-
                 Rectangle {
-                    visible: root.joined
-                    anchors.fill: parent
-                    radius: root.barRadius
-                    color: root.bgColor
-                    border.width: cfg.border ? 1 : 0
-                    border.color: root.borderColor
+                    visible: root.joined; anchors.fill: parent; radius: root.barRadius; color: root.bgColor
+                    border.width: cfg.border ? 1 : 0; border.color: root.borderColor
                 }
-
-                // 1 · start
                 Panel {
-                    id: startPanel
-                    model: root.startList
-                    clockComp: clockC
-                    anchors.left: frame.left
-                    anchors.top: frame.top
+                    id: startPanel; model: root.startList; anchors.left: frame.left; anchors.top: frame.top
                     onDropped: (modId, sx, sy) => bar.dropModule(modId, sx, sy)
                 }
-
-                // 2 · between start and center
                 Panel {
-                    id: midLeftPanel
-                    model: root.midLeftList
-                    clockComp: clockC
+                    id: midLeftPanel; model: root.midLeftList
                     x: root.vertical ? 0
                                      : Math.max(0, Math.min(frame.axisLen - width, frame.midLeftC - width / 2))
                     y: root.vertical ? Math.max(0, Math.min(frame.axisLen - height, frame.midLeftC - height / 2))
                                      : 0
                     onDropped: (modId, sx, sy) => bar.dropModule(modId, sx, sy)
                 }
-
-                // 3 · center (hosts the clock module; calendar / side panel is now SidePanel.qml)
                 Panel {
-                    id: clockPanel
-                    model: root.centerList
-                    clockComp: clockC
+                    id: clockPanel; model: root.centerList
                     anchors.horizontalCenter: root.vertical ? undefined : frame.horizontalCenter
                     anchors.verticalCenter: root.vertical ? frame.verticalCenter : undefined
                     anchors.top: root.vertical ? undefined : frame.top
                     anchors.left: root.vertical ? frame.left : undefined
                     onDropped: (modId, sx, sy) => bar.dropModule(modId, sx, sy)
-
-                    // The clock is only needed while the module is enabled.
-                    SystemClock {
-                        id: clk
-                        enabled: root.isOn("clock")
-                        precision: cfg.clockSeconds ? SystemClock.Seconds : SystemClock.Minutes
-                    }
-
-                    Component {
-                        id: clockC
-                        Mod {
-                            id: clockMod
-
-                            // "calendar" | "quickactions" | "settings" | "barsettings" | "none"
-                            // "calendar" opens SidePanel (anchored next to this clock module)
-                            function act(a) {
-                                if (a === "calendar") root.openSidepanelAt(clockMod);
-                                else root.doAction(a);
-                            }
-
-                            bold: true
-                            baseSize: root.sz.clock
-                            yOffset: 1
-                            text: root.clockBarText(clk.date)
-                            vtext: root.clockBarVText(clk.date)
-                            tip: Qt.formatDate(clk.date, "dddd, d MMMM yyyy")
-                            primaryHint: root.actionHint(cfg.clockPrimary)
-                            secondaryHint: root.actionHint(cfg.clockSecondary)
-                            tertiaryHint: root.actionHint(cfg.clockTertiary)
-                            noSecondary: secondaryHint === ""
-                            onPrimary: act(cfg.clockPrimary)
-                            onSecondary: act(cfg.clockSecondary)
-                            onTertiary: act(cfg.clockTertiary)
-                        }
-                    }
                 }
-
-                // 4 · between center and end
                 Panel {
-                    id: midRightPanel
-                    model: root.midRightList
-                    clockComp: clockC
+                    id: midRightPanel; model: root.midRightList
                     x: root.vertical ? 0
                                      : Math.max(0, Math.min(frame.axisLen - width, frame.midRightC - width / 2))
                     y: root.vertical ? Math.max(0, Math.min(frame.axisLen - height, frame.midRightC - height / 2))
                                      : 0
                     onDropped: (modId, sx, sy) => bar.dropModule(modId, sx, sy)
                 }
-
-                // 5 · end
                 Panel {
-                    id: endPanel
-                    model: root.endList
-                    clockComp: clockC
-                    anchors.right: root.vertical ? undefined : frame.right
+                    id: endPanel; model: root.endList; anchors.right: root.vertical ? undefined : frame.right
                     anchors.bottom: root.vertical ? frame.bottom : undefined
                     anchors.top: root.vertical ? undefined : frame.top
                     anchors.left: root.vertical ? frame.left : undefined

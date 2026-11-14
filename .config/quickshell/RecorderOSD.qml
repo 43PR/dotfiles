@@ -13,13 +13,21 @@ PanelWindow {
     property int elapsed: 0
 
     readonly property string pidFile: "${XDG_RUNTIME_DIR:-/tmp}/gsr.pid"
-    readonly property string statePath: Quickshell.env("HOME") + "/.config/quickshell/state/recorder-osd.json"
+    readonly property string stateDir: Quickshell.env("HOME") + "/.config/quickshell/state"
+    readonly property string statePath: stateDir + "/recorder-osd.json"
 
     // ---- position (margins from the top-right corner) ----
     readonly property int defaultTop: 12
     readonly property int defaultRight: 12
+
+    // position the user WANTS (persisted, never clamped destructively)
+    property int wantTop: defaultTop
+    property int wantRight: defaultRight
+
+    // position actually DISPLAYED (derived from want* and clamped to the window)
     property int posTop: defaultTop
     property int posRight: defaultRight
+
     property bool dragging: false
     property bool animatePos: false   // only true briefly during reset
     property bool ready: false        // true once the saved state has been loaded
@@ -45,8 +53,10 @@ PanelWindow {
         Region { item: toggle }
     }
 
-    onWidthChanged: setPosition(posTop, posRight)
-    onHeightChanged: setPosition(posTop, posRight)
+    onWidthChanged: clampPosition()
+    onHeightChanged: clampPosition()
+
+    Component.onCompleted: mkState.running = true
 
     function fmt(s) {
         const m = Math.floor(s / 60), r = s % 60
@@ -54,9 +64,9 @@ PanelWindow {
     }
 
     function sendSignal(sig) {
-        signal.command = ["sh", "-c",
+        sigProc.command = ["sh", "-c",
             "f=\"" + pidFile + "\"; [ -f \"$f\" ] && kill -" + sig + " \"$(cat \"$f\")\""]
-        signal.running = true
+        sigProc.running = true
     }
 
     function togglePause() {
@@ -69,30 +79,40 @@ PanelWindow {
         sendSignal("INT")
     }
 
-    // keep the pill + chevron fully on screen
+    // user intent: called on load and while dragging
     function setPosition(top, right) {
+        wantTop = top
+        wantRight = right
+        clampPosition()
+    }
+
+    // derive the displayed position from the wanted one, keeping pill + chevron on screen.
+    // Re-clamping always starts from want*, so a temporarily tiny window
+    // (e.g. 100x100 before the layer surface is configured) can't destroy the saved value.
+    function clampPosition() {
         if (width <= 0 || height <= 0) {
-            posTop = top
-            posRight = right
+            posTop = wantTop
+            posRight = wantRight
             return
         }
         const maxTop = Math.max(0, height - pill.height - toggle.height - 2)
         const maxRight = Math.max(0, width - pill.width)
-        posTop = Math.round(Math.max(0, Math.min(maxTop, top)))
-        posRight = Math.round(Math.max(0, Math.min(maxRight, right)))
+        posTop = Math.round(Math.max(0, Math.min(maxTop, wantTop)))
+        posRight = Math.round(Math.max(0, Math.min(maxRight, wantRight)))
     }
 
-    // persists position AND hidden state in the same JSON file
+    // persists wanted position AND hidden state in the same JSON file
     function saveState() {
         if (!ready) return
-        store.setText(JSON.stringify({ top: posTop, right: posRight, hidden: hidden }))
+        store.setText(JSON.stringify({ top: wantTop, right: wantRight, hidden: hidden }))
     }
 
     function resetPos() {
         animatePos = true
         animOff.restart()
-        posTop = defaultTop
-        posRight = defaultRight
+        wantTop = defaultTop
+        wantRight = defaultRight
+        clampPosition()
         saveState()
     }
 
@@ -110,6 +130,12 @@ PanelWindow {
     }
 
     onHiddenChanged: saveState()
+
+    // make sure the state directory exists so saving can't fail silently
+    Process {
+        id: mkState
+        command: ["mkdir", "-p", root.stateDir]
+    }
 
     // ---- persistence ----
     FileView {
@@ -130,10 +156,13 @@ PanelWindow {
             root.ready = true
         }
         onLoadFailed: root.ready = true
+        onSaveFailed: function (error) {
+            console.warn("recorder-osd: could not save state:", error)
+        }
     }
 
     // Fires signals at the recorder process
-    Process { id: signal }
+    Process { id: sigProc }
 
     // Poll the pidfile; recording = file exists AND process is alive
     Process {
@@ -200,7 +229,7 @@ PanelWindow {
             }
 
             // re-clamp when the label changes width (REC <-> PAUSED)
-            onWidthChanged: root.setPosition(root.posTop, root.posRight)
+            onWidthChanged: root.clampPosition()
 
             // Drag handle: sits under the buttons so they keep their own clicks
             MouseArea {

@@ -80,38 +80,33 @@ Scope {
             } catch (e) { console.warn("powermenu: malformed hub.json:", e) }
         }
     }
-
-    // ---- settings specs (numbers) ----------------------------------------
     readonly property var numSpec: ({
-        menuSize:     { min: 70,  max: 260, def: 100, step: 5, unit: "%" },
+        menuSize:     { min: 70,  max: 260, def: 185, step: 5, unit: "%" },
         animMs:       { min: 0,   max: 500, def: 200, step: 10, unit: " ms" },
-
-        cardWidth:    { min: 60, max: 700, def: 284, step: 5, unit: "px" },
-        itemHeight:   { min: 40,  max: 120, def: 56,  step: 4,  unit: "px" },
-        itemSpacing:  { min: 0,   max: 24,  def: 8,   step: 2,  unit: "px" },
-        panelPadding: { min: 0,   max: 24,  def: 6,   step: 2,  unit: "px" },
+        cardWidth:    { min: 60,  max: 700, def: 275, step: 5, unit: "px" },
+        itemHeight:   { min: 40,  max: 120, def: 52,  step: 4,  unit: "px" },
+        itemSpacing:  { min: 0,   max: 24,  def: 24,  step: 2,  unit: "px" },
+        panelPadding: { min: 0,   max: 24,  def: 0,   step: 2,  unit: "px" },
         topGap:       { min: 0,   max: 120, def: 12,  step: 4,  unit: "px" },
         sideGap:      { min: 0,   max: 120, def: 24,  step: 4,  unit: "px" },
-
         panelRadius:  { min: 0,   max: 40,  def: 20,  step: 2,  unit: "px" },
-        itemRadius:   { min: 0,   max: 40,  def: 12,  step: 2,  unit: "px" },
-        iconSize:     { min: 12,  max: 56,  def: 20,  step: 2,  unit: "px" },
+        itemRadius:   { min: 0,   max: 40,  def: 36,  step: 2,  unit: "px" },
+        iconSize:     { min: 12,  max: 56,  def: 18,  step: 2,  unit: "px" },
         labelSize:    { min: 9,   max: 22,  def: 11,  step: 1,  unit: "px" },
         borderWidth:  { min: 0,   max: 4,   def: 1,   step: 1,  unit: "px" },
         inactiveBorderWidth: { min: 0, max: 4, def: 1, step: 1, unit: "px" },
 
         panelOpacity: { min: 0,   max: 100, def: 0,   step: 5,  unit: "%" },
-        itemOpacity:  { min: 0,   max: 100, def: Math.round((Theme.bg.a ?? 1) * 20) * 5, step: 5, unit: "%" },
-        hoverBoost:   { min: 0,   max: 40,  def: 12,  step: 2,  unit: "%" },
-        dimOpacity:   { min: 0,   max: 100,  def: 0,   step: 5,  unit: "%" },
+        itemOpacity:  { min: 0,   max: 100, def: 10,  step: 5,  unit: "%" },
+        hoverBoost:   { min: 0,   max: 40,  def: 32,  step: 2,  unit: "%" },
+        dimOpacity:   { min: 0,   max: 100, def: 40,  step: 5,  unit: "%" },
 
-        // per-element opacity (inactive / active)
         labelOpacity:          { min: 0, max: 100, def: 100, step: 5, unit: "%" },
         labelActiveOpacity:    { min: 0, max: 100, def: 100, step: 5, unit: "%" },
-        iconOpacity:           { min: 0, max: 100, def: 100, step: 5, unit: "%" },
+        iconOpacity:           { min: 0, max: 100, def: 50,  step: 5, unit: "%" },
         iconActiveOpacity:     { min: 0, max: 100, def: 100, step: 5, unit: "%" },
         borderOpacity:         { min: 0, max: 100, def: 100, step: 5, unit: "%" },
-        inactiveBorderOpacity: { min: 0, max: 100, def: 0,   step: 5, unit: "%" },
+        inactiveBorderOpacity: { min: 0, max: 100, def: 15,  step: 5, unit: "%" },
         keyHintOpacity:        { min: 0, max: 100, def: 100, step: 5, unit: "%" },
         keyHintBgOpacity:      { min: 0, max: 100, def: 8,   step: 2, unit: "%" }
     })
@@ -119,11 +114,10 @@ Scope {
 
     readonly property var boolDefaults: ({
         showTooltips: true,
-        horizontal: false,
+        horizontal: true,
         showIcons: true,
-        showLabels: true,
-        showKeyHints: true,
-        showFooter: true,
+        showLabels: false,
+        showKeyHints: false,
         confirmDangerous: false,
         wrapNav: true,
         hoverSelect: true,
@@ -155,24 +149,25 @@ Scope {
     ]
 
     readonly property var colorDefaults: ({
-        panelBgColor:        "bg",
+        panelBgColor:        "accent",
         itemBgColor:         "bg",
         itemBgActiveColor:   "bg",
         borderColor:         "highlight",
-        inactiveBorderColor: "text",
+        inactiveBorderColor: "accent2",
         labelColor:          "text",
         labelActiveColor:    "text",
-        iconColor:           "text",
-        iconActiveColor:     "text",
+        iconColor:           "accent2",
+        iconActiveColor:     "accent2",
         keyHintColor:        "textDim",
         keyHintBgColor:      "text",
         pendingColor:        "highlight",
         pendingBorderColor:  "text"
     })
     readonly property var colorKeys: Object.keys(colorDefaults)
-
-    property real offsetX: 0
-    property real offsetY: 0
+    readonly property var posDefaults: ({ offsetX: -1280.0273437500005, offsetY: 448.54296875 })
+    readonly property var hiddenDefaults: ["hibernate"]
+    property real offsetX: posDefaults.offsetX
+    property real offsetY: posDefaults.offsetY
 
     property int menuSize: numSpec.menuSize.def
     property int animMs: numSpec.animMs.def
@@ -207,7 +202,6 @@ Scope {
     property bool showIcons: boolDefaults.showIcons
     property bool showLabels: boolDefaults.showLabels
     property bool showKeyHints: boolDefaults.showKeyHints
-    property bool showFooter: boolDefaults.showFooter
     property bool confirmDangerous: boolDefaults.confirmDangerous
     property bool wrapNav: boolDefaults.wrapNav
     property bool hoverSelect: boolDefaults.hoverSelect
@@ -233,7 +227,7 @@ Scope {
     property bool dragging: false
     property int currentIndex: 0
     property string confirmName: ""
-    property var hiddenNames: []
+    property var hiddenNames: hiddenDefaults.slice()
 
     // ---- highlight colour ---------------------------------------------------
     // cAccent is the "Highlight" colour: toggles, sliders, focus rings, and
@@ -312,15 +306,15 @@ Scope {
     readonly property color itemHoverColor: solid(themeColor(itemBgActiveColor),
                                                   Math.min(100, itemOpacity + hoverBoost))
 
-    readonly property bool movedFromDefault: posKeys.some(k => root[k] !== 0)
-
+    readonly property bool movedFromDefault:
+    posKeys.some(k => Math.abs(root[k] - posDefaults[k]) > 0.5)
     readonly property bool modified:
-        posKeys.some(k => root[k] !== 0)
-        || numKeys.some(k => root[k] !== numSpec[k].def)
-        || boolKeys.some(k => root[k] !== boolDefaults[k])
-        || colorKeys.some(k => root[k] !== colorDefaults[k])
-        || accentSource !== "accent"
-        || hiddenNames.length > 0
+    movedFromDefault
+    || numKeys.some(k => root[k] !== numSpec[k].def)
+    || boolKeys.some(k => root[k] !== boolDefaults[k])
+    || colorKeys.some(k => root[k] !== colorDefaults[k])
+    || accentSource !== "accent"
+    || JSON.stringify(hiddenNames) !== JSON.stringify(hiddenDefaults)
 
     readonly property string statePath: Quickshell.env("HOME") + "/.config/quickshell/state/powermenu-state.json"
 
@@ -510,13 +504,13 @@ Scope {
     }
 
     function resetPosition() {
-        root.offsetX = 0
-        root.offsetY = 0
+        root.offsetX = posDefaults.offsetX
+        root.offsetY = posDefaults.offsetY
         root.saveState()
     }
 
     function resetAll() {
-        posKeys.forEach(function (k) { root[k] = 0 })
+        root.hiddenNames = hiddenDefaults.slice()      
         numKeys.forEach(function (k) { root[k] = numSpec[k].def })
         boolKeys.forEach(function (k) { root[k] = boolDefaults[k] })
         colorKeys.forEach(function (k) { root[k] = colorDefaults[k] })
@@ -984,35 +978,6 @@ Scope {
                                 }
                             }
                         }
-
-                        // ---- footer: settings button ----
-                        Item {
-                            visible: root.showFooter
-                            width: parent.width
-                            height: 16
-                            z: footTip.shown ? 100 : 0
-
-                            FooterButton {
-                                id: footBtn
-                                host: root
-                                anchors.right: parent.right
-                                anchors.verticalCenter: parent.verticalCenter
-                                label: "\udb81\udc93"
-                                fontSize: 12
-                                active: root.settingsOpen
-                                opacity: (hovered || root.settingsOpen) ? 1 : 0.1
-                                onClicked: root.toggleSettings()
-                                onRightClicked: root.openSettings()
-                            }
-
-                            Tip {
-                                id: footTip
-                                allowed: root.showTooltips
-                                hovered: footBtn.hovered
-                                side: "belowEnd"
-                                text: "Settings (C or right-click)"
-                            }
-                        }
                     }
                 }
             }
@@ -1128,14 +1093,6 @@ Scope {
                             hoverEnabled: true
                             onClicked: root.closeSettings()
                         }
-                        Tip {
-                            allowed: root.showTooltips
-                            hovered: closeArea.containsMouse
-                            side: "belowEnd"
-                            text: "Close (Esc)"
-                            u: settingsWin.u
-                            family: root.th.fontFamily
-                        }
                     }
                 }
 
@@ -1168,24 +1125,16 @@ Scope {
                                 key: "showTooltips"
                                 label: "Tooltips"
                                 checked: root.showTooltips
-                                tip: "Turn off to hide all hover hints"
                             }
-                            ToggleRow {
-                                host: root
-                                key: "showFooter"
-                                label: "Settings button"
-                                checked: root.showFooter
-                                tip: "Hides the gear button; C and right-click still work"
-                            }
-                            SliderRow { host: root; key: "menuSize"; label: "Scale"; tip: "Overall size of the power menu" }
-                            SliderRow { host: root; key: "animMs"; label: "Animation"; tip: "Animation duration. 0 disables animations" }
+                            SliderRow { host: root; key: "menuSize"; label: "Scale" }
+                            SliderRow { host: root; key: "animMs"; label: "Animation" }
                         }
 
                         // ---------------- LAYOUT & CONTENT ----------------
                         SectionHeader { host: root; text: "Layout & content" }
                         Grid {
                             width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                            ToggleRow { host: root; key: "horizontal"; label: "Horizontal"; checked: root.horizontal; tip: "Show actions in a row instead of a list" }
+                            ToggleRow { host: root; key: "horizontal"; label: "Horizontal"; checked: root.horizontal }
                             ToggleRow { host: root; key: "showIcons"; label: "Icons"; checked: root.showIcons }
                             ToggleRow { host: root; key: "showLabels"; label: "Labels"; checked: root.showLabels }
                             ToggleRow {
@@ -1194,7 +1143,6 @@ Scope {
                                 label: "Key hints"
                                 checked: root.showKeyHints
                                 enabled: !root.horizontal
-                                tip: "Small key badges (vertical layout only)"
                             }
                             SliderRow { host: root; key: "cardWidth"; label: "Width" }
                             SliderRow { host: root; key: "itemHeight"; label: "Item height" }
@@ -1210,10 +1158,10 @@ Scope {
                             SliderRow { host: root; key: "itemRadius"; label: "Item roundness" }
                             SliderRow { host: root; key: "iconSize"; label: "Icon size"; enabled: root.showIcons }
                             SliderRow { host: root; key: "labelSize"; label: "Label size"; enabled: root.showLabels }
-                            SliderRow { host: root; key: "borderWidth"; label: "Active border"; tip: "Border width of the selected item" }
-                            SliderRow { host: root; key: "inactiveBorderWidth"; label: "Inactive border"; tip: "Border width of the other items. 0 = none" }
-                            SliderRow { host: root; key: "panelOpacity"; label: "Panel opacity"; tip: "Panel background opacity" }
-                            SliderRow { host: root; key: "dimOpacity"; label: "Screen dim"; tip: "Dim the screen behind the menu" }
+                            SliderRow { host: root; key: "borderWidth"; label: "Active border" }
+                            SliderRow { host: root; key: "inactiveBorderWidth"; label: "Inactive border" }
+                            SliderRow { host: root; key: "panelOpacity"; label: "Panel opacity" }
+                            SliderRow { host: root; key: "dimOpacity"; label: "Screen dim" }
                         }
 
                         // ---------------- COLORS ----------------
@@ -1223,7 +1171,6 @@ Scope {
                             width: contentCol.width
                             height: 50 * settingsWin.u
                             activeFocusOnTab: true
-                            z: acTip.shown ? 100 : 0
 
                             onActiveFocusChanged: if (activeFocus) root.ensureVisible(acRow, 32 * settingsWin.u)
 
@@ -1324,39 +1271,23 @@ Scope {
                                     }
                                 }
                             }
-
-                            MouseArea {
-                                id: acHover
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                acceptedButtons: Qt.NoButton
-                            }
-                            Tip {
-                                id: acTip
-                                allowed: root.showTooltips
-                                hovered: acHover.containsMouse
-                                side: "belowStart"
-                                text: "The \"Highlight\" Theme color: used by toggles, sliders, focus rings and, by default, the active border and confirm prompt. Left / Right to change"
-                                u: settingsWin.u
-                                family: root.th.fontFamily
-                            }
                         }
                         Grid {
                             width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                            ToggleRow { host: root; colorKey: "panelBgColor"; label: "Panel background"; tip: "Color of the panel behind the items (opacity: Appearance > Panel opacity). Click: next, right-click: previous" }
+                            ToggleRow { host: root; colorKey: "panelBgColor"; label: "Panel background" }
                         }
 
                         // ---------------- INACTIVE ITEMS ----------------
                         SectionHeader { host: root; text: "Inactive items" }
                         Grid {
                             width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                            ToggleRow { host: root; colorKey: "itemBgColor"; label: "Background"; tip: "Background of items that are not selected or hovered" }
-                            SliderRow { host: root; key: "itemOpacity"; label: "Background opacity"; tip: "Item background opacity" }
+                            ToggleRow { host: root; colorKey: "itemBgColor"; label: "Background" }
+                            SliderRow { host: root; key: "itemOpacity"; label: "Background opacity" }
                             ToggleRow { host: root; colorKey: "labelColor"; label: "Label color"; enabled: root.showLabels }
                             SliderRow { host: root; key: "labelOpacity"; label: "Label opacity"; enabled: root.showLabels }
                             ToggleRow { host: root; colorKey: "iconColor"; label: "Icon color"; enabled: root.showIcons }
                             SliderRow { host: root; key: "iconOpacity"; label: "Icon opacity"; enabled: root.showIcons }
-                            ToggleRow { host: root; colorKey: "inactiveBorderColor"; label: "Border color"; tip: "Needs Appearance > Inactive border above 0" }
+                            ToggleRow { host: root; colorKey: "inactiveBorderColor"; label: "Border color" }
                             SliderRow { host: root; key: "inactiveBorderOpacity"; label: "Border opacity" }
                         }
 
@@ -1364,13 +1295,13 @@ Scope {
                         SectionHeader { host: root; text: "Active items" }
                         Grid {
                             width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                            ToggleRow { host: root; colorKey: "itemBgActiveColor"; label: "Background"; tip: "Background of the selected / hovered item" }
-                            SliderRow { host: root; key: "hoverBoost"; label: "Background boost"; tip: "Extra opacity added to the item background when active" }
+                            ToggleRow { host: root; colorKey: "itemBgActiveColor"; label: "Background" }
+                            SliderRow { host: root; key: "hoverBoost"; label: "Background boost" }
                             ToggleRow { host: root; colorKey: "labelActiveColor"; label: "Label color"; enabled: root.showLabels }
                             SliderRow { host: root; key: "labelActiveOpacity"; label: "Label opacity"; enabled: root.showLabels }
                             ToggleRow { host: root; colorKey: "iconActiveColor"; label: "Icon color"; enabled: root.showIcons }
                             SliderRow { host: root; key: "iconActiveOpacity"; label: "Icon opacity"; enabled: root.showIcons }
-                            ToggleRow { host: root; colorKey: "borderColor"; label: "Border color"; tip: "Needs Appearance > Active border above 0" }
+                            ToggleRow { host: root; colorKey: "borderColor"; label: "Border color" }
                             SliderRow { host: root; key: "borderOpacity"; label: "Border opacity" }
                         }
 
@@ -1382,18 +1313,18 @@ Scope {
                             SliderRow { host: root; key: "keyHintOpacity"; label: "Hint text opacity"; enabled: !root.horizontal && root.showKeyHints }
                             ToggleRow { host: root; colorKey: "keyHintBgColor"; label: "Hint badge color"; enabled: !root.horizontal && root.showKeyHints }
                             SliderRow { host: root; key: "keyHintBgOpacity"; label: "Hint badge opacity"; enabled: !root.horizontal && root.showKeyHints }
-                            ToggleRow { host: root; colorKey: "pendingColor"; label: "Confirm text / icon"; tip: "Label and icon color while waiting for confirmation" }
-                            ToggleRow { host: root; colorKey: "pendingBorderColor"; label: "Confirm border"; tip: "Border color while waiting for confirmation" }
+                            ToggleRow { host: root; colorKey: "pendingColor"; label: "Confirm text / icon" }
+                            ToggleRow { host: root; colorKey: "pendingBorderColor"; label: "Confirm border" }
                         }
 
                         // ---------------- BEHAVIOR ----------------
                         SectionHeader { host: root; text: "Behavior" }
                         Grid {
                             width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                            ToggleRow { host: root; key: "confirmDangerous"; label: "Confirm danger"; checked: root.confirmDangerous; tip: "Shutdown / reboot / logout need a second press to confirm" }
-                            ToggleRow { host: root; key: "wrapNav"; label: "Wrap around"; checked: root.wrapNav; tip: "Wrap around when navigating with the keyboard" }
-                            ToggleRow { host: root; key: "hoverSelect"; label: "Hover selects"; checked: root.hoverSelect; tip: "Hovering an item selects it" }
-                            ToggleRow { host: root; key: "closeOnOutside"; label: "Click outside"; checked: root.closeOnOutside; tip: "Close the menu when clicking outside of it" }
+                            ToggleRow { host: root; key: "confirmDangerous"; label: "Confirm danger"; checked: root.confirmDangerous }
+                            ToggleRow { host: root; key: "wrapNav"; label: "Wrap around"; checked: root.wrapNav }
+                            ToggleRow { host: root; key: "hoverSelect"; label: "Hover selects"; checked: root.hoverSelect }
+                            ToggleRow { host: root; key: "closeOnOutside"; label: "Click outside"; checked: root.closeOnOutside }
                         }
 
                         // ---------------- VISIBLE ACTIONS ----------------
@@ -1489,18 +1420,12 @@ Scope {
                             host: root
                             label: "Reset all"
                             enabled: root.modified
-                            tipsOn: root.showTooltips
-                            tip: "Restore every setting to its default"
-                            tipSide: "above"
                             onClicked: root.resetAll()
                         }
                         ActionButton {
                             host: root
                             label: "Reset position"
                             enabled: root.movedFromDefault
-                            tipsOn: root.showTooltips
-                            tip: "Move the menu back to its default spot"
-                            tipSide: "above"
                             onClicked: root.resetPosition()
                         }
                     }
@@ -1512,9 +1437,6 @@ Scope {
                         anchors.verticalCenter: parent.verticalCenter
                         label: "Done"
                         primary: true
-                        tipsOn: root.showTooltips
-                        tip: "Close settings (Esc)"
-                        tipSide: "above"
                         onClicked: root.closeSettings()
                     }
                 }
@@ -1527,14 +1449,15 @@ Scope {
     // Lightweight hover hint drawn inside the host's own window (no extra
     // popup surface). Appears after a short delay, only if `allowed`.
     // The host should raise its own z while `shown` so the hint isn't covered
-    // by siblings. `u` / `family` let the settings window scale it and use the
-    // shared font; the main menu keeps the defaults.
+    // by siblings. Used by the main menu only; always renders at 12px on screen.
     component Tip: Rectangle {
         id: tp
         property string text: ""
         property bool allowed: false
         property bool hovered: false
-        property real u: 1
+        // Default cancels the panel's scale (menuSize / 100) so the tooltip
+        // always renders at 12px.
+        property real u: 100 / root.menuSize
         property string family: Qt.application.font.family
         // left | below | belowStart | belowEnd | above
         property string side: "belowStart"
@@ -1580,48 +1503,8 @@ Scope {
             anchors.centerIn: parent
             text: tp.text
             font.family: tp.family
-            font.pixelSize: 10 * tp.u
+            font.pixelSize: 12 * tp.u
             color: Theme.text
-        }
-    }
-
-    component FooterButton: Rectangle {
-        id: fb
-        property var host: null
-        property string label: ""
-        property int fontSize: 11
-        property bool active: false
-        readonly property color cAccent: host ? host.cAccent : Theme.accent
-        property color textColor: Theme.textDim
-        readonly property bool hovered: fbArea.containsMouse
-        signal clicked()
-        signal rightClicked()
-
-        width: 16; height: 16; radius: 6
-        color: Theme.bg
-        Behavior on color { ColorAnimation { duration: 120 } }
-        Behavior on opacity { NumberAnimation { duration: 120 } }
-
-        Text {
-            anchors.centerIn: parent
-            text: fb.label
-            font.family: "Symbols Nerd Font"
-            font.pixelSize: fb.fontSize
-            font.bold: true
-            color: fb.active ? fb.cAccent : (fb.hovered ? Theme.text : fb.textColor)
-        }
-
-        MouseArea {
-            id: fbArea
-            anchors.fill: parent
-            hoverEnabled: true
-            acceptedButtons: Qt.LeftButton | Qt.RightButton
-            onClicked: mouse => {
-                if (mouse.button === Qt.RightButton)
-                    fb.rightClicked()
-                else
-                    fb.clicked()
-            }
         }
     }
 
@@ -1641,9 +1524,6 @@ Scope {
         property var host
         property string label: ""
         property bool primary: false
-        property string tip: ""
-        property bool tipsOn: false
-        property string tipSide: "belowStart"
         readonly property real u: host.menuUi
         readonly property QtObject th: host.th
         readonly property color cAccent: host.cAccent
@@ -1655,7 +1535,6 @@ Scope {
         width: implicitWidth
         height: 28 * u
         radius: Math.min(height / 2, ab.th.radius * u)
-        z: abTip.shown ? 100 : 0
         opacity: enabled ? 1 : 0.4
         color: primary
             ? ab.cAccent
@@ -1699,16 +1578,6 @@ Scope {
                 ab.forceActiveFocus()
                 ab.clicked()
             }
-        }
-
-        Tip {
-            id: abTip
-            allowed: ab.tipsOn
-            hovered: abArea.containsMouse
-            side: ab.tipSide
-            text: ab.tip
-            u: ab.u
-            family: ab.th.fontFamily
         }
     }
 
@@ -1788,7 +1657,6 @@ Scope {
         property var host
         property string key: ""
         property string label: ""
-        property string tip: ""
         property bool checked: false
         // when set, the row is a colour picker for that host property instead of a switch
         property string colorKey: ""
@@ -1801,7 +1669,6 @@ Scope {
 
         width: host.cellW(parent)
         height: (colorKey !== "" ? 38 : 28) * u
-        z: trTip.shown ? 100 : 0
         opacity: enabled ? 1 : 0.4
 
         function activate() {
@@ -1934,16 +1801,6 @@ Scope {
                     tr.activate()
             }
         }
-
-        Tip {
-            id: trTip
-            allowed: tr.host ? tr.host.showTooltips : false
-            hovered: trArea.containsMouse
-            side: "belowStart"
-            text: tr.tip
-            u: tr.u
-            family: tr.th.fontFamily
-        }
     }
 
     // Self-contained minimal slider. Reads/writes a numSpec entry on the
@@ -1955,7 +1812,6 @@ Scope {
         property var host
         property string key: ""
         property string label: ""
-        property string tip: ""
         readonly property real u: host.menuUi
         readonly property QtObject th: host.th
         readonly property color cAccent: host.cAccent
@@ -1968,7 +1824,6 @@ Scope {
 
         width: host.cellW(parent)
         height: 38 * u
-        z: srTip.shown ? 100 : 0
         opacity: enabled ? 1 : 0.4
 
         onActiveFocusChanged: if (activeFocus) sr.host.ensureVisible(sr, 32 * u)
@@ -2080,16 +1935,6 @@ Scope {
             }
             onPositionChanged: mouse => { if (pressed) apply(mouse.x) }
             onReleased: sr.host.saveState()
-        }
-
-        Tip {
-            id: srTip
-            allowed: sr.host ? sr.host.showTooltips : false
-            hovered: sliderArea.containsMouse && !sliderArea.pressed
-            side: "belowStart"
-            text: sr.tip
-            u: sr.u
-            family: sr.th.fontFamily
         }
     }
 }
