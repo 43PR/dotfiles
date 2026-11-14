@@ -24,10 +24,10 @@ Item {
         position: "left", style: "joined", thickness: 20, margin: 4,
         reserveSpace: true, allScreens: true, dragModules: true,
         scale: 1.0, barScale: 0.9, bgOpacity: 0.35, border: false, borderOpacity: 1.0, radius: 16, calRadius: 15, calScale: 0.9,
-        tooltips: true, tooltipHints: false, tooltipBorder: false, tipDelay: 450, tooltipScale: 1.0,
+        tooltips: true, tooltipHints: false, tooltipBorder: false, tipDelay: 450, tooltipScale: 0.9,
         modPad: 18, wsDot: 16, wsGap: 8, wsScroll: true, wsNumbers: true,
         tasksScale: 0.85, tasksGap: 2, tasksColor: "normal",
-        statsPercent: false, statsIcons: false, statsScale: 0.95, statsBorder: false, statsRadius: 24, statsGap: 1, statsWarn: 85, tempWarn: 85, batLowPct: 15,
+        statsRing: true, statsNumbers: true, statsPercent: false, statsIcons: false, statsScale: 0.95, statsBorder: false, statsRadius: 24, statsGap: 1, statsWarn: 85, tempWarn: 85, batLowPct: 15,
         batNumber: false, batPercent: false,
         volStep: 2, volMax: 100, volNumber: false, volPercent: false,
         lightIcons: "normal", brightStep: 5, nightStep: 100,
@@ -815,11 +815,21 @@ Item {
 
                     Cols {
                         ToggleRow {
+                            label: "RING GAUGE"; checked: page.val("statsRing")
+                            onToggled: v => page.set("statsRing", v)
+                        }
+                        ToggleRow {
+                            label: "NUMBERS"; checked: page.val("statsNumbers")
+                            onToggled: v => page.set("statsNumbers", v)
+                        }
+                        ToggleRow {
                             label: "ICONS/LABELS"; checked: page.val("statsIcons")
+                            enabled: !page.val("statsRing")
                             onToggled: v => page.set("statsIcons", v)
                         }
                         ToggleRow {
                             label: "% / °C SYMBOLS"; checked: page.val("statsPercent")
+                            enabled: page.val("statsNumbers")
                             onToggled: v => page.set("statsPercent", v)
                         }
                         ToggleRow {

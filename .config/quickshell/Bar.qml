@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import QtQuick.Effects
 import Quickshell
 import Quickshell.Io
+import QtQuick.Shapes
 import Quickshell.Wayland
 import Quickshell.Hyprland
 import Quickshell.Bluetooth
@@ -20,10 +21,10 @@ Scope {
         // appearance
         scale: 1.0, barScale: 0.9, bgOpacity: 0.35, border: false, borderOpacity: 1.0, radius: 16, calRadius: 15, calScale: 0.9, 
         // tooltips
-        tooltips: true, tooltipHints: false, tooltipBorder: false, tipDelay: 450, tooltipScale: 1.0,
+        tooltips: true, tooltipHints: false, tooltipBorder: false, tipDelay: 450, tooltipScale: 0.9,
         modPad: 18, wsDot: 16, wsGap: 8, wsScroll: true, wsNumbers: true,
         tasksScale: 0.85, tasksGap: 2, tasksColor: "normal",
-        statsPercent: false, statsIcons: false, statsScale: 0.95, statsBorder: false, statsRadius: 24, statsGap: 1, statsWarn: 85, tempWarn: 85, batLowPct: 15,
+        statsRing: true, statsNumbers: true, statsPercent: false, statsIcons: false, statsScale: 0.95, statsBorder: false, statsRadius: 24, statsGap: 1, statsWarn: 85, tempWarn: 85, batLowPct: 15, 
         batNumber: false, batPercent: false,
         volStep: 2, volMax: 100, volNumber: false, volPercent: false,
         lightIcons: "normal", brightStep: 5, nightStep: 100, 
@@ -91,6 +92,8 @@ Scope {
             property real tasksScale: root.defaults.tasksScale   // open-apps icon scale
             property int tasksGap: root.defaults.tasksGap        // space between open-apps icons
             property string tasksColor: root.defaults.tasksColor // open-apps icon tint: "normal" | "accent"
+            property bool statsRing: root.defaults.statsRing
+            property bool statsNumbers: root.defaults.statsNumbers
             property bool statsPercent: root.defaults.statsPercent // show the % / °C symbols on CPU / RAM / GPU / TEMP
             property bool statsIcons: root.defaults.statsIcons   // glyph instead of the CPU / RAM / GPU / TEMP text label
             property real statsScale: root.defaults.statsScale   // text scale of the CPU / RAM / GPU / TEMP badges
@@ -1142,106 +1145,157 @@ function nightWheel(delta) {
             }
         }
     }
+component StatBadge: Interactive {
+    id: stat
+    anchors.verticalCenterOffset: 1
+    property string label: ""
+    property string icon: ""
+    property string iconFont: Theme.iconFont
+    property string valueText: ""
+    property string unit: ""
+    property real level: 0                      // 0..1, drives the ring arc
 
-    // Rounded stat badge (CPU / RAM / GPU / temperatures), informational only.
-    // Capsule with label + value ("CPU 12" / stacked on vertical bars).
-    // With the "icons" option on, a glyph replaces the text label.
-    // `unit` ("%" or "°C") is appended when the "show unit symbols" option is on.
-    component StatBadge: Interactive {
-        id: stat
-        anchors.verticalCenterOffset: 1
-        property string label: ""
-        property string icon: ""          // Nerd Font glyph; used instead of `label` when the option is on
-        property string iconFont: Theme.iconFont   // badges can override this for their glyph
-        property string valueText: ""
-        property string unit: ""
-        readonly property bool useIcon: cfg.statsIcons && icon !== ""
-        readonly property string shownLabel: useIcon ? icon : label
-        readonly property string shownValue: valueText + (cfg.statsPercent ? unit : "")
-        readonly property color fg: warning ? Theme.danger : Theme.text
+    readonly property bool ring: cfg.statsRing && icon !== ""
+    readonly property bool useIcon: cfg.statsIcons && icon !== ""
+    readonly property string shownLabel: useIcon ? icon : label
+    readonly property string shownValue: valueText + (cfg.statsPercent ? unit : "")
+    readonly property color fg: warning ? Theme.danger : Theme.text
 
-        // ── Never outgrow the bar ──
-        // Badge follows the text size and is always clamped to maxCross.
-        // statsScale never changes the bar thickness.
-        // Base ≈ 10px at scale/barScale 1.0; statsScale 1.0 is a comfortable default.
-        readonly property int maxCross: Math.max(8, root.panelThick - (cfg.border ? 2 : 0))
-        readonly property int crossPad: root.vertical ? 8 : 6
-        readonly property int wantedPx: Math.max(4, Math.round(10 * cfg.statsScale * cfg.scale * cfg.barScale))
-        readonly property int labelWantedPx: useIcon ? wantedPx + 2 : Math.max(4, wantedPx - 1)
-        // worst-case value ("100" / "100%") so the font does not jump while the numbers change
-        readonly property string sampleValue: "100" + (cfg.statsPercent ? "%" : "")
-        readonly property real contentCross: root.vertical
-            ? Math.max(mLabel.width, mValue.width)
-            : Math.max(mLabel.height, mValue.height)
-        // shrink text only when the wanted size would exceed the bar
-        readonly property int fontPx: contentCross + crossPad > maxCross
-            ? Math.max(4, Math.floor(wantedPx * (maxCross - crossPad) / contentCross))
-            : wantedPx
+    readonly property int maxCross: Math.max(8, root.panelThick - (cfg.border ? 2 : 0))
+    readonly property int crossPad: root.vertical ? 8 : 6
+    readonly property int wantedPx: Math.max(4, Math.round(10 * cfg.statsScale * cfg.scale * cfg.barScale))
+    readonly property int labelWantedPx: useIcon ? wantedPx + 2 : Math.max(4, wantedPx - 1)
+    readonly property string sampleValue: "100" + (cfg.statsPercent ? "%" : "")
+    readonly property real contentCross: root.vertical
+        ? Math.max(mLabel.width, mValue.width)
+        : Math.max(mLabel.height, mValue.height)
+    readonly property int fontPx: contentCross + crossPad > maxCross
+        ? Math.max(4, Math.floor(wantedPx * (maxCross - crossPad) / contentCross))
+        : wantedPx
 
-        TextMetrics {
-            id: mLabel
-            text: stat.shownLabel
-            font.family: stat.useIcon ? stat.iconFont : Theme.iconFont
-            font.pixelSize: stat.labelWantedPx
-        }
-        TextMetrics {
-            id: mValue
-            text: stat.sampleValue
-            font.family: Theme.iconFont
-            font.bold: true
-            font.pixelSize: stat.wantedPx
-        }
+    // ── ring geometry (always clamped to the bar thickness) ──
+    readonly property int ringPx: Math.max(10, Math.min(maxCross - 2, Math.round(wantedPx * 2.3)))
+    readonly property real ringStroke: Math.max(1.2, ringPx * 0.08)
+    property real shownLevel: Math.max(0, Math.min(1, level))
+    Behavior on shownLevel { NumberAnimation { duration: 250; easing.type: Easing.OutQuad } }
 
-        Layout.alignment: Qt.AlignCenter
-        implicitWidth: root.vertical ? root.panelThick : badge.width + cfg.statsGap
-        // stay inside the bar thickness; never expand it
-        implicitHeight: root.vertical ? badge.height + cfg.statsGap
-                                      : Math.min(root.panelThick, Math.max(root.panelThick - 2, badge.height + 4))
-        interactive: false
+    TextMetrics {
+        id: mLabel
+        text: stat.shownLabel
+        font.family: stat.useIcon ? stat.iconFont : Theme.iconFont
+        font.pixelSize: stat.labelWantedPx
+    }
+    TextMetrics {
+        id: mValue
+        text: cfg.statsNumbers ? stat.sampleValue : ""
+        font.family: Theme.iconFont
+        font.bold: true
+        font.pixelSize: stat.wantedPx
+    }
 
-        Rectangle {
-            id: badge
+    Layout.alignment: Qt.AlignCenter
+    implicitWidth: root.vertical ? root.panelThick : badge.width + cfg.statsGap
+    implicitHeight: root.vertical ? badge.height + cfg.statsGap
+                                  : Math.min(root.panelThick, Math.max(root.panelThick - 2, badge.height + 4))
+    interactive: false
+
+    Rectangle {
+        id: badge
+        anchors.centerIn: parent
+        width: root.vertical
+               ? Math.min(stat.maxCross, statRow.implicitWidth + 8)
+               : statRow.implicitWidth + 12
+        height: root.vertical
+                ? statRow.implicitHeight + 8
+                : Math.min(stat.maxCross, statRow.implicitHeight + 4)
+        clip: true
+        radius: Math.min(cfg.statsRadius, Math.min(width, height) / 2)
+        color: "transparent"
+        border.width: cfg.statsBorder ? 1 : 0
+        border.color: Qt.alpha(stat.fg, 0.18)
+
+        GridLayout {
+            id: statRow
             anchors.centerIn: parent
-            // size follows the text (with padding); always clamped to the bar cross-section
-            width: root.vertical
-                   ? Math.min(stat.maxCross, statRow.implicitWidth + 8)
-                   : statRow.implicitWidth + 12
-            height: root.vertical
-                    ? statRow.implicitHeight + 8
-                    : Math.min(stat.maxCross, statRow.implicitHeight + 4)
-            clip: true
-            radius: Math.min(cfg.statsRadius, Math.min(width, height) / 2)
-            color: "transparent"
-            border.width: cfg.statsBorder ? 1 : 0
-            border.color: Qt.alpha(stat.fg, 0.18)
+            flow: root.vertical ? GridLayout.TopToBottom : GridLayout.LeftToRight
+            rowSpacing: stat.ring ? 2 : 0
+            columnSpacing: stat.ring ? 4 : 3
 
-            GridLayout {
-                id: statRow
-                anchors.centerIn: parent
-                flow: root.vertical ? GridLayout.TopToBottom : GridLayout.LeftToRight
-                rowSpacing: 0
-                columnSpacing: 3
+            // ── ring gauge with the icon inside ──
+            Item {
+                id: ringItem
+                visible: stat.ring
+                Layout.alignment: Qt.AlignCenter
+                implicitWidth: stat.ringPx
+                implicitHeight: stat.ringPx
 
-                Text {
-                    Layout.alignment: Qt.AlignCenter
-                    text: stat.shownLabel
-                    color: Qt.alpha(stat.fg, 0.75)
-                    font.family: stat.useIcon ? stat.iconFont : Theme.iconFont
-                    font.pixelSize: stat.useIcon ? stat.fontPx + 2 : Math.max(4, stat.fontPx - 1)
-                    renderType: Text.NativeRendering
+                Shape {
+                    anchors.fill: parent
+                    preferredRendererType: Shape.CurveRenderer
+                    layer.enabled: true
+                    layer.samples: 4
+
+                    // track
+                    ShapePath {
+                        strokeColor: Qt.alpha(Theme.accent2, 0.2)
+                        strokeWidth: stat.ringStroke
+                        fillColor: "transparent"
+                        PathAngleArc {
+                            centerX: ringItem.width / 2; centerY: ringItem.height / 2
+                            radiusX: (ringItem.width - stat.ringStroke) / 2
+                            radiusY: (ringItem.height - stat.ringStroke) / 2
+                            startAngle: -90; sweepAngle: 360
+                        }
+                    }
+                    // usage arc (starts at 12 o'clock, clockwise)
+                    ShapePath {
+                        strokeColor: stat.shownLevel <= 0 ? "transparent"
+                                   : stat.warning ? Theme.danger : Theme.accent2
+                        strokeWidth: stat.ringStroke
+                        fillColor: "transparent"
+                        capStyle: ShapePath.RoundCap
+                        PathAngleArc {
+                            centerX: ringItem.width / 2; centerY: ringItem.height / 2
+                            radiusX: (ringItem.width - stat.ringStroke) / 2
+                            radiusY: (ringItem.height - stat.ringStroke) / 2
+                            startAngle: -90
+                            sweepAngle: Math.min(359.9, 360 * stat.shownLevel)
+                        }
+                    }
                 }
                 Text {
-                    Layout.alignment: Qt.AlignCenter
-                    text: stat.shownValue
+                    anchors.centerIn: parent
+                    text: stat.icon
                     color: stat.fg
-                    font.family: stat.useIcon ? stat.iconFont : Theme.iconFont
-                    font.bold: true
-                    font.pixelSize: stat.fontPx
+                    font.family: stat.iconFont
+                    font.pixelSize: Math.round(stat.ringPx * 0.5)
                     renderType: Text.NativeRendering
                 }
             }
+            // classic text label (only when the ring is off
+            Text {
+                visible: !stat.ring
+                Layout.alignment: Qt.AlignCenter
+                text: stat.shownLabel
+                color: Qt.alpha(stat.fg, 0.75)
+                font.family: stat.useIcon ? stat.iconFont : Theme.iconFont
+                font.pixelSize: stat.useIcon ? stat.fontPx + 2 : Math.max(4, stat.fontPx - 1)
+                renderType: Text.NativeRendering
+            }
+            // number (hidden when the NUMBERS option is off)
+            Text {
+                visible: cfg.statsNumbers
+                Layout.alignment: Qt.AlignCenter
+                text: stat.shownValue
+                color: stat.fg
+                font.family: Theme.iconFont
+                font.bold: true
+                font.pixelSize: stat.fontPx
+                renderType: Text.NativeRendering
+            }
         }
     }
+}
     // Tiny level pill. Lies across the bar on vertical bars, stands upright on horizontal ones.
     component MiniBar: Item {
         id: mb
@@ -1474,7 +1528,7 @@ function nightWheel(delta) {
                 width: Math.max(height, badgeText.implicitWidth + 6)
                 height: Math.max(11, badgeText.implicitHeight + 1)
                 radius: height / 2
-                color: Theme.bg
+                color: Qt.alpha(Theme.bg, cfg.bgOpacity)
 
                 Text {
                     id: badgeText
@@ -1541,6 +1595,7 @@ function nightWheel(delta) {
             label: "CPU"; icon: "\uEF8E"; iconFont: Theme.tablerFont
             unit: "%"
             valueText: String(root.cpuUsage)
+            level: root.cpuUsage / 100
             warning: root.cpuUsage >= cfg.statsWarn
             tip: "CPU usage: " + root.cpuUsage + "%"
         }
@@ -1553,6 +1608,7 @@ function nightWheel(delta) {
             label: "RAM"; icon: "\uD800\uDEB7"; iconFont: Theme.tablerFont
             unit: "%"
             valueText: String(root.memPercent)
+            level: root.memPercent / 100
             warning: root.memPercent >= cfg.statsWarn
             tip: "Memory: " + root.memUsedG.toFixed(1) + " / " + root.memTotalG.toFixed(1)
                  + " GiB (" + root.memPercent + "%)"
@@ -1566,6 +1622,7 @@ function nightWheel(delta) {
             label: "GPU"; icon: "\uD800\uDE99"; iconFont: Theme.tablerFont
             unit: root.gpuHasUsage ? "%" : ""
             valueText: root.gpuHasUsage ? String(root.gpuUsage) : "–"
+            level: root.gpuHasUsage ? root.gpuUsage / 100 : 0
             warning: root.gpuHasUsage && root.gpuUsage >= cfg.statsWarn
             tip: root.gpuHasUsage ? "GPU usage: " + root.gpuUsage + "%" : "GPU usage: unavailable"
         }
@@ -1578,6 +1635,7 @@ function nightWheel(delta) {
             label: "CPUT"; icon: "\uEB38"; iconFont: Theme.tablerFont
             unit: root.cpuTemp >= 0 ? "°C" : ""
             valueText: root.tempText(root.cpuTemp)
+            level: root.cpuTemp >= 0 ? root.cpuTemp / 100 : 0
             warning: root.cpuTemp >= cfg.tempWarn
             tip: root.tempTip("CPU", root.cpuTemp)
         }
@@ -1590,6 +1648,7 @@ function nightWheel(delta) {
             label: "GPUT"; icon: "\uEB38"; iconFont: Theme.tablerFont
             unit: root.gpuTemp >= 0 ? "°C" : ""
             valueText: root.tempText(root.gpuTemp)
+            level: root.gpuTemp >= 0 ? root.gpuTemp / 100 : 0
             warning: root.gpuTemp >= cfg.tempWarn
             tip: root.tempTip("GPU", root.gpuTemp)
         }
