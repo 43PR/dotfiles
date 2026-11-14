@@ -25,15 +25,26 @@ Scope {
     property real sidebarCollapsedWidth: 37   // only the toggle button stays visible
     property bool sidebarCollapsed: false
 
-    // ---- lifecycle -------------------------------------------------------
-    property bool showing: false      // logical "settings are open"
-    property bool mounted: false      // window exists
+    // ---- lifecycle (open/close/toggle animation logic lives in PopupLifecycle.qml) ----
     property real winW: 0             // reported by the window while mounted
     property real winH: 0
 
-    function show()   { showing = true }
-    function hide()   { showing = false }
-    function toggle() { showing = !showing }
+    PopupLifecycle {
+        id: life
+        keepAliveMs: 20000
+        sized: root.winW > 0 && root.winH > 0
+        onUnmounted: {
+            root.winW = 0
+            root.winH = 0
+        }
+    }
+
+    readonly property bool showing: life.showing   // logical "settings are open"
+    readonly property bool mounted: life.mounted   // window exists
+
+    function show()   { life.show() }
+    function hide()   { life.hide() }
+    function toggle() { life.toggle() }
 
     function toggleSidebar() {
         sidebarCollapsed = !sidebarCollapsed
@@ -41,32 +52,13 @@ Scope {
     }
 
     onShowingChanged: {
-        if (showing) {
-            unmountTimer.stop()
-            mounted = true
-        } else {
+        if (!showing) {
             dragging = false
             resizing = false
             sidebarResizing = false
             searchQuery = ""
             focusTarget = "page"
-            unmountTimer.restart()
         }
-    }
-
-    function unmount() {
-        if (root.showing) return        // reopened in the meantime
-        root.mounted = false
-        root.winW = 0
-        root.winH = 0
-    }
-
-    property int keepAliveMs: 20000
-
-    Timer {
-        id: unmountTimer
-        interval: Math.max(600, root.keepAliveMs)
-        onTriggered: root.unmount()
     }
 
     // ---- navigation -------------------------------------------------------
@@ -80,6 +72,7 @@ Scope {
         { name: "Appearance", icon: "󰏘", page: "AppearancePage" },
         { name: "Themes", icon: "󰉼",  page: "ThemesPage" },
         { name: "Bar", icon: "\ue690",  page: "BarPage" },
+        { name: "Side Panel", icon: "\uec01",  page: "SidePanelPage" },
         { name: "Input", icon: "\udb83\udfb0", page: "InputPage" },
         { name: "Network", icon: "󰖩", page: "NetworkPage" },
         { name: "Bluetooth", icon: "\uf293", page: "BluetoothPage" },
@@ -369,47 +362,19 @@ Scope {
 
     // ---- the window: only exists while mounted ---------------------------
     LazyLoader {
-        active: root.mounted
+        active: life.mounted
 
         PanelWindow {
             id: win
-            property bool reveal: false
             property bool sized: false
-            property bool warm: false       // fallback so a broken page can't keep the window hidden
-            property bool revealBound: false
-            property int warmFrames: 0
 
-            readonly property bool pageReady: pageLoader.status === Loader.Ready
-            readonly property bool canReveal: sized && (pageReady || warm) && (bgPic.ready || warm)
+            // Feed the window's readiness into the lifecycle (restored automatically
+            // when the window is destroyed on unmount).
+            Binding { target: life; property: "contentReady"; value: pageLoader.status === Loader.Ready }
+            Binding { target: life; property: "assetsReady";  value: bgPic.ready }
+            Binding { target: life; property: "frameWindow";  value: card.Window.window }
 
-            function bindReveal() {
-                if (revealBound)
-                    return
-                revealBound = true
-                reveal = Qt.binding(function () { return root.showing })
-            }
-
-            Timer {
-                running: true
-                interval: 600
-                onTriggered: win.warm = true
-            }
-
-            Timer {
-                running: win.canReveal && !win.revealBound
-                interval: 250
-                onTriggered: win.bindReveal()
-            }
-
-            Connections {
-                target: card.Window.window
-                enabled: !win.revealBound          // stop listening to every frame once revealed
-                ignoreUnknownSignals: true
-                function onFrameSwapped() {
-                    if (win.sized && win.pageReady && !win.revealBound && ++win.warmFrames >= 3)
-                        win.bindReveal()
-                }
-            }
+            readonly property bool reveal: life.reveal
 
             anchors { top: true; left: true; right: true; bottom: true }
             color: "transparent"
@@ -561,44 +526,17 @@ Scope {
                 open: win.reveal
 
                 cacheContent: true
-                prewarm: win.sized && !win.revealBound
-                fadeDuration: 260       
-                popDuration: 340        
-                tiltDuration: 380       
+                prewarm: win.sized && !life.opened
+                fadeDuration: 260
+                popDuration: 340
+                tiltDuration: 380
                 popEasing: Easing.OutCubic
-                closedScale: 0.7 
+                closedScale: 0.7
 
-                Behavior on x {
-                    enabled: !root.dragging && !root.resizing && win.reveal
-                    NumberAnimation {
-                        duration: Theme.animMed
-                        easing.type: Easing.OutCubic
-                    }
-                }
-
-                Behavior on y {
-                    enabled: !root.dragging && !root.resizing && win.reveal
-                    NumberAnimation {
-                        duration: Theme.animMed
-                        easing.type: Easing.OutCubic
-                    }
-                }
-
-                Behavior on width {
-                    enabled: !root.dragging && !root.resizing && win.reveal
-                    NumberAnimation {
-                        duration: Theme.animMed
-                        easing.type: Easing.OutCubic
-                    }
-                }
-
-                Behavior on height {
-                    enabled: !root.dragging && !root.resizing && win.reveal
-                    NumberAnimation {
-                        duration: Theme.animMed
-                        easing.type: Easing.OutCubic
-                    }
-                }
+                Behavior on x      { enabled: !root.dragging && !root.resizing && win.reveal; NumberAnimation { duration: Theme.animMed; easing.type: Easing.OutCubic } }
+                Behavior on y      { enabled: !root.dragging && !root.resizing && win.reveal; NumberAnimation { duration: Theme.animMed; easing.type: Easing.OutCubic } }
+                Behavior on width  { enabled: !root.dragging && !root.resizing && win.reveal; NumberAnimation { duration: Theme.animMed; easing.type: Easing.OutCubic } }
+                Behavior on height { enabled: !root.dragging && !root.resizing && win.reveal; NumberAnimation { duration: Theme.animMed; easing.type: Easing.OutCubic } }
 
                 Rectangle {
                     anchors.fill: parent
@@ -608,7 +546,7 @@ Scope {
                     border.width: 1
                     scale: Theme.settingsScale
                     transformOrigin: Item.Center
-                    BackgroundImage {       
+                    BackgroundImage {
                         id: bgPic
                         anchors.fill: parent
                         anchors.margins: 1
@@ -770,13 +708,7 @@ Scope {
                             spacing: 10
                             clip: true
 
-                            Behavior on width {
-                                enabled: !root.sidebarResizing
-                                NumberAnimation {
-                                    duration: Theme.animMed
-                                    easing.type: Easing.OutCubic
-                                }
-                            }
+                            Behavior on width { enabled: !root.sidebarResizing; NumberAnimation { duration: Theme.animMed; easing.type: Easing.OutCubic } }
 
                             Item {
                                 id: sidebarHeader
@@ -805,13 +737,8 @@ Scope {
                                                 ? Theme.alpha(Theme.text, 0.18)
                                                 : "transparent"
 
-                                        Behavior on color {
-                                            ColorAnimation { duration: Theme.animFast }
-                                        }
-
-                                        Behavior on border.color {
-                                            ColorAnimation { duration: Theme.animFast }
-                                        }
+                                        Behavior on color        { ColorAnimation { duration: Theme.animFast } }
+                                        Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
 
                                         // ChatGPT-style sidebar icon
                                         Item {
@@ -841,12 +768,7 @@ Scope {
                                                     ? Theme.accent
                                                     : Theme.textDim
 
-                                                Behavior on x {
-                                                    NumberAnimation {
-                                                        duration: Theme.animMed
-                                                        easing.type: Easing.OutCubic
-                                                    }
-                                                }
+                                                Behavior on x { NumberAnimation { duration: Theme.animMed; easing.type: Easing.OutCubic } }
                                             }
                                         }
 
@@ -1085,9 +1007,7 @@ Scope {
                                     ? Theme.accent
                                     : Theme.border
 
-                                Behavior on color {
-                                    ColorAnimation { duration: Theme.animFast }
-                                }
+                                Behavior on color { ColorAnimation { duration: Theme.animFast } }
                             }
 
                             MouseArea {

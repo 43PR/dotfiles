@@ -6,7 +6,7 @@
 -- terminal/browser — those globals are the program names from hyprland.lua).
 local terminal_key      = "T"
 local launcher_key      = "D"
-local qa_key         = "S"
+local sidepanel_key     = "S"
 local files_key         = "E"
 local browser_key       = "B"
 local close_key         = "Q"
@@ -18,7 +18,6 @@ local colorpicker_key   = "SHIFT + C"
 local fullscreen_key    = "F"
 local opacity_key       = "O"
 local theme_key         = "period"
-local notifications_key = "N"
 local todo_key          = "C"
 local bar_key           = "SHIFT + W"
 local clipboard_key     = "V"
@@ -40,7 +39,7 @@ do
         else
             if kb_terminal      then terminal_key      = kb_terminal end
             if kb_launcher      then launcher_key      = kb_launcher end
-            if kb_qa         then qa_key         = kb_qa end
+            if kb_sidepanel_key then sidepanel_key     = kb_sidepanel end
             if kb_files         then files_key         = kb_files end
             if kb_browser       then browser_key       = kb_browser end
             if kb_close         then close_key         = kb_close end
@@ -52,7 +51,6 @@ do
             if kb_fullscreen    then fullscreen_key    = kb_fullscreen end
             if kb_opacity       then opacity_key       = kb_opacity end
             if kb_theme         then theme_key         = kb_theme end
-            if kb_notifications then notifications_key = kb_notifications end
             if kb_todo          then todo_key          = kb_todo end
             if kb_bar           then bar_key           = kb_bar end
             if kb_clipboard     then clipboard_key     = kb_clipboard end
@@ -105,7 +103,7 @@ end
 
 terminal_key      = normalize_key(terminal_key)
 launcher_key      = normalize_key(launcher_key)
-qa_key            = normalize_key(qa_key)
+sidepanel_key     = normalize_key(sidepanel_key)
 files_key         = normalize_key(files_key)
 browser_key       = normalize_key(browser_key)
 close_key         = normalize_key(close_key)
@@ -117,7 +115,6 @@ colorpicker_key   = normalize_key(colorpicker_key)
 fullscreen_key    = normalize_key(fullscreen_key)
 opacity_key       = normalize_key(opacity_key)
 theme_key         = normalize_key(theme_key)
-notifications_key = normalize_key(notifications_key)
 todo_key          = normalize_key(todo_key)
 bar_key           = normalize_key(bar_key)
 clipboard_key     = normalize_key(clipboard_key)
@@ -142,7 +139,7 @@ local menu = "rofi -show drun"
 
 bind(mainMod .. " + " .. terminal_key,      hl.dsp.exec_cmd(terminal))
 bind(mainMod .. " + " .. launcher_key,      hl.dsp.exec_cmd("pgrep -x rofi >/dev/null && pkill -x rofi || " .. menu))
-bind(mainMod .. " + " .. qa_key,         hl.dsp.exec_cmd("qs ipc call qa toggle"))
+bind(mainMod .. " + " .. sidepanel_key,         hl.dsp.exec_cmd("qs ipc call sidepanel toggle"))
 bind(mainMod .. " + " .. files_key,         hl.dsp.exec_cmd(fileManager))
 bind(mainMod .. " + " .. browser_key,       hl.dsp.exec_cmd("python3 " .. home .. "/.config/hypr/scripts/default-browser.py"))
 bind(mainMod .. " + " .. close_key,         hl.dsp.window.close())
@@ -154,7 +151,6 @@ bind(mainMod .. " + " .. colorpicker_key, hl.dsp.exec_cmd("qs ipc call colorpick
 bind(mainMod .. " + " .. fullscreen_key,    hl.dsp.window.fullscreen({ mode = 0 }))
 bind(mainMod .. " + " .. opacity_key,       hl.dsp.exec_cmd(home .. "/.config/hypr/scripts/opacity.sh"))
 bind(mainMod .. " + " .. theme_key,         hl.dsp.exec_cmd("python3 " .. home .. "/.config/43pr/bin/theme.py toggle"))
-bind(mainMod .. " + " .. notifications_key, hl.dsp.exec_cmd("qs ipc call notifications toggle"))
 bind(mainMod .. " + " .. todo_key,          hl.dsp.exec_cmd("qs ipc call todo toggle"))
 
 bind(mainMod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })

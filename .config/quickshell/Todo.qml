@@ -1318,7 +1318,7 @@ Scope {
 
                                             Text {
                                                 anchors.centerIn: parent
-                                                text: "󰂚"
+                                                text: "\ueaa2"
                                                 font.pixelSize: root.fpx(12)
                                                 color: Theme.textDim
                                                 opacity: (entry.remindAt > 0 && !entry.notified) || entry.picking ? 1

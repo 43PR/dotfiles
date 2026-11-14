@@ -77,7 +77,7 @@ Hover over elements to see actions.
 | `Super + V`             | Clipboard history         |
 | `Super + I`             | Settings menu             |
 | `Super + Grave`         | Logout menu               |
-| `Super + S`             | Quick actions             |
+| `Super + S`             | Side panel                |
 | `Super + O`             | Switch opacity            |
 | `Super + C`             | Notes & Reminders         |
 | `Super + W`             | Wallpaper selector        |

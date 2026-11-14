@@ -11,7 +11,6 @@ import Quickshell.Services.UPower
 
 Scope {
     id: root
-
     // ───────────────────────── Config ─────────────────────────
     // Single source of truth for defaults (used by the adapter AND reset).
     readonly property var defaults: ({
@@ -21,8 +20,7 @@ Scope {
         // appearance
         scale: 1.0, barScale: 0.9, bgOpacity: 0.35, border: false, borderOpacity: 1.0, radius: 16, calRadius: 15, calScale: 0.9, 
         // tooltips
-        tooltips: true, tooltipHints: false, tooltipBorder: false, tipDelay: 450,
-        // modules
+        tooltips: true, tooltipHints: false, tooltipBorder: false, tipDelay: 450, tooltipScale: 1.0,
         modPad: 18, wsDot: 16, wsGap: 8, wsScroll: true, wsNumbers: true,
         tasksScale: 0.85, tasksGap: 2, tasksColor: "normal",
         statsPercent: false, statsIcons: false, statsScale: 0.95, statsBorder: false, statsRadius: 24, statsGap: 1, statsWarn: 85, tempWarn: 85, batLowPct: 15,
@@ -31,7 +29,7 @@ Scope {
         lightIcons: "normal", brightStep: 5, nightStep: 100, 
         // clock / calendar
         clock24: true, clockSeconds: false, clockPadHour: true, clockDate: true, clockDay: false, clockCase: "normal", dateOrder: "dm", weekMonday: true,
-        // clock click binds: "calendar" | "quickactions" | "settings" | "barsettings" | "none"
+        // clock click binds: "calendar" (opens SidePanel) | "quickactions" | "settings" | "barsettings" | "none"
         clockPrimary: "calendar", clockSecondary: "settings", clockTertiary: "quickactions",
         // settings button click binds: "quickactions" | "settings" | "barsettings" | "none"
         settingsPrimary: "settings", settingsSecondary: "barsettings", settingsTertiary: "none",
@@ -84,6 +82,7 @@ Scope {
             property bool tooltipHints: root.defaults.tooltipHints // show "Left click: ..." lines in tooltips
             property bool tooltipBorder: root.defaults.tooltipBorder // outline around tooltips
             property int tipDelay: root.defaults.tipDelay        // ms before a tooltip appears
+            property real tooltipScale: root.defaults.tooltipScale 
             property int modPad: root.defaults.modPad            // horizontal padding of text modules
             property int wsDot: root.defaults.wsDot              // workspace dot size
             property int wsGap: root.defaults.wsGap              // gap between workspace dots
@@ -550,16 +549,41 @@ Scope {
     function openSettings() { run("qs ipc call settings bar"); }
 
     // Shared click actions (clock + settings button binds)
-    // "settings" | "barsettings" | "quickactions" | "none"
+    // "calendar" | "settings" | "barsettings" | "quickactions" | "none"
     function actionHint(a) {
-        return a === "settings" ? "Settings"
+        return a === "calendar" ? "Side panel"
+             : a === "settings" ? "Settings"
              : a === "barsettings" ? "Bar settings"
              : a === "quickactions" ? "Quick actions" : "";
     }
     function doAction(a) {
-        if (a === "settings") run("qs ipc call settings toggle");
+        if (a === "calendar") openSidepanelAt(null);
+        else if (a === "settings") run("qs ipc call settings toggle");
         else if (a === "barsettings") openSettings();
         else if (a === "quickactions") run("qs ipc call qa toggle");
+    }
+
+    // Open SidePanel next to a bar module (normally the clock). Falls back to a
+    // plain toggle when no item is given (e.g. keybind / IPC).
+    // Args match SidePanel's `toggleAt <screen> <position> <along> <edge>`.
+    function openSidepanelAt(item) {
+        if (!item) {
+            Quickshell.execDetached(["qs", "ipc", "call", "sidepanel", "toggle"]);
+            return;
+        }
+        const win = item.QsWindow ? item.QsWindow.window : null;
+        if (!win || !win.screen) {
+            Quickshell.execDetached(["qs", "ipc", "call", "sidepanel", "toggle"]);
+            return;
+        }
+        const c = item.mapToItem(win.contentItem, item.width / 2, item.height / 2);
+        const along = Math.round(root.vertical ? c.y : c.x);
+        // distance from screen edge to the bar's inner edge (matches SidePanel.barEdge)
+        const edge = root.panelThick + root.effEdge;
+        Quickshell.execDetached([
+            "qs", "ipc", "call", "sidepanel", "toggleAt",
+            win.screen.name, cfg.position, String(along), String(edge)
+        ]);
     }
 
     IpcHandler {
@@ -653,12 +677,12 @@ Scope {
     readonly property string notifTip: (notifCount > 0 ? "Notifications: " + notifCount : "No notifications")
                                        + (notifDnd ? " · Do Not Disturb" : "")
 
-    // Do Not Disturb: owned by the notifications panel, which persists it in its state file.
+    // Do Not Disturb: owned by SidePanel, which persists it in sidepanel-state.json.
     // The bar only reads it (to show the state) and toggles it over IPC (right click on the bell).
     property bool notifDnd: false
     FileView {
         id: notifStateFile
-        path: Quickshell.env("HOME") + "/.config/quickshell/state/notifications-state.json"
+        path: Quickshell.env("HOME") + "/.config/quickshell/state/sidepanel-state.json"
         printErrors: false
         watchChanges: true
         onFileChanged: reload()
@@ -765,7 +789,7 @@ function brightAdjust(dir) {
     brightness = next / 100;                                   // instant feedback
     Quickshell.execDetached(["brightnessctl", "set", next + "%"]);
     brightRecheck.restart();
-}// Night light is owned by Quick Actions; the bar sends IPC and reads its state file.
+}// Night light is owned by SidePanel; the bar sends IPC and reads its state file.
 function toggleNight() { nightOn = !nightOn; qa(["nightToggle"]); }
 function nightAdjust(dir) {
     const delta = dir * Math.max(50, cfg.nightStep);
@@ -774,7 +798,7 @@ function nightAdjust(dir) {
 }
 
 FileView {
-    path: Quickshell.env("HOME") + "/.config/quickshell/state/quickactions-state.json"
+    path: Quickshell.env("HOME") + "/.config/quickshell/state/sidepanel-state.json"
     printErrors: false
     watchChanges: true
     onFileChanged: reload()
@@ -907,6 +931,7 @@ function nightWheel(delta) {
             active: tp.shown && tp.usable
 
             PopupWindow {
+                readonly property real k: cfg.tooltipScale
                 readonly property var win: tp.target.QsWindow.window
                 readonly property point p: win.contentItem.mapFromItem(tp.target, 0, 0)
 
@@ -918,8 +943,8 @@ function nightWheel(delta) {
                 anchor.rect.y: root.vertical
                     ? p.y + (tp.target.height - implicitHeight) / 2
                     : (cfg.position === "top" ? p.y + tp.target.height + 6 : p.y - implicitHeight - 6)
-                implicitWidth: tcol.implicitWidth + 20
-                implicitHeight: tcol.implicitHeight + 14
+                implicitWidth: tcol.implicitWidth + Math.round(20 * k)
+                implicitHeight: tcol.implicitHeight + Math.round(14 * k)
                 color: "transparent"
                 visible: true
 
@@ -933,13 +958,13 @@ function nightWheel(delta) {
                     Column {
                         id: tcol
                         anchors.centerIn: parent
-                        spacing: 3
+                        spacing: Math.round(3 * k)
                         Text {
                             visible: tp.title !== ""
                             text: tp.title
                             color: Theme.text
                             font.family: Theme.iconFont
-                            font.pixelSize: 12
+                            font.pixelSize: Math.max(6, Math.round(12 * k))
                             font.bold: true
                         }
                         Text {
@@ -947,7 +972,7 @@ function nightWheel(delta) {
                             text: tp.hints
                             color: Theme.textDim
                             font.family: Theme.iconFont
-                            font.pixelSize: 11
+                            font.pixelSize: Math.max(6, Math.round(11 * k))
                         }
                     }
                 }
@@ -1421,7 +1446,7 @@ function nightWheel(delta) {
                    : isNotif && !root.vertical ? root.iconYOffset - 0.5
                    : root.iconYOffset
             xOffset: !root.vertical ? 0 : (isNotif || mid === "power" || isSettings) ? -1 : 0
-            text: isNotif && root.notifDnd ? "\uDB80\uDC9B" : (def.g ?? "")
+            text: isNotif && root.notifDnd ? "\uec08" : (def.g ?? "")
             tip: isNotif ? root.notifTip : (def.tip ?? "")
             // The settings button has configurable click binds (see Bar page → Settings button)
             primaryHint: isSettings ? root.actionHint(cfg.settingsPrimary) : (def.hint ?? "")
@@ -2089,7 +2114,7 @@ Component {
                     onDropped: (modId, sx, sy) => bar.dropModule(modId, sx, sy)
                 }
 
-                // 3 · center (also hosts the clock logic + calendar popup, wherever the clock is placed)
+                // 3 · center (hosts the clock module; calendar / side panel is now SidePanel.qml)
                 Panel {
                     id: clockPanel
                     model: root.centerList
@@ -2099,28 +2124,6 @@ Component {
                     anchors.top: root.vertical ? undefined : frame.top
                     anchors.left: root.vertical ? frame.left : undefined
                     onDropped: (modId, sx, sy) => bar.dropModule(modId, sx, sy)
-
-                    property bool calOpen: false
-                    property int monthOffset: 0
-                    property Item clockItem: null     // the live clock module (wherever it was placed)
-
-                    // The popup window stays mounted for a moment after the calendar is
-                    // closed so the close animation can play (same idea as the
-                    // notification panel). Must outlast the longest calendar animation.
-                    property bool calMounted: false
-                    Timer {
-                        id: calUnmountTimer
-                        interval: 260
-                        onTriggered: clockPanel.calMounted = false
-                    }
-                    onCalOpenChanged: {
-                        if (calOpen) {
-                            calUnmountTimer.stop();
-                            calMounted = true;
-                        } else {
-                            calUnmountTimer.restart();
-                        }
-                    }
 
                     // The clock is only needed while the module is enabled.
                     SystemClock {
@@ -2135,17 +2138,10 @@ Component {
                             id: clockMod
 
                             // "calendar" | "quickactions" | "settings" | "barsettings" | "none"
-                            function hintFor(a) {
-                                return a === "calendar" ? (clockPanel.calOpen ? "Close calendar" : "Open calendar")
-                                                        : root.actionHint(a);
-                            }
+                            // "calendar" opens SidePanel (anchored next to this clock module)
                             function act(a) {
-                                if (a === "calendar") {
-                                    clockPanel.monthOffset = 0;
-                                    clockPanel.calOpen = !clockPanel.calOpen;
-                                } else {
-                                    root.doAction(a);
-                                }
+                                if (a === "calendar") root.openSidepanelAt(clockMod);
+                                else root.doAction(a);
                             }
 
                             bold: true
@@ -2153,228 +2149,14 @@ Component {
                             yOffset: 1
                             text: root.clockBarText(clk.date)
                             vtext: root.clockBarVText(clk.date)
-                            active: clockPanel.calOpen
                             tip: Qt.formatDate(clk.date, "dddd, d MMMM yyyy")
-                            primaryHint: hintFor(cfg.clockPrimary)
-                            secondaryHint: hintFor(cfg.clockSecondary)
-                            tertiaryHint: hintFor(cfg.clockTertiary)
+                            primaryHint: root.actionHint(cfg.clockPrimary)
+                            secondaryHint: root.actionHint(cfg.clockSecondary)
+                            tertiaryHint: root.actionHint(cfg.clockTertiary)
                             noSecondary: secondaryHint === ""
                             onPrimary: act(cfg.clockPrimary)
                             onSecondary: act(cfg.clockSecondary)
                             onTertiary: act(cfg.clockTertiary)
-
-                            onVisibleChanged: if (!visible) clockPanel.calOpen = false   // clock hidden → close calendar
-                            Component.onCompleted: clockPanel.clockItem = clockMod
-                            Component.onDestruction: if (clockPanel.clockItem === clockMod) {
-                                clockPanel.clockItem = null;
-                                clockPanel.calOpen = false;
-                            }
-                        }
-                    }
-                    LazyLoader {
-                        active: clockPanel.calMounted && root.isOn("clock") && clockPanel.clockItem !== null
-
-                        PopupWindow {
-                            id: calWin
-                            readonly property Item ci: clockPanel.clockItem
-                            readonly property point p: bar.contentItem.mapFromItem(ci, 0, 0)
-
-                            // The window can be created with the calendar already open; bind
-                            // `reveal` one tick later so the open animation still plays.
-                            property bool reveal: false
-                            Component.onCompleted: {
-                                Qt.callLater(function () {
-                                    calWin.reveal = Qt.binding(function () { return clockPanel.calOpen; });
-                                });
-                            }
-
-                            anchor.window: bar
-                            anchor.rect.x: root.vertical
-                                ? (cfg.position === "left" ? p.x + ci.width + 6
-                                                           : p.x - implicitWidth - 6)
-                                : p.x + (ci.width - implicitWidth) / 2
-                            anchor.rect.y: root.vertical
-                                ? p.y + (ci.height - implicitHeight) / 2
-                                : (cfg.position === "top" ? p.y + ci.height + 4
-                                                          : p.y - implicitHeight - 4)
-                            implicitWidth: calBox.gridW + 2 * calBox.pad
-                            implicitHeight: calCol.implicitHeight + 2 * calBox.pad
-                            color: "transparent"
-                            visible: true
-
-                            Rectangle {
-                                id: calBox
-                                anchors.fill: parent
-                                radius: cfg.calRadius
-                                color: root.bgColor
-                                border.width: cfg.border ? 1 : 0
-                                border.color: root.borderColor
-
-                                // Grows out of the edge facing the bar (and shrinks back into
-                                // it on close), so it works for every bar position:
-                                //   top    → from the top edge, centered
-                                //   bottom → from the bottom edge, centered
-                                //   left   → from the left edge, centered
-                                //   right  → from the right edge, centered
-                                property real grow: calWin.reveal ? 1 : 0.3
-                                Behavior on grow {
-                                    NumberAnimation {
-                                        duration: calWin.reveal ? 220 : 140
-                                        easing.type: Easing.OutCubic
-                                    }
-                                }
-                                opacity: calWin.reveal ? 1 : 0
-                                Behavior on opacity {
-                                    NumberAnimation {
-                                        duration: calWin.reveal ? 180 : 120
-                                        easing.type: Easing.InOutQuad
-                                    }
-                                }
-                                transform: Scale {
-                                    origin.x: root.vertical ? (cfg.position === "left" ? 0 : calBox.width)
-                                                            : calBox.width / 2
-                                    origin.y: root.vertical ? calBox.height / 2
-                                                            : (cfg.position === "top" ? 0 : calBox.height)
-                                    xScale: calBox.grow
-                                    yScale: calBox.grow
-                                }
-
-                                readonly property int firstDay: cfg.weekMonday ? 1 : 0
-                                readonly property int cellW: root.cl(36)
-                                readonly property int cellH: root.cl(30)
-                                readonly property int pad: root.cl(16)
-                                readonly property int gridW: cellW * 7
-
-                                readonly property date now: clk.date
-                                readonly property date view: new Date(now.getFullYear(), now.getMonth() + clockPanel.monthOffset, 1)
-
-                                readonly property var cells: {
-                                    const first = (view.getDay() - firstDay + 7) % 7;
-                                    const y = view.getFullYear(), m = view.getMonth();
-                                    const ty = now.getFullYear(), tm = now.getMonth(), td = now.getDate();
-                                    return Array.from({ length: 42 }, (_, i) => {
-                                        const d = new Date(y, m, i - first + 1);
-                                        return {
-                                            n: d.getDate(),
-                                            inMonth: d.getMonth() === m,
-                                            today: d.getFullYear() === ty && d.getMonth() === tm && d.getDate() === td
-                                        };
-                                    });
-                                }
-
-                                WheelHandler {
-                                    onWheel: e => clockPanel.monthOffset += (e.angleDelta.y > 0 ? -1 : 1)
-                                }
-
-                                Column {
-                                    id: calCol
-                                    anchors.centerIn: parent
-                                    spacing: root.cl(12)
-
-                                    Column {
-                                        spacing: 2
-                                        Text {
-                                            text: root.clockText(calBox.now)
-                                            color: Theme.text
-                                            font.family: Theme.iconFont
-                                            font.pixelSize: root.sz.calTime
-                                            font.bold: true
-                                        }
-                                        Text {
-                                            text: Qt.formatDate(calBox.now, "dddd, d MMMM yyyy")
-                                            color: Theme.textDim
-                                            font.family: Theme.iconFont
-                                            font.pixelSize: root.sz.calDate
-                                        }
-                                    }
-
-                                    Rule { width: calBox.gridW }
-
-                                    Item {
-                                        width: calBox.gridW
-                                        height: root.cl(26)
-
-                                        Arrow {
-                                            anchors.left: parent.left
-                                            glyph: "\uDB80\uDD41"
-                                            onClicked: clockPanel.monthOffset -= 1
-                                        }
-
-                                        Item {
-                                            anchors.centerIn: parent
-                                            width: monthTitle.implicitWidth + 16
-                                            height: parent.height
-                                            Text {
-                                                id: monthTitle
-                                                anchors.centerIn: parent
-                                                text: Qt.formatDate(calBox.view, "MMMM yyyy")
-                                                color: titleMa.containsMouse ? Theme.accent : Theme.text
-                                                font.family: Theme.iconFont
-                                                font.pixelSize: root.sz.calMonth
-                                                font.bold: true
-                                            }
-                                            MouseArea {
-                                                id: titleMa
-                                                anchors.fill: parent
-                                                hoverEnabled: true
-                                                cursorShape: Qt.PointingHandCursor
-                                                onClicked: clockPanel.monthOffset = 0
-                                            }
-                                        }
-
-                                        Arrow {
-                                            anchors.right: parent.right
-                                            glyph: "\uDB80\uDD42"
-                                            onClicked: clockPanel.monthOffset += 1
-                                        }
-                                    }
-
-                                    Row {
-                                        Repeater {
-                                            model: 7
-                                            delegate: Text {
-                                                required property int index
-                                                width: calBox.cellW
-                                                horizontalAlignment: Text.AlignHCenter
-                                                text: Qt.locale().dayName((index + calBox.firstDay) % 7, Locale.ShortFormat)
-                                                color: Theme.textDim
-                                                font.family: Theme.iconFont
-                                                font.pixelSize: root.sz.calWeekday
-                                            }
-                                        }
-                                    }
-
-                                    Grid {
-                                        columns: 7
-                                        Repeater {
-                                            model: calBox.cells
-                                            delegate: Item {
-                                                required property var modelData
-                                                width: calBox.cellW
-                                                height: calBox.cellH
-
-                                                Rectangle {
-                                                    visible: parent.modelData.today
-                                                    anchors.fill: parent
-                                                    anchors.margins: 2
-                                                    radius: Theme.radius
-                                                    color: Qt.alpha(Theme.accent, 0.45)
-                                                    border.width: 1
-                                                    border.color: Theme.accent
-                                                }
-                                                Text {
-                                                    anchors.centerIn: parent
-                                                    text: parent.modelData.n
-                                                    color: parent.modelData.inMonth ? Theme.text : Theme.textFaint
-                                                    font.family: Theme.iconFont
-                                                    font.pixelSize: root.sz.calDay
-                                                    font.bold: parent.modelData.today
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
                         }
                     }
                 }

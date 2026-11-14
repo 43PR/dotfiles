@@ -18,6 +18,7 @@ Item {
     readonly property string imgDir: homeDir + "/.config/quickshell/imgs"
     readonly property string defaultAvatar: imgDir + "/pfp3.png"
     readonly property string customAvatar: imgDir + "/pfp_custom"
+    readonly property string fastfetchLogo: imgDir + "/pfp_anim.gif" 
 
     // ── State ─────────────────────────────────────────────────
     // CPU / GPU / memory / network / temperatures come from the shared
@@ -275,7 +276,11 @@ Item {
     function resetAvatar() {
         pReset.running = true
     }
-
+    function syncFastfetchLogo(force) {
+        if (pSync.running) return
+        pSync.mode = force ? "force" : "auto"
+        pSync.running = true
+    }
     // ── Components ────────────────────────────────────────────
     component InfoRow: Column {
         property string icon: ""
@@ -436,16 +441,34 @@ Item {
             }
         }
     }
-    Process {
-        id: pCopy
-        onExited: page.reloadAvatar()
-    }
-    Process {
-        id: pReset
-        command: ["rm", "-f", "--", page.customAvatar]
-        onExited: page.reloadAvatar()
-    }
-
+Process {
+    id: pCopy
+    onExited: { page.reloadAvatar(); page.syncFastfetchLogo(true) }
+}
+Process {
+    id: pReset
+    command: ["rm", "-f", "--", page.customAvatar]
+    onExited: { page.reloadAvatar(); page.syncFastfetchLogo(true) }
+}
+Component.onCompleted: { reloadAvatar(); syncFastfetchLogo(false) }
+Process {
+    id: pSync
+    property string mode: "auto"
+    command: ["sh", "-c",
+        "mkdir -p \"$(dirname \"$2\")\"; " +
+        "if [ -f \"$1\" ]; then src=\"$1\"; else src=\"$3\"; fi; " +
+        "if [ \"$4\" != force ] && [ -f \"$2\" ] && [ \"$2\" -nt \"$src\" ]; then exit 0; fi; " +
+        "if command -v magick >/dev/null; then IM=magick; " +
+        "elif command -v convert >/dev/null; then IM=convert; " +
+        "else cp -f -- \"$src\" \"$2\"; exit 0; fi; " +
+        "mask=$(mktemp --suffix=.png); " +
+        "nice -n 19 $IM -limit thread 1 -size 400x400 xc:none -fill white -draw 'circle 200,200 200,0' \"$mask\"; " +
+        "nice -n 19 $IM -limit thread 1 \"$src\" -coalesce -resize 400x400^ -gravity center -extent 400x400 " +
+        "null: \"$mask\" -gravity center -compose DstIn -layers composite " +
+        "\"$2.tmp.gif\" && mv -f \"$2.tmp.gif\" \"$2\"; " +
+        "rm -f \"$mask\" \"$2.tmp.gif\"",
+        "sh", page.customAvatar, page.fastfetchLogo, page.defaultAvatar, mode]
+}
     // ── Timers (paused while the page is hidden) ──────────────
     Timer {
         interval: 1000
@@ -461,8 +484,6 @@ Item {
         triggeredOnStart: true
         onTriggered: upInfo.reload()
     }
-
-    Component.onCompleted: reloadAvatar()
 
     // ── UI ────────────────────────────────────────────────────
     Flickable {

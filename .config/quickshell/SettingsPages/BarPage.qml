@@ -24,7 +24,7 @@ Item {
         position: "left", style: "joined", thickness: 20, margin: 4,
         reserveSpace: true, allScreens: true, dragModules: true,
         scale: 1.0, barScale: 0.9, bgOpacity: 0.35, border: false, borderOpacity: 1.0, radius: 16, calRadius: 15, calScale: 0.9,
-        tooltips: true, tooltipHints: false, tooltipBorder: false, tipDelay: 450,
+        tooltips: true, tooltipHints: false, tooltipBorder: false, tipDelay: 450, tooltipScale: 1.0,
         modPad: 18, wsDot: 16, wsGap: 8, wsScroll: true, wsNumbers: true,
         tasksScale: 0.85, tasksGap: 2, tasksColor: "normal",
         statsPercent: false, statsIcons: false, statsScale: 0.95, statsBorder: false, statsRadius: 24, statsGap: 1, statsWarn: 85, tempWarn: 85, batLowPct: 15,
@@ -32,6 +32,7 @@ Item {
         volStep: 2, volMax: 100, volNumber: false, volPercent: false,
         lightIcons: "normal", brightStep: 5, nightStep: 100,
         clock24: true, clockSeconds: false, clockPadHour: true, clockDate: true, clockDay: false, clockCase: "normal", dateOrder: "dm", weekMonday: true,
+        // "calendar" opens SidePanel (calendar + quick actions + notifications)
         clockPrimary: "calendar", clockSecondary: "settings", clockTertiary: "quickactions",
         settingsPrimary: "settings", settingsSecondary: "barsettings", settingsTertiary: "none",
         hidden: "wall,settings,ram",
@@ -46,7 +47,7 @@ Item {
     readonly property var styles: ["floating", "joined", "strip", "islands"]
     readonly property var clockActions: ["calendar", "quickactions", "settings", "barsettings", "none"]
     readonly property var settingsActions: ["settings", "barsettings", "quickactions", "none"]
-    readonly property var actionLabels: ({ quickactions: "QUICK ACTIONS", barsettings: "BAR SETTINGS" })
+    readonly property var actionLabels: ({ calendar: "SIDE PANEL", quickactions: "QUICK ACTIONS", barsettings: "BAR SETTINGS" })
     readonly property var caseOptions: ["normal", "upper", "lower"]
     readonly property var caseLabels: ({ normal: "NORMAL", upper: "UPPERCASE", lower: "LOWERCASE" })
     readonly property var dateOrderOptions: ["dm", "md"]
@@ -472,7 +473,7 @@ Item {
     // UI
     //
     // Sections, most used first:
-    //   Bar (layout + look) · Modules · Clock & Calendar · Workspaces & Open apps
+    //   Bar (layout + look) · Modules · Clock · Workspaces & Open apps
     //   System stats · Battery & Volume · Tooltips · Click actions
     // Options that belong to a module are dimmed while that module is off.
     // ------------------------------------------------------------------
@@ -661,14 +662,14 @@ Item {
                 }
             }
 
-            // ---------------- CLOCK, DATE & CALENDAR ----------------
-            // The calendar is the popup that opens from the clock.
+            // ---------------- CLOCK ----------------
+            // Calendar / side panel appearance is configured inside SidePanel settings.
             Column {
                 id: secClock
                 width: parent.width; spacing: 6
                 topPadding: 2
 
-                SectionTitle { text: "CLOCK & CALENDAR" }
+                SectionTitle { text: "CLOCK" }
 
                 Note {
                     visible: !page.isOn("clock")
@@ -719,24 +720,6 @@ Item {
                             options: page.dateOrderOptions; labels: page.dateOrderLabels
                             current: page.val("dateOrder")
                             onPicked: v => page.set("dateOrder", v)
-                        }
-                        CycleChoice {
-                            label: "WEEK STARTS ON"
-                            options: ["monday", "sunday"]
-                            current: page.val("weekMonday") ? "monday" : "sunday"
-                            onPicked: v => page.set("weekMonday", v === "monday")
-                        }
-                        BarSlider {
-                            label: "CALENDAR SCALE"
-                            from: 0.6; to: 1.5; step: 0.05; unit: "×"; decimals: 2
-                            value: page.val("calScale")
-                            onMoved: v => page.set("calScale", v)
-                        }
-                        BarSlider {
-                            label: "CALENDAR RADIUS"
-                            from: 0; to: 32; step: 1; unit: " px"
-                            value: page.val("calRadius")
-                            onMoved: v => page.set("calRadius", v)
                         }
                     }
                 }
@@ -1022,12 +1005,20 @@ Item {
                             value: page.val("tipDelay")
                             onMoved: v => page.set("tipDelay", v)
                         }
+                        BarSlider {
+                            label: "SCALE"
+                            enabled: page.val("tooltips")
+                            from: 0.7; to: 2.0; step: 0.05; unit: "×"; decimals: 2
+                            value: page.val("tooltipScale")
+                            onMoved: v => page.set("tooltipScale", v)
+                        }
                     }
                 }
             }
 
             // ---------------- CLICK ACTIONS ----------------
             // What a click on the clock / settings button does.
+            // "SIDE PANEL" = open SidePanel (calendar + quick actions + notifications).
             // Click a button to cycle through the available actions.
             Column {
                 id: secActions

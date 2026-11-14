@@ -20,11 +20,10 @@ hl.window_rule({
 })
 
 hl.layer_rule({
-    match = { namespace = "quickshell" },
+    match = { namespace = "quickshell|sidepanel" },
     blur = true,
     ignore_alpha = 0.01,
 })
-
 --hl.window_rule({
 --    name = "brave",
 --    match = { class = "^brave-browser$" },
