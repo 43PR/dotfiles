@@ -1,3 +1,4 @@
+//@ pragma UseQApplication
 import Quickshell
 import "colorpicker"
 

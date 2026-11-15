@@ -7,6 +7,7 @@ import QtQuick.Shapes
 import Quickshell.Wayland
 import Quickshell.Hyprland
 import Quickshell.Bluetooth
+import Quickshell.Services.SystemTray
 import Quickshell.Services.Pipewire
 import Quickshell.Services.UPower
 Scope {
@@ -21,7 +22,7 @@ Scope {
         statsRing: true, statsNumbers: false, statsPercent: false, statsIcons: false, statsScale: 1, statsBorder: false, statsRadius: 24, statsGap: 2, statsWarn: 85, tempWarn: 85, batLowPct: 15,
         batNumber: false, batPercent: false, batRing: true, batLabel: false,
         volStep: 5, volMax: 100, volNumber: false, volPercent: false, volRing: true, volLabel: false,
-        lightIcons: "normal", brightStep: 5, nightStep: 100, brightRing: true, nightRing: true,
+        trayArrow: true, lightIcons: "normal", brightStep: 5, nightStep: 100, brightRing: true, nightRing: true,
         clock24: true, clockSeconds: false, clockPadHour: true, clockDate: true, clockDay: false, clockCase: "normal", dateOrder: "md", weekMonday: true,
         clockPrimary: "calendar", clockSecondary: "settings", clockTertiary: "barsettings",
         settingsPrimary: "settings", settingsSecondary: "barsettings", settingsTertiary: "none",
@@ -68,6 +69,7 @@ Scope {
             property int volMax: root.defaults.volMax; property bool volNumber: root.defaults.volNumber
             property bool volPercent: root.defaults.volPercent; property int brightStep: root.defaults.brightStep
             property int nightStep: root.defaults.nightStep; property bool brightRing: root.defaults.brightRing
+            property bool trayArrow: root.defaults.trayArrow
             property bool nightRing: root.defaults.nightRing; property string lightIcons: root.defaults.lightIcons
             property bool clock24: root.defaults.clock24; property bool clockSeconds: root.defaults.clockSeconds
             property bool clockPadHour: root.defaults.clockPadHour; property bool clockDate: root.defaults.clockDate
@@ -110,6 +112,23 @@ Scope {
     readonly property int sizeIconGap: Math.round(12 * bs); readonly property int iconYOffset: 1
     readonly property int taskIconPx: Math.max(8, Math.min(Math.round(sz.taskIcon * cfg.tasksScale), panelThick - 2))
     readonly property int taskGapPx: Math.round(cfg.tasksGap * bs)
+    readonly property int trayIconPx: taskIconPx
+    readonly property bool hasTray: SystemTray.items.values.some(i => i.status !== Status.Passive)
+    readonly property int trayEdge: vertical ? (cfg.position === "left" ? Edges.Right : Edges.Left)
+    : (cfg.position === "top" ? Edges.Bottom : Edges.Top)
+    function trayChevron(flip) {
+        const down = trayEdge === Edges.Bottom, up = trayEdge === Edges.Top, right = trayEdge === Edges.Right;
+        if (flip) return down ? "\uf077" : up ? "\uf078" : right ? "\uf053" : "\uf054";
+        return down ? "\uf078" : up ? "\uf077" : right ? "\uf054" : "\uf053";
+    }
+    function trayHostOf(item) {
+        let p = item;
+        while (p) {
+            if (p.isTrayHost === true) return p;
+            p = p.parent;
+        }
+        return null;
+    }
     function edgeMargin(side) {
         if (cfg.position === side) return effEdge;
         const alongBar = vertical ? (side === "top" || side === "bottom")
@@ -269,6 +288,7 @@ Scope {
         { id: "gputemp",  l: "GPU temperature" },
         { id: "ws",       l: "Workspaces" },
         { id: "tasks",    l: "Open apps" },
+        { id: "tray",     l: "System tray" },
         { id: "media",    l: "Media" },
         { id: "volume",   l: "Volume" },
         { id: "bright",   l: "Brightness" },
@@ -289,7 +309,7 @@ Scope {
     readonly property var defMap: moduleDefs.reduce((m, d) => { m[d.id] = d; return m; }, {})
     readonly property var comps: ({
         cpu: cpuC, ram: ramC, gpu: gpuC, cputemp: cpuTempC, gputemp: gpuTempC,
-        ws: wsC, tasks: tasksC, media: mediaC, volume: volumeC,
+        ws: wsC, tasks: tasksC, tray: trayC, media: mediaC, volume: volumeC,
         bright: brightC, night: nightC, battery: batteryC,
         bt: btC, net: netC, clock: clockC, icon: iconC
     })
@@ -317,6 +337,7 @@ Scope {
         case "media":   return Marquee.player !== null && Marquee.title !== "";
         case "battery": return hasBattery;
         case "bt":      return hasBt;
+        case "tray":    return cfg.trayArrow ? SystemTray.items.values.length > 0 : hasTray;
         default:        return true;
         }
     }
@@ -417,6 +438,7 @@ Scope {
         function toggle(): void { root.barVisible = !root.barVisible; }
         function show(): void { root.barVisible = true; }
         function hide(): void { root.barVisible = false; }
+        function setTrayArrow(on: bool): void { cfg.trayArrow = on; root.save(); }
         function setPosition(pos: string): void {
             if (root.positions.indexOf(pos) >= 0) { cfg.position = pos; root.save(); }
         }
@@ -1168,6 +1190,129 @@ Scope {
             }
         }
     }
+Component {
+    id: trayIconC
+    Interactive {
+        id: ti
+        required property var modelData
+        readonly property bool flyout: cfg.trayArrow
+        readonly property bool attention: modelData.status === Status.NeedsAttention
+        function hostItem() { return root.trayHostOf(ti); }
+        function openMenu() { if (modelData.hasMenu) menuAnchor.open(); }
+
+        visible: flyout || modelData.status !== Status.Passive
+        Layout.alignment: Qt.AlignCenter
+        implicitWidth: flyout ? root.trayIconPx + 14 : (root.vertical ? root.panelThick : root.trayIconPx + 10)
+        implicitHeight: flyout ? root.trayIconPx + 10
+                      : root.vertical ? root.trayIconPx + 8
+                                      : Math.max(root.panelThick - 4, root.trayIconPx + 4)
+        mid: "tray"; warning: attention; noTip: flyout
+        tip: modelData.tooltipTitle !== "" ? modelData.tooltipTitle
+           : modelData.title !== "" ? modelData.title : modelData.id
+        primaryHint: "Activate"; secondaryHint: "Open menu"
+        tertiaryHint: "Secondary action"; scrollHint: "Scroll action"
+        noSecondary: !modelData.hasMenu
+
+        onPrimary: {
+            if (modelData.onlyMenu && modelData.hasMenu) openMenu();
+            else {
+                modelData.activate();
+                const h = hostItem();
+                if (h) h.dismiss();
+            }
+        }
+        onSecondary: openMenu()
+        onTertiary: modelData.secondaryActivate()
+        onScrolled: delta => {
+            const d = root.notch("tray:" + modelData.id, delta);
+            if (d !== 0) modelData.scroll(d * 120, false);
+        }
+
+        QsMenuAnchor {
+            id: menuAnchor
+            menu: ti.modelData.menu
+            anchor.item: ti
+            anchor.edges: root.trayEdge
+            anchor.gravity: root.trayEdge
+            anchor.adjustment: PopupAdjustment.Slide
+            onOpened: { const h = ti.hostItem(); if (h) h.menuOpen = true; }
+            onClosed: { const h = ti.hostItem(); if (h) h.menuOpen = false; }
+        }
+        Image {
+            anchors.centerIn: parent
+            width: root.trayIconPx; height: root.trayIconPx
+            sourceSize: Qt.size(width, height)
+            asynchronous: true; smooth: true; fillMode: Image.PreserveAspectFit
+            source: ti.modelData.icon
+        }
+    }
+}
+
+Component {
+    id: trayArrowC
+    Mod {
+        id: arrow
+        property bool open: false
+        mid: "tray"; glyphSize: root.sz.icon - 2; glyph: root.trayChevron(open)
+        tip: "Show hidden icons"; primaryHint: open ? "Hide tray" : "Show tray"
+        noSecondary: true; noTip: open
+        onPrimary: open = !open
+
+        LazyLoader {
+            active: arrow.open && SystemTray.items.values.length > 0
+            PopupWindow {
+                id: pop
+                readonly property int cols: Math.max(1, Math.min(4, SystemTray.items.values.length))
+                anchor.item: arrow
+                anchor.edges: root.trayEdge
+                anchor.gravity: root.trayEdge
+                anchor.adjustment: PopupAdjustment.Slide
+                anchor.margins.top: 6; anchor.margins.bottom: 6
+                anchor.margins.left: 6; anchor.margins.right: 6
+                implicitWidth: card.implicitWidth; implicitHeight: card.implicitHeight
+                color: "transparent"; visible: true
+
+                HyprlandFocusGrab {
+                    windows: [pop, arrow.QsWindow.window]
+                    active: !card.menuOpen
+                    onCleared: arrow.open = false
+                }
+                Rectangle {
+                    id: card
+                    readonly property bool isTrayHost: true
+                    property bool menuOpen: false
+                    function dismiss() { arrow.open = false; }
+                    anchors.fill: parent
+                    implicitWidth: grid.implicitWidth + 16; implicitHeight: grid.implicitHeight + 16
+                    radius: Math.min(cfg.radius, 16); color: root.bgColor
+                    border.width: cfg.border ? 1 : 0; border.color: root.borderColor
+                    GridLayout {
+                        id: grid; anchors.centerIn: parent
+                        columns: pop.cols; rowSpacing: 2; columnSpacing: 2
+                        Repeater { model: SystemTray.items; delegate: trayIconC }
+                    }
+                }
+            }
+        }
+    }
+}
+
+Component {
+    id: trayC
+    Lane {
+        gap: root.taskGapPx
+        Loader {
+            active: cfg.trayArrow; visible: active
+            Layout.alignment: Qt.AlignCenter
+            sourceComponent: trayArrowC
+        }
+        Repeater {
+            model: cfg.trayArrow ? null : SystemTray.items
+            delegate: trayIconC
+        }
+    }
+}
+
     Component {
         id: mediaC
         Interactive {

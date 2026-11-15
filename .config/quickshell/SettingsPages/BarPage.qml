@@ -29,7 +29,7 @@ Item {
         statsRing: true, statsNumbers: false, statsPercent: false, statsIcons: false, statsScale: 1, statsBorder: false, statsRadius: 24, statsGap: 2, statsWarn: 85, tempWarn: 85, batLowPct: 15,
         batNumber: false, batPercent: false, batRing: true, batLabel: false,
         volStep: 5, volMax: 100, volNumber: false, volPercent: false, volRing: true, volLabel: false,
-        lightIcons: "normal", brightStep: 5, nightStep: 100, brightRing: true, nightRing: true,
+        trayArrow: true, lightIcons: "normal", brightStep: 5, nightStep: 100, brightRing: true, nightRing: true,
         clock24: true, clockSeconds: false, clockPadHour: true, clockDate: true, clockDay: false, clockCase: "normal", dateOrder: "md", weekMonday: true,
         clockPrimary: "calendar", clockSecondary: "settings", clockTertiary: "barsettings",
         settingsPrimary: "settings", settingsSecondary: "barsettings", settingsTertiary: "none",
@@ -62,6 +62,7 @@ Item {
         { id: "gputemp",  l: "GPU TEMP" },
         { id: "ws",       l: "WORKSPACES" },
         { id: "tasks",    l: "OPEN APPS" },
+        { id: "tray",     l: "SYSTEM TRAY" },
         { id: "media",    l: "MEDIA" },
         { id: "volume",   l: "VOLUME" },
         { id: "bright",   l: "BRIGHTNESS" },
@@ -796,7 +797,33 @@ Item {
                     }
                 }
             }
+            // ---------------- SYSTEM TRAY ----------------
+            Column {
+                id: secTray
+                width: parent.width; spacing: 6
+                topPadding: 2
 
+                SectionTitle { text: "SYSTEM TRAY" }
+
+                Note {
+                    visible: !page.isOn("tray")
+                    text: "Turn on the SYSTEM TRAY module in MODULES to use these options."
+                }
+
+                Card {
+                    enabled: page.isOn("tray")
+
+                    Cols {
+                        ToggleRow {
+                            label: "ARROW + FLYOUT"; checked: page.val("trayArrow")
+                            onToggled: v => page.set("trayArrow", v)
+                        }
+                    }
+                    Note {
+                        text: "On: one arrow button opens the tray icons in a popup. Off: icons sit directly in the bar."
+                    }
+                }
+            }
             // ---------------- SYSTEM STATS ----------------
             // CPU / RAM / GPU / TEMP badges.
             Column {
