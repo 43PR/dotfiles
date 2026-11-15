@@ -27,6 +27,7 @@ local record_key        = "R"
 local shot_key          = "Delete"
 local shot_area_key     = "SHIFT + Delete"
 local ocr_key           = "SHIFT + F12"
+local mic_key           = "M"
 
 do
     local f = os.getenv("HOME") .. "/.config/quickshell/state/binds.lua"
@@ -60,6 +61,7 @@ do
             if kb_shot          then shot_key          = kb_shot end
             if kb_shot_area     then shot_area_key     = kb_shot_area end
             if kb_ocr           then ocr_key           = kb_ocr end
+            if kb_mic           then mic_key           = kb_mic end
         end
     end
 end
@@ -124,7 +126,7 @@ record_key        = normalize_key(record_key)
 shot_key          = normalize_key(shot_key)
 shot_area_key     = normalize_key(shot_area_key)
 ocr_key           = normalize_key(ocr_key)
-
+mic_key           = normalize_key(mic_key)
 
 -- A single bad key string must not take the rest of the config down with it.
 local function bind(keys, ...)
@@ -279,3 +281,6 @@ bind("XF86AudioMute", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggl
 bind("XF86AudioPlay", hl.dsp.exec_cmd("playerctl play-pause"), { locked = true })
 bind("XF86AudioNext", hl.dsp.exec_cmd("playerctl next"), { locked = true })
 bind("XF86AudioPrev", hl.dsp.exec_cmd("playerctl previous"), { locked = true })
+
+bind(mainMod .. " + " .. mic_key, hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"))
+bind("XF86AudioMicMute", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"), { locked = true })
