@@ -63,6 +63,7 @@ Item {
         { id: "ws",       l: "WORKSPACES" },
         { id: "tasks",    l: "OPEN APPS" },
         { id: "media",    l: "MEDIA" },
+        { id: "layout",   l: "LAYOUT" },
         { id: "volume",   l: "VOLUME" },
         { id: "bright",   l: "BRIGHTNESS" },
         { id: "night",    l: "NIGHT LIGHT" },
