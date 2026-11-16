@@ -349,10 +349,12 @@ Scope {
         function hide(): void { root.hide() }
         function toggleSidebar(): void { root.toggleSidebar() }
         function resetSidebarWidth(): void { root.resetSidebarWidth() }
+        function system(): void { root.selectedIndex = 0, root.show() }
         function sound(): void { root.selectedIndex = 1, root.show() }
+        function appearance(): void { root.selectedIndex = 5, root.show() }
+        function bar(): void { root.selectedIndex = 6, root.show() }
         function network(): void { root.selectedIndex = 9, root.show() }
         function bluetooth(): void { root.selectedIndex = 10, root.show() }   // <- set the right index
-        function bar(): void { root.selectedIndex = 6, root.show() }
         function snapTop(): void { root.snapTop() }
         function snapCenter(): void { root.snapCenter() }
         function snapBottom(): void { root.snapBottom() }

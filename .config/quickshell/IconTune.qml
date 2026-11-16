@@ -45,42 +45,37 @@ Singleton {
         textX: 0, textY: 0,
         glyphSize: 0, textSize: 0, ringSize: 0,
         scaleX: 1, scaleY: 1, rotation: 0,
-        spacing: 0, pad: 0
+        spacing: 0, pad: 0,
+        trayScale: 0.9,
+        taskScale: 0.9
     })
-
     readonly property var table: ({
         // Applied to every module first. Example: "*": { all: { y: 0 } }
         "*": {},
-
         // ── generic icon buttons (text glyphs) ──
         notif:    { h: { x: -1, y: 0.5, textY: -1 },            v: { x: -1, textY: 0 } },
         wall:     { h: { x: -1, y: 0 },                         v: {} },
         settings: { h: { x: -1, y: 0 },                         v: { x: -1 } },
         power:    { h: { x: -1, y: 1, textY: -1 },              v: { x: -1, textY: 0 } },
-
         // ── clock (text only) ──
         clock:    { h: { y: 1, textY: -1 },              v: {} },
-
         // ── network / bluetooth ──
         net:      { h: { x: -1, y: 1, iconY: -1 },              v: { x: -1, iconY: 0 } },
         bt:       { all: { scaleX: 1.2 },
                     h: { x: -1, y: 1, iconY: -1 },              v: { x: -1, iconY: 0 } },
-
         // ── meters ──
         volume:   { h: { y: 1.25, iconY: -1, textY: -1 }, v: { x: -1, iconY: 0, textY: -1 } },
-
         // iconY applies to the plain glyph / drawn icon; ringIconY to the ring gauge
         battery:  { h: { y: 1.25, iconY: -1.25, ringIconY: 0, textY: -1 },
                     v: { textY: -1 } },
-
         bright:   { h: { y: 0 },                         v: { x: -1 } },
         night:    { h: { y: 0 },                         v: { x: -1 } },
-
+        // ── system tray arrow ──
+        tray:     { all: { glyphSize: -1 } },
         // STARS icon set: glyph is 2 px smaller than the sun / moon
         "bright.star": { all: { glyphSize: -2 } },
         "night.star":  { all: { glyphSize: -2 } }
     })
-
     // ───────────────────────── Colours ─────────────────────────
     // Every icon colour role lives here. Bar.qml asks IconTune.color(moduleId, role).
     //   Lookup: colors[moduleId][role] → colors["*"][role] → colorDefaults[role] → colorDefaults.normal
@@ -100,7 +95,6 @@ Singleton {
         pressed: ["accent", 0.35], activeBg: ["accent", 0], warnBg: ["danger", 0.16],
         taskActive: "accent2"
     })
-
     readonly property var colors: ({
         // Applied to every module first. Example: "*": { normal: "text" }
         "*": {},
@@ -108,7 +102,6 @@ Singleton {
         bt:  { off: "text", connected: "text", idle: "accent" },
         night: { active: "text" }
     })
-
     // Theme colour by name. Add a case here to expose another Theme colour.
     function theme(name) {
         switch (name) {
@@ -122,13 +115,11 @@ Singleton {
         default:        return name;     // literal colour such as "#ff5555"
         }
     }
-
     function color(id, role) {
         const spec = (colors[id] ?? {})[role] ?? colors["*"][role]
                   ?? colorDefaults[role] ?? colorDefaults.normal;
         return Array.isArray(spec) ? Qt.alpha(theme(spec[0]), spec[1]) : theme(spec);
     }
-
     // Returns one flat object with every field for this module + orientation.
     function resolve(id, vertical, variant) {
         const side = vertical ? "v" : "h";

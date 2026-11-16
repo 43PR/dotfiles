@@ -544,7 +544,6 @@ Scope {
         boolKeys.forEach(function (k) { root[k] = boolDefaults[k] })
         colorKeys.forEach(function (k) { root[k] = colorDefaults[k] })
         root.accentSource = "accent"
-        root.hiddenNames = []
         root.currentIndex = 0
         reclamp()
         saveState()

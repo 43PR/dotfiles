@@ -15,23 +15,23 @@ Scope {
     readonly property var defaults: ({
         position: "left", style: "islands", thickness: 22, margin: 4,
         reserveSpace: true, allScreens: true, dragModules: true,
-        scale: 1, barScale: 0.75, bgOpacity: 0.2, border: true, borderOpacity: 0.15, radius: 34, calRadius: 15, calScale: 0.9,
+        scale: 1, barScale: 0.75, bgOpacity: 0.2, border: true, borderOpacity: 0.05, radius: 37, calRadius: 15, calScale: 0.9,
         tooltips: true, tooltipHints: false, tooltipBorder: true, tipDelay: 450, tooltipScale: 0.85,
-        modPad: 6, wsDot: 16, wsGap: 10, wsScroll: true, wsNumbers: true,
+        modPad: 6, wsDot: 15, wsGap: 10, wsScroll: true, wsStyle: "minimal",
         tasksScale: 0.75, tasksGap: 2, tasksColor: "accent",
         statsRing: true, statsNumbers: false, statsPercent: false, statsIcons: false, statsScale: 1, statsBorder: false, statsRadius: 24, statsGap: 2, statsWarn: 85, tempWarn: 85, batLowPct: 15,
         batNumber: false, batPercent: false, batRing: true, batLabel: false,
         volStep: 5, volMax: 100, volNumber: false, volPercent: false, volRing: true, volLabel: false,
-        trayArrow: true, lightIcons: "normal", brightStep: 5, nightStep: 100, brightRing: true, nightRing: true,
+        trayArrow: true, lightIcons: "star", brightStep: 5, nightStep: 100, brightRing: true, nightRing: true,
         clock24: true, clockSeconds: false, clockPadHour: true, clockDate: true, clockDay: false, clockCase: "normal", dateOrder: "md", weekMonday: true,
         clockPrimary: "calendar", clockSecondary: "settings", clockTertiary: "barsettings",
         settingsPrimary: "settings", settingsSecondary: "barsettings", settingsTertiary: "none",
-        hidden: "wall,settings,bright,ws,tasks,gputemp,gpu,night",
-        startMods: "notif,cpu,tasks,gpu,gputemp,ram,cputemp,ws",
-        midLeftMods: "",
+        hidden: "wall,settings,bright,gputemp,ram",
+        startMods: "cpu,gpu,gputemp,ram,cputemp,ws,notif,night",
+        midLeftMods: "tasks,tray",
         centerMods: "clock",
         midRightMods: "",
-        endMods: "media,night,bright,volume,battery,wall,settings,bt,net,power"
+        endMods: "media,bright,volume,battery,wall,settings,bt,net,power"
     })
     readonly property var positions: ["top", "right", "bottom", "left"]
     readonly property var styles: ["floating", "joined", "strip", "islands"]
@@ -54,7 +54,7 @@ Scope {
             property bool tooltipBorder: root.defaults.tooltipBorder; property int tipDelay: root.defaults.tipDelay
             property real tooltipScale: root.defaults.tooltipScale; property int modPad: root.defaults.modPad
             property int wsDot: root.defaults.wsDot; property int wsGap: root.defaults.wsGap
-            property bool wsScroll: root.defaults.wsScroll; property bool wsNumbers: root.defaults.wsNumbers
+            property bool wsScroll: root.defaults.wsScroll; property string wsStyle: root.defaults.wsStyle
             property real tasksScale: root.defaults.tasksScale; property int tasksGap: root.defaults.tasksGap
             property string tasksColor: root.defaults.tasksColor; property bool statsRing: root.defaults.statsRing
             property bool statsNumbers: root.defaults.statsNumbers
@@ -112,7 +112,7 @@ Scope {
     readonly property int sizeIconGap: Math.round(12 * bs); readonly property int iconYOffset: 1
     readonly property int taskIconPx: Math.max(8, Math.min(Math.round(sz.taskIcon * cfg.tasksScale), panelThick - 2))
     readonly property int taskGapPx: Math.round(cfg.tasksGap * bs)
-    readonly property int trayIconPx: taskIconPx
+    readonly property int trayIconPx: Math.max(8, Math.round(taskIconPx * IconTune.resolve("tray", vertical).trayScale))
     readonly property bool hasTray: SystemTray.items.values.some(i => i.status !== Status.Passive)
     readonly property int trayEdge: vertical ? (cfg.position === "left" ? Edges.Right : Edges.Left)
     : (cfg.position === "top" ? Edges.Bottom : Edges.Top)
@@ -309,7 +309,7 @@ Scope {
     readonly property var defMap: moduleDefs.reduce((m, d) => { m[d.id] = d; return m; }, {})
     readonly property var comps: ({
         cpu: cpuC, ram: ramC, gpu: gpuC, cputemp: cpuTempC, gputemp: gpuTempC,
-        ws: wsC, tasks: tasksC, tray: trayC, media: mediaC, volume: volumeC,
+        ws: wsMinimal ? wsMinC : wsDotsC, tasks: tasksC, tray: trayC, media: mediaC, volume: volumeC,
         bright: brightC, night: nightC, battery: batteryC,
         bt: btC, net: netC, clock: clockC, icon: iconC
     })
@@ -605,6 +605,11 @@ Scope {
         else p.previous();
     }
     readonly property string wsHints: "Left click: Switch to workspace\nRight click: Quick actions\nScroll: Previous / next workspace"
+    readonly property bool wsMinimal: cfg.wsStyle === "minimal"
+    readonly property bool wsNumbers: cfg.wsStyle === "numbers"
+    function wsWheel(dy) {
+        run("hyprctl dispatch 'hl.dsp.focus({workspace=\"e" + (dy > 0 ? "+1" : "-1") + "\"})'");
+    }
     component Lane: GridLayout {
         property int gap: 0; flow: root.vertical ? GridLayout.TopToBottom : GridLayout.LeftToRight; rowSpacing: gap
         columnSpacing: gap
@@ -878,6 +883,8 @@ Scope {
             ? Math.max(4, Math.floor(wantedPx * (maxCross - crossPad) / contentCross))
             : wantedPx
         readonly property int ringPx: Math.max(10, Math.min(maxCross - 2, Math.round(wantedPx * 2.3)))
+        secondaryHint: "Open system settings"
+        onSecondary: root.run("qs ipc call settings system")
         TextMetrics {
             id: mLabel; text: stat.shownLabel; font.family: stat.useIcon ? stat.iconFont : Theme.iconFont
             font.pixelSize: stat.labelWantedPx
@@ -999,11 +1006,14 @@ Scope {
         Mod {
             id: ic; property var def: root.defMap[mid] ?? ({}); readonly property bool isNotif: mid === "notif"
             readonly property bool isSettings: mid === "settings"
+            readonly property bool isPower: mid === "power"                                   // NEW
             baseSize: mid === "power" ? root.sz.power - 3 : root.sz.icon - 2
             text: isNotif && root.notifDnd ? "\uec08" : (def.g ?? ""); tip: isNotif ? root.notifTip : (def.tip ?? "")
             primaryHint: isSettings ? root.actionHint(cfg.settingsPrimary) : (def.hint ?? "")
             secondaryHint: isSettings ? root.actionHint(cfg.settingsSecondary)
-                         : isNotif ? (root.notifDnd ? "Turn off Do Not Disturb" : "Turn on Do Not Disturb") : ""
+                         : isNotif ? (root.notifDnd ? "Turn off Do Not Disturb" : "Turn on Do Not Disturb")
+                         : isPower ? "Appearance settings"                                    // NEW
+                         : ""
             tertiaryHint: isSettings ? root.actionHint(cfg.settingsTertiary) : ""
             noSecondary: isSettings && cfg.settingsSecondary === "none"
             onPrimary: {
@@ -1013,7 +1023,8 @@ Scope {
             onSecondary: {
                 if (isSettings) root.doAction(cfg.settingsSecondary);
                 else if (isNotif) root.toggleDnd();
-            }
+                else if (isPower) root.run("qs ipc call settings appearance");                // NEW
+             }
             onTertiary: if (isSettings) root.doAction(cfg.settingsTertiary)
             Rectangle {
                 visible: ic.isNotif && root.notifCount > 0; anchors.horizontalCenter: parent.horizontalCenter
@@ -1105,7 +1116,7 @@ Scope {
         }
     }
     Component {
-        id: wsC
+        id: wsDotsC
         Item {
             implicitWidth: root.vertical ? root.panelThick : wsLane.implicitWidth + 12
             implicitHeight: wsLane.implicitHeight + (root.vertical ? 12 : 0)
@@ -1116,7 +1127,8 @@ Scope {
                     delegate: Rectangle {
                         id: dot
                         required property var modelData
-                        readonly property bool wide: modelData.focused && !cfg.wsNumbers; visible: modelData.id > 0
+                        readonly property bool wide: modelData.focused && !root.wsNumbers
+                        visible: modelData.id > 0
                         Layout.alignment: Qt.AlignCenter
                         implicitWidth: !root.vertical && wide ? Math.round(root.wsBoxPx * 3.2) : root.wsBoxPx
                         implicitHeight: root.vertical && wide ? Math.round(root.wsBoxPx * 2.4) : root.wsBoxPx
@@ -1128,7 +1140,8 @@ Scope {
                         Behavior on implicitWidth { NumberAnimation { duration: Theme.animMed; easing.type: Easing.OutQuad } }
                         Behavior on implicitHeight { NumberAnimation { duration: Theme.animMed; easing.type: Easing.OutQuad } }
                         Loader {
-                            anchors.centerIn: parent; active: cfg.wsNumbers
+                            anchors.centerIn: parent
+                            active: root.wsNumbers
                             sourceComponent: Text {
                                 text: dot.modelData.id; color: Theme.text; font.family: Theme.iconFont
                                 font.pixelSize: Math.round(root.wsBoxPx * 0.62); font.bold: dot.modelData.focused
@@ -1155,11 +1168,102 @@ Scope {
             }
             WheelHandler {
                 enabled: cfg.wsScroll; acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-                onWheel: e => root.run("hyprctl dispatch 'hl.dsp.focus({workspace=\"e"
-                                       + (e.angleDelta.y > 0 ? "+1" : "-1") + "\"})'")
+                onWheel: e => root.wsWheel(e.angleDelta.y)
             }
         }
     }
+Component {
+    id: wsC
+    Loader { sourceComponent: root.wsMinimal ? wsMinC : wsDotsC }
+}
+Component {
+    id: wsMinC
+    Item {
+        id: wm
+        readonly property int dotPx: Math.max(2, Math.round(3 * root.bs))
+        readonly property int hit: dotPx + 2
+        readonly property int circle: root.vertical
+            ? Math.max(8, Math.min(Math.round(root.wsBoxPx * 1.5), root.panelThick - hit - 2))
+            : Math.max(8, Math.min(Math.round(root.wsBoxPx * 1.5), root.panelThick - 4))
+        readonly property var focusedWs: Hyprland.focusedWorkspace
+        readonly property int focusedId: focusedWs ? focusedWs.id : 0
+        readonly property int perRow: Math.max(1, Math.floor((root.panelThick - 6) / hit))
+        readonly property int perCol: Math.max(1, Math.floor((root.panelThick - 4) / hit))
+        readonly property int wsCount: Math.max(1, Hyprland.workspaces.values.length)
+        implicitWidth: root.vertical ? root.panelThick : lay.implicitWidth + 12
+        implicitHeight: root.vertical ? lay.implicitHeight + 4 : root.panelThick
+
+        GridLayout {
+            id: lay; anchors.centerIn: parent
+            flow: root.vertical ? GridLayout.TopToBottom : GridLayout.LeftToRight
+            rowSpacing: 2; columnSpacing: 3
+
+            Rectangle {
+                id: ring
+                Layout.alignment: Qt.AlignCenter
+                implicitWidth: wm.circle; implicitHeight: wm.circle; radius: width / 2
+                color: "transparent"; border.width: 0
+                Text {
+                    anchors.centerIn: parent; text: wm.focusedId > 0 ? wm.focusedId : ""
+                    color: ringMa.containsMouse ? Theme.accent2 : Theme.text
+                    font.family: Theme.iconFont; font.bold: true
+                    font.pixelSize: Math.round(wm.circle * 0.62); renderType: Text.NativeRendering
+                }
+                DMouseArea {
+                    id: ringMa; anchors.fill: parent; hoverEnabled: true
+                    acceptedButtons: Qt.RightButton; cursorShape: Qt.PointingHandCursor
+                    onPressed: ringTip.dismiss()
+                    onClicked: { if (!ringMa.suppressClick) root.openSettings(); }
+                }
+                Tip {
+                    id: ringTip; hot: ringMa.containsMouse
+                    title: "Workspace " + wm.focusedId
+                    hints: cfg.tooltipHints ? root.wsHints : ""
+                }
+            }
+            Grid {
+                Layout.alignment: Qt.AlignCenter
+                flow: root.vertical ? Grid.LeftToRight : Grid.TopToBottom
+                columns: root.vertical ? wm.perRow : Math.max(1, Math.ceil(wm.wsCount / wm.perCol))
+                spacing: 0
+                Repeater {
+                    model: Hyprland.workspaces
+                    delegate: Item {
+                        id: wd
+                        required property var modelData
+                        visible: modelData.id > 0
+                        width: wm.hit; height: wm.hit
+                        Rectangle {
+                            anchors.centerIn: parent; width: wm.dotPx; height: wm.dotPx; radius: width / 2
+                            color: wd.modelData.urgent ? Theme.danger
+                                 : wd.modelData.focused ? Theme.accent2
+                                 : dMa.containsMouse ? Qt.alpha(Theme.accent2, 0.8)
+                                 : Qt.alpha(Theme.text, 0.3)
+                        }
+                        DMouseArea {
+                            id: dMa; anchors.fill: parent; hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onPressed: dTip.dismiss()
+                            onClicked: {
+                                if (dMa.suppressClick) return;
+                                Hyprland.dispatch("hl.dsp.focus({ workspace = " + wd.modelData.id + " })");
+                            }
+                        }
+                        Tip {
+                            id: dTip; hot: dMa.containsMouse
+                            title: "Workspace " + wd.modelData.id
+                                   + (wd.modelData.urgent ? " · urgent" : wd.modelData.focused ? " · focused" : "")
+                        }
+                    }
+                }
+            }
+        }
+        WheelHandler {
+            enabled: cfg.wsScroll; acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+            onWheel: e => root.wsWheel(e.angleDelta.y)
+        }
+    }
+}
     Component {
         id: tasksC
         Lane {
@@ -1185,6 +1289,7 @@ Scope {
                         anchors.fill: appIcon; source: appIcon; colorization: cfg.tasksColor === "accent" ? 1.0 : 0.0
                         colorizationColor: IconTune.color("tasks", task.modelData.activated ? "taskActive" : "normal")
                         opacity: task.modelData.activated ? 1 : 0.5
+                        scale: IconTune.resolve("tasks", root.vertical).taskScale
                     }
                 }
             }
@@ -1262,40 +1367,47 @@ Component {
             active: arrow.open && SystemTray.items.values.length > 0
             PopupWindow {
                 id: pop
-                readonly property int cols: Math.max(1, Math.min(4, SystemTray.items.values.length))
-                anchor.item: arrow
-                anchor.edges: root.trayEdge
-                anchor.gravity: root.trayEdge
+                readonly property var win: arrow.QsWindow.window
+                readonly property point p: win.contentItem.mapFromItem(arrow, 0, 0)
+                readonly property int gap: 8 + root.effEdge
+                readonly property int count: Math.max(1, SystemTray.items.values.length)
+                anchor.window: win
                 anchor.adjustment: PopupAdjustment.Slide
-                anchor.margins.top: 6; anchor.margins.bottom: 6
-                anchor.margins.left: 6; anchor.margins.right: 6
+                anchor.rect.x: root.vertical
+                ? (cfg.position === "left" ? p.x + arrow.width + gap : p.x - implicitWidth - gap)
+                : p.x + (arrow.width - implicitWidth) / 2
+                anchor.rect.y: root.vertical
+                ? p.y + (arrow.height - implicitHeight) / 2
+                : (cfg.position === "top" ? p.y + arrow.height + gap : p.y - implicitHeight - gap)
                 implicitWidth: card.implicitWidth; implicitHeight: card.implicitHeight
                 color: "transparent"; visible: true
-
                 HyprlandFocusGrab {
                     windows: [pop, arrow.QsWindow.window]
                     active: !card.menuOpen
                     onCleared: arrow.open = false
-                }
-                Rectangle {
-                    id: card
-                    readonly property bool isTrayHost: true
-                    property bool menuOpen: false
-                    function dismiss() { arrow.open = false; }
-                    anchors.fill: parent
-                    implicitWidth: grid.implicitWidth + 16; implicitHeight: grid.implicitHeight + 16
-                    radius: Math.min(cfg.radius, 16); color: root.bgColor
-                    border.width: cfg.border ? 1 : 0; border.color: root.borderColor
-                    GridLayout {
-                        id: grid; anchors.centerIn: parent
-                        columns: pop.cols; rowSpacing: 2; columnSpacing: 2
-                        Repeater { model: SystemTray.items; delegate: trayIconC }
+                    }
+                    Rectangle {
+                        id: card
+                        readonly property bool isTrayHost: true
+                        property bool menuOpen: false
+                        function dismiss() { arrow.open = false; }
+                        anchors.fill: parent
+                        implicitWidth: root.vertical ? arrow.width : grid.implicitWidth + 12
+                        implicitHeight: root.vertical ? grid.implicitHeight + 12 : arrow.height
+                        radius: Math.min(cfg.radius, Math.min(width, height) / 2); color: root.bgColor
+                        border.width: cfg.border ? 1 : 0; border.color: root.borderColor
+                        GridLayout {
+                            id: grid; anchors.centerIn: parent
+                            columns: root.vertical ? 1 : pop.count
+                            rowSpacing: 2; columnSpacing: 2
+                            Repeater { model: SystemTray.items; delegate: trayIconC }
+                        }
                     }
                 }
             }
         }
     }
-}
+
 
 Component {
     id: trayC

@@ -22,23 +22,23 @@ Item {
     readonly property var defaults: ({
         position: "left", style: "islands", thickness: 22, margin: 4,
         reserveSpace: true, allScreens: true, dragModules: true,
-        scale: 1, barScale: 0.75, bgOpacity: 0.2, border: true, borderOpacity: 0.15, radius: 34, calRadius: 15, calScale: 0.9,
+        scale: 1, barScale: 0.75, bgOpacity: 0.2, border: true, borderOpacity: 0.05, radius: 37, calRadius: 15, calScale: 0.9,
         tooltips: true, tooltipHints: false, tooltipBorder: true, tipDelay: 450, tooltipScale: 0.85,
-        modPad: 6, wsDot: 16, wsGap: 10, wsScroll: true, wsNumbers: true,
+        modPad: 6, wsDot: 15, wsGap: 10, wsScroll: true, wsStyle: "minimal",
         tasksScale: 0.75, tasksGap: 2, tasksColor: "accent",
         statsRing: true, statsNumbers: false, statsPercent: false, statsIcons: false, statsScale: 1, statsBorder: false, statsRadius: 24, statsGap: 2, statsWarn: 85, tempWarn: 85, batLowPct: 15,
         batNumber: false, batPercent: false, batRing: true, batLabel: false,
         volStep: 5, volMax: 100, volNumber: false, volPercent: false, volRing: true, volLabel: false,
-        trayArrow: true, lightIcons: "normal", brightStep: 5, nightStep: 100, brightRing: true, nightRing: true,
+        trayArrow: true, lightIcons: "star", brightStep: 5, nightStep: 100, brightRing: true, nightRing: true,
         clock24: true, clockSeconds: false, clockPadHour: true, clockDate: true, clockDay: false, clockCase: "normal", dateOrder: "md", weekMonday: true,
         clockPrimary: "calendar", clockSecondary: "settings", clockTertiary: "barsettings",
         settingsPrimary: "settings", settingsSecondary: "barsettings", settingsTertiary: "none",
-        hidden: "wall,settings,bright,ws,tasks,gputemp,gpu,night",
-        startMods: "notif,cpu,tasks,gpu,gputemp,ram,cputemp,ws",
-        midLeftMods: "",
+        hidden: "wall,settings,bright,gputemp,ram",
+        startMods: "cpu,gpu,gputemp,ram,cputemp,ws,notif,night",
+        midLeftMods: "tasks,tray",
         centerMods: "clock",
         midRightMods: "",
-        endMods: "media,night,bright,volume,battery,wall,settings,bt,net,power"
+        endMods: "media,bright,volume,battery,wall,settings,bt,net,power"
     })
 
     readonly property var positions: ["top", "right", "bottom", "left"]
@@ -742,6 +742,14 @@ Item {
                         opacity: enabled ? 1.0 : 0.45
 
                         GroupLabel { text: page.isOn("ws") ? "WORKSPACES" : "WORKSPACES  (turn the module on in MODULES)" }
+                        BarChoice {
+                            label: "STYLE"
+                            options: ["dots", "numbers", "minimal"]
+                            labels: ({ dots: "DOTS", numbers: "NUMBERED", minimal: "MINIMAL" })
+                            maxCols: 3
+                            current: page.val("wsStyle")
+                            onPicked: v => page.set("wsStyle", v)
+                        }
                         Cols {
                             BarSlider {
                                 label: "DOT SIZE"
@@ -755,14 +763,6 @@ Item {
                                 value: page.val("wsGap")
                                 onMoved: v => page.set("wsGap", v)
                             }
-                            ToggleRow {
-                                label: "NUMBERS"; checked: page.val("wsNumbers")
-                                onToggled: v => page.set("wsNumbers", v)
-                            }
-                            /*ToggleRow {
-                                label: "SCROLL TO SWITCH"; checked: page.val("wsScroll")
-                                onToggled: v => page.set("wsScroll", v)
-                            }*/
                         }
                     }
 
