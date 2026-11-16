@@ -665,7 +665,13 @@ Item {
     }
     onVisibleChanged: if (visible) { refreshBrowser(); refreshOcr() }
 
-    Component.onCompleted: { initBindKeys(); refreshBrowser(); refreshOcr(); }
+    Component.onCompleted: {
+        initBindKeys();
+        if (bindsFile.loaded)
+            page.parseBinds(bindsFile.text());
+        refreshBrowser();
+        refreshOcr();
+    }
 
     // Invisible focus target. While a row is selected, the next real key
     // (Super+Enter, Super+Shift+C, …) is written and Hyprland is reloaded.
@@ -678,8 +684,11 @@ Item {
     FileView {
         id: bindsFile
         path: page.bindsPath
-        printErrors: false
+        printErrors: true
         onLoaded: page.parseBinds(text())
+        onLoadFailed: error => console.warn(
+            "KeybindsPage: failed to load " + page.bindsPath + ": " + error
+        )
     }
 
     // Writes binds.lua, then reloads Hyprland. Args are not expanded by the
