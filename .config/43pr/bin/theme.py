@@ -554,6 +554,27 @@ def cmd_preset(a):
         reload_gtk(mode == "dark")                                # after all GTK sync
     print(f"theme: preset '{a.name}' applied")
 
+def cmd_palette(a):
+    """Apply a saved palette json (profiles saved with color generation on)."""
+    p = Path(a.path).expanduser()
+    if not p.is_file():
+        die(f"not a file: {p}")
+    with lock():
+        try:
+            pal = merged(json.loads(p.read_text()))
+            apply_palette(pal)
+        except Exception as e:
+            ensure_fallback()
+            die(f"theme unchanged: {e}")
+        st = load_state()
+        st["mode"] = "wallpaper"
+        st["colorgen"] = True
+        if a.wallpaper:
+            st["wallpaper"] = str(Path(a.wallpaper).expanduser())
+        mode = sync_appearance(st, pal)     # light/dark follows the palette
+        save_state(st)
+        reload_gtk(mode == "dark")
+    print("theme: palette applied from", p)
 
 def cmd_auto(a):
     """Back to wallpaper-driven mode, re-generating from the last wallpaper."""
@@ -666,6 +687,7 @@ def main():
     s.add_argument("source", nargs="?", default="default"); s.set_defaults(f=cmd_new)
     s = sp.add_parser("status"); s.set_defaults(f=cmd_status)
     s = sp.add_parser("toggle"); s.set_defaults(f=cmd_toggle)
+    s = sp.add_parser("palette"); s.add_argument("path"); s.add_argument("--wallpaper"); s.set_defaults(f=cmd_palette)
     a = ap.parse_args()
     a.f(a)
 

@@ -146,6 +146,9 @@ QtObject {
     property FileView hubFile: FileView {
         path: Quickshell.env("HOME") + "/.config/quickshell/state/hub.json"
         printErrors: false
+        // live reload: a restored profile (or any external edit) updates the hub at once
+        watchChanges: true
+        onFileChanged: reload()
         onLoaded: {
             try {
                 const s = JSON.parse(text())
@@ -201,6 +204,9 @@ QtObject {
         }
         function setBgImageEnabled(on: bool): void {
             root.setHub("bgImageEnabled", on)
+        }
+        function reloadHub(): void {
+            hubFile.reload()
         }
     }
 

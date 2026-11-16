@@ -397,11 +397,20 @@ Item {
     FileView {
         id: settingsFile
         path: page.stateDir + "/performance.json"
+        // live reload: a restored profile (or any external edit) updates this page at once
+        watchChanges: true
+        onFileChanged: reload()
         // Non-blocking: settings are applied from onLoaded / onLoadFailed.
         onLoaded: {
             if (!page.settingsReady) {
                 page.loadSettings()
                 page.markReady()
+            } else if (settingsFile.text() !== page.lastSavedJson) {
+                // changed by something other than our own persist(): take it over
+                page.lastSavedJson = settingsFile.text()
+                page.loadSettings()
+                page.lastLua = ""
+                applyTimer.restart()
             }
         }
         // Missing file on first run is normal: start from defaults.
@@ -1163,190 +1172,6 @@ Item {
                     }
                 }
             }
-
-            // ---------------- BLUR & SHADOWS ----------------
-            Column {
-                id: secBlur
-                width: parent.width; spacing: 6
-                topPadding: 2
-
-                SectionTitle { text: "BLUR & SHADOWS" }
-
-                Note {
-                    visible: page.effectsLevel === "off"
-                    text: "Blur and shadows are switched off in PERFORMANCE; these options apply once they are on."
-                }
-
-                Card {
-                    Cols {
-                        enabled: page.effectsLevel !== "off"
-
-                        BarSlider {
-                            label: "BLUR SIZE"
-                            from: 1; to: 20; step: 1
-                            value: page.look.blurSize
-                            onMoved: v => page.setLook("blurSize", v)
-                        }
-                        BarSlider {
-                            label: "BLUR PASSES"
-                            from: 1; to: 6; step: 1
-                            value: page.look.blurPasses
-                            onMoved: v => page.setLook("blurPasses", v)
-                        }
-                        BarSlider {
-                            label: "VIBRANCY"
-                            from: 0; to: 1; step: 0.05; decimals: 2
-                            value: page.look.blurVibrancy
-                            onMoved: v => page.setLook("blurVibrancy", v)
-                        }
-                        BarSlider {
-                            label: "VIBRANCY DARKNESS"
-                            from: 0; to: 1; step: 0.05; decimals: 2
-                            value: page.look.blurVibrancyDarkness
-                            onMoved: v => page.setLook("blurVibrancyDarkness", v)
-                        }
-                        BarSlider {
-                            label: "NOISE"
-                            from: 0; to: 1; step: 0.005; decimals: 3
-                            value: page.look.blurNoise
-                            onMoved: v => page.setLook("blurNoise", v)
-                        }
-                        BarSlider {
-                            label: "CONTRAST"
-                            from: 0; to: 2; step: 0.01; decimals: 2
-                            value: page.look.blurContrast
-                            onMoved: v => page.setLook("blurContrast", v)
-                        }
-                        BarSlider {
-                            label: "BRIGHTNESS"
-                            from: 0; to: 2; step: 0.01; decimals: 2
-                            value: page.look.blurBrightness
-                            onMoved: v => page.setLook("blurBrightness", v)
-                        }
-                        BarSlider {
-                            label: "SHADOW RANGE"
-                            from: 0; to: 50; step: 1
-                            value: page.look.shadowRange
-                            onMoved: v => page.setLook("shadowRange", v)
-                        }
-                        BarSlider {
-                            label: "SHADOW POWER"
-                            from: 1; to: 4; step: 1
-                            value: page.look.shadowPower
-                            onMoved: v => page.setLook("shadowPower", v)
-                        }
-                    }
-
-                    Cols {
-                        enabled: page.effectsLevel !== "off"
-
-                        ToggleRow {
-                            label: "IGNORE OPACITY"; checked: page.look.blurIgnoreOpacity
-                            onToggled: v => page.setLook("blurIgnoreOpacity", v)
-                        }
-                        ToggleRow {
-                            label: "NEW OPTIMIZATIONS"; checked: page.look.blurNewOptimizations
-                            onToggled: v => page.setLook("blurNewOptimizations", v)
-                        }
-                        ToggleRow {
-                            label: "SPECIAL WORKSPACE"; checked: page.look.blurSpecial
-                            onToggled: v => page.setLook("blurSpecial", v)
-                        }
-                        ToggleRow {
-                            label: "BLUR POPUPS"; checked: page.look.blurPopups
-                            onToggled: v => page.setLook("blurPopups", v)
-                        }
-                    }
-
-                    Divider {}
-
-                    // ---- Blur variant (Hyprland 0.57+) ----
-                    GroupLabel { text: "BLUR STYLE" }
-
-                    BarChoice {
-                        enabled: page.effectsLevel !== "off"
-                        label: "VARIANT"
-                        options: page.blurVariantOptions
-                        labels: page.blurVariantLabels
-                        maxCols: 4
-                        current: page.look.blurVariant
-                        onPicked: v => page.setLook("blurVariant", v)
-                    }
-
-                    Note {
-                        text: (page.variantNotes[page.look.blurVariant] ?? "")
-                            + (page.look.blurVariant !== "kawase"
-                                ? " Non-default styles can significantly increase GPU and CPU usage, animated ones the most."
-                                : "")
-                    }
-
-                    Cols {
-                        enabled: page.effectsLevel !== "off"
-
-                        ToggleRow {
-                            label: "PROPORTIONAL BLUR"; checked: page.look.blurProportional
-                            onToggled: v => page.setLook("blurProportional", v)
-                        }
-                    }
-                    Note {
-                        visible: page.look.blurProportional
-                        text: "Blur strength follows each pixel's opacity (render:use_shader_blur_blend is enabled for you). It can weaken blur on low-opacity panels, so check PANEL BLUR THRESHOLD below."
-                    }
-
-                    // Sliders for the selected variant
-                    Cols {
-                        visible: page.sliderSpecs.length > 0
-                        enabled: page.effectsLevel !== "off"
-
-                        Repeater {
-                            model: page.sliderSpecs
-                            delegate: BarSlider {
-                                required property var modelData
-                                label: modelData.label
-                                from: modelData.from; to: modelData.to; step: modelData.step
-                                decimals: modelData.dec; unit: modelData.unit
-                                value: page.optValue(page.look.blurVariant, modelData)
-                                onMoved: v => page.setBlurOpt(page.look.blurVariant, modelData, v)
-                            }
-                        }
-                    }
-
-                    // Colour options for the selected variant (hex text input)
-                    Cols {
-                        visible: page.colorSpecs.length > 0
-                        enabled: page.effectsLevel !== "off"
-
-                        Repeater {
-                            model: page.colorSpecs
-                            delegate: HexInput {
-                                required property var modelData
-                                label: modelData.label
-                                value: page.optValue(page.look.blurVariant, modelData)
-                                onPicked: v => page.setBlurOpt(page.look.blurVariant, modelData, v)
-                            }
-                        }
-                    }
-
-                    Divider {}
-
-                    Cols {
-                        enabled: page.effectsLevel !== "off"
-
-                        ToggleRow {
-                            label: "BLUR PANELS"; checked: page.look.blurLayers
-                            onToggled: v => page.setLook("blurLayers", v)
-                        }
-                        BarSlider {
-                            label: "PANEL BLUR THRESHOLD"
-                            enabled: page.look.blurLayers
-                            from: 0; to: page.blurAlphaCap; step: 0.05; decimals: 2
-                            value: page.effectiveBlurAlpha
-                            onMoved: v => page.setLook("blurLayerAlpha", v)
-                        }
-                    }
-                }
-            }
-
             // ---------------- ANIMATIONS ----------------
             Column {
                 id: secAnim
@@ -1539,6 +1364,188 @@ Item {
                             value: Theme.bgImageFadeBottom
                             onMoved: v => Theme.bgImageFadeBottom = v
                             onCommitted: v => Theme.setHub("bgImageFadeBottom", page.round2(v))
+                        }
+                    }
+                }
+            }
+            // ---------------- BLUR & SHADOWS ----------------
+            Column {
+                id: secBlur
+                width: parent.width; spacing: 6
+                topPadding: 2
+
+                SectionTitle { text: "BLUR & SHADOWS" }
+
+                Note {
+                    visible: page.effectsLevel === "off"
+                    text: "Blur and shadows are switched off in PERFORMANCE; these options apply once they are on."
+                }
+
+                Card {
+                    Cols {
+                        enabled: page.effectsLevel !== "off"
+
+                        BarSlider {
+                            label: "BLUR SIZE"
+                            from: 1; to: 20; step: 1
+                            value: page.look.blurSize
+                            onMoved: v => page.setLook("blurSize", v)
+                        }
+                        BarSlider {
+                            label: "BLUR PASSES"
+                            from: 1; to: 6; step: 1
+                            value: page.look.blurPasses
+                            onMoved: v => page.setLook("blurPasses", v)
+                        }
+                        BarSlider {
+                            label: "VIBRANCY"
+                            from: 0; to: 1; step: 0.05; decimals: 2
+                            value: page.look.blurVibrancy
+                            onMoved: v => page.setLook("blurVibrancy", v)
+                        }
+                        BarSlider {
+                            label: "VIBRANCY DARKNESS"
+                            from: 0; to: 1; step: 0.05; decimals: 2
+                            value: page.look.blurVibrancyDarkness
+                            onMoved: v => page.setLook("blurVibrancyDarkness", v)
+                        }
+                        BarSlider {
+                            label: "NOISE"
+                            from: 0; to: 1; step: 0.005; decimals: 3
+                            value: page.look.blurNoise
+                            onMoved: v => page.setLook("blurNoise", v)
+                        }
+                        BarSlider {
+                            label: "CONTRAST"
+                            from: 0; to: 2; step: 0.01; decimals: 2
+                            value: page.look.blurContrast
+                            onMoved: v => page.setLook("blurContrast", v)
+                        }
+                        BarSlider {
+                            label: "BRIGHTNESS"
+                            from: 0; to: 2; step: 0.01; decimals: 2
+                            value: page.look.blurBrightness
+                            onMoved: v => page.setLook("blurBrightness", v)
+                        }
+                        BarSlider {
+                            label: "SHADOW RANGE"
+                            from: 0; to: 50; step: 1
+                            value: page.look.shadowRange
+                            onMoved: v => page.setLook("shadowRange", v)
+                        }
+                        BarSlider {
+                            label: "SHADOW POWER"
+                            from: 1; to: 4; step: 1
+                            value: page.look.shadowPower
+                            onMoved: v => page.setLook("shadowPower", v)
+                        }
+                    }
+
+                    Cols {
+                        enabled: page.effectsLevel !== "off"
+
+                        ToggleRow {
+                            label: "IGNORE OPACITY"; checked: page.look.blurIgnoreOpacity
+                            onToggled: v => page.setLook("blurIgnoreOpacity", v)
+                        }
+                        ToggleRow {
+                            label: "NEW OPTIMIZATIONS"; checked: page.look.blurNewOptimizations
+                            onToggled: v => page.setLook("blurNewOptimizations", v)
+                        }
+                        ToggleRow {
+                            label: "SPECIAL WORKSPACE"; checked: page.look.blurSpecial
+                            onToggled: v => page.setLook("blurSpecial", v)
+                        }
+                        ToggleRow {
+                            label: "BLUR POPUPS"; checked: page.look.blurPopups
+                            onToggled: v => page.setLook("blurPopups", v)
+                        }
+                    }
+
+                    Divider {}
+
+                    // ---- Blur variant (Hyprland 0.57+) ----
+                    GroupLabel { text: "BLUR STYLE" }
+
+                    BarChoice {
+                        enabled: page.effectsLevel !== "off"
+                        label: "VARIANT"
+                        options: page.blurVariantOptions
+                        labels: page.blurVariantLabels
+                        maxCols: 4
+                        current: page.look.blurVariant
+                        onPicked: v => page.setLook("blurVariant", v)
+                    }
+
+                    Note {
+                        text: (page.variantNotes[page.look.blurVariant] ?? "")
+                            + (page.look.blurVariant !== "kawase"
+                                ? " Non-default styles can significantly increase GPU and CPU usage, animated ones the most."
+                                : "")
+                    }
+
+                    Cols {
+                        enabled: page.effectsLevel !== "off"
+
+                        ToggleRow {
+                            label: "PROPORTIONAL BLUR"; checked: page.look.blurProportional
+                            onToggled: v => page.setLook("blurProportional", v)
+                        }
+                    }
+                    Note {
+                        visible: page.look.blurProportional
+                        text: "Blur strength follows each pixel's opacity (render:use_shader_blur_blend is enabled for you). It can weaken blur on low-opacity panels, so check PANEL BLUR THRESHOLD below."
+                    }
+
+                    // Sliders for the selected variant
+                    Cols {
+                        visible: page.sliderSpecs.length > 0
+                        enabled: page.effectsLevel !== "off"
+
+                        Repeater {
+                            model: page.sliderSpecs
+                            delegate: BarSlider {
+                                required property var modelData
+                                label: modelData.label
+                                from: modelData.from; to: modelData.to; step: modelData.step
+                                decimals: modelData.dec; unit: modelData.unit
+                                value: page.optValue(page.look.blurVariant, modelData)
+                                onMoved: v => page.setBlurOpt(page.look.blurVariant, modelData, v)
+                            }
+                        }
+                    }
+
+                    // Colour options for the selected variant (hex text input)
+                    Cols {
+                        visible: page.colorSpecs.length > 0
+                        enabled: page.effectsLevel !== "off"
+
+                        Repeater {
+                            model: page.colorSpecs
+                            delegate: HexInput {
+                                required property var modelData
+                                label: modelData.label
+                                value: page.optValue(page.look.blurVariant, modelData)
+                                onPicked: v => page.setBlurOpt(page.look.blurVariant, modelData, v)
+                            }
+                        }
+                    }
+
+                    Divider {}
+
+                    Cols {
+                        enabled: page.effectsLevel !== "off"
+
+                        ToggleRow {
+                            label: "BLUR PANELS"; checked: page.look.blurLayers
+                            onToggled: v => page.setLook("blurLayers", v)
+                        }
+                        BarSlider {
+                            label: "PANEL BLUR THRESHOLD"
+                            enabled: page.look.blurLayers
+                            from: 0; to: page.blurAlphaCap; step: 0.05; decimals: 2
+                            value: page.effectiveBlurAlpha
+                            onMoved: v => page.setLook("blurLayerAlpha", v)
                         }
                     }
                 }

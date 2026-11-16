@@ -36,6 +36,7 @@ awww
 mpvpaper
 grim
 slurp
+socat
 gpu-screen-recorder
 imagemagick
 matugen

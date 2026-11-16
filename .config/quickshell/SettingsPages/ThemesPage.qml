@@ -48,8 +48,47 @@ Item {
                                          && page.editId !== "default"
                                          && page.palettes[page.editId] === undefined
 
+    // ── Profiles (saved wallpaper + theme) ────────────────────────────
+    // ADJUST: path to the wallpaper picker's commands.sh
+    property string wallpaperScript: Quickshell.env("HOME") + "/.config/quickshell/hyprquickpaper/commands.sh"
+    readonly property string profilesDir: Quickshell.env("HOME") + "/.config/43pr/profiles"
+    // Shell state folder, and the files in it that every profile snapshots.
+    // Add / remove names here to change what a profile stores.
+    readonly property string stateDir: Quickshell.env("HOME") + "/.config/quickshell/state"
+    // Palette theme.py generated from the wallpaper (copied into a profile saved with color generation on)
+    readonly property string paletteFile: Quickshell.env("HOME") + "/.cache/43pr/palette.json"
+    // What a profile can save: [key, button label, state files]. All on by default.
+    readonly property var profileGroups: [
+        ["wallpaper", "WALLPAPER", []],                               // no state file: handled separately
+        ["theme",   "THEME / COLORS", []],
+        ["bar",     "BAR",       ["bar-state.json"]],
+        ["look",    "LOOK",      ["look.lua", "performance.json"]],   // performance.json feeds look.lua
+        ["hub",     "HUB",       ["hub.json"]],                       // bg opacity, radius, tilt, scale, border, bg image
+        ["media",   "MEDIA OSD", ["mediaosd-state.json"]],
+        ["power",   "POWER MENU", ["powermenu-state.json"]],
+        ["side",    "SIDE PANEL", ["sidepanel-state.json"]]
+    ]
+    property var saveOff: ({})              // key -> true when that group is switched off
+    function groupOn(key) { return page.saveOff[key] !== true }
+    function toggleGroup(key) {
+        var o = Object.assign({}, page.saveOff)
+        if (o[key] === true) delete o[key]; else o[key] = true
+        page.saveOff = o
+    }
+    function selectedStateFiles() {
+        var files = []
+        for (var i = 0; i < page.profileGroups.length; i++)
+            if (page.groupOn(page.profileGroups[i][0]))
+                files = files.concat(page.profileGroups[i][2])
+        return files
+    }
+    property string currentWallpaper: ""    // read from ~/.cache/43pr/last-wallpaper
+    property bool namingProfile: false      // true while the profile name prompt is open
+    property string profileMsg: ""          // error / status line under the prompt
+
     ListModel { id: colorModel }        // roles: key, value, grp
     ListModel { id: customModel }       // roles: tid  (user-created themes found on disk)
+    ListModel { id: profileModel }      // roles: pid, wallpaper, preset
 
     // Order: bg, surface, fg, muted, accent, accent2
     readonly property var palettes: ({
@@ -106,6 +145,7 @@ Item {
     property bool colorGen: true
     property bool darkMode: true
     property string activeId: "default"   // last applied preset
+    property string stateMode: ""         // "wallpaper" (generated colors) or "preset", from state.json
 
     FileView {
         id: stateView
@@ -116,6 +156,7 @@ Item {
         onLoaded: {
             page.colorGen = stateAdapter.colorgen
             page.darkMode = stateAdapter.mode_appearance !== "light"
+            page.stateMode = stateAdapter.mode
             // Optional: if theme.py writes a "preset" key, pick it up.
             if (stateAdapter.preset !== "")
                 page.activeId = stateAdapter.preset
@@ -124,14 +165,28 @@ Item {
             id: stateAdapter
             property bool colorgen: true
             property string mode_appearance: "dark"
+            property string mode: ""
             property string preset: ""
         }
+    }
+
+    // Current wallpaper path, written by commands.sh on every wallpaper change
+    FileView {
+        id: lastWallpaperView
+        path: Quickshell.env("HOME") + "/.cache/43pr/last-wallpaper"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: page.currentWallpaper = text().trim()
     }
 
     Timer {
         id: reloadTimer
         interval: 700
-        onTriggered: stateView.reload()
+        onTriggered: {
+            stateView.reload()
+            lastWallpaperView.reload()
+        }
     }
 
     function setColorGen(on) {
@@ -501,6 +556,7 @@ Item {
         }
         page.palOverrides = o
         page.palRev++
+        page.rebuildThemes()
     }
 
     Process {
@@ -516,7 +572,252 @@ Item {
         }
     }
 
-    Component.onCompleted: page.scanThemes()
+    // ── Theme buttons: built-in list + custom themes, user-orderable ──
+    ListModel { id: themeModel }        // roles: label, command
+    property bool themeDragging: false
+    property var themeOrder: []         // saved order (list of commands)
+    readonly property string themeOrderPath: Quickshell.env("HOME") + "/.config/43pr/theme-order.json"
+    readonly property var builtinThemes: [
+        ["MONOCHROME", "default"], ["SLATE", "preset slate"], ["GRAPHITE", "preset graphite"],
+        ["NORD", "preset nord"], ["ARCTIC", "preset arctic"], ["METAL", "preset metal"],
+        ["CATPPUCCIN MOCHA", "preset catppuccin-mocha"], ["TOKYO NIGHT", "preset tokyo-night"],
+        ["KANAGAWA", "preset kanagawa"], ["ONE DARK", "preset one-dark"], ["DRACULA", "preset dracula"],
+        ["ROSE PINE", "preset rose-pine"], ["EVERFOREST DARK", "preset everforest-dark"],
+        ["MOSS", "preset moss"], ["GOLD", "preset gold"], ["CYAN", "preset cyan"],
+        ["MATRIX", "preset matrix"], ["RED", "preset red"], ["GRUVBOX DARK", "preset gruvbox-dark"],
+        ["SOLARIZED DARK", "preset solarized-dark"], ["MONOKAI", "preset monokai"],
+        ["SILVER", "preset silver"], ["LIGHT GRAY", "preset light-gray"], ["BEIGE", "preset beige"],
+        ["CATPPUCCIN LATTE", "preset catppuccin-latte"], ["SOLARIZED LIGHT", "preset solarized-light"],
+        ["GRUVBOX LIGHT", "preset gruvbox-light"]
+    ]
+
+    function rebuildThemes() {
+        if (page.themeDragging) return
+        var all = []
+        for (var i = 0; i < page.builtinThemes.length; i++)
+            all.push({ label: page.builtinThemes[i][0], command: page.builtinThemes[i][1] })
+        for (var j = 0; j < customModel.count; j++) {
+            var tid = customModel.get(j).tid
+            all.push({ label: page.themeLabel(tid), command: "preset " + tid })
+        }
+        var ordered = []
+        var order = page.themeOrder
+        for (var k = 0; k < order.length; k++)
+            for (var m = 0; m < all.length; m++)
+                if (all[m].command === order[k]) { ordered.push(all[m]); all.splice(m, 1); break }
+        ordered = ordered.concat(all)       // new / unsaved themes go at the end
+        themeModel.clear()
+        for (var n = 0; n < ordered.length; n++) themeModel.append(ordered[n])
+    }
+
+    function saveThemeOrder() {
+        var list = []
+        for (var i = 0; i < themeModel.count; i++) list.push(themeModel.get(i).command)
+        page.themeOrder = list
+        themeOrderFile.setText(JSON.stringify(list))
+    }
+
+    FileView {
+        id: themeOrderFile
+        path: page.themeOrderPath
+        printErrors: false
+        onLoaded: {
+            try {
+                var o = JSON.parse(text())
+                if (Array.isArray(o)) page.themeOrder = o
+            } catch (e) {}
+            page.rebuildThemes()
+        }
+        onLoadFailed: page.rebuildThemes()
+    }
+
+    // ── Profiles: save / apply / delete (wallpaper + theme) ───────────
+    // Each profile is ~/.config/43pr/profiles/<name>.json:
+    //   { "wallpaper": "/path/to/file", "preset": "<theme id>" }
+    // Saved state files of a profile live next to it in <name>.d/
+    function profilePath(id) {
+        return page.profilesDir + "/" + id + ".json"
+    }
+
+    function profileFilesPath(id) {
+        return page.profilesDir + "/" + id + ".d"
+    }
+
+    function openProfileNaming() {
+        page.profileMsg = ""
+        page.namingProfile = true
+        profileNameInput.text = ""
+        profileNameInput.forceActiveFocus()
+    }
+
+    function closeProfileNaming() {
+        page.namingProfile = false
+        page.profileMsg = ""
+        page.searchFocusReleased()
+    }
+
+    function saveProfile(rawName) {
+        if (profileSaver.running) return
+        var id = rawName.trim().toLowerCase()
+                        .replace(/[^a-z0-9_-]+/g, "-")
+                        .replace(/^-+|-+$/g, "")
+        if (id === "") {
+            page.profileMsg = "Enter a name (letters, numbers, - and _)."
+            return
+        }
+        var wpOn = page.groupOn("wallpaper")
+        var themeOn = page.groupOn("theme")
+        if (wpOn && page.currentWallpaper === "") {
+            page.profileMsg = "No wallpaper recorded yet. Pick one with the wallpaper picker first."
+            return
+        }
+        // Color generation on (and not sitting on a clicked preset): save the generated
+        // palette itself instead of a theme name.
+        var generated = themeOn && page.colorGen && page.stateMode !== "preset"
+        var json = JSON.stringify({ wallpaper: wpOn ? page.currentWallpaper : "",
+                                    preset: themeOn ? page.activeId : "",
+                                    generated: generated })
+        // $1 = profiles dir, $2 = json, $3 = json path, $4 = files dir, $5 = state dir,
+        // $6 = generated palette file, $7 = "1" if the palette is saved,
+        // $8... = state file names (no shell interpolation of the name)
+        profileSaver.command = [
+            "/bin/sh", "-c",
+            "rm -rf -- \"$4\"; mkdir -p \"$1\" \"$4\" || exit 1; "
+            + "printf '%s' \"$2\" > \"$3\" || exit 1; "
+            + "if [ \"$7\" = 1 ]; then "
+            + "mkdir -p \"$4/theme\" && cp -- \"$6\" \"$4/theme/palette.json\" || exit 4; fi; "
+            + "src=\"$5\"; dst=\"$4\"; shift 7; "
+            + "for f in \"$@\"; do [ -f \"$src/$f\" ] && cp -- \"$src/$f\" \"$dst/$f\"; done; "
+            + "exit 0",
+            "sh", page.profilesDir, json, page.profilePath(id),
+            page.profileFilesPath(id), page.stateDir,
+            page.paletteFile, generated ? "1" : "0"
+        ].concat(page.selectedStateFiles())
+        profileSaver.running = true
+    }
+
+    function applyProfile(id, wallpaper, preset, generated) {
+        // 1. wallpaper (the 4th arg "notheme" stops commands.sh from running theme.py)
+        // 2. colors: the saved generated palette, or the saved theme preset
+        // 3. copy the saved state files back, then reload Hyprland if look.lua came with them
+        if (profileApplier.running) return
+        profileApplier.command = [
+            "/bin/sh", "-c",
+            "mkdir -p \"$HOME/.cache/43pr\"; log=\"$HOME/.cache/43pr/profile-apply.log\"; "
+            + "{ echo \"== apply $(date +%T): $4\"; "
+            // 1. state files FIRST (fast, cannot be blocked by the wallpaper/theme steps).
+            // atomic replace: copy to a temp name, then mv, so watchers get a clean event
+            + "if [ -d \"$4\" ]; then "
+            + "for f in \"$4\"/*; do [ -f \"$f\" ] || continue; b=$(basename \"$f\"); "
+            + "cp -- \"$f\" \"$5/.$b.43pr-tmp\" && mv -f -- \"$5/.$b.43pr-tmp\" \"$5/$b\" && echo \"restored $b\"; done; "
+            + "qs ipc call theme reloadHub 2>&1 || echo 'ipc reloadHub failed (add it to Theme.qml)'; "
+            + "[ -f \"$4/look.lua\" ] && hyprctl reload >/dev/null 2>&1; "
+            + "else echo \"NO saved state files at $4 (re-save this profile)\"; fi; "
+            // 2. wallpaper, 3. colors
+            + "[ -n \"$2\" ] && bash \"$1\" \"$2\" outer 1 notheme; "
+            + "if [ \"$6\" = 1 ] && [ -f \"$4/theme/palette.json\" ]; then "
+            + "python3 \"$HOME/.config/43pr/bin/theme.py\" palette \"$4/theme/palette.json\" --wallpaper \"$2\"; "
+            + "elif [ \"$3\" = default ]; then python3 \"$HOME/.config/43pr/bin/theme.py\" default; "
+            + "elif [ -n \"$3\" ]; then python3 \"$HOME/.config/43pr/bin/theme.py\" preset \"$3\"; fi; "
+            + "} 2>&1 | tee -a \"$log\"; exit 0",
+            "sh", page.wallpaperScript, wallpaper, preset,
+            page.profileFilesPath(id), page.stateDir, generated ? "1" : "0"
+        ]
+        profileApplier.running = true
+        if (generated) page.colorGen = true     // optimistic; state.json reload corrects it
+        else if (preset !== "") page.activeId = preset
+        if (wallpaper !== "") page.currentWallpaper = wallpaper
+        reloadTimer.restart()
+    }
+
+    function deleteProfile(id) {
+        profileDeleter.command = [
+            "/bin/sh", "-c",
+            "rm -f -- \"$1\"; rm -rf -- \"$2\"",
+            "sh", page.profilePath(id), page.profileFilesPath(id)
+        ]
+        profileDeleter.running = true
+    }
+
+    function scanProfiles() {
+        if (profileScanner.running) return
+        profileScanner.running = true
+    }
+
+    function parseProfileScan(text) {
+        var parts = text.split("@@")
+        profileModel.clear()
+        for (var i = 1; i < parts.length; i++) {
+            var nl = parts[i].indexOf("\n")
+            if (nl < 0) continue
+            var id = parts[i].substring(0, nl).trim()
+            try {
+                var d = JSON.parse(parts[i].substring(nl + 1))
+                profileModel.append({ pid: id, wallpaper: d.wallpaper || "", preset: d.preset !== undefined ? d.preset : "default",
+                                      generated: d.generated === true })
+            } catch (e) {
+                console.warn("ThemesPage: bad profile", id, e)
+            }
+        }
+    }
+
+    Process {
+        id: profileSaver
+        onExited: (exitCode, exitStatus) => {
+            if (exitCode === 0) {
+                page.namingProfile = false
+                page.profileMsg = ""
+                page.scanProfiles()
+                page.searchFocusReleased()
+            } else if (exitCode === 4) {
+                page.profileMsg = "No generated palette found at " + page.paletteFile + "."
+            } else {
+                page.profileMsg = "Save failed (exit code " + exitCode + ")."
+            }
+        }
+    }
+
+    // Runs the profile apply script. When it finishes, the shell is reloaded so every
+    // component re-reads its restored state file, even ones that only read it at startup.
+    // Set to false once all components watch their files live.
+    property bool reloadShellAfterApply: false
+
+    Process {
+        id: profileApplier
+        stdout: StdioCollector {
+            onStreamFinished: if (text.trim() !== "") console.log("[profile] apply:\n" + text.trim())
+        }
+        stderr: StdioCollector {
+            onStreamFinished: if (text.trim() !== "") console.warn("[profile] apply errors:\n" + text.trim())
+        }
+        onExited: (exitCode, exitStatus) => {
+            if (page.reloadShellAfterApply)
+                Quickshell.reload(false)
+        }
+    }
+
+    Process {
+        id: profileDeleter
+        onExited: page.scanProfiles()
+    }
+
+    Process {
+        id: profileScanner
+        command: [
+            "/bin/sh", "-c",
+            "for f in \"$1\"/*.json; do [ -f \"$f\" ] || continue; "
+            + "printf '@@%s\\n' \"$(basename \"$f\" .json)\"; cat \"$f\"; printf '\\n'; done",
+            "sh", page.profilesDir
+        ]
+        stdout: StdioCollector {
+            onStreamFinished: page.parseProfileScan(text)
+        }
+    }
+
+    Component.onCompleted: {
+        page.scanThemes()
+        page.scanProfiles()
+    }
 
     component ToggleButton: Rectangle {
         required property string label
@@ -915,46 +1216,239 @@ Item {
                     }
                 }
 
+                // ───────────────────── PROFILES ─────────────────────
+                Text {
+                    text: "PROFILES"
+                    color: Theme.textDim
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.textSizeSmall
+                    font.bold: true
+                    font.letterSpacing: 2
+                    topPadding: 6
+                }
+
+                // SAVE button first, saved profiles right after it: 4 columns
                 Grid {
+                    id: profGrid
                     width: parent.width
-                    columns: 3
+                    columns: 4
+                    spacing: page.sectionSpacing
+                    readonly property real cellW: (width - 3 * spacing) / 4
+
+                    ActionButton {
+                        width: profGrid.cellW
+                        label: "SAVE CURRENT PROFILE"
+                        primary: page.namingProfile
+                        onClicked: page.namingProfile ? page.closeProfileNaming() : page.openProfileNaming()
+                    }
+
+                    // click = apply, small × in the corner = delete
+                    Repeater {
+                        model: profileModel
+                        delegate: ActionButton {
+                            id: profBtn
+                            required property string pid
+                            required property string wallpaper
+                            required property string preset
+                            required property bool generated
+                            width: profGrid.cellW
+                            label: profBtn.pid.toUpperCase() + "\n"
+                                   + (profBtn.generated ? "GENERATED COLORS"
+                                      : (profBtn.preset === "" ? "NO THEME" : page.themeLabel(profBtn.preset)))
+                            onClicked: page.applyProfile(profBtn.pid, profBtn.wallpaper,
+                                                         profBtn.preset, profBtn.generated)
+
+                            Rectangle {
+                                width: 20; height: 20
+                                anchors.top: parent.top
+                                anchors.right: parent.right
+                                anchors.margins: 4
+                                radius: 10
+                                color: delMa.containsMouse ? Theme.alpha(Theme.accent, 0.25) : "#00000000"
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "×"
+                                    color: delMa.containsMouse ? Theme.accent : Theme.textDim
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.textSizeBody
+                                    font.bold: true
+                                }
+                                MouseArea {
+                                    id: delMa
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: page.deleteProfile(profBtn.pid)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // What to save (all on by default); wallpaper + colors are always saved
+                Grid {
+                    id: saveSelGrid
+                    width: parent.width
+                    columns: 4
+                    spacing: page.sectionSpacing
+                    visible: page.namingProfile
+
+                    Repeater {
+                        model: page.profileGroups
+                        delegate: ToggleButton {
+                            required property var modelData
+                            width: (saveSelGrid.width - 3 * saveSelGrid.spacing) / 4
+                            label: modelData[1]
+                            checked: page.groupOn(modelData[0])
+                            onToggled: page.toggleGroup(modelData[0])
+                        }
+                    }
+                }
+
+                // Name prompt for SAVE CURRENT PROFILE
+                Row {
+                    id: profNameRow
+                    width: parent.width
+                    spacing: page.sectionSpacing
+                    visible: page.namingProfile
+
+                    Rectangle {
+                        width: profNameRow.width - 2 * (topRow.cellW + profNameRow.spacing)
+                        height: page.buttonHeight
+                        radius: Theme.radius
+                        color: "#00000000"
+                        border.width: 1
+                        border.color: profileNameInput.activeFocus ? Theme.accent : Theme.border
+
+                        TextInput {
+                            id: profileNameInput
+                            anchors.fill: parent
+                            anchors.leftMargin: 10
+                            anchors.rightMargin: 10
+                            verticalAlignment: TextInput.AlignVCenter
+                            color: Theme.text
+                            selectByMouse: true
+                            maximumLength: 40
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.textSizeBody
+                            onAccepted: page.saveProfile(text)
+                            onTextChanged: if (page.profileMsg !== "") page.profileMsg = ""
+
+                            Keys.onEscapePressed: page.closeProfileNaming()
+
+                            Text {
+                                anchors.fill: parent
+                                verticalAlignment: Text.AlignVCenter
+                                visible: profileNameInput.text === "" && !profileNameInput.preeditText
+                                text: "profile name"
+                                color: Theme.alpha(Theme.textDim, 0.5)
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.textSizeBody
+                            }
+                        }
+                    }
+
+                    ActionButton {
+                        width: topRow.cellW
+                        label: "SAVE"
+                        primary: true
+                        onClicked: page.saveProfile(profileNameInput.text)
+                    }
+                    ActionButton {
+                        width: topRow.cellW
+                        label: "CANCEL"
+                        onClicked: page.closeProfileNaming()
+                    }
+                }
+
+                Text {
+                    visible: page.profileMsg !== ""
+                    width: parent.width
+                    text: page.profileMsg
+                    color: "#ff5555"
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.textSizeBody
+                    wrapMode: Text.WordWrap
+                }
+
+                Text {
+                    text: "THEMES"
+                    color: Theme.textDim
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.textSizeSmall
+                    font.bold: true
+                    font.letterSpacing: 2
+                    topPadding: 6
+                }
+
+                // Right-click + drag a button to reorder; the order is saved.
+                Grid {
+                    id: themeGrid
+                    width: parent.width
+                    columns: 4
                     spacing: page.sectionSpacing
 
-                    ThemeButton { label: "MONOCHROME"; command: "default" }
-                    ThemeButton { label: "SLATE"; command: "preset slate" }
-                    ThemeButton { label: "GRAPHITE"; command: "preset graphite" }
-                    ThemeButton { label: "NORD"; command: "preset nord" }
-                    ThemeButton { label: "ARCTIC"; command: "preset arctic" }
-                    ThemeButton { label: "METAL"; command: "preset metal" }
-                    ThemeButton { label: "CATPPUCCIN MOCHA"; command: "preset catppuccin-mocha" }
-                    ThemeButton { label: "TOKYO NIGHT"; command: "preset tokyo-night" }
-                    ThemeButton { label: "KANAGAWA"; command: "preset kanagawa" }
-                    ThemeButton { label: "ONE DARK"; command: "preset one-dark" }
-                    ThemeButton { label: "DRACULA"; command: "preset dracula" }
-                    ThemeButton { label: "ROSE PINE"; command: "preset rose-pine" }
-                    ThemeButton { label: "EVERFOREST DARK"; command: "preset everforest-dark" }
-                    ThemeButton { label: "MOSS"; command: "preset moss" }
-                    ThemeButton { label: "GOLD"; command: "preset gold" }
-                    ThemeButton { label: "CYAN"; command: "preset cyan" }
-                    ThemeButton { label: "MATRIX"; command: "preset matrix" }
-                    ThemeButton { label: "RED"; command: "preset red" }
-                    ThemeButton { label: "GRUVBOX DARK"; command: "preset gruvbox-dark" }
-                    ThemeButton { label: "SOLARIZED DARK"; command: "preset solarized-dark" }
-                    ThemeButton { label: "MONOKAI"; command: "preset monokai" }
-                    ThemeButton { label: "SILVER"; command: "preset silver" }
-                    ThemeButton { label: "LIGHT GRAY"; command: "preset light-gray" }
-                    ThemeButton { label: "BEIGE"; command: "preset beige" }
-                    ThemeButton { label: "CATPPUCCIN LATTE"; command: "preset catppuccin-latte" }
-                    ThemeButton { label: "SOLARIZED LIGHT"; command: "preset solarized-light" }
-                    ThemeButton { label: "GRUVBOX LIGHT"; command: "preset gruvbox-light" }
-
-                    // user-created themes (one button per extra .toml in the themes dir)
                     Repeater {
-                        model: customModel
+                        model: themeModel
                         delegate: ThemeButton {
-                            required property string tid
-                            label: page.themeLabel(tid)
-                            command: "preset " + tid
+                            id: tb
+                            required property int index
+
+                            property bool dragging: false
+                            transform: Translate {
+                                id: tr
+                                Behavior on x { enabled: !tb.dragging; NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                                Behavior on y { enabled: !tb.dragging; NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                            }
+                            z: dragging ? 100 : 0
+                            opacity: dragging ? 0.85 : 1.0
+
+                            MouseArea {
+                                id: dragArea
+                                anchors.fill: parent
+                                acceptedButtons: Qt.RightButton
+                                preventStealing: true
+
+                                property real px: 0
+                                property real py: 0
+
+                                function place(m) {
+                                    var g = dragArea.mapToItem(themeGrid, m.x, m.y)
+                                    var cw = tb.width + themeGrid.spacing
+                                    var ch = tb.height + themeGrid.spacing
+                                    var cols = themeGrid.columns
+                                    var rows = Math.ceil(themeModel.count / cols)
+                                    var col = Math.max(0, Math.min(cols - 1, Math.floor(g.x / cw)))
+                                    var row = Math.max(0, Math.min(rows - 1, Math.floor(g.y / ch)))
+                                    var target = Math.min(row * cols + col, themeModel.count - 1)
+                                    if (target !== tb.index)
+                                        themeModel.move(tb.index, target, 1)
+                                    // keep the button under the cursor
+                                    tr.x = g.x - dragArea.px - (tb.index % cols) * cw
+                                    tr.y = g.y - dragArea.py - Math.floor(tb.index / cols) * ch
+                                }
+
+                                onPressed: m => {
+                                    dragArea.px = m.x
+                                    dragArea.py = m.y
+                                    page.themeDragging = true
+                                    tb.dragging = true
+                                }
+                                onPositionChanged: m => { if (tb.dragging) dragArea.place(m) }
+                                onReleased: {
+                                    tb.dragging = false
+                                    tr.x = 0
+                                    tr.y = 0
+                                    page.themeDragging = false
+                                    page.saveThemeOrder()
+                                }
+                                onCanceled: {
+                                    tb.dragging = false
+                                    tr.x = 0
+                                    tr.y = 0
+                                    page.themeDragging = false
+                                }
+                            }
                         }
                     }
                 }

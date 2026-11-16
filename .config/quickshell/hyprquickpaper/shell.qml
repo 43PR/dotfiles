@@ -15,8 +15,6 @@ PanelWindow {
     readonly property real uiW: Screen.width / 1920
     readonly property real screenW: Screen.width
     readonly property real refHeight: 500
-    // -----------------------------------------------------------------------
-
     // ---- Settings spec ----------------------------------------------------
     // One entry per slider in the menu. To add an option:
     //   1. add it here, 2. add a matching `property real <key>` below,

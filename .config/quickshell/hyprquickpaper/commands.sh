@@ -14,6 +14,8 @@ esac
 [[ "$duration" =~ ^[0-9]+([.][0-9]+)?$ ]] || duration=1
 
 [[ -f "$img" ]] || { echo "commands.sh: not a file: $img" >&2; exit 1; }
+mkdir -p "$HOME/.cache/43pr"
+echo "$img" > "$HOME/.cache/43pr/last-wallpaper"
 
 mkdir -p "$HOME/.cache/43pr"
 frames="$HOME/.cache/43pr/gif-frames"
@@ -31,7 +33,7 @@ case "${img,,}" in
 
         # mpvpaper can't do transitions, so stop the old one, let awww animate
         # to the video's first frame, then start mpvpaper on top once it's done
-        pkill -x mpvpaper
+        pkill -CONT -x mpvpaper; pkill -x mpvpaper
         if [[ -n "$theme_img" ]]; then
             awww img "$theme_img" -t "$transition" --transition-duration "$duration"
             sleep "$duration"
@@ -42,7 +44,7 @@ case "${img,,}" in
         ;;
     *)
         # static/GIF wallpaper: stop any live wallpaper so it doesn't cover awww
-        pkill -x mpvpaper
+        pkill -CONT -x mpvpaper; pkill -x mpvpaper
         rm -f "$HOME/.cache/43pr/last-live"
 
         # awww handles GIFs natively and keeps them animated
@@ -63,7 +65,7 @@ case "${img,,}" in
 esac
 
 [[ -n "$theme_img" && -f "$theme_img" ]] || exit 0
-
+[[ "$4" == "notheme" ]] && exit 0
 # run theme.py, then make open GTK apps (Thunar etc.) reload the new colors
 setsid -f bash -c '
     python3 "$HOME/.config/43pr/bin/theme.py" wallpaper "$1"
