@@ -111,8 +111,25 @@ PanelWindow {
         readonly property color bg: alpha(palette.bg || "#000000", bgAlpha)
     }
 
+    // Shift + wheel over the settings panel changes this; saved in settings.json
+    property real menuZoom: 1.0
+    readonly property real menuZoomMin: 0.6
+    readonly property real menuZoomMax: 2.0
+
+    // Saved panel position (-1 = not saved yet, use the default spot)
+    property real panelX: -1
+    property real panelY: -1
+
     // Theme.settingsScale scales the whole menu, like it does for the settings window.
-    readonly property real menuUi: ui * th.settingsScale
+    // menuZoom is the extra Shift+wheel zoom on top of it (text, controls and panel size).
+    readonly property real menuUi: ui * th.settingsScale * menuZoom
+
+    function zoomMenu(delta) {
+        var v = menuZoom + (delta > 0 ? 1 : -1) * 0.05 * Math.abs(delta) / 120
+        menuZoom = parseFloat(Math.max(menuZoomMin, Math.min(menuZoomMax, v)).toFixed(3))
+        saveTimer.restart()
+    }
+    Timer { id: saveTimer; interval: 300; onTriggered: main.saveState() }
 
     FileView {
         path: Quickshell.env("HOME") + "/.cache/43pr/quickshell-theme.json"
@@ -203,6 +220,7 @@ PanelWindow {
         return (v * s.mult).toFixed(s.dec) + s.unit
     }
 
+    // Note: menuZoom and the panel position are deliberately not reset here.
     function resetAll() {
         numKeys.forEach(k => main[k] = defOf(k))
         boolKeys.forEach(k => main[k] = boolDefaults[k])
@@ -217,6 +235,8 @@ PanelWindow {
         numKeys.forEach(k => { if (Math.abs(main[k] - defOf(k)) > 1e-6) s[k] = main[k] })
         boolKeys.forEach(k => { if (main[k] !== boolDefaults[k]) s[k] = main[k] })
         if (transition !== transitionDefault) s.transition = transition
+        if (Math.abs(menuZoom - 1) > 1e-6) s.menuZoom = menuZoom
+        if (panelX >= 0 && panelY >= 0) { s.panelX = panelX; s.panelY = panelY }
         stateFile.setText(JSON.stringify(s))
     }
 
@@ -232,6 +252,13 @@ PanelWindow {
                 main.boolKeys.forEach(k => { if (typeof s[k] === "boolean") main[k] = s[k] })
                 if (typeof s.transition === "string" && main.transitions.indexOf(s.transition) >= 0)
                     main.transition = s.transition
+                if (typeof s.menuZoom === "number")
+                    main.menuZoom = Math.max(main.menuZoomMin, Math.min(main.menuZoomMax, s.menuZoom))
+                if (typeof s.panelX === "number" && typeof s.panelY === "number") {
+                    main.panelX = s.panelX
+                    main.panelY = s.panelY
+                }
+                Qt.callLater(panel.place)
             } catch (e) {
                 console.warn("wallpaper picker: could not read saved settings:", e)
             }
@@ -752,6 +779,8 @@ PanelWindow {
 
     // ---- Settings panel (right-click to open) -----------------------------
     // Draggable by its header. Everything under the panel is shielded from the mouse.
+    // Shift + wheel over the panel zooms the whole menu (text, controls, size).
+    // The position and zoom are remembered in settings.json.
     //
     // Keyboard: while the panel is open its focus scope (panelScope) owns the keys.
     // Every slider, toggle, transition row and footer button is Tab-focusable (Qt's
@@ -766,8 +795,8 @@ PanelWindow {
         z: 50
         width: 340 * u
         height: Math.min(Screen.height * 0.88, 720 * u)
-        x: Screen.width - width - 12 * u
-        y: (Screen.height - height) / 2
+        // x / y are set by place() (saved position or default spot), not bound,
+        // because dragging breaks a binding anyway.
         radius: main.th.radius * u
         color: main.th.bg
         border.width: 1
@@ -781,11 +810,31 @@ PanelWindow {
         Behavior on opacity { NumberAnimation { duration: main.th.animMed } }
         Behavior on scale { NumberAnimation { duration: main.th.animMed; easing.type: Easing.OutCubic } }
 
+        // Saved position (clamped to the screen) or the default spot at the right edge.
+        function place() {
+            var maxX = Math.max(0, Screen.width - width)
+            var maxY = Math.max(0, Screen.height - height)
+            if (main.panelX >= 0 && main.panelY >= 0) {
+                x = Math.max(0, Math.min(maxX, main.panelX))
+                y = Math.max(0, Math.min(maxY, main.panelY))
+            } else {
+                x = Screen.width - width - 12 * u
+                y = (Screen.height - height) / 2
+            }
+        }
+        onWidthChanged: place()    // keeps it on screen when the zoom changes its size
+        onHeightChanged: place()
+        Component.onCompleted: place()
+
         MouseArea {
             anchors.fill: parent
             hoverEnabled: true
             acceptedButtons: Qt.AllButtons
-            onWheel: wheel => wheel.accepted = true
+            onWheel: wheel => {
+                if (wheel.modifiers & Qt.ShiftModifier)
+                    main.zoomMenu(wheel.angleDelta.y !== 0 ? wheel.angleDelta.y : wheel.angleDelta.x)
+                wheel.accepted = true
+            }
         }
 
         FocusScope {
@@ -831,6 +880,11 @@ PanelWindow {
                     drag.maximumX: Screen.width - panel.width
                     drag.minimumY: 0
                     drag.maximumY: Screen.height - panel.height
+                    onReleased: {
+                        main.panelX = panel.x
+                        main.panelY = panel.y
+                        main.saveState()
+                    }
                 }
 
                 Text {
@@ -843,7 +897,7 @@ PanelWindow {
                 }
                 Text {
                     x: 20 * panel.u; y: 34 * panel.u
-                    text: "Drag to move · Tab to navigate"
+                    text: "Drag · Tab · Shift+scroll"
                     font.family: main.th.fontFamily
                     font.pixelSize: main.th.textSizeSmall * panel.u
                     color: main.th.textDim
@@ -872,6 +926,13 @@ PanelWindow {
                 clip: true
                 flickableDirection: Flickable.VerticalFlick
                 boundsBehavior: Flickable.StopAtBounds
+
+                // Shift + wheel zooms the menu; without Shift this handler does not
+                // match, so the Flickable scrolls normally.
+                WheelHandler {
+                    acceptedModifiers: Qt.ShiftModifier
+                    onWheel: event => main.zoomMenu(event.angleDelta.y !== 0 ? event.angleDelta.y : event.angleDelta.x)
+                }
 
                 Column {
                     id: contentCol
@@ -915,7 +976,50 @@ PanelWindow {
                     SliderRow { key: "transitionDuration"; label: "Transition duration" }
                 }
             }
+            // Scrollbar lives outside the Flickable content so it doesn't scroll away.
+            Rectangle {
+                visible: flick.contentHeight > flick.height
+                x: flick.x + flick.width - 14 * panel.u
+                y: flick.y
+                width: 4 * panel.u
+                height: flick.height
+                radius: 2 * panel.u
+                color: main.th.alpha(main.th.text, 0.08)
+            }
 
+            Rectangle {
+                id: sbHandle
+                visible: flick.contentHeight > flick.height
+                x: flick.x + flick.width - 14 * panel.u
+                width: 4 * panel.u
+                radius: 2 * panel.u
+                height: Math.max(24 * panel.u, flick.height * flick.visibleArea.heightRatio)
+                y: flick.y + flick.visibleArea.yPosition * flick.height
+                color: main.th.text
+                opacity: (sbArea.containsMouse || sbArea.pressed || flick.moving) ? 0.7 : 0.3
+                Behavior on opacity { NumberAnimation { duration: 150 } }
+
+                MouseArea {
+                    id: sbArea
+                    anchors.fill: parent
+                    anchors.margins: -5 * panel.u
+                    hoverEnabled: true
+
+                    // Drive contentY instead of drag.target (which would break the y binding).
+                    property real grabY: 0
+
+                    onPressed: mouse => {
+                        grabY = mapToItem(flick, mouse.x, mouse.y).y - flick.visibleArea.yPosition * flick.height
+                    }
+                    onPositionChanged: mouse => {
+                        if (!pressed) return
+                        var span = flick.height - sbHandle.height
+                        if (span <= 0) return
+                        var r = Math.max(0, Math.min(1, (mapToItem(flick, mouse.x, mouse.y).y - grabY) / span))
+                        flick.contentY = r * (flick.contentHeight - flick.height)
+                    }
+                }
+            }
             Item {
                 id: foot
                 anchors.bottom: parent.bottom

@@ -51,7 +51,8 @@ Scope {
     // Colours still come from the Theme singleton; the "Colors" settings sections
     // only choose WHICH Theme colour is used for each element (see themeColor).
     //   ui     : resolution scale (1.0 at 1080p height)
-    //   menuUi : ui * hub "settingsScale"; multiply every settings-window size by it
+    //   menuUi : ui * hub "settingsScale" * settingsZoom; multiply every
+    //            settings-window size by it
     readonly property QtObject th: QtObject {
         property real settingsScale: 1.0
         property int radius: 10
@@ -65,7 +66,28 @@ Scope {
         readonly property int textSizeSmall: 10
     }
     readonly property real ui: (targetScreen?.height ?? 1080) / 1080
-    readonly property real menuUi: ui * th.settingsScale
+    readonly property real menuUi: ui * th.settingsScale * settingsZoom
+
+    // ---- settings window: position + zoom -----------------------------------
+    // The settings window is drawn inside a full-screen transparent layer
+    // surface (input is masked to the card itself), so it can be dragged freely
+    // without fighting the compositor. Position and zoom are saved in the state
+    // file. Drag the title bar to move, Shift + scroll to zoom, double-click the
+    // title bar to re-centre and reset the zoom.
+    //
+    // Layer namespace of that surface. Blur / layer rules for the settings window
+    // must target this name (use `ignorealpha`, because the surface is full-screen).
+    readonly property string settingsNamespace: "powermenu-settings"
+
+    readonly property real zoomMin: 0.6
+    readonly property real zoomMax: 2.0
+    readonly property real zoomStep: 0.05      // per wheel notch
+
+    property real settingsZoom: 1.0
+    property bool settingsPosSet: false         // false = centred on the screen
+    property real settingsX: 0                  // top-left of the card, screen px
+    property real settingsY: 0
+    property bool settingsDragging: false
 
     FileView {
         path: Quickshell.env("HOME") + "/.config/quickshell/state/hub.json"
@@ -353,7 +375,10 @@ Scope {
         { keys: "← → / PgUp PgDn",        desc: "Settings: adjust slider" },
         { keys: "← → / Space",            desc: "Settings: cycle color" },
         { keys: "Space / Enter",          desc: "Settings: toggle / press" },
-        { keys: "Drag handle",            desc: "Move the menu" }
+        { keys: "Drag handle",            desc: "Move the menu" },
+        { keys: "Drag title bar",         desc: "Move the settings window" },
+        { keys: "Shift + Scroll",         desc: "Zoom the settings window" },
+        { keys: "Double-click title",     desc: "Reset settings window" }
     ]
     readonly property var keybindActionKeys: actions.map(function (a) {
         return { keys: a.key.toUpperCase(), desc: a.label }
@@ -445,6 +470,7 @@ Scope {
         confirmName = ""
         settingsOpen = false
         dragging = false
+        settingsDragging = false
         showing = true   // onShowingChanged mounts the window
     }
 
@@ -452,6 +478,7 @@ Scope {
         showing = false
         settingsOpen = false
         dragging = false
+        settingsDragging = false
         confirmName = ""
     }
     function toggleMenu() { showing ? closeMenu() : openMenu() }
@@ -459,11 +486,13 @@ Scope {
     function openSettings() {
         if (!showing) openMenu()
         dragging = false
+        settingsDragging = false
         settingsOpen = true
     }
     function closeSettings() {
         settingsOpen = false
         dragging = false
+        settingsDragging = false
     }
     function toggleSettings() { settingsOpen ? closeSettings() : openSettings() }
 
@@ -527,6 +556,11 @@ Scope {
         numKeys.forEach(function (k) { s[k] = root[k] })
         boolKeys.forEach(function (k) { s[k] = root[k] })
         colorKeys.forEach(function (k) { s[k] = root[k] })
+        s.settingsZoom = root.settingsZoom
+        if (root.settingsPosSet) {
+            s.settingsX = root.settingsX
+            s.settingsY = root.settingsY
+        }
         stateFile.setText(JSON.stringify(s))
     }
 
@@ -547,6 +581,68 @@ Scope {
         var maxY = Math.max(minY, root.winH - kv - root.topGap)
         root.offsetX = Math.max(minX, Math.min(maxX, x))
         root.offsetY = Math.max(minY, Math.min(maxY, y))
+    }
+
+    // ---- settings window geometry -------------------------------------------
+    // Size of the settings card in screen px (follows the zoom).
+    readonly property real settingsWinW: Math.round(Math.min(440 * menuUi, (targetScreen?.width ?? 1920) * 0.95))
+    readonly property real settingsWinH: Math.round(Math.min(640 * menuUi, (targetScreen?.height ?? 1080) * 0.88))
+
+    // Keep at least `keepVisible` px of the card on screen; the title bar
+    // (top edge) never leaves the screen so it can always be grabbed again.
+    function clampSX(x) {
+        var sw = targetScreen?.width ?? 1920
+        return Math.round(Math.max(keepVisible - settingsWinW, Math.min(sw - keepVisible, x)))
+    }
+    function clampSY(y) {
+        var sh = targetScreen?.height ?? 1080
+        return Math.round(Math.max(0, Math.min(sh - keepVisible, y)))
+    }
+
+    // Where the card is actually drawn: the saved position (clamped to the
+    // current screen), or centred when it was never moved.
+    readonly property real settingsEffX: settingsPosSet
+        ? clampSX(settingsX)
+        : Math.round(((targetScreen?.width ?? 1920) - settingsWinW) / 2)
+    readonly property real settingsEffY: settingsPosSet
+        ? clampSY(settingsY)
+        : Math.round(((targetScreen?.height ?? 1080) - settingsWinH) / 2)
+
+    function setSettingsPos(x, y) {
+        root.settingsX = clampSX(x)
+        root.settingsY = clampSY(y)
+        root.settingsPosSet = true
+    }
+
+    // Zoom the settings window. If it has been moved, it zooms around its centre;
+    // if it is still auto-centred it simply stays centred.
+    function setSettingsZoom(z) {
+        var nz = Math.max(zoomMin, Math.min(zoomMax, Math.round(z * 100) / 100))
+        if (nz === root.settingsZoom)
+            return
+        if (root.settingsPosSet) {
+            var cx = root.settingsEffX + root.settingsWinW / 2
+            var cy = root.settingsEffY + root.settingsWinH / 2
+            root.settingsZoom = nz                      // settingsWinW / H update here
+            root.settingsX = clampSX(cx - root.settingsWinW / 2)
+            root.settingsY = clampSY(cy - root.settingsWinH / 2)
+        } else {
+            root.settingsZoom = nz
+        }
+        zoomSaveTimer.restart()
+    }
+
+    function resetSettingsWindow() {
+        root.settingsPosSet = false
+        root.settingsZoom = 1.0
+        root.saveState()
+    }
+
+    // wheel notches fire many times a second: save once it settles
+    Timer {
+        id: zoomSaveTimer
+        interval: 400
+        onTriggered: root.saveState()
     }
 
     // ---- always-on services (cheap) --------------------------------------
@@ -595,6 +691,15 @@ Scope {
                 if (typeof s.accentSource === "string"
                         && root.accentChoices.some(function (c) { return c.id === s.accentSource }))
                     root.accentSource = s.accentSource
+
+                // settings window zoom + position
+                if (typeof s.settingsZoom === "number")
+                    root.settingsZoom = Math.max(root.zoomMin, Math.min(root.zoomMax, s.settingsZoom))
+                if (typeof s.settingsX === "number" && typeof s.settingsY === "number") {
+                    root.settingsX = s.settingsX
+                    root.settingsY = s.settingsY
+                    root.settingsPosSet = true
+                }
             } catch (e) {
                 console.warn("powermenu: could not read saved state:", e)
             }
@@ -986,9 +1091,17 @@ Scope {
 
     // ---- settings window ----------------------------------------------------
     // Look matches the wallpaper picker's settings menu: JetBrains Mono, the same text
-    // sizes, hub.json radius, and everything scaled by `u` (= root.menuUi).
-    // No custom layer namespace is set here (the picker sets none either), so the
-    // compositor's layer rules, e.g. blur, apply to this window the same way.
+    // sizes, hub.json radius, and everything scaled by `u` (= root.menuUi, which
+    // includes the Shift+scroll zoom).
+    //
+    // The layer surface is full-screen and transparent; only `card` receives
+    // input (mask), and `card` is what gets positioned. That makes dragging
+    // jitter-free: the surface never moves, the card does. Position and zoom are
+    // persisted in the state file.
+    //
+    // The surface uses its own layer namespace (root.settingsNamespace). Because it
+    // is full-screen, a blur layer rule for it should use `ignorealpha`, otherwise
+    // the whole screen would be blurred.
     //
     // Compact layout: sliders, colour pickers and toggles sit in plain `Grid`s
     // (2 columns, 3 for the key list), so the whole page needs far less scrolling.
@@ -999,6 +1112,9 @@ Scope {
     // steps, Home / End for min / max) adjust a focused slider or cycle a colour,
     // Space / Enter flips a toggle or presses a button, and the page auto-scrolls
     // to keep the focused control in view. Esc or C closes the window.
+    //
+    // Mouse: drag the title bar to move, Shift + scroll to zoom, double-click the
+    // title bar to re-centre and reset the zoom.
     LazyLoader {
         active: root.settingsOpen
 
@@ -1008,436 +1124,507 @@ Scope {
 
             readonly property real u: root.menuUi
 
+            anchors { top: true; bottom: true; left: true; right: true }
             color: "transparent"
-            implicitWidth: Math.round(440 * u)
-            implicitHeight: Math.round(Math.min(640 * u, (screen?.height ?? 800) * 0.88))
             exclusionMode: ExclusionMode.Ignore
 
             WlrLayershell.layer: WlrLayer.Overlay
+            WlrLayershell.namespace: root.settingsNamespace
             WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
 
-            Rectangle {
-                anchors.fill: parent
-                radius: root.th.radius * settingsWin.u
-                color: Theme.bg
-                border.width: 1
-                border.color: Theme.alpha(Theme.text, 0.12)
-            }
+            // only the card takes input; everything else falls through to the menu
+            mask: Region { item: card }
 
-            FocusScope {
-                anchors.fill: parent
-                focus: true
-                Keys.onEscapePressed: root.closeSettings()
+            Item {
+                id: card
+                x: root.settingsEffX
+                y: root.settingsEffY
+                width: root.settingsWinW
+                height: root.settingsWinH
 
-                // Fallback keys, only reached when the focused control did not
-                // handle the key (or nothing is focused yet): scrolling and C.
-                // Tab / Shift+Tab are deliberately NOT handled here so Qt's focus
-                // chain moves between controls.
-                Keys.onPressed: function (event) {
-                    var maxY = Math.max(0, flick.contentHeight - flick.height)
-                    var step = 48 * settingsWin.u
-                    var page = flick.height * 0.9
-                    var dy = 0
-
-                    switch (event.key) {
-                    case Qt.Key_Down:     dy = step;  break
-                    case Qt.Key_Up:       dy = -step; break
-                    case Qt.Key_PageDown: dy = page;  break
-                    case Qt.Key_PageUp:   dy = -page; break
-                    case Qt.Key_Home:     flick.contentY = 0;    event.accepted = true; return
-                    case Qt.Key_End:      flick.contentY = maxY; event.accepted = true; return
-                    case Qt.Key_C:        root.closeSettings();  event.accepted = true; return
-                    default: return   // Tab, Escape etc. are handled elsewhere
-                    }
-                    flick.contentY = Math.max(0, Math.min(maxY, flick.contentY + dy))
-                    event.accepted = true
+                Rectangle {
+                    anchors.fill: parent
+                    radius: root.th.radius * settingsWin.u
+                    color: Theme.bg
+                    border.width: 1
+                    border.color: Theme.alpha(Theme.text, 0.12)
                 }
 
-                // header
-                Item {
-                    id: head
-                    anchors.top: parent.top
-                    width: parent.width
-                    height: 52 * settingsWin.u
+                FocusScope {
+                    anchors.fill: parent
+                    focus: true
+                    Keys.onEscapePressed: root.closeSettings()
 
-                    Text {
-                        x: 20 * settingsWin.u; y: 8 * settingsWin.u
-                        text: "Power menu settings"
-                        font.family: root.th.fontFamily
-                        font.pixelSize: root.th.textSizeSection * settingsWin.u
-                        font.bold: true
-                        color: Theme.text
+                    // Fallback keys, only reached when the focused control did not
+                    // handle the key (or nothing is focused yet): scrolling and C.
+                    // Tab / Shift+Tab are deliberately NOT handled here so Qt's focus
+                    // chain moves between controls.
+                    Keys.onPressed: function (event) {
+                        var maxY = Math.max(0, flick.contentHeight - flick.height)
+                        var step = 48 * settingsWin.u
+                        var page = flick.height * 0.9
+                        var dy = 0
+
+                        switch (event.key) {
+                        case Qt.Key_Down:     dy = step;  break
+                        case Qt.Key_Up:       dy = -step; break
+                        case Qt.Key_PageDown: dy = page;  break
+                        case Qt.Key_PageUp:   dy = -page; break
+                        case Qt.Key_Home:     flick.contentY = 0;    event.accepted = true; return
+                        case Qt.Key_End:      flick.contentY = maxY; event.accepted = true; return
+                        case Qt.Key_C:        root.closeSettings();  event.accepted = true; return
+                        default: return   // Tab, Escape etc. are handled elsewhere
+                        }
+                        flick.contentY = Math.max(0, Math.min(maxY, flick.contentY + dy))
+                        event.accepted = true
                     }
-                    Text {
-                        x: 20 * settingsWin.u; y: 30 * settingsWin.u
-                        text: "Drag the handle to move. Tab to navigate."
-                        font.family: root.th.fontFamily
-                        font.pixelSize: root.th.textSizeSmall * settingsWin.u
-                        color: Theme.textDim
-                    }
-                    Text {
-                        id: closeX
-                        anchors.right: parent.right
-                        anchors.rightMargin: 16 * settingsWin.u
-                        y: 8 * settingsWin.u
-                        width: 26 * settingsWin.u; height: 26 * settingsWin.u
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                        text: "×"
-                        font.family: root.th.fontFamily
-                        font.pixelSize: 22 * settingsWin.u
-                        color: closeArea.containsMouse ? Theme.text : Theme.textDim
+
+                    // header (also the drag handle for the whole window)
+                    Item {
+                        id: head
+                        anchors.top: parent.top
+                        width: parent.width
+                        height: 52 * settingsWin.u
+
+                        // Drag area. Coordinates are taken in the (static) window
+                        // frame, so moving the card does not feed back into the drag.
                         MouseArea {
-                            id: closeArea
+                            id: headDrag
                             anchors.fill: parent
                             hoverEnabled: true
-                            onClicked: root.closeSettings()
+                            cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+                            property real pressX: 0
+                            property real pressY: 0
+                            property real startX: 0
+                            property real startY: 0
+
+                            onPressed: mouse => {
+                                var p = headDrag.mapToItem(null, mouse.x, mouse.y)
+                                pressX = p.x
+                                pressY = p.y
+                                startX = root.settingsEffX
+                                startY = root.settingsEffY
+                                root.settingsDragging = true
+                            }
+                            onPositionChanged: mouse => {
+                                if (!root.settingsDragging) return
+                                var p = headDrag.mapToItem(null, mouse.x, mouse.y)
+                                root.setSettingsPos(startX + (p.x - pressX), startY + (p.y - pressY))
+                            }
+                            onReleased: {
+                                if (!root.settingsDragging) return
+                                root.settingsDragging = false
+                                root.saveState()
+                            }
+                            onCanceled: {
+                                if (!root.settingsDragging) return
+                                root.settingsDragging = false
+                                root.saveState()
+                            }
+                            onDoubleClicked: root.resetSettingsWindow()
+                        }
+
+                        Text {
+                            x: 20 * settingsWin.u; y: 8 * settingsWin.u
+                            text: "Power menu settings"
+                            font.family: root.th.fontFamily
+                            font.pixelSize: root.th.textSizeSection * settingsWin.u
+                            font.bold: true
+                            color: Theme.text
+                        }
+                        Text {
+                            x: 20 * settingsWin.u; y: 30 * settingsWin.u
+                            text: "Drag · Tab · Shift+scroll"
+                            font.family: root.th.fontFamily
+                            font.pixelSize: root.th.textSizeSmall * settingsWin.u
+                            color: Theme.textDim
+                        }
+                        Text {
+                            id: closeX
+                            anchors.right: parent.right
+                            anchors.rightMargin: 16 * settingsWin.u
+                            y: 8 * settingsWin.u
+                            width: 26 * settingsWin.u; height: 26 * settingsWin.u
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                            text: "×"
+                            font.family: root.th.fontFamily
+                            font.pixelSize: 22 * settingsWin.u
+                            color: closeArea.containsMouse ? Theme.text : Theme.textDim
+                            MouseArea {
+                                id: closeArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                onClicked: root.closeSettings()
+                            }
                         }
                     }
-                }
 
-                // Everything below the header scrolls (mouse wheel, drag,
-                // or the scrollbar on the right edge).
-                Flickable {
-                    id: flick
-                    anchors.top: head.bottom
-                    anchors.topMargin: 2 * settingsWin.u
-                    anchors.bottom: foot.top
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    contentWidth: width
-                    contentHeight: contentCol.height + 12 * settingsWin.u
-                    clip: true
-                    flickableDirection: Flickable.VerticalFlick
-                    boundsBehavior: Flickable.StopAtBounds
+                    // Everything below the header scrolls (mouse wheel, drag,
+                    // or the scrollbar on the right edge).
+                    Flickable {
+                        id: flick
+                        anchors.top: head.bottom
+                        anchors.topMargin: 2 * settingsWin.u
+                        anchors.bottom: foot.top
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        contentWidth: width
+                        contentHeight: contentCol.height + 12 * settingsWin.u
+                        clip: true
+                        flickableDirection: Flickable.VerticalFlick
+                        boundsBehavior: Flickable.StopAtBounds
 
-                    Column {
-                        id: contentCol
-                        x: 20 * settingsWin.u
-                        width: flick.width - 48 * settingsWin.u
+                        Column {
+                            id: contentCol
+                            x: 20 * settingsWin.u
+                            width: flick.width - 48 * settingsWin.u
 
-                        // ---------------- GENERAL ----------------
-                        SectionHeader { host: root; text: "General" }
-                        Grid {
-                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                            ToggleRow {
-                                host: root
-                                key: "showTooltips"
-                                label: "Tooltips"
-                                checked: root.showTooltips
-                            }
-                            SliderRow { host: root; key: "menuSize"; label: "Scale" }
-                            SliderRow { host: root; key: "animMs"; label: "Animation" }
-                        }
-
-                        // ---------------- LAYOUT & CONTENT ----------------
-                        SectionHeader { host: root; text: "Layout & content" }
-                        Grid {
-                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                            ToggleRow { host: root; key: "horizontal"; label: "Horizontal"; checked: root.horizontal }
-                            ToggleRow { host: root; key: "showIcons"; label: "Icons"; checked: root.showIcons }
-                            ToggleRow { host: root; key: "showLabels"; label: "Labels"; checked: root.showLabels }
-                            ToggleRow {
-                                host: root
-                                key: "showKeyHints"
-                                label: "Key hints"
-                                checked: root.showKeyHints
-                                enabled: !root.horizontal
-                            }
-                            SliderRow { host: root; key: "cardWidth"; label: "Width" }
-                            SliderRow { host: root; key: "itemHeight"; label: "Item height" }
-                            SliderRow { host: root; key: "itemSpacing"; label: "Item spacing" }
-                            SliderRow { host: root; key: "panelPadding"; label: "Panel padding" }
-                        }
-
-                        // ---------------- APPEARANCE ----------------
-                        SectionHeader { host: root; text: "Appearance" }
-                        Grid {
-                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                            SliderRow { host: root; key: "panelRadius"; label: "Panel roundness" }
-                            SliderRow { host: root; key: "itemRadius"; label: "Item roundness" }
-                            SliderRow { host: root; key: "iconSize"; label: "Icon size"; enabled: root.showIcons }
-                            SliderRow { host: root; key: "labelSize"; label: "Label size"; enabled: root.showLabels }
-                            SliderRow { host: root; key: "borderWidth"; label: "Active border" }
-                            SliderRow { host: root; key: "inactiveBorderWidth"; label: "Inactive border" }
-                            SliderRow { host: root; key: "panelOpacity"; label: "Panel opacity" }
-                            SliderRow { host: root; key: "dimOpacity"; label: "Screen dim" }
-                        }
-
-                        // ---------------- COLORS ----------------
-                        SectionHeader { host: root; text: "Colors" }
-                        Item {
-                            id: acRow
-                            width: contentCol.width
-                            height: 50 * settingsWin.u
-                            activeFocusOnTab: true
-
-                            onActiveFocusChanged: if (activeFocus) root.ensureVisible(acRow, 32 * settingsWin.u)
-
-                            Keys.onPressed: function (event) {
-                                if (event.key === Qt.Key_Left) {
-                                    root.cycleAccent(-1)
-                                } else if (event.key === Qt.Key_Right
-                                        || event.key === Qt.Key_Space
-                                        || event.key === Qt.Key_Return
-                                        || event.key === Qt.Key_Enter) {
-                                    root.cycleAccent(1)
-                                } else if (event.key === Qt.Key_Down) {
-                                    root.focusStep(acRow, true)
-                                } else if (event.key === Qt.Key_Up) {
-                                    root.focusStep(acRow, false)
-                                } else {
-                                    return
+                            // ---------------- GENERAL ----------------
+                            SectionHeader { host: root; text: "General" }
+                            Grid {
+                                width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                                ToggleRow {
+                                    host: root
+                                    key: "showTooltips"
+                                    label: "Tooltips"
+                                    checked: root.showTooltips
                                 }
-                                event.accepted = true
+                                SliderRow { host: root; key: "menuSize"; label: "Scale" }
+                                SliderRow { host: root; key: "animMs"; label: "Animation" }
                             }
 
-                            Rectangle {
-                                anchors.fill: parent
-                                anchors.margins: -3 * settingsWin.u
-                                radius: Math.min(8 * settingsWin.u, root.th.radius * settingsWin.u)
-                                color: "transparent"
-                                visible: acRow.activeFocus
-                                border.width: Math.max(1, Math.round(settingsWin.u))
-                                border.color: root.cAccent
+                            // ---------------- LAYOUT & CONTENT ----------------
+                            SectionHeader { host: root; text: "Layout & content" }
+                            Grid {
+                                width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                                ToggleRow { host: root; key: "horizontal"; label: "Horizontal"; checked: root.horizontal }
+                                ToggleRow { host: root; key: "showIcons"; label: "Icons"; checked: root.showIcons }
+                                ToggleRow { host: root; key: "showLabels"; label: "Labels"; checked: root.showLabels }
+                                ToggleRow {
+                                    host: root
+                                    key: "showKeyHints"
+                                    label: "Key hints"
+                                    checked: root.showKeyHints
+                                    enabled: !root.horizontal
+                                }
+                                SliderRow { host: root; key: "cardWidth"; label: "Width" }
+                                SliderRow { host: root; key: "itemHeight"; label: "Item height" }
+                                SliderRow { host: root; key: "itemSpacing"; label: "Item spacing" }
+                                SliderRow { host: root; key: "panelPadding"; label: "Panel padding" }
                             }
 
-                            Text {
-                                y: 4 * settingsWin.u
-                                text: "Highlight color"
-                                font.family: root.th.fontFamily
-                                font.pixelSize: root.th.textSizeGroup * settingsWin.u
-                                font.bold: true
-                                color: Theme.text
+                            // ---------------- APPEARANCE ----------------
+                            SectionHeader { host: root; text: "Appearance" }
+                            Grid {
+                                width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                                SliderRow { host: root; key: "panelRadius"; label: "Panel roundness" }
+                                SliderRow { host: root; key: "itemRadius"; label: "Item roundness" }
+                                SliderRow { host: root; key: "iconSize"; label: "Icon size"; enabled: root.showIcons }
+                                SliderRow { host: root; key: "labelSize"; label: "Label size"; enabled: root.showLabels }
+                                SliderRow { host: root; key: "borderWidth"; label: "Active border" }
+                                SliderRow { host: root; key: "inactiveBorderWidth"; label: "Inactive border" }
+                                SliderRow { host: root; key: "panelOpacity"; label: "Panel opacity" }
+                                SliderRow { host: root; key: "dimOpacity"; label: "Screen dim" }
                             }
 
-                            Row {
-                                id: acSegs
-                                y: 22 * settingsWin.u
-                                width: parent.width
-                                spacing: 6 * settingsWin.u
+                            // ---------------- COLORS ----------------
+                            SectionHeader { host: root; text: "Colors" }
+                            Item {
+                                id: acRow
+                                width: contentCol.width
+                                height: 50 * settingsWin.u
+                                activeFocusOnTab: true
 
-                                Repeater {
-                                    model: root.accentChoices
-                                    delegate: Rectangle {
-                                        id: seg
-                                        required property var modelData
-                                        readonly property bool picked: root.accentSource === modelData.id
-                                        width: (acSegs.width - 2 * acSegs.spacing) / 3
-                                        height: 24 * settingsWin.u
-                                        radius: Math.min(8 * settingsWin.u, root.th.radius * settingsWin.u)
-                                        color: seg.picked
-                                            ? Theme.alpha(root.accentColorOf(modelData.id), 0.18)
-                                            : (segArea.containsMouse ? Theme.alpha(Theme.text, 0.08) : "transparent")
-                                        border.width: 1
-                                        border.color: seg.picked
-                                            ? root.accentColorOf(modelData.id)
-                                            : Theme.alpha(Theme.text, 0.2)
+                                onActiveFocusChanged: if (activeFocus) root.ensureVisible(acRow, 32 * settingsWin.u)
 
-                                        // swatch of the Theme colour this choice maps to
-                                        Rectangle {
-                                            id: dot
-                                            anchors.left: parent.left
-                                            anchors.leftMargin: 8 * settingsWin.u
-                                            anchors.verticalCenter: parent.verticalCenter
-                                            width: 10 * settingsWin.u
-                                            height: 10 * settingsWin.u
-                                            radius: width / 2
-                                            color: root.accentColorOf(seg.modelData.id)
-                                        }
-                                        Text {
-                                            anchors.left: dot.right
-                                            anchors.leftMargin: 6 * settingsWin.u
-                                            anchors.right: parent.right
-                                            anchors.rightMargin: 4 * settingsWin.u
-                                            anchors.verticalCenter: parent.verticalCenter
-                                            elide: Text.ElideRight
-                                            text: seg.modelData.label
-                                            font.family: root.th.fontFamily
-                                            font.pixelSize: root.th.textSizeBody * settingsWin.u
-                                            font.bold: seg.picked
-                                            color: seg.picked ? Theme.text : Theme.textDim
-                                        }
-                                        MouseArea {
-                                            id: segArea
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            onClicked: {
-                                                acRow.forceActiveFocus()
-                                                root.accentSource = seg.modelData.id
-                                                root.saveState()
+                                Keys.onPressed: function (event) {
+                                    if (event.key === Qt.Key_Left) {
+                                        root.cycleAccent(-1)
+                                    } else if (event.key === Qt.Key_Right
+                                            || event.key === Qt.Key_Space
+                                            || event.key === Qt.Key_Return
+                                            || event.key === Qt.Key_Enter) {
+                                        root.cycleAccent(1)
+                                    } else if (event.key === Qt.Key_Down) {
+                                        root.focusStep(acRow, true)
+                                    } else if (event.key === Qt.Key_Up) {
+                                        root.focusStep(acRow, false)
+                                    } else {
+                                        return
+                                    }
+                                    event.accepted = true
+                                }
+
+                                Rectangle {
+                                    anchors.fill: parent
+                                    anchors.margins: -3 * settingsWin.u
+                                    radius: Math.min(8 * settingsWin.u, root.th.radius * settingsWin.u)
+                                    color: "transparent"
+                                    visible: acRow.activeFocus
+                                    border.width: Math.max(1, Math.round(settingsWin.u))
+                                    border.color: root.cAccent
+                                }
+
+                                Text {
+                                    y: 4 * settingsWin.u
+                                    text: "Highlight color"
+                                    font.family: root.th.fontFamily
+                                    font.pixelSize: root.th.textSizeGroup * settingsWin.u
+                                    font.bold: true
+                                    color: Theme.text
+                                }
+
+                                Row {
+                                    id: acSegs
+                                    y: 22 * settingsWin.u
+                                    width: parent.width
+                                    spacing: 6 * settingsWin.u
+
+                                    Repeater {
+                                        model: root.accentChoices
+                                        delegate: Rectangle {
+                                            id: seg
+                                            required property var modelData
+                                            readonly property bool picked: root.accentSource === modelData.id
+                                            width: (acSegs.width - 2 * acSegs.spacing) / 3
+                                            height: 24 * settingsWin.u
+                                            radius: Math.min(8 * settingsWin.u, root.th.radius * settingsWin.u)
+                                            color: seg.picked
+                                                ? Theme.alpha(root.accentColorOf(modelData.id), 0.18)
+                                                : (segArea.containsMouse ? Theme.alpha(Theme.text, 0.08) : "transparent")
+                                            border.width: 1
+                                            border.color: seg.picked
+                                                ? root.accentColorOf(modelData.id)
+                                                : Theme.alpha(Theme.text, 0.2)
+
+                                            // swatch of the Theme colour this choice maps to
+                                            Rectangle {
+                                                id: dot
+                                                anchors.left: parent.left
+                                                anchors.leftMargin: 8 * settingsWin.u
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                width: 10 * settingsWin.u
+                                                height: 10 * settingsWin.u
+                                                radius: width / 2
+                                                color: root.accentColorOf(seg.modelData.id)
+                                            }
+                                            Text {
+                                                anchors.left: dot.right
+                                                anchors.leftMargin: 6 * settingsWin.u
+                                                anchors.right: parent.right
+                                                anchors.rightMargin: 4 * settingsWin.u
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                elide: Text.ElideRight
+                                                text: seg.modelData.label
+                                                font.family: root.th.fontFamily
+                                                font.pixelSize: root.th.textSizeBody * settingsWin.u
+                                                font.bold: seg.picked
+                                                color: seg.picked ? Theme.text : Theme.textDim
+                                            }
+                                            MouseArea {
+                                                id: segArea
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                onClicked: {
+                                                    acRow.forceActiveFocus()
+                                                    root.accentSource = seg.modelData.id
+                                                    root.saveState()
+                                                }
                                             }
                                         }
                                     }
                                 }
                             }
-                        }
-                        Grid {
-                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                            ToggleRow { host: root; colorKey: "panelBgColor"; label: "Panel background" }
-                        }
+                            Grid {
+                                width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                                ToggleRow { host: root; colorKey: "panelBgColor"; label: "Panel background" }
+                            }
 
-                        // ---------------- INACTIVE ITEMS ----------------
-                        SectionHeader { host: root; text: "Inactive items" }
-                        Grid {
-                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                            ToggleRow { host: root; colorKey: "itemBgColor"; label: "Background" }
-                            SliderRow { host: root; key: "itemOpacity"; label: "Background opacity" }
-                            ToggleRow { host: root; colorKey: "labelColor"; label: "Label color"; enabled: root.showLabels }
-                            SliderRow { host: root; key: "labelOpacity"; label: "Label opacity"; enabled: root.showLabels }
-                            ToggleRow { host: root; colorKey: "iconColor"; label: "Icon color"; enabled: root.showIcons }
-                            SliderRow { host: root; key: "iconOpacity"; label: "Icon opacity"; enabled: root.showIcons }
-                            ToggleRow { host: root; colorKey: "inactiveBorderColor"; label: "Border color" }
-                            SliderRow { host: root; key: "inactiveBorderOpacity"; label: "Border opacity" }
-                        }
+                            // ---------------- INACTIVE ITEMS ----------------
+                            SectionHeader { host: root; text: "Inactive items" }
+                            Grid {
+                                width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                                ToggleRow { host: root; colorKey: "itemBgColor"; label: "Background" }
+                                SliderRow { host: root; key: "itemOpacity"; label: "Background opacity" }
+                                ToggleRow { host: root; colorKey: "labelColor"; label: "Label color"; enabled: root.showLabels }
+                                SliderRow { host: root; key: "labelOpacity"; label: "Label opacity"; enabled: root.showLabels }
+                                ToggleRow { host: root; colorKey: "iconColor"; label: "Icon color"; enabled: root.showIcons }
+                                SliderRow { host: root; key: "iconOpacity"; label: "Icon opacity"; enabled: root.showIcons }
+                                ToggleRow { host: root; colorKey: "inactiveBorderColor"; label: "Border color" }
+                                SliderRow { host: root; key: "inactiveBorderOpacity"; label: "Border opacity" }
+                            }
 
-                        // ---------------- ACTIVE ITEMS ----------------
-                        SectionHeader { host: root; text: "Active items" }
-                        Grid {
-                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                            ToggleRow { host: root; colorKey: "itemBgActiveColor"; label: "Background" }
-                            SliderRow { host: root; key: "hoverBoost"; label: "Background boost" }
-                            ToggleRow { host: root; colorKey: "labelActiveColor"; label: "Label color"; enabled: root.showLabels }
-                            SliderRow { host: root; key: "labelActiveOpacity"; label: "Label opacity"; enabled: root.showLabels }
-                            ToggleRow { host: root; colorKey: "iconActiveColor"; label: "Icon color"; enabled: root.showIcons }
-                            SliderRow { host: root; key: "iconActiveOpacity"; label: "Icon opacity"; enabled: root.showIcons }
-                            ToggleRow { host: root; colorKey: "borderColor"; label: "Border color" }
-                            SliderRow { host: root; key: "borderOpacity"; label: "Border opacity" }
-                        }
+                            // ---------------- ACTIVE ITEMS ----------------
+                            SectionHeader { host: root; text: "Active items" }
+                            Grid {
+                                width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                                ToggleRow { host: root; colorKey: "itemBgActiveColor"; label: "Background" }
+                                SliderRow { host: root; key: "hoverBoost"; label: "Background boost" }
+                                ToggleRow { host: root; colorKey: "labelActiveColor"; label: "Label color"; enabled: root.showLabels }
+                                SliderRow { host: root; key: "labelActiveOpacity"; label: "Label opacity"; enabled: root.showLabels }
+                                ToggleRow { host: root; colorKey: "iconActiveColor"; label: "Icon color"; enabled: root.showIcons }
+                                SliderRow { host: root; key: "iconActiveOpacity"; label: "Icon opacity"; enabled: root.showIcons }
+                                ToggleRow { host: root; colorKey: "borderColor"; label: "Border color" }
+                                SliderRow { host: root; key: "borderOpacity"; label: "Border opacity" }
+                            }
 
-                        // ---------------- KEY HINTS & CONFIRM ----------------
-                        SectionHeader { host: root; text: "Key hints & confirm" }
-                        Grid {
-                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                            ToggleRow { host: root; colorKey: "keyHintColor"; label: "Hint text color"; enabled: !root.horizontal && root.showKeyHints }
-                            SliderRow { host: root; key: "keyHintOpacity"; label: "Hint text opacity"; enabled: !root.horizontal && root.showKeyHints }
-                            ToggleRow { host: root; colorKey: "keyHintBgColor"; label: "Hint badge color"; enabled: !root.horizontal && root.showKeyHints }
-                            SliderRow { host: root; key: "keyHintBgOpacity"; label: "Hint badge opacity"; enabled: !root.horizontal && root.showKeyHints }
-                            ToggleRow { host: root; colorKey: "pendingColor"; label: "Confirm text / icon" }
-                            ToggleRow { host: root; colorKey: "pendingBorderColor"; label: "Confirm border" }
-                        }
+                            // ---------------- KEY HINTS & CONFIRM ----------------
+                            SectionHeader { host: root; text: "Key hints & confirm" }
+                            Grid {
+                                width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                                ToggleRow { host: root; colorKey: "keyHintColor"; label: "Hint text color"; enabled: !root.horizontal && root.showKeyHints }
+                                SliderRow { host: root; key: "keyHintOpacity"; label: "Hint text opacity"; enabled: !root.horizontal && root.showKeyHints }
+                                ToggleRow { host: root; colorKey: "keyHintBgColor"; label: "Hint badge color"; enabled: !root.horizontal && root.showKeyHints }
+                                SliderRow { host: root; key: "keyHintBgOpacity"; label: "Hint badge opacity"; enabled: !root.horizontal && root.showKeyHints }
+                                ToggleRow { host: root; colorKey: "pendingColor"; label: "Confirm text / icon" }
+                                ToggleRow { host: root; colorKey: "pendingBorderColor"; label: "Confirm border" }
+                            }
 
-                        // ---------------- BEHAVIOR ----------------
-                        SectionHeader { host: root; text: "Behavior" }
-                        Grid {
-                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                            ToggleRow { host: root; key: "confirmDangerous"; label: "Confirm danger"; checked: root.confirmDangerous }
-                            ToggleRow { host: root; key: "wrapNav"; label: "Wrap around"; checked: root.wrapNav }
-                            ToggleRow { host: root; key: "hoverSelect"; label: "Hover selects"; checked: root.hoverSelect }
-                            ToggleRow { host: root; key: "closeOnOutside"; label: "Click outside"; checked: root.closeOnOutside }
-                        }
+                            // ---------------- BEHAVIOR ----------------
+                            SectionHeader { host: root; text: "Behavior" }
+                            Grid {
+                                width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                                ToggleRow { host: root; key: "confirmDangerous"; label: "Confirm danger"; checked: root.confirmDangerous }
+                                ToggleRow { host: root; key: "wrapNav"; label: "Wrap around"; checked: root.wrapNav }
+                                ToggleRow { host: root; key: "hoverSelect"; label: "Hover selects"; checked: root.hoverSelect }
+                                ToggleRow { host: root; key: "closeOnOutside"; label: "Click outside"; checked: root.closeOnOutside }
+                            }
 
-                        // ---------------- VISIBLE ACTIONS ----------------
-                        SectionHeader { host: root; text: "Visible actions" }
-                        Grid {
-                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                            Repeater {
-                                model: root.actions
-                                delegate: ToggleRow {
-                                    required property var modelData
-                                    host: root
-                                    label: modelData.label + " (" + modelData.key.toUpperCase() + ")"
-                                    checked: root.hiddenNames.indexOf(modelData.name) < 0
-                                    onToggled: root.toggleAction(modelData.name)
+                            // ---------------- VISIBLE ACTIONS ----------------
+                            SectionHeader { host: root; text: "Visible actions" }
+                            Grid {
+                                width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                                Repeater {
+                                    model: root.actions
+                                    delegate: ToggleRow {
+                                        required property var modelData
+                                        host: root
+                                        label: modelData.label + " (" + modelData.key.toUpperCase() + ")"
+                                        checked: root.hiddenNames.indexOf(modelData.name) < 0
+                                        onToggled: root.toggleAction(modelData.name)
+                                    }
                                 }
                             }
                         }
                     }
-                }
 
-                // The scrollbar sits outside the Flickable's content so it
-                // doesn't scroll away with it.
-                Rectangle {
-                    id: sbTrack
-                    visible: flick.contentHeight > flick.height
-                    x: flick.x + flick.width - 14 * settingsWin.u
-                    y: flick.y
-                    width: 4 * settingsWin.u
-                    height: flick.height
-                    radius: width / 2
-                    color: Theme.alpha(Theme.text, 0.08)
-                }
-
-                Rectangle {
-                    id: sbHandle
-                    visible: flick.contentHeight > flick.height
-                    x: flick.x + flick.width - 14 * settingsWin.u
-                    width: 4 * settingsWin.u
-                    radius: width / 2
-                    height: Math.max(24 * settingsWin.u, flick.height * flick.visibleArea.heightRatio)
-                    y: flick.y + flick.visibleArea.yPosition * flick.height
-                    color: Theme.text
-                    opacity: (sbArea.containsMouse || sbArea.pressed || flick.moving) ? 0.7 : 0.3
-                    Behavior on opacity { NumberAnimation { duration: 150 } }
-
-                    MouseArea {
-                        id: sbArea
-                        anchors.fill: parent
-                        anchors.margins: -5 * settingsWin.u
-                        hoverEnabled: true
-
-                        // Not using drag.target: dragging would overwrite the
-                        // handle's y binding and it would stop following the
-                        // wheel afterwards. Drive contentY instead.
-                        property real grabY: 0
-
-                        onPressed: mouse => {
-                            grabY = mapToItem(flick, mouse.x, mouse.y).y
-                                - flick.visibleArea.yPosition * flick.height
-                        }
-                        onPositionChanged: mouse => {
-                            if (!pressed)
-                                return
-                            var span = flick.height - sbHandle.height
-                            if (span <= 0)
-                                return
-                            var ny = mapToItem(flick, mouse.x, mouse.y).y - grabY
-                            var r = Math.max(0, Math.min(1, ny / span))
-                            flick.contentY = r * (flick.contentHeight - flick.height)
-                        }
-                    }
-                }
-
-                // footer
-                Item {
-                    id: foot
-                    anchors.bottom: parent.bottom
-                    width: parent.width
-                    height: 50 * settingsWin.u
-
+                    // The scrollbar sits outside the Flickable's content so it
+                    // doesn't scroll away with it.
                     Rectangle {
-                        width: parent.width
-                        height: 1
+                        id: sbTrack
+                        visible: flick.contentHeight > flick.height
+                        x: flick.x + flick.width - 14 * settingsWin.u
+                        y: flick.y
+                        width: 4 * settingsWin.u
+                        height: flick.height
+                        radius: width / 2
                         color: Theme.alpha(Theme.text, 0.08)
                     }
 
-                    Row {
-                        x: 20 * settingsWin.u
-                        anchors.verticalCenter: parent.verticalCenter
-                        spacing: 8 * settingsWin.u
+                    Rectangle {
+                        id: sbHandle
+                        visible: flick.contentHeight > flick.height
+                        x: flick.x + flick.width - 14 * settingsWin.u
+                        width: 4 * settingsWin.u
+                        radius: width / 2
+                        height: Math.max(24 * settingsWin.u, flick.height * flick.visibleArea.heightRatio)
+                        y: flick.y + flick.visibleArea.yPosition * flick.height
+                        color: Theme.text
+                        opacity: (sbArea.containsMouse || sbArea.pressed || flick.moving) ? 0.7 : 0.3
+                        Behavior on opacity { NumberAnimation { duration: 150 } }
 
-                        ActionButton {
-                            host: root
-                            label: "Reset all"
-                            enabled: root.modified
-                            onClicked: root.resetAll()
-                        }
-                        ActionButton {
-                            host: root
-                            label: "Reset position"
-                            enabled: root.movedFromDefault
-                            onClicked: root.resetPosition()
+                        MouseArea {
+                            id: sbArea
+                            anchors.fill: parent
+                            anchors.margins: -5 * settingsWin.u
+                            hoverEnabled: true
+
+                            // Not using drag.target: dragging would overwrite the
+                            // handle's y binding and it would stop following the
+                            // wheel afterwards. Drive contentY instead.
+                            property real grabY: 0
+
+                            onPressed: mouse => {
+                                grabY = mapToItem(flick, mouse.x, mouse.y).y
+                                    - flick.visibleArea.yPosition * flick.height
+                            }
+                            onPositionChanged: mouse => {
+                                if (!pressed)
+                                    return
+                                var span = flick.height - sbHandle.height
+                                if (span <= 0)
+                                    return
+                                var ny = mapToItem(flick, mouse.x, mouse.y).y - grabY
+                                var r = Math.max(0, Math.min(1, ny / span))
+                                flick.contentY = r * (flick.contentHeight - flick.height)
+                            }
                         }
                     }
 
-                    ActionButton {
-                        host: root
-                        anchors.right: parent.right
-                        anchors.rightMargin: 20 * settingsWin.u
-                        anchors.verticalCenter: parent.verticalCenter
-                        label: "Done"
-                        primary: true
-                        onClicked: root.closeSettings()
+                    // footer
+                    Item {
+                        id: foot
+                        anchors.bottom: parent.bottom
+                        width: parent.width
+                        height: 50 * settingsWin.u
+
+                        Rectangle {
+                            width: parent.width
+                            height: 1
+                            color: Theme.alpha(Theme.text, 0.08)
+                        }
+
+                        Row {
+                            x: 20 * settingsWin.u
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: 8 * settingsWin.u
+
+                            ActionButton {
+                                host: root
+                                label: "Reset all"
+                                enabled: root.modified
+                                onClicked: root.resetAll()
+                            }
+                            ActionButton {
+                                host: root
+                                label: "Reset position"
+                                enabled: root.movedFromDefault
+                                onClicked: root.resetPosition()
+                            }
+                        }
+
+                        ActionButton {
+                            host: root
+                            anchors.right: parent.right
+                            anchors.rightMargin: 20 * settingsWin.u
+                            anchors.verticalCenter: parent.verticalCenter
+                            label: "Done"
+                            primary: true
+                            onClicked: root.closeSettings()
+                        }
+                    }
+                }
+
+                // Shift + scroll = zoom the whole settings window. Sits above
+                // everything else in the card and only takes wheel events that
+                // carry Shift; plain scrolling is passed on to the Flickable,
+                // and clicks are never touched (no buttons accepted).
+                MouseArea {
+                    id: zoomArea
+                    anchors.fill: parent
+                    z: -1
+                    acceptedButtons: Qt.NoButton
+                    onWheel: wheel => {
+                        if (!(wheel.modifiers & Qt.ShiftModifier)) {
+                            wheel.accepted = false
+                            return
+                        }
+                        // some stacks turn Shift+wheel into a horizontal scroll
+                        var d = wheel.angleDelta.y !== 0 ? wheel.angleDelta.y : wheel.angleDelta.x
+                        if (d !== 0)
+                            root.setSettingsZoom(root.settingsZoom + (d / 120) * root.zoomStep)
+                        wheel.accepted = true
                     }
                 }
             }

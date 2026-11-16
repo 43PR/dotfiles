@@ -58,6 +58,16 @@ Scope {
 
     property real offsetX: 0; property real offsetY: 0; property real volOffsetX: 0; property real volOffsetY: 0
 
+    // Settings window: remembered position (offset from screen centre) and zoom (%).
+    // Saved in the same state file, but deliberately NOT part of "Reset all" /
+    // `modified` (they belong to the menu itself, not the OSD). Double-click the
+    // settings header / footer to reset them.
+    readonly property var winKeys: ["setOffsetX", "setOffsetY", "settingsZoom"]
+    readonly property real zoomMin: 50
+    readonly property real zoomMax: 200
+    property real setOffsetX: 0; property real setOffsetY: 0
+    property real settingsZoom: 100
+
     // Every key in numSpec needs a matching property here (mediaWidth was
     // missing, which collapsed the landscape card).
     property int mediaScale: numSpec.mediaScale.def; property int volScale: numSpec.volScale.def
@@ -96,7 +106,8 @@ Scope {
     // Same scale system as the wallpaper picker's menu:
     //   ui            : screen height / 1080 (resolution independence)
     //   settingsScale : Theme.settingsScale (user's "settings scale" from hub.json)
-    //   menuUi        : ui * settingsScale, multiplies every size in the settings menu.
+    //   settingsZoom  : Shift+scroll zoom of the settings window (percent)
+    //   menuUi        : ui * settingsScale * zoom, multiplies every size in the settings menu.
     // menuUi is kept up to date by a Binding inside the settings window (it knows its screen).
     // Everything below falls back to the picker's defaults if Theme doesn't define it.
     readonly property real settingsScale: Theme.settingsScale ?? 1
@@ -363,6 +374,34 @@ Scope {
         saveState()
     }
 
+    // ---- settings window position / zoom -------------------------------------
+    // The panel sits at screen centre + (setOffsetX, setOffsetY). sw/sh = screen
+    // (window) size, pw/ph = panel size. The header row always stays on screen
+    // and at least `keepVisible` px of the panel stay reachable on every side.
+    function setSettingsPosition(x, y, sw, sh, pw, ph) {
+        if (sw <= 0 || sh <= 0 || pw <= 0 || ph <= 0) { setOffsetX = x; setOffsetY = y; return }
+        var minX = keepVisible - (sw + pw) / 2
+        var maxX = (sw + pw) / 2 - keepVisible
+        var minY = -(sh - ph) / 2
+        var maxY = Math.max(minY, (sh + ph) / 2 - keepVisible)
+        setOffsetX = Math.max(minX, Math.min(maxX, x))
+        setOffsetY = Math.max(minY, Math.min(maxY, y))
+    }
+
+    // Zoom is applied around the panel centre (the centre stays put because the
+    // position is stored as an offset from the screen centre).
+    function zoomSettings(deltaPercent) {
+        settingsZoom = Math.max(zoomMin, Math.min(zoomMax, settingsZoom + deltaPercent))
+        zoomSaveTimer.restart()   // wheel events are frequent; write the file once they stop
+    }
+
+    function resetSettingsWindow() {
+        setOffsetX = 0; setOffsetY = 0; settingsZoom = 100
+        saveState()
+    }
+
+    Timer { id: zoomSaveTimer; interval: 400; onTriggered: root.saveState() }
+
     function setNumber(key, v) { root[key] = clamp(v, numSpec[key].min, numSpec[key].max) }
     function toggleSetting(key) { root[key] = !root[key]; saveState() }
 
@@ -375,7 +414,7 @@ Scope {
 
     function saveState() {
         var s = {}
-        posKeys.concat(numKeys, boolKeys).forEach(k => s[k] = root[k])
+        posKeys.concat(winKeys, numKeys, boolKeys).forEach(k => s[k] = root[k])
         stateFile.setText(JSON.stringify(s))
     }
 
@@ -388,6 +427,10 @@ Scope {
             try {
                 var s = JSON.parse(stateFile.text())
                 root.posKeys.forEach(k => { if (typeof s[k] === "number") root[k] = s[k] })
+                if (typeof s.setOffsetX === "number") root.setOffsetX = s.setOffsetX
+                if (typeof s.setOffsetY === "number") root.setOffsetY = s.setOffsetY
+                if (typeof s.settingsZoom === "number")
+                    root.settingsZoom = Math.max(root.zoomMin, Math.min(root.zoomMax, s.settingsZoom))
                 root.numKeys.forEach(k => {
                     if (typeof s[k] === "number") root[k] = root.clamp(s[k], root.numSpec[k].min, root.numSpec[k].max)
                 })
@@ -851,9 +894,16 @@ Scope {
     }
 
     // ---- settings window: only exists while settings are open -------------
-    // Fixed size on purpose (content-driven height can leave a blank first frame).
-    // Every size below is multiplied by `u` (= ui * Theme.settingsScale), exactly like the
+    // The window itself covers the whole screen (transparent, input mask = the
+    // panel only), exactly like the OSD window, so the panel can be dragged
+    // anywhere without moving a layer-shell surface around.
+    //
+    // Every size below is multiplied by `u` (= ui * Theme.settingsScale * zoom), exactly like the
     // wallpaper picker's menu, so both menus scale together.
+    //
+    // Mouse: drag the header (or the empty part of the footer) to move the
+    // window; Shift + scroll zooms it (50 - 200 %); double-click the header /
+    // footer to reset position and zoom. Position and zoom are remembered.
     //
     // Keyboard: every toggle, slider and footer button is Tab-focusable (Qt's
     // normal focus chain, in visual order). Tab / Shift+Tab or Up / Down move
@@ -868,251 +918,340 @@ Scope {
             id: settingsWin
 
             readonly property real ui: (screen?.height ?? 1080) / 1080
-            readonly property real u: ui * root.settingsScale
+            readonly property real u: ui * root.settingsScale * (root.settingsZoom / 100)
 
+            anchors { top: true; bottom: true; left: true; right: true }
             color: "transparent"
-            implicitWidth: 440 * u
-            implicitHeight: Math.min(600 * u, (screen?.height ?? 800) * 0.85)
             exclusionMode: ExclusionMode.Ignore
 
             WlrLayershell.layer: WlrLayer.Overlay
             WlrLayershell.namespace: "mediaosd-settings"
             WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
 
+            // Only the panel receives input; everything else passes through.
+            mask: Region { item: panel }
+
             // Shares the scale with the reusable components (they read root.menuUi).
             Binding { target: root; property: "menuUi"; value: settingsWin.u }
 
-            Rectangle {
-                anchors.fill: parent
-                radius: root.menuRadius * settingsWin.u
-                color: Theme.bg
-                border.width: 1
-                border.color: Theme.alpha(Theme.text, 0.12)
+            // Keep the panel reachable after a resolution change / zoom.
+            function reclamp() {
+                root.setSettingsPosition(root.setOffsetX, root.setOffsetY,
+                                         sScene.width, sScene.height, panel.width, panel.height)
             }
 
-            FocusScope {
+            // Shift + wheel: 10 % per notch (smooth-scroll devices accumulate smoothly).
+            // Some compositors turn Shift+wheel into a horizontal scroll, so accept both axes.
+            function zoomBy(e) {
+                var d = e.angleDelta.y !== 0 ? e.angleDelta.y : e.angleDelta.x
+                if (d === 0) return
+                root.zoomSettings(d / 120 * 10)
+                reclamp()
+            }
+
+            // Header / footer drag. Positions are measured in sScene coordinates, which
+            // don't move while the panel does, so the drag stays stable.
+            property real dragPressX: 0; property real dragPressY: 0
+            property real dragStartX: 0; property real dragStartY: 0
+
+            function dragStart(area, mouse) {
+                var p = area.mapToItem(sScene, mouse.x, mouse.y)
+                dragPressX = p.x; dragPressY = p.y
+                dragStartX = root.setOffsetX; dragStartY = root.setOffsetY
+            }
+
+            function dragMove(area, mouse) {
+                var p = area.mapToItem(sScene, mouse.x, mouse.y)
+                root.setSettingsPosition(dragStartX + (p.x - dragPressX), dragStartY + (p.y - dragPressY),
+                                         sScene.width, sScene.height, panel.width, panel.height)
+            }
+
+            Component.onCompleted: Qt.callLater(settingsWin.reclamp)
+
+            Item {
+                id: sScene
                 anchors.fill: parent
-                focus: true
-                Keys.onEscapePressed: root.closeSettings()
-
-                // Fallback keys, only reached when the focused control did not
-                // handle the key (or nothing is focused yet): scrolling and C.
-                // Tab / Shift+Tab are deliberately NOT handled here so Qt's focus
-                // chain moves between controls.
-                Keys.onPressed: function (event) {
-                    var maxY = Math.max(0, flick.contentHeight - flick.height)
-                    var step = 48 * settingsWin.u
-                    var page = flick.height * 0.9
-                    var dy = 0
-
-                    switch (event.key) {
-                    case Qt.Key_Down:     dy = step;  break
-                    case Qt.Key_Up:       dy = -step; break
-                    case Qt.Key_PageDown: dy = page;  break
-                    case Qt.Key_PageUp:   dy = -page; break
-                    case Qt.Key_Home:     flick.contentY = 0;    event.accepted = true; return
-                    case Qt.Key_End:      flick.contentY = maxY; event.accepted = true; return
-                    case Qt.Key_C:        root.closeSettings();  event.accepted = true; return
-                    default: return   // Tab, Escape etc. are handled elsewhere
-                    }
-                    flick.contentY = Math.max(0, Math.min(maxY, flick.contentY + dy))
-                    event.accepted = true
-                }
 
                 Item {
-                    id: head
-                    anchors.top: parent.top
-                    width: parent.width
-                    height: 54 * settingsWin.u
+                    id: panel
+                    width: 440 * settingsWin.u
+                    height: Math.min(600 * settingsWin.u, (settingsWin.screen?.height ?? 800) * 0.85)
+                    x: (sScene.width - width) / 2 + root.setOffsetX
+                    y: (sScene.height - height) / 2 + root.setOffsetY
 
-                    Text {
-                        x: 20 * settingsWin.u; y: 10 * settingsWin.u
-                        text: "OSD settings"
-                        font.family: root.menuFont
-                        font.pixelSize: root.textSizeSection * settingsWin.u
-                        font.bold: true
-                        color: Theme.text
+                    // Shift + scroll over the frame / header / footer.
+                    WheelHandler {
+                        acceptedModifiers: Qt.ShiftModifier
+                        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                        onWheel: e => settingsWin.zoomBy(e)
                     }
-                    Text {
-                        x: 20 * settingsWin.u; y: 31 * settingsWin.u
-                        text: "Drag to move · right-click: settings · Tab: navigate"
-                        font.family: root.menuFont
-                        font.pixelSize: root.textSizeSmall * settingsWin.u
-                        color: Theme.textDim
-                    }
-                    Text {
-                        anchors.right: parent.right
-                        anchors.rightMargin: 20 * settingsWin.u
-                        y: 10 * settingsWin.u
-                        width: 24 * settingsWin.u; height: 24 * settingsWin.u
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                        text: "×"
-                        font.family: root.menuFont
-                        font.pixelSize: 22 * settingsWin.u
-                        color: closeArea.containsMouse ? Theme.text : Theme.textDim
-                        MouseArea { id: closeArea; anchors.fill: parent; hoverEnabled: true; onClicked: root.closeSettings() }
-                    }
-                }
 
-                Flickable {
-                    id: flick
-                    anchors { top: head.bottom; bottom: foot.top; left: parent.left; right: parent.right }
-                    anchors.topMargin: 4 * settingsWin.u
-                    contentWidth: width
-                    contentHeight: contentCol.height + 12 * settingsWin.u
-                    clip: true
-                    flickableDirection: Flickable.VerticalFlick
-                    boundsBehavior: Flickable.StopAtBounds
-
-                    Column {
-                        id: contentCol
-                        x: 20 * settingsWin.u
-                        width: flick.width - 48 * settingsWin.u
-
-                        SectionHeader { text: "Global" }
-                        Grid {
-                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                            ToggleRow { key: "showTips"; label: "Tooltips" }
-                            SliderRow { key: "fadeMs"; label: "Animation" }
-                            SliderRow { key: "mediaScale"; label: "Media scale" }
-                            SliderRow { key: "volScale"; label: "Volume scale" }
-                        }
-
-                        SectionHeader { text: "Content" }
-                        Grid {
-                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                            ToggleRow { key: "showArt"; label: "Album art" }
-                            ToggleRow { key: "showTitle"; label: "Title" }
-                            ToggleRow { key: "showArtist"; label: "Artist" }
-                            ToggleRow { key: "showControls"; label: "Controls" }
-                            ToggleRow { key: "showBar"; label: "Visualizer & bar" }
-                            ToggleRow { key: "showVisualizer"; label: "Visualizer"; enabled: root.showBar }
-                        }
-
-                        SectionHeader { text: "Layout" }
-                        Grid {
-                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                            ToggleRow { key: "portrait"; label: "Portrait" }
-                            ToggleRow {
-                                key: "artistBelow"
-                                label: "Artist below"
-                                checked: root.artistBelow || root.portrait
-                                enabled: !root.portrait && root.showTitle && root.showArtist
-                            }
-                            ToggleRow { key: "showBorder"; label: "Border" }
-                            SliderRow { key: root.portrait ? "portraitWidth" : "mediaWidth"; label: "Width" }
-                            SliderRow { key: "artSize"; label: "Art size"; enabled: root.showArt && !root.portrait }
-                            SliderRow { key: "cardRadius"; label: "Corner radius" }
-                        }
-
-                        SectionHeader { text: "Visualizer" }
-                        Grid {
-                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                            SliderRow { key: "barCount"; label: "Bars"; enabled: root.showBar && root.showVisualizer }
-                            SliderRow { key: "barSpacing"; label: "Spacing"; enabled: root.showBar && root.showVisualizer }
-                            SliderRow { key: "barHeight"; label: "Height"; enabled: root.showBar }
-                            SliderRow { key: "barRadius"; label: "Round"; enabled: root.showBar }
-                            SliderRow { key: "barFps"; label: "Frame rate"; enabled: root.showBar && root.showVisualizer }
-                            SliderRow { key: "barSensitivity"; label: "Sensitivity"; enabled: root.showBar && root.showVisualizer }
-                            ToggleRow { key: "accentBars"; label: "Accent colour"; enabled: root.showBar }
-                        }
-
-                        SectionHeader { text: "Opacity" }
-                        Grid {
-                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                            SliderRow { key: "bgOpacity"; label: "Background" }
-                            SliderRow { key: "artOpacity"; label: "Album art"; enabled: root.showArt }
-                            SliderRow { key: "barOpacity"; label: "Bars played"; enabled: root.showBar }
-                            SliderRow { key: "barDimOpacity"; label: "Bars remaining"; enabled: root.showBar }
-                        }
-
-                        SectionHeader { text: "Behavior" }
-                        Grid {
-                            width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                            ToggleRow { key: "musicOnly"; label: "Music only" }
-                            ToggleRow { key: "trackChangeOsd"; label: "On track change" }
-                            SliderRow { key: "mediaTimeout"; label: "Media hide after" }
-                            SliderRow { key: "volTimeout"; label: "Volume hide after" }
-                        }
-
-                        SectionHeader { text: "Position" }
-                        Row {
-                            spacing: 8 * settingsWin.u
-                            ActionButton { label: "Reset media position"; enabled: root.mediaMoved; onClicked: root.resetPos(true) }
-                            ActionButton { label: "Reset volume position"; enabled: root.volMoved; onClicked: root.resetPos(false) }
-                        }
-                    }
-                }
-
-                // Scrollbar lives outside the Flickable content so it doesn't scroll away.
-                Rectangle {
-                    visible: flick.contentHeight > flick.height
-                    x: flick.x + flick.width - 14 * settingsWin.u
-                    y: flick.y
-                    width: 4 * settingsWin.u
-                    height: flick.height
-                    radius: 2 * settingsWin.u
-                    color: Theme.alpha(Theme.text, 0.08)
-                }
-
-                Rectangle {
-                    id: sbHandle
-                    visible: flick.contentHeight > flick.height
-                    x: flick.x + flick.width - 14 * settingsWin.u
-                    width: 4 * settingsWin.u
-                    radius: 2 * settingsWin.u
-                    height: Math.max(24 * settingsWin.u, flick.height * flick.visibleArea.heightRatio)
-                    y: flick.y + flick.visibleArea.yPosition * flick.height
-                    color: Theme.text
-                    opacity: (sbArea.containsMouse || sbArea.pressed || flick.moving) ? 0.7 : 0.3
-                    Behavior on opacity { NumberAnimation { duration: 150 } }
-
-                    MouseArea {
-                        id: sbArea
+                    Rectangle {
                         anchors.fill: parent
-                        anchors.margins: -5 * settingsWin.u
-                        hoverEnabled: true
-
-                        // Drive contentY instead of drag.target (which would break the y binding).
-                        property real grabY: 0
-
-                        onPressed: mouse => {
-                            grabY = mapToItem(flick, mouse.x, mouse.y).y - flick.visibleArea.yPosition * flick.height
-                        }
-                        onPositionChanged: mouse => {
-                            if (!pressed) return
-                            var span = flick.height - sbHandle.height
-                            if (span <= 0) return
-                            var r = Math.max(0, Math.min(1, (mapToItem(flick, mouse.x, mouse.y).y - grabY) / span))
-                            flick.contentY = r * (flick.contentHeight - flick.height)
-                        }
-                    }
-                }
-
-                Item {
-                    id: foot
-                    anchors.bottom: parent.bottom
-                    width: parent.width
-                    height: 50 * settingsWin.u
-
-                    Rectangle { width: parent.width; height: 1; color: Theme.alpha(Theme.text, 0.08) }
-
-                    ActionButton {
-                        x: 20 * settingsWin.u
-                        anchors.verticalCenter: parent.verticalCenter
-                        label: "Reset all"
-                        enabled: root.modified
-                        onClicked: root.resetAll()
+                        radius: root.menuRadius * settingsWin.u
+                        color: Theme.bg
+                        border.width: 1
+                        border.color: Theme.alpha(Theme.text, 0.12)
                     }
 
-                    ActionButton {
-                        anchors.right: parent.right
-                        anchors.rightMargin: 20 * settingsWin.u
-                        anchors.verticalCenter: parent.verticalCenter
-                        label: "Done"
-                        primary: true
-                        onClicked: root.closeSettings()
+                    FocusScope {
+                        anchors.fill: parent
+                        focus: true
+                        Keys.onEscapePressed: root.closeSettings()
+
+                        // Fallback keys, only reached when the focused control did not
+                        // handle the key (or nothing is focused yet): scrolling and C.
+                        // Tab / Shift+Tab are deliberately NOT handled here so Qt's focus
+                        // chain moves between controls.
+                        Keys.onPressed: function (event) {
+                            var maxY = Math.max(0, flick.contentHeight - flick.height)
+                            var step = 48 * settingsWin.u
+                            var page = flick.height * 0.9
+                            var dy = 0
+
+                            switch (event.key) {
+                            case Qt.Key_Down:     dy = step;  break
+                            case Qt.Key_Up:       dy = -step; break
+                            case Qt.Key_PageDown: dy = page;  break
+                            case Qt.Key_PageUp:   dy = -page; break
+                            case Qt.Key_Home:     flick.contentY = 0;    event.accepted = true; return
+                            case Qt.Key_End:      flick.contentY = maxY; event.accepted = true; return
+                            case Qt.Key_C:        root.closeSettings();  event.accepted = true; return
+                            default: return   // Tab, Escape etc. are handled elsewhere
+                            }
+                            flick.contentY = Math.max(0, Math.min(maxY, flick.contentY + dy))
+                            event.accepted = true
+                        }
+
+                        Item {
+                            id: head
+                            anchors.top: parent.top
+                            width: parent.width
+                            height: 54 * settingsWin.u
+
+                            // Drag handle (declared first so the close button stays on top).
+                            MouseArea {
+                                id: headDrag
+                                anchors.fill: parent
+                                acceptedButtons: Qt.LeftButton
+                                cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+                                onPressed: mouse => settingsWin.dragStart(headDrag, mouse)
+                                onPositionChanged: mouse => { if (pressed) settingsWin.dragMove(headDrag, mouse) }
+                                onReleased: root.saveState()
+                                onCanceled: root.saveState()
+                                onDoubleClicked: root.resetSettingsWindow()
+                            }
+
+                            Text {
+                                x: 20 * settingsWin.u; y: 10 * settingsWin.u
+                                text: "OSD settings"
+                                font.family: root.menuFont
+                                font.pixelSize: root.textSizeSection * settingsWin.u
+                                font.bold: true
+                                color: Theme.text
+                            }
+                            Text {
+                                x: 20 * settingsWin.u; y: 31 * settingsWin.u
+                                text: "Drag · Tab · Shift+scroll"
+                                font.family: root.menuFont
+                                font.pixelSize: root.textSizeSmall * settingsWin.u
+                                color: Theme.textDim
+                            }
+                            Text {
+                                anchors.right: parent.right
+                                anchors.rightMargin: 20 * settingsWin.u
+                                y: 10 * settingsWin.u
+                                width: 24 * settingsWin.u; height: 24 * settingsWin.u
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                text: "×"
+                                font.family: root.menuFont
+                                font.pixelSize: 22 * settingsWin.u
+                                color: closeArea.containsMouse ? Theme.text : Theme.textDim
+                                MouseArea { id: closeArea; anchors.fill: parent; hoverEnabled: true; onClicked: root.closeSettings() }
+                            }
+                        }
+
+                        Flickable {
+                            id: flick
+                            anchors { top: head.bottom; bottom: foot.top; left: parent.left; right: parent.right }
+                            anchors.topMargin: 4 * settingsWin.u
+                            contentWidth: width
+                            contentHeight: contentCol.height + 12 * settingsWin.u
+                            clip: true
+                            flickableDirection: Flickable.VerticalFlick
+                            boundsBehavior: Flickable.StopAtBounds
+
+                            // Shift + scroll over the content zooms instead of scrolling.
+                            WheelHandler {
+                                acceptedModifiers: Qt.ShiftModifier
+                                acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                                onWheel: e => settingsWin.zoomBy(e)
+                            }
+
+                            Column {
+                                id: contentCol
+                                x: 20 * settingsWin.u
+                                width: flick.width - 48 * settingsWin.u
+
+                                SectionHeader { text: "Global" }
+                                Grid {
+                                    width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                                    ToggleRow { key: "showTips"; label: "Tooltips" }
+                                    SliderRow { key: "fadeMs"; label: "Animation" }
+                                    SliderRow { key: "mediaScale"; label: "Media scale" }
+                                    SliderRow { key: "volScale"; label: "Volume scale" }
+                                }
+
+                                SectionHeader { text: "Content" }
+                                Grid {
+                                    width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                                    ToggleRow { key: "showArt"; label: "Album art" }
+                                    ToggleRow { key: "showTitle"; label: "Title" }
+                                    ToggleRow { key: "showArtist"; label: "Artist" }
+                                    ToggleRow { key: "showControls"; label: "Controls" }
+                                    ToggleRow { key: "showBar"; label: "Visualizer & bar" }
+                                    ToggleRow { key: "showVisualizer"; label: "Visualizer"; enabled: root.showBar }
+                                }
+
+                                SectionHeader { text: "Layout" }
+                                Grid {
+                                    width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                                    ToggleRow { key: "portrait"; label: "Portrait" }
+                                    ToggleRow {
+                                        key: "artistBelow"
+                                        label: "Artist below"
+                                        checked: root.artistBelow || root.portrait
+                                        enabled: !root.portrait && root.showTitle && root.showArtist
+                                    }
+                                    ToggleRow { key: "showBorder"; label: "Border" }
+                                    SliderRow { key: root.portrait ? "portraitWidth" : "mediaWidth"; label: "Width" }
+                                    SliderRow { key: "artSize"; label: "Art size"; enabled: root.showArt && !root.portrait }
+                                    SliderRow { key: "cardRadius"; label: "Corner radius" }
+                                }
+
+                                SectionHeader { text: "Visualizer" }
+                                Grid {
+                                    width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                                    SliderRow { key: "barCount"; label: "Bars"; enabled: root.showBar && root.showVisualizer }
+                                    SliderRow { key: "barSpacing"; label: "Spacing"; enabled: root.showBar && root.showVisualizer }
+                                    SliderRow { key: "barHeight"; label: "Height"; enabled: root.showBar }
+                                    SliderRow { key: "barRadius"; label: "Round"; enabled: root.showBar }
+                                    SliderRow { key: "barFps"; label: "Frame rate"; enabled: root.showBar && root.showVisualizer }
+                                    SliderRow { key: "barSensitivity"; label: "Sensitivity"; enabled: root.showBar && root.showVisualizer }
+                                    ToggleRow { key: "accentBars"; label: "Accent colour"; enabled: root.showBar }
+                                }
+
+                                SectionHeader { text: "Opacity" }
+                                Grid {
+                                    width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                                    SliderRow { key: "bgOpacity"; label: "Background" }
+                                    SliderRow { key: "artOpacity"; label: "Album art"; enabled: root.showArt }
+                                    SliderRow { key: "barOpacity"; label: "Bars played"; enabled: root.showBar }
+                                    SliderRow { key: "barDimOpacity"; label: "Bars remaining"; enabled: root.showBar }
+                                }
+
+                                SectionHeader { text: "Behavior" }
+                                Grid {
+                                    width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                                    ToggleRow { key: "musicOnly"; label: "Music only" }
+                                    ToggleRow { key: "trackChangeOsd"; label: "On track change" }
+                                    SliderRow { key: "mediaTimeout"; label: "Media hide after" }
+                                    SliderRow { key: "volTimeout"; label: "Volume hide after" }
+                                }
+
+                                SectionHeader { text: "Position" }
+                                Row {
+                                    spacing: 8 * settingsWin.u
+                                    ActionButton { label: "Reset media position"; enabled: root.mediaMoved; onClicked: root.resetPos(true) }
+                                    ActionButton { label: "Reset volume position"; enabled: root.volMoved; onClicked: root.resetPos(false) }
+                                }
+                            }
+                        }
+
+                        // Scrollbar lives outside the Flickable content so it doesn't scroll away.
+                        Rectangle {
+                            visible: flick.contentHeight > flick.height
+                            x: flick.x + flick.width - 14 * settingsWin.u
+                            y: flick.y
+                            width: 4 * settingsWin.u
+                            height: flick.height
+                            radius: 2 * settingsWin.u
+                            color: Theme.alpha(Theme.text, 0.08)
+                        }
+
+                        Rectangle {
+                            id: sbHandle
+                            visible: flick.contentHeight > flick.height
+                            x: flick.x + flick.width - 14 * settingsWin.u
+                            width: 4 * settingsWin.u
+                            radius: 2 * settingsWin.u
+                            height: Math.max(24 * settingsWin.u, flick.height * flick.visibleArea.heightRatio)
+                            y: flick.y + flick.visibleArea.yPosition * flick.height
+                            color: Theme.text
+                            opacity: (sbArea.containsMouse || sbArea.pressed || flick.moving) ? 0.7 : 0.3
+                            Behavior on opacity { NumberAnimation { duration: 150 } }
+
+                            MouseArea {
+                                id: sbArea
+                                anchors.fill: parent
+                                anchors.margins: -5 * settingsWin.u
+                                hoverEnabled: true
+
+                                // Drive contentY instead of drag.target (which would break the y binding).
+                                property real grabY: 0
+
+                                onPressed: mouse => {
+                                    grabY = mapToItem(flick, mouse.x, mouse.y).y - flick.visibleArea.yPosition * flick.height
+                                }
+                                onPositionChanged: mouse => {
+                                    if (!pressed) return
+                                    var span = flick.height - sbHandle.height
+                                    if (span <= 0) return
+                                    var r = Math.max(0, Math.min(1, (mapToItem(flick, mouse.x, mouse.y).y - grabY) / span))
+                                    flick.contentY = r * (flick.contentHeight - flick.height)
+                                }
+                            }
+                        }
+
+                        Item {
+                            id: foot
+                            anchors.bottom: parent.bottom
+                            width: parent.width
+                            height: 50 * settingsWin.u
+
+                            Rectangle { width: parent.width; height: 1; color: Theme.alpha(Theme.text, 0.08) }
+
+                            // Empty footer space is a drag handle too (buttons sit on top).
+                            MouseArea {
+                                id: footDrag
+                                anchors.fill: parent
+                                acceptedButtons: Qt.LeftButton
+                                cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+                                onPressed: mouse => settingsWin.dragStart(footDrag, mouse)
+                                onPositionChanged: mouse => { if (pressed) settingsWin.dragMove(footDrag, mouse) }
+                                onReleased: root.saveState()
+                                onCanceled: root.saveState()
+                                onDoubleClicked: root.resetSettingsWindow()
+                            }
+
+                            ActionButton {
+                                x: 20 * settingsWin.u
+                                anchors.verticalCenter: parent.verticalCenter
+                                label: "Reset all"
+                                enabled: root.modified
+                                onClicked: root.resetAll()
+                            }
+
+                            ActionButton {
+                                anchors.right: parent.right
+                                anchors.rightMargin: 20 * settingsWin.u
+                                anchors.verticalCenter: parent.verticalCenter
+                                label: "Done"
+                                primary: true
+                                onClicked: root.closeSettings()
+                            }
+                        }
                     }
                 }
             }
