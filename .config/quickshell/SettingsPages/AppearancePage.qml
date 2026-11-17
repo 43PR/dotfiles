@@ -20,7 +20,7 @@ Item {
     readonly property real tiltMin: 0
     readonly property real tiltMax: 15
     readonly property real scaleMin: 0.6
-    readonly property real scaleMax: 1.2
+    readonly property real scaleMax: 1
     readonly property real radiusMin: 0
     readonly property real radiusMax: 35
     // Border opacity stops at 10% so borders can't vanish completely by accident

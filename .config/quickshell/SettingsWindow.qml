@@ -628,7 +628,7 @@ Scope {
                                 property real w: positionHandle.width
                                 property real h: positionHandle.height
                                 property real r: 6
-                                property real fx: 30
+                                property real fx: 0
                                 property real fy: 0
 
                                 strokeColor: Theme.accent
@@ -676,7 +676,7 @@ Scope {
                                 font.pixelSize: 8
                                 color: Theme.textDim
                                 anchors.verticalCenter: parent.verticalCenter
-                                MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: root.snapTop() }
+                                MouseArea { anchors.fill: parent; anchors.margins: -4; cursorShape: Qt.PointingHandCursor; onClicked: root.snapTop() }
                             }
                             Text {
                                 text: "●"
@@ -684,7 +684,7 @@ Scope {
                                 font.pixelSize: 8
                                 color: Theme.textDim
                                 anchors.verticalCenter: parent.verticalCenter
-                                MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: root.snapCenter() }
+                                MouseArea { anchors.fill: parent; anchors.margins: -4; cursorShape: Qt.PointingHandCursor; onClicked: root.snapCenter() }
                             }
                             Text {
                                 text: "●"
@@ -692,7 +692,7 @@ Scope {
                                 font.pixelSize: 8
                                 color: Theme.textDim
                                 anchors.verticalCenter: parent.verticalCenter
-                                MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: root.snapBottom() }
+                                MouseArea { anchors.fill: parent; anchors.margins: -4; cursorShape: Qt.PointingHandCursor; onClicked: root.snapBottom() }
                             }
                         }
                     }
@@ -985,6 +985,7 @@ Scope {
 
                                             MouseArea {
                                                 anchors.fill: parent
+                                                cursorShape: Qt.PointingHandCursor
                                                 onClicked: root.selectedIndex = modelData.origIndex
                                             }
                                         }
@@ -1090,7 +1091,7 @@ Scope {
 
                     // ---- corner resize grips ----
                     Repeater {
-                        model: ["tr", "bl", "br"]
+                        model: ["bl", "br"] 
 
                         delegate: MouseArea {
                             id: grip
@@ -1135,6 +1136,19 @@ Scope {
                             onReleased: if (root.resizing) root.finishResize()
                             onCanceled: if (root.resizing) root.finishResize()
                         }
+                    }
+                    // ---- invisible top-right close hotspot ----
+                    MouseArea {
+                        id: closeCorner
+                        width: root.resizeGripSize
+                        height: root.resizeGripSize
+                        anchors.top: parent.top
+                        anchors.right: parent.right
+                        z: 10
+                        acceptedButtons: Qt.LeftButton
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.hide()
                     }
                 }
             }

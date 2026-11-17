@@ -73,18 +73,13 @@ Item {
     // Wrap a script so the terminal stays open until Enter is pressed.
     function inTerminal(title, script) {
         const full = script
-            + "; printf '\\n\\033[1;32m[DONE]\\033[0m Press Enter to close...'; read -r _"
+            + "; printf '\\n\\033[1;32m[DONE]\\033[0m You can close this window.\\n'; exec bash"
         return [terminal, "--title", title, "bash", "-c", full]
     }
     function run(title, script) {
-        if (runner.running) {
-            page.statusText = "ANOTHER UPDATE IS STILL RUNNING"
-            return
-        }
-        page.statusText = title.toUpperCase() + " RUNNING…"
-        runner.title = title
-        runner.command = inTerminal(title, script)
-        runner.running = true
+        page.statusText = title.toUpperCase() + " LAUNCHED"
+        Quickshell.execDetached(inTerminal(title, script))
+        refreshTimer.restart()
     }
 
     // ---- Individual update scripts ----

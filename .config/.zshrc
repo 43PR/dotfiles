@@ -90,3 +90,4 @@ ZSH_HIGHLIGHT_STYLES[unknown-token]='fg=245'
 # --------------------------------------------------
 
 theme() { python3 "$HOME/.config/43pr/bin/theme.py" "$@"; }
+export PATH="$HOME/.local/bin:$PATH"
