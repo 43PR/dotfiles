@@ -18,6 +18,8 @@ Item {
     property real marginRight: 10
     property real marginTop: 0
     property real marginBottom: 0
+    signal searchFocusReleased()
+    signal closeRequested()
     // Slider bounds only. Hyprland's own scale limits were not verified.
     property real scaleMin: 0.5
     property real scaleMax: 3.0
@@ -618,7 +620,14 @@ Item {
 
     Timer { id: refreshTimer; interval: 250; onTriggered: page.refresh() }
     Timer { id: lateRefreshTimer; interval: 1500; onTriggered: page.refresh() }
-
+    // ValueSlider preset for the scale row (value shown inside the row, click to type)
+    component DispSlider: ValueSlider {
+        inline: true
+        valueFontSize: Theme.textSizeBody
+        valueColor: Theme.text
+        onEditFinished: page.searchFocusReleased()
+        onEscapePressed: page.closeRequested()
+    }
     Flickable {
         id: flick
         anchors.fill: parent
@@ -763,29 +772,24 @@ Item {
                                     text: "SCALE"; color: Theme.textDim
                                     font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
                                 }
-
-                                Slider {
-                                    id: scaleSlider
-                                    width: parent.width - 36 - 44 - 16
+                                DispSlider {
+                                    width: parent.width - 36 - 8
                                     anchors.verticalCenter: parent.verticalCenter
-                                    icon: "\uf00e"
-                                    value: page.scaleToSlider(card.modelData.scale)
-                                    onCommitted: v => {
-                                        const target = page.pickScale(card.modelData,
-                                            page.scaleMin + v * (page.scaleMax - page.scaleMin))
-                                        page.setScale(card.modelData, target)
-                                        // Interaction can break the binding above; restore it so the handle
-                                        // jumps to the accepted scale instead of staying where you clicked.
-                                        scaleSlider.value = Qt.binding(() => page.scaleToSlider(card.modelData.scale))
-                                    }
-                                }
+                                    from: page.scaleMin; to: page.scaleMax; step: 0
+                                    unit: "x"; decimals: 2; valueWidth: 44
 
-                                Text {
-                                    width: 44; anchors.verticalCenter: parent.verticalCenter
-                                    horizontalAlignment: Text.AlignRight
-                                    text: card.modelData.scale.toFixed(2) + "x"
-                                    color: Theme.text
-                                    font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
+                                    // While dragging, show the dragged value. Otherwise follow the applied scale.
+                                    property real live: 0
+                                    onDraggingChanged: if (dragging) live = card.modelData.scale
+                                    value: dragging ? live : card.modelData.scale
+                                    onMoved: v => { if (dragging) live = v }
+
+                                    // Apply once: on release, or right away for typed values and arrow keys.
+                                    onCommitted: v => {
+                                        const target = page.pickScale(card.modelData, v)
+                                        if (Math.abs(target - card.modelData.scale) > 1e-6)
+                                            page.setScale(card.modelData, target)
+                                    }
                                 }
                             }
 

@@ -52,29 +52,20 @@ Singleton {
     readonly property var table: ({
         // Applied to every module first. Example: "*": { all: { y: 0 } }
         "*": {},
-        // ── generic icon buttons (text glyphs) ──
-        notif:    { h: { x: -1, y: 0.5, textY: -1 },            v: { x: -1, textY: 0 } },
-        wall:     { h: { x: -1, y: 0 },                         v: {} },
-        settings: { h: { x: -1, y: 0 },                         v: { x: -1 } },
-        power:    { h: { x: -1, y: 1, textY: -1 },              v: { x: -1, textY: 0 } },
-        // ── clock (text only) ──
-        clock:    { h: { y: 1, textY: -1 },              v: {} },
-        // ── network / bluetooth ──
-        net:      { h: { x: -1, y: 1, iconY: -1 },              v: { x: -1, iconY: 0 } },
-        bt:       { all: { scaleX: 1.17 },
-                    h: { x: -1, y: 1, iconY: -1 },              v: { x: -1, iconY: 0 } },
-        // ── meters ──
-        volume:   { h: { y: 1.25, iconY: -1, textY: -1 }, v: { x: -1, iconY: 0, textY: -1 } },
-        // iconY applies to the plain glyph / drawn icon; ringIconY to the ring gauge
-        battery:  { h: { y: 1.25, iconY: -1.25, ringIconY: 0, textY: -1 },
-                    v: { textY: -1 } },
-        bright:   { h: { y: 0 },                         v: { x: -1 } },
-        night:    { h: { y: 0 },                         v: { x: -1 } },
-        // ── system tray arrow ──
-        tray:     { all: { glyphSize: -1 } },
-        // STARS icon set: glyph is 2 px smaller than the sun / moon
+        notif:         { h: { x: -1, y: 0.5, textY: -1 }, v: { x: -1, textY: 0 } },
+        wall:          { h: { x: -1, y: 1 }, v: {} },
+        settings:      { h: { x: -1, y: 0 }, v: { x: -1 } },
+        power:         { h: { x: -1, y: 1, textY: -1 }, v: { x: 0, textY: 0 } },
+        clock:         { h: { y: 1, textY: -1 }, v: {} },
+        net:           { h: { x: -1, y: 1, iconY: -1 }, v: { x: -1, iconY: 0 } },
+        bt:            { all: { scaleX: 1.17 }, h: { x: 0, y: 1, iconY: -1 }, v: { x: 1, iconY: 0 } },
+        volume:        { h: { y: 1.25, iconY: -1, textY: -1 }, v: { x: 0, iconY: 0, textY: -1 } },
+        battery:       { h: { y: 1.25, iconY: -1.25, ringIconY: 0, textY: -1 }, v: { textY: -1 } },
+        bright:        { h: { y: 0 }, v: { x: 0 } },
+        night:         { h: { y: 0 }, v: { x: 0 } },
         "bright.star": { all: { glyphSize: -2 } },
-        "night.star":  { all: { glyphSize: -2 } }
+        "night.star":  { all: { glyphSize: -2 } },
+        tray:          { all: { glyphSize: -1 }, h: { x: -1 }, v: { x: 1 } },
     })
     // ───────────────────────── Colours ─────────────────────────
     // Every icon colour role lives here. Bar.qml asks IconTune.color(moduleId, role).

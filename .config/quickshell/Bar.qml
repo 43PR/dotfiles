@@ -13,25 +13,25 @@ import Quickshell.Services.UPower
 Scope {
     id: root
     readonly property var defaults: ({
-        position: "left", style: "islands", thickness: 22, margin: 4,
+        position: "left", style: "islands", thickness: 22, margin: 4, insetH: 11, insetV: 4,
         reserveSpace: true, allScreens: true, dragModules: true,
-        scale: 1, barScale: 0.75, bgOpacity: 0.2, border: true, borderOpacity: 0.05, radius: 37, calRadius: 15, calScale: 0.9,
-        tooltips: true, tooltipHints: false, tooltipBorder: true, tipDelay: 450, tooltipScale: 0.85,
-        modPad: 6, wsDot: 15, wsGap: 10, wsScroll: true, wsStyle: "minimal",
+        scale: 0.9, barScale: 0.75, bgOpacity: 0.1, border: true, borderOpacity: 0.1, radius: 15, calRadius: 15, calScale: 0.9,
+        tooltips: true, tooltipHints: true, tooltipBorder: true, tipDelay: 450, tooltipScale: 0.85,
+        modPad: 3, islandGap: 4, wsDot: 15, wsGap: 10, wsScroll: true, wsStyle: "minimal",
         tasksScale: 0.75, tasksGap: 2, tasksColor: "accent",
-        statsRing: true, statsNumbers: false, statsPercent: false, statsIcons: false, statsScale: 1, statsBorder: false, statsRadius: 24, statsGap: 2, statsWarn: 85, tempWarn: 85, batLowPct: 15,
+        statsRing: true, statsNumbers: false, statsPercent: false, statsIcons: false, statsScale: 1, statsBorder: false, statsRadius: 24, statsGap: 0, statsWarn: 85, tempWarn: 85, batLowPct: 15,
         batNumber: false, batPercent: false, batRing: true, batLabel: false,
         volStep: 5, volMax: 100, volNumber: false, volPercent: false, volRing: true, volLabel: false,
         trayArrow: true, lightIcons: "star", brightStep: 5, nightStep: 100, brightRing: true, nightRing: true,
         clock24: true, clockSeconds: false, clockPadHour: true, clockDate: true, clockDay: false, clockCase: "normal", dateOrder: "md", weekMonday: true,
         clockPrimary: "calendar", clockSecondary: "settings", clockTertiary: "barsettings",
         settingsPrimary: "settings", settingsSecondary: "barsettings", settingsTertiary: "none",
-        hidden: "wall,settings,bright,gputemp,ram",
-        startMods: "cpu,gpu,gputemp,ram,cputemp,ws,notif,night",
-        midLeftMods: "tasks,tray",
+        hidden: "gputemp,gpu,settings,bright,night,wall",
+        startMods: "cputemp,ram,cpu,gpu,gputemp",
+        midLeftMods: "tasks,tray,ws",
         centerMods: "clock",
-        midRightMods: "",
-        endMods: "media,bright,volume,battery,wall,settings,bt,net,power"
+        midRightMods: "media",
+        endMods: "volume,net,bt,notif,power,bright,night,battery,settings,wall"
     })
     readonly property var positions: ["top", "right", "bottom", "left"]
     readonly property var styles: ["floating", "joined", "strip", "islands"]
@@ -44,6 +44,7 @@ Scope {
         adapter: JsonAdapter {
             id: cfg; property string position: root.defaults.position; property string style: root.defaults.style
             property int thickness: root.defaults.thickness; property int margin: root.defaults.margin
+            property int insetH: root.defaults.insetH; property int insetV: root.defaults.insetV
             property bool reserveSpace: root.defaults.reserveSpace; property bool allScreens: root.defaults.allScreens
             property bool dragModules: root.defaults.dragModules; property real scale: root.defaults.scale
             property real barScale: root.defaults.barScale; property real bgOpacity: root.defaults.bgOpacity
@@ -52,7 +53,7 @@ Scope {
             property real calScale: root.defaults.calScale; property bool tooltips: root.defaults.tooltips
             property bool tooltipHints: root.defaults.tooltipHints
             property bool tooltipBorder: root.defaults.tooltipBorder; property int tipDelay: root.defaults.tipDelay
-            property real tooltipScale: root.defaults.tooltipScale; property int modPad: root.defaults.modPad
+            property real tooltipScale: root.defaults.tooltipScale; property int modPad: root.defaults.modPad; property int islandGap: root.defaults.islandGap
             property int wsDot: root.defaults.wsDot; property int wsGap: root.defaults.wsGap
             property bool wsScroll: root.defaults.wsScroll; property string wsStyle: root.defaults.wsStyle
             property real tasksScale: root.defaults.tasksScale; property int tasksGap: root.defaults.tasksGap
@@ -98,7 +99,12 @@ Scope {
     readonly property int panelThick: Math.round((vertical ? cfg.thickness + 12 : cfg.thickness) * bs)
     readonly property int effEdge: strip ? 0 : Math.round(cfg.margin * bs)
     readonly property int effGap: strip ? 0 : Math.round(6 * bs)
+    readonly property int alongMargin: strip || islands ? 0 : Math.round(14 * bs)
+    readonly property int barInset: vertical ? cfg.insetV : cfg.insetH
     readonly property int modPadPx: Math.round(cfg.modPad * bs)
+    readonly property int islandGapPx: Math.round(cfg.islandGap * bs)
+    readonly property var selfPadded: ["cpu", "ram", "gpu", "cputemp", "gputemp", "ws", "tasks", "clock", "media"]
+
     readonly property int wsBoxPx: Math.max(3, Math.round(cfg.wsDot * bs))
     readonly property int wsGapPx: Math.round(cfg.wsGap * bs)
     readonly property real barRadius: strip ? 0 : cfg.radius
@@ -106,7 +112,7 @@ Scope {
     readonly property color borderColor: Qt.alpha(Theme.accent, cfg.borderOpacity)
     function s(n) { return Math.round(n * cfg.scale * cfg.barScale); }
     readonly property var sz: ({
-        stat: s(12), clock: s(12), marquee: s(11),
+        stat: s(12), clock: s(12), marquee: s(12),
         icon: s(16), batText: s(12), power: s(16), taskIcon: s(18)
     })
     readonly property int sizeIconGap: Math.round(12 * bs); readonly property int iconYOffset: 1
@@ -133,7 +139,7 @@ Scope {
         if (cfg.position === side) return effEdge;
         const alongBar = vertical ? (side === "top" || side === "bottom")
                                   : (side === "left" || side === "right");
-        return alongBar ? effGap : 0;
+        return alongBar ? alongMargin : 0;
     }
     function snapStep(cur, step, dir) {
         return dir > 0 ? (Math.floor(cur / step) + 1) * step : (Math.ceil(cur / step) - 1) * step;
@@ -221,7 +227,9 @@ Scope {
         return t + "\n\u2022\n" + (cfg.clockDay ? dayText(d) + "\n" : "")
              + (cfg.dateOrder === "md" ? mm + "\n" + dd : dd + "\n" + mm);
     }
-    property bool batTest: false; property int batTestPct: 60; property bool batTestCharging: false
+    property bool batTest: false
+    property int batTestPct: 60
+    property bool batTestCharging: false
     readonly property var battery: UPower.devices.values.find(d => d.isLaptopBattery)
         ?? (UPower.displayDevice && UPower.displayDevice.isPresent
             && UPower.displayDevice.type === UPowerDeviceType.Battery
@@ -604,7 +612,7 @@ Scope {
         else if (kind === "next") p.next();
         else p.previous();
     }
-    readonly property string wsHints: "Left click: Switch to workspace\nRight click: Quick actions\nScroll: Previous / next workspace"
+    readonly property string wsHints: "Scroll: Previous / next workspace"
     readonly property bool wsMinimal: cfg.wsStyle === "minimal"
     readonly property bool wsNumbers: cfg.wsStyle === "numbers"
     function wsWheel(dy) {
@@ -792,10 +800,11 @@ Scope {
         property string tone: "normal"; property bool bold: false; property real xOffset: 0; property real yOffset: 0
         property real iconX: 0; property real iconY: 0; property real textX: 0; property real textY: 0
         property real glyphXScale: 1; property int spacing: meter ? Math.round(4 * root.bs) : root.sizeIconGap
-        property int padX: root.modPadPx; property string variant: ""
+        property int padX: 0; property string variant: ""
         readonly property var tn: IconTune.resolve(mid, root.vertical, variant)
         readonly property real iconYEff: meter && ringOn && tn.ringIconY !== null ? tn.ringIconY : tn.iconY
         readonly property real padEff: padX + tn.pad
+        readonly property real basePad: root.selfPadded.indexOf(mid) >= 0 ? 0 : Math.round(8 * root.bs)
         readonly property color fg: IconTune.color(mid, warning ? "warning" : active ? "active" : tone)
         readonly property string shown: !meter ? (root.vertical ? vtext : text)
             : asLabel ? (numText !== "" ? labelText + (root.vertical ? "\n" : " ") + numText : labelText)
@@ -813,7 +822,7 @@ Scope {
             }
         }
         Layout.alignment: Qt.AlignCenter
-        implicitWidth: root.vertical ? root.panelThick : content.implicitWidth + padEff
+        implicitWidth: root.vertical ? root.panelThick : content.implicitWidth + padEff + basePad
         implicitHeight: root.vertical ? Math.max(20, content.implicitHeight + Math.round(padEff * 0.4))
                                       : Math.max(root.panelThick - 2, content.implicitHeight)
         GridLayout {
@@ -947,19 +956,21 @@ Scope {
         id: panel; property var model: []; property bool dragActive: false; readonly property Item lane: laneItem
         signal dropped(string modId, real sx, real sy)
         readonly property bool hasVisible: model.some(id => root.modVisible(id)); visible: hasVisible
+        readonly property var visIds: model.filter(id => root.modVisible(id))
+        readonly property int padAlong: root.islands ? 0 : 4
         z: dragActive ? 100 : 0
-        width: root.vertical ? root.panelThick : laneItem.implicitWidth + (root.islands ? 0 : 4)
-        height: root.vertical ? laneItem.implicitHeight + (root.islands ? 0 : 4) : root.panelThick
+        width: root.vertical ? root.panelThick : laneItem.implicitWidth + padAlong
+        height: root.vertical ? laneItem.implicitHeight + padAlong : root.panelThick
         radius: root.barRadius; color: root.joined || root.islands ? "transparent" : root.bgColor
         border.width: cfg.border && !root.joined && !root.islands ? 1 : 0; border.color: root.borderColor
         Lane {
-            id: laneItem; anchors.centerIn: parent; gap: root.islands ? root.effGap : 0
+            id: laneItem; anchors.centerIn: parent; gap: root.islands ? root.effGap + root.islandGapPx : 0
             Repeater {
                 model: root.groupsOf(panel.model)
                 delegate: Rectangle {
                     id: isl
                     required property var modelData
-                    readonly property Item lane: islLane; readonly property int pad: root.islands ? 4 : 0
+                    readonly property Item lane: islLane; readonly property int pad: root.islands ? 4 + root.modPadPx : 0
                     property bool dragActive: false; visible: modelData.some(id => root.modVisible(id))
                     z: dragActive ? 100 : 0; Layout.alignment: Qt.AlignCenter
                     implicitWidth: root.vertical ? root.panelThick : islLane.implicitWidth + pad
@@ -968,7 +979,7 @@ Scope {
                     border.width: root.islands && cfg.border ? 1 : 0; border.color: root.borderColor
                     onDragActiveChanged: panel.dragActive = dragActive
                     Lane {
-                        id: islLane; anchors.centerIn: parent
+                        id: islLane; anchors.centerIn: parent; gap: root.modPadPx
                         Repeater {
                             model: isl.modelData
                             delegate: Slot {
@@ -1074,6 +1085,7 @@ Scope {
         id: clockC
         Mod {
             id: clockMod
+            padX: root.joined ? 0 : Math.round((root.vertical ? 28 : 16) * root.bs)
             function act(a) {
                 if (a === "calendar") root.openSidepanelAt(clockMod);
                 else root.doAction(a);
@@ -1224,23 +1236,33 @@ Component {
         GridLayout {
             id: lay; anchors.centerIn: parent
             flow: root.vertical ? GridLayout.TopToBottom : GridLayout.LeftToRight
-            rowSpacing: 2; columnSpacing: 3
+            rowSpacing: root.vertical ? 0 : 2; columnSpacing: 3
 
             Rectangle {
                 Layout.alignment: Qt.AlignCenter
-                implicitWidth: wm.circle; implicitHeight: wm.circle; radius: width / 2
+                implicitWidth: wm.circle
+                implicitHeight: root.vertical ? Math.ceil(wsNum.implicitHeight) : wm.circle
+                radius: width / 2
                 color: "transparent"; border.width: 0
                 Text {
-                    anchors.centerIn: parent; text: wm.focusedId > 0 ? wm.focusedId : ""
+                    id: wsNum
+                    readonly property var ct: IconTune.resolve("clock", root.vertical)
+                    anchors.centerIn: parent
+                    anchors.verticalCenterOffset: root.vertical ? 0 : ct.y + ct.textY
+                    text: wm.focusedId > 0 ? wm.focusedId : ""
                     color: wmMa.containsMouse ? Theme.accent2 : Theme.text
                     font.family: Theme.iconFont; font.bold: true
-                    font.pixelSize: Math.round(wm.circle * 0.62); renderType: Text.NativeRendering
+                    font.pixelSize: root.sz.clock + ct.textSize
+                    renderType: Text.NativeRendering
                 }
             }
             Grid {
                 Layout.alignment: Qt.AlignCenter
                 flow: root.vertical ? Grid.LeftToRight : Grid.TopToBottom
-                columns: root.vertical ? wm.perRow : Math.max(1, Math.ceil(wm.wsCount / wm.perCol))
+                rows: 2
+                columns: root.vertical
+                    ? Math.max(1, Math.min(wm.perRow, Math.ceil(wm.wsCount / 2)))
+                    : Math.max(1, Math.ceil(wm.wsCount / 2))
                 spacing: 0
                 Repeater {
                     model: Hyprland.workspaces
@@ -1633,7 +1655,9 @@ Component {
                     border.width: cfg.border ? 1 : 0; border.color: root.borderColor
                 }
                 Panel {
-                    id: startPanel; model: root.startList; anchors.left: frame.left; anchors.top: frame.top
+                    id: startPanel; model: root.startList
+                    x: root.vertical ? 0 : root.barInset
+                    y: root.vertical ? root.barInset : 0
                     onDropped: (modId, sx, sy) => bar.dropModule(modId, sx, sy)
                 }
                 Panel {
@@ -1655,9 +1679,14 @@ Component {
                 Panel {
                     id: midRightPanel; model: root.midRightList
                     x: root.vertical ? 0
-                                     : Math.max(0, Math.min(frame.axisLen - width, frame.midRightC - width / 2))
-                    y: root.vertical ? Math.max(0, Math.min(frame.axisLen - height, frame.midRightC - height / 2))
-                                     : 0
+                    : Math.max(root.barInset,
+                    Math.min(frame.axisLen - width - root.barInset,
+                    frame.midRightC - width / 2))
+                    y: root.vertical
+                    ? Math.max(root.barInset,
+                    Math.min(frame.axisLen - height - root.barInset,
+                    frame.midRightC - height / 2))
+                    : 0
                     onDropped: (modId, sx, sy) => bar.dropModule(modId, sx, sy)
                 }
                 Panel {
@@ -1665,6 +1694,8 @@ Component {
                     anchors.bottom: root.vertical ? frame.bottom : undefined
                     anchors.top: root.vertical ? undefined : frame.top
                     anchors.left: root.vertical ? frame.left : undefined
+                    anchors.rightMargin: root.vertical ? 0 : root.barInset
+                    anchors.bottomMargin: root.vertical ? root.barInset : 0
                     onDropped: (modId, sx, sy) => bar.dropModule(modId, sx, sy)
                 }
             }

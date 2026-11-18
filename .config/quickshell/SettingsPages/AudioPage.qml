@@ -13,6 +13,10 @@ Item {
     property real marginBottom: 0
     property real labelWidth: 70
 
+    // Settings.qml listens for these: give keyboard focus back to the window / close it (Esc)
+    signal searchFocusReleased()
+    signal closeRequested()
+
     PwObjectTracker { objects: Pipewire.nodes.values }
 
     property var sink: Pipewire.defaultAudioSink
@@ -254,12 +258,20 @@ Item {
         }
     }
 
-    // dB slider + readout, meant to sit inside a volume Row, to the right of the % slider.
-    // Same volume as the % slider on PulseAudio's dB scale
+    // ValueSlider preset for volume rows (value shown inside the row, click to type)
+    component VolSlider: ValueSlider {
+        inline: true
+        valueFontSize: Theme.textSizeGroup
+        valueColor: Theme.text
+        onEditFinished: page.searchFocusReleased()
+        onEscapePressed: page.closeRequested()
+    }
+
+    // dB slider + readout. Same volume as the % slider on PulseAudio's dB scale
     // (dB = 60 * log10(volume), so 100% = 0 dB and 15% = -49.4 dB).
-    // Slider range is minDb..0 dB; dragging to the far left sets silence.
+    // Slider range is minDb..0 dB; far left = silence. Type a value like -12 to set it.
     // Total width = sliderWidth + 8 + 60.
-    component DbControl: Row {
+    component DbControl: Item {
         id: dc
         property real volume: 0
         property bool muted: false
@@ -268,23 +280,18 @@ Item {
         readonly property real db: volume > 0.0001 ? 60 * Math.log(volume) / Math.LN10 : -Infinity
         signal commit(real vol)
 
-        spacing: 8
+        width: sliderWidth + 68
+        height: 28
 
-        Slider {
-            width: dc.sliderWidth
-            anchors.verticalCenter: parent.verticalCenter
-            label: ""; icon: ""
-            value: dc.muted || !isFinite(dc.db) ? 0 : Math.max(0, Math.min(1, (dc.db - dc.minDb) / -dc.minDb))
-            onCommitted: v => dc.commit(v <= 0 ? 0 : Math.pow(10, (dc.minDb + v * -dc.minDb) / 60))
-        }
-
-        Text {
-            width: 60
-            anchors.verticalCenter: parent.verticalCenter
-            horizontalAlignment: Text.AlignRight
-            text: dc.muted ? "MUTED" : (isFinite(dc.db) ? (dc.db > 0 ? "+" : "") + dc.db.toFixed(1) + " dB" : "-\u221e dB")
-            color: dc.muted ? Theme.danger : Theme.text
-            font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeGroup
+        VolSlider {
+            anchors.fill: parent
+            valueWidth: 60
+            from: dc.minDb; to: 0; step: 0.1; decimals: 1; unit: " dB"
+            value: dc.muted || !isFinite(dc.db) ? dc.minDb : Math.max(dc.minDb, Math.min(0, dc.db))
+            displayText: dc.muted ? "MUTED"
+                : (isFinite(dc.db) ? (dc.db > 0 ? "+" : "") + dc.db.toFixed(1) + " dB" : "-\u221e dB")
+            valueColor: dc.muted ? Theme.danger : Theme.text
+            onMoved: v => dc.commit(v <= dc.minDb ? 0 : Math.pow(10, v / 60))
         }
     }
 
@@ -432,26 +439,19 @@ Item {
                                 font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeGroup
                             }
 
-                            Slider {
-                                width: Math.max(40, (parent.width - page.labelWidth - 180) / 2)
+                            VolSlider {
+                                width: Math.max(40, (parent.width - page.labelWidth - 180) / 2) + 60
                                 anchors.verticalCenter: parent.verticalCenter
-                                label: ""; icon: ""
+                                from: 0; to: 1; step: 0.01; unit: "%"; displayScale: 100
                                 value: page.muted ? 0 : page.volume
-                                onCommitted: v => {
+                                displayText: page.muted ? "MUTED" : ""
+                                valueColor: page.muted ? Theme.danger : Theme.text
+                                onMoved: v => {
                                     if (page.sink?.audio) {
                                         page.sink.audio.muted = false
                                         page.sink.audio.volume = v
                                     }
                                 }
-                            }
-
-                            Text {
-                                width: 52
-                                anchors.verticalCenter: parent.verticalCenter
-                                horizontalAlignment: Text.AlignRight
-                                text: page.muted ? "MUTED" : Math.round(page.volume * 100) + "%"
-                                color: page.muted ? Theme.danger : Theme.text
-                                font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeGroup
                             }
 
                             DbControl {
@@ -527,26 +527,19 @@ Item {
                                 font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeGroup
                             }
 
-                            Slider {
-                                width: Math.max(40, (parent.width - page.labelWidth - 180) / 2)
+                            VolSlider {
+                                width: Math.max(40, (parent.width - page.labelWidth - 180) / 2) + 60
                                 anchors.verticalCenter: parent.verticalCenter
-                                label: ""; icon: ""
+                                from: 0; to: 1; step: 0.01; unit: "%"; displayScale: 100
                                 value: page.inputMuted ? 0 : page.inputVolume
-                                onCommitted: v => {
+                                displayText: page.inputMuted ? "MUTED" : ""
+                                valueColor: page.inputMuted ? Theme.danger : Theme.text
+                                onMoved: v => {
                                     if (page.source?.audio) {
                                         page.source.audio.muted = false
                                         page.source.audio.volume = v
                                     }
                                 }
-                            }
-
-                            Text {
-                                width: 52
-                                anchors.verticalCenter: parent.verticalCenter
-                                horizontalAlignment: Text.AlignRight
-                                text: page.inputMuted ? "MUTED" : Math.round(page.inputVolume * 100) + "%"
-                                color: page.inputMuted ? Theme.danger : Theme.text
-                                font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeGroup
                             }
 
                             DbControl {
@@ -640,26 +633,20 @@ Item {
                                     font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
                                 }
 
-                                Slider {
-                                    width: parent.width - 28 - 110 - 52 - 24
+                                VolSlider {
+                                    width: parent.width - 28 - 110 - 16
                                     anchors.verticalCenter: parent.verticalCenter
-                                    label: ""; icon: ""
+                                    valueFontSize: Theme.textSizeBody
+                                    from: 0; to: 1; step: 0.01; unit: "%"; displayScale: 100
                                     value: streamRow.streamMuted ? 0 : streamRow.streamVolume
-                                    onCommitted: v => {
+                                    displayText: streamRow.streamMuted ? "MUTED" : ""
+                                    valueColor: streamRow.streamMuted ? Theme.danger : Theme.text
+                                    onMoved: v => {
                                         if (streamRow.stream?.audio) {
                                             streamRow.stream.audio.muted = false
                                             streamRow.stream.audio.volume = v
                                         }
                                     }
-                                }
-
-                                Text {
-                                    width: 52
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    horizontalAlignment: Text.AlignRight
-                                    text: streamRow.streamMuted ? "MUTED" : Math.round(streamRow.streamVolume * 100) + "%"
-                                    color: streamRow.streamMuted ? Theme.danger : Theme.text
-                                    font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
                                 }
                             }
                         }

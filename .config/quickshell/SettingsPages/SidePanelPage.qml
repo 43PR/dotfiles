@@ -11,7 +11,8 @@ Item {
     property real marginRight: 10
     property real marginTop: 0
     property real marginBottom: 0
-
+    signal searchFocusReleased()
+    signal closeRequested()
     readonly property string stateDir: Quickshell.env("HOME") + "/.config/quickshell/state"
 
     // ------------------------------------------------------------------
@@ -371,83 +372,9 @@ Item {
         }
     }
 
-    component BarSlider: Item {
-        id: sl
-        property string label: ""
-        property real from: 0
-        property real to: 1
-        property real step: 1
-        property real value: 0
-        property string unit: ""
-        property real displayScale: 1
-        property int decimals: 0
-        // shown instead of the number when value is 0 (e.g. "AUTO")
-        property string zeroText: ""
-        signal moved(real v)
-
-        readonly property real ratio: to > from ? Math.max(0, Math.min(1, (value - from) / (to - from))) : 0
-
-        width: parent.cellWidth ?? parent.width
-        height: 34
-        opacity: enabled ? 1.0 : 0.4
-
-        Text {
-            anchors.left: parent.left; anchors.right: valueText.left; anchors.rightMargin: 6
-            y: 0
-            elide: Text.ElideRight
-            text: sl.label
-            color: Theme.textDim
-            font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody; font.letterSpacing: 1
-        }
-
-        Text {
-            id: valueText
-            anchors.right: parent.right; y: 0
-            text: (sl.zeroText !== "" && sl.value === 0)
-                  ? sl.zeroText
-                  : (sl.value * sl.displayScale).toFixed(sl.decimals) + sl.unit
-            color: Theme.accent2
-            font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeSmall
-        }
-
-        Rectangle {
-            id: track
-            anchors.left: parent.left; anchors.right: parent.right
-            y: 24; height: 4; radius: 2
-            color: Theme.border
-
-            Rectangle {
-                width: knob.x + knob.width / 2
-                height: parent.height; radius: 2
-                color: Theme.accent
-            }
-            Rectangle {
-                id: knob
-                width: 12; height: 12; radius: 6
-                anchors.verticalCenter: parent.verticalCenter
-                x: sl.ratio * (track.width - width)
-                color: Theme.accent
-            }
-        }
-
-        MouseArea {
-            anchors.left: parent.left; anchors.right: parent.right
-            y: 14; height: 20
-            hoverEnabled: true
-            preventStealing: true
-            enabled: sl.enabled
-            cursorShape: Qt.PointingHandCursor
-
-            function apply(mx) {
-                const usable = track.width - knob.width
-                if (usable <= 0) return
-                const r = Math.max(0, Math.min(1, (mx - knob.width / 2) / usable))
-                const v = sl.from + r * (sl.to - sl.from)
-                sl.moved(sl.step > 0 ? +(Math.round(v / sl.step) * sl.step).toFixed(3) : v)
-            }
-            onPressed: m => apply(m.x)
-            onPositionChanged: m => { if (pressed) apply(m.x) }
-        }
+    component BarSlider: ValueSlider {
+        onEditFinished: page.searchFocusReleased()
+        onEscapePressed: page.closeRequested()
     }
 
     component BarChoice: Item {
@@ -895,7 +822,7 @@ Item {
                                 color: Theme.text
                                 selectionColor: Theme.accent
                                 font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
-                                onEditingFinished: page.set("notifBgPath", page.cleanPath(text))
+                                onEditingFinished: { page.set("notifBgPath", page.cleanPath(text)); page.searchFocusReleased() }
                             }
 
                             Text {

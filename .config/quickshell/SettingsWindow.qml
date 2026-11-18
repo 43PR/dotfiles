@@ -70,8 +70,8 @@ Scope {
         { name: "Display", icon: "󰍹", page: "DisplayPage" },
         { name: "Keybinds", icon: "\ue612",  page: "KeybindsPage" },
         { name: "Themes", icon: "󰉼",  page: "ThemesPage" },
-        { name: "Appearance", icon: "󰏘", page: "AppearancePage" },
         { name: "Bar", icon: "\ue690",  page: "BarPage" },
+        { name: "Appearance", icon: "󰏘", page: "AppearancePage" },
         { name: "Side Panel", icon: "\uec02",  page: "SidePanelPage" },
         { name: "Input", icon: "\udb83\udfb0", page: "InputPage" },
         { name: "Network", icon: "󰖩", page: "NetworkPage" },
@@ -720,6 +720,8 @@ Scope {
 
                                 Row {
                                     anchors.verticalCenter: parent.verticalCenter
+                                    anchors.left: parent.left
+                                    anchors.leftMargin: 5
                                     spacing: 10
 
                                     Rectangle {
@@ -787,7 +789,7 @@ Scope {
                                     Rectangle {
                                         id: searchBox
                                         anchors.verticalCenter: parent.verticalCenter
-                                        width: root.sidebarExpandedWidth - collapseButton.width - 10
+                                        width: root.sidebarExpandedWidth - collapseButton.width - 10 - 12
                                         height: 26
                                         radius: Theme.radius
                                         color: "transparent"

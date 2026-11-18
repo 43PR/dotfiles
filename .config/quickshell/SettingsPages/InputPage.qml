@@ -628,27 +628,34 @@ Item {
                 text: sRow.modelData.label; color: Theme.text
                 font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
             }
-
-            Slider {
-                width: parent.width - page.labelWidth - 52 - 16
+            ValueSlider {
+                id: sv
+                inline: true
+                width: parent.width - page.labelWidth - 8
                 anchors.verticalCenter: parent.verticalCenter
                 enabled: sRow.usable
-                icon: ""
-                value: Math.max(0, Math.min(1, (page.num(sRow.modelData.key) - sRow.modelData.min) / (sRow.modelData.max - sRow.modelData.min)))
-                onCommitted: value => {
-                    let v = Math.round((sRow.modelData.min + value * (sRow.modelData.max - sRow.modelData.min)) * 100) / 100
-                    if (sRow.modelData.min < 0 && Math.abs(v) < 0.03) v = 0
-                    page.setOption(sRow.modelData.key, v)
-                }
-            }
+                valueFontSize: Theme.textSizeBody
+                valueColor: Theme.text
+                valueWidth: 52
+                from: sRow.modelData.min; to: sRow.modelData.max
+                step: 0.01; decimals: 2; unit: sRow.modelData.suffix
 
-            Text {
-                width: 52
-                anchors.verticalCenter: parent.verticalCenter
-                horizontalAlignment: Text.AlignRight
-                text: Number(page.num(sRow.modelData.key)).toFixed(2) + sRow.modelData.suffix
-                color: Theme.text
-                font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
+                // While dragging, show the dragged value. Otherwise follow the applied setting.
+                property real live: 0
+                onDraggingChanged: if (dragging) live = page.num(sRow.modelData.key)
+                value: dragging ? live : page.num(sRow.modelData.key)
+                onMoved: v => { if (dragging) live = v }
+
+                // Apply once: on release, or right away for typed values and arrow keys.
+                onCommitted: v => {
+                    let x = v
+                    if (sRow.modelData.min < 0 && Math.abs(x) < 0.03) x = 0
+                    if (Math.abs(x - page.num(sRow.modelData.key)) > 1e-9)
+                        page.setOption(sRow.modelData.key, x)
+                }
+
+                onEditFinished: page.searchFocusReleased()
+                onEscapePressed: page.closeRequested()
             }
         }
     }

@@ -11,34 +11,30 @@ Item {
     property real marginRight: 10
     property real marginTop: 0
     property real marginBottom: 0
-
+    // Settings.qml listens for this and gives keyboard focus back to the window (so Esc works)
+    signal searchFocusReleased()
     readonly property string stateDir: Quickshell.env("HOME") + "/.config/quickshell/state"
-
-    // ------------------------------------------------------------------
     // Bar config (shared with the bar through state/bar-state.json)
-    // The bar watches that file, so every change here applies instantly.
-    // Keep `defaults` in sync with Bar.qml.
-    // ------------------------------------------------------------------
     readonly property var defaults: ({
-        position: "left", style: "islands", thickness: 22, margin: 4,
+        position: "left", style: "islands", thickness: 22, margin: 4, insetH: 11, insetV: 4,
         reserveSpace: true, allScreens: true, dragModules: true,
-        scale: 1, barScale: 0.75, bgOpacity: 0.2, border: true, borderOpacity: 0.05, radius: 37, calRadius: 15, calScale: 0.9,
-        tooltips: true, tooltipHints: false, tooltipBorder: true, tipDelay: 450, tooltipScale: 0.85,
-        modPad: 6, wsDot: 15, wsGap: 10, wsScroll: true, wsStyle: "minimal",
+        scale: 0.9, barScale: 0.75, bgOpacity: 0.1, border: true, borderOpacity: 0.1, radius: 15, calRadius: 15, calScale: 0.9,
+        tooltips: true, tooltipHints: true, tooltipBorder: true, tipDelay: 450, tooltipScale: 0.85,
+        modPad: 3, islandGap: 4, wsDot: 15, wsGap: 10, wsScroll: true, wsStyle: "minimal",
         tasksScale: 0.75, tasksGap: 2, tasksColor: "accent",
-        statsRing: true, statsNumbers: false, statsPercent: false, statsIcons: false, statsScale: 1, statsBorder: false, statsRadius: 24, statsGap: 2, statsWarn: 85, tempWarn: 85, batLowPct: 15,
+        statsRing: true, statsNumbers: false, statsPercent: false, statsIcons: false, statsScale: 1, statsBorder: false, statsRadius: 24, statsGap: 0, statsWarn: 85, tempWarn: 85, batLowPct: 15,
         batNumber: false, batPercent: false, batRing: true, batLabel: false,
         volStep: 5, volMax: 100, volNumber: false, volPercent: false, volRing: true, volLabel: false,
         trayArrow: true, lightIcons: "star", brightStep: 5, nightStep: 100, brightRing: true, nightRing: true,
         clock24: true, clockSeconds: false, clockPadHour: true, clockDate: true, clockDay: false, clockCase: "normal", dateOrder: "md", weekMonday: true,
         clockPrimary: "calendar", clockSecondary: "settings", clockTertiary: "barsettings",
         settingsPrimary: "settings", settingsSecondary: "barsettings", settingsTertiary: "none",
-        hidden: "wall,settings,bright,gputemp,ram",
-        startMods: "cpu,gpu,gputemp,ram,cputemp,ws,notif,night",
-        midLeftMods: "tasks,tray",
+        hidden: "gputemp,gpu,settings,bright,night,wall",
+        startMods: "cputemp,ram,cpu,gpu,gputemp",
+        midLeftMods: "tasks,tray,ws",
         centerMods: "clock",
-        midRightMods: "",
-        endMods: "media,bright,volume,battery,wall,settings,bt,net,power"
+        midRightMods: "media",
+        endMods: "volume,net,bt,notif,power,bright,night,battery,settings,wall"
     })
 
     readonly property var positions: ["top", "right", "bottom", "left"]
@@ -314,83 +310,11 @@ Item {
             onClicked: tg.toggled(!tg.checked)
         }
     }
-
-    // Label + value on one line, drag track right below.
-    component BarSlider: Item {
-        id: sl
-        property string label: ""
-        property real from: 0
-        property real to: 1
-        property real step: 1
-        property real value: 0
-        property string unit: ""
-        property real displayScale: 1
-        property int decimals: 0
-        signal moved(real v)
-
-        readonly property real ratio: to > from ? Math.max(0, Math.min(1, (value - from) / (to - from))) : 0
-
-        width: parent.cellWidth ?? parent.width
-        height: 34
-        opacity: enabled ? 1.0 : 0.4
-
-        Text {
-            anchors.left: parent.left; anchors.right: valueText.left; anchors.rightMargin: 6
-            y: 0
-            elide: Text.ElideRight
-            text: sl.label
-            color: Theme.textDim
-            font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody; font.letterSpacing: 1
-        }
-
-        Text {
-            id: valueText
-            anchors.right: parent.right; y: 0
-            text: (sl.value * sl.displayScale).toFixed(sl.decimals) + sl.unit
-            color: Theme.accent2
-            font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeSmall
-        }
-
-        Rectangle {
-            id: track
-            anchors.left: parent.left; anchors.right: parent.right
-            y: 24; height: 4; radius: 2
-            color: Theme.border
-
-            Rectangle {
-                width: knob.x + knob.width / 2
-                height: parent.height; radius: 2
-                color: Theme.accent
-            }
-            Rectangle {
-                id: knob
-                width: 12; height: 12; radius: 6
-                anchors.verticalCenter: parent.verticalCenter
-                x: sl.ratio * (track.width - width)
-                color: Theme.accent
-            }
-        }
-
-        MouseArea {
-            anchors.left: parent.left; anchors.right: parent.right
-            y: 14; height: 20
-            hoverEnabled: true
-            preventStealing: true      // keep the page from scrolling while dragging
-            enabled: sl.enabled
-            cursorShape: Qt.PointingHandCursor
-
-            function apply(mx) {
-                const usable = track.width - knob.width
-                if (usable <= 0) return
-                const r = Math.max(0, Math.min(1, (mx - knob.width / 2) / usable))
-                const v = sl.from + r * (sl.to - sl.from)
-                sl.moved(sl.step > 0 ? +(Math.round(v / sl.step) * sl.step).toFixed(3) : v)
-            }
-            onPressed: m => apply(m.x)
-            onPositionChanged: m => { if (pressed) apply(m.x) }
-        }
+    component BarSlider: ValueSlider {
+        onEditFinished: page.searchFocusReleased()
+        onEscapePressed: page.closeRequested()
     }
-
+    signal closeRequested()
     // Label on top, one button per option side by side (wraps after `maxCols`).
     // Use for short lists where seeing every option at once helps.
     component BarChoice: Item {
@@ -557,7 +481,7 @@ Item {
                     Cols {
                         BarSlider {
                             label: "BAR SCALE"
-                            from: 0.6; to: 1.5; step: 0.05; unit: "×"; decimals: 2
+                            from: 0.6; to: 1.1; step: 0.05; unit: "×"; decimals: 2
                             value: page.val("barScale")
                             onMoved: v => page.set("barScale", v)
                         }
@@ -568,16 +492,30 @@ Item {
                             onMoved: v => page.set("bgOpacity", v)
                         }
                         BarSlider {
+                            label: "MODULE PADDING"
+                            from: 0; to: 40; step: 1; unit: " px"
+                            value: page.val("modPad")
+                            onMoved: v => page.set("modPad", v)
+                        }
+                        BarSlider {
+                            label: "ISLAND GAP"
+                            enabled: page.val("style") === "islands"
+                            from: 0; to: 40; step: 1; unit: " px"
+                            value: page.val("islandGap")
+                            onMoved: v => page.set("islandGap", v)
+                        }
+                        BarSlider {
+                            label: "CORNER RADIUS"
+                            enabled: !page.strip
+                            from: 0; to: 40; step: 1; unit: " px"
+                            value: page.val("radius")
+                            onMoved: v => page.set("radius", v)
+                        }
+                        BarSlider {
                             label: "THICKNESS"
                             from: 16; to: 40; step: 1; unit: " px"
                             value: page.val("thickness")
                             onMoved: v => page.set("thickness", v)
-                        }
-                        BarSlider {
-                            label: "MODULE PADDING"
-                            from: 0; to: 40; step: 2; unit: " px"
-                            value: page.val("modPad")
-                            onMoved: v => page.set("modPad", v)
                         }
                         BarSlider {
                             label: "EDGE MARGIN"
@@ -588,16 +526,23 @@ Item {
                         }
                         BarSlider {
                             label: "TEXT SCALE"
-                            from: 0.8; to: 1.5; step: 0.05; unit: "×"; decimals: 2
+                            from: 0.8; to: 1.1; step: 0.1; unit: "×"; decimals: 2
                             value: page.val("scale")
                             onMoved: v => page.set("scale", v)
                         }
                         BarSlider {
-                            label: "CORNER RADIUS"
-                            enabled: !page.strip
-                            from: 0; to: 40; step: 1; unit: " px"
-                            value: page.val("radius")
-                            onMoved: v => page.set("radius", v)
+                            label: "H-BAR END INSET"
+                            enabled: !page.vertical
+                            from: 0; to: 600; step: 1; unit: " px"
+                            value: page.val("insetH")
+                            onMoved: v => page.set("insetH", v)
+                        }
+                        BarSlider {
+                            label: "V-BAR END INSET"
+                            enabled: page.vertical
+                            from: 0; to: 600; step: 1; unit: " px"
+                            value: page.val("insetV")
+                            onMoved: v => page.set("insetV", v)
                         }
                         BarSlider {
                             label: "BORDER OPACITY"
