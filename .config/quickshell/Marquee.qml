@@ -15,9 +15,9 @@ Scope {
     readonly property string title: player
         ? ((player.trackArtist ? player.trackArtist + " - " : "") + player.trackTitle)
         : ""
-    // nf-md play / pause
-    readonly property string text: (playing ? "\uDB81\uDC0A " : "\uDB80\uDFE4 ") + title
-
+    // nf-md play / pause (kept separate so the bar can pin it in place)
+    readonly property string glyph: playing ? "\uDB81\uDC0A" : "\uDB80\uDFE4"
+    readonly property string text: title   // scrolling part only
     readonly property int maxW: 130       // visible width in px
     readonly property int gap: 20         // gap between the two copies
     readonly property int step: 1         // px per tick (integer = crisp text)

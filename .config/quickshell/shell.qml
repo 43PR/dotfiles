@@ -11,5 +11,6 @@ ShellRoot {
     Bar {}
     SidePanel {}
     Todo {}
+    Notifications {}
     ColorPicker {}
 }

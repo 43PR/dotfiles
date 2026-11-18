@@ -73,7 +73,7 @@ Item {
         { id: "notif",    l: "NOTIFS" },
         { id: "wall",     l: "WALLPAPERS" },
         { id: "settings", l: "SETTINGS" },
-        { id: "power",    l: "POWER", fixed: true }
+        { id: "power",    l: "POWER" }
     ]
 
     // values changed from their defaults (reassigned on every change so bindings update)

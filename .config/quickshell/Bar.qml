@@ -303,7 +303,7 @@ Scope {
         { id: "settings", l: "Settings",      cmd: "qs ipc call settings toggle", g: "\uDB81\uDC93",
                                               tip: "Settings", hint: "Open settings" },
         { id: "power",    l: "Power",         cmd: "qs ipc call powermenu toggle", g: "\u23FB",
-                                              tip: "Power menu", hint: "Open", fixed: true }
+                                              tip: "Power menu", hint: "Open" }
     ]
     readonly property var moduleIds: moduleDefs.map(d => d.id)
     readonly property var defMap: moduleDefs.reduce((m, d) => { m[d.id] = d; return m; }, {})
@@ -982,21 +982,45 @@ Scope {
         }
     }
     component MarqueeStrip: Item {
-        clip: true
-        Row {
-            x: Marquee.animating ? Marquee.x : 0; spacing: Marquee.gap; anchors.verticalCenter: parent.verticalCenter
-            anchors.verticalCenterOffset: root.vertical ? 0 : root.iconYOffset
-            Repeater {
-                model: Marquee.animating ? 2 : 1
-                delegate: Text {
-                    required property int index
-                    text: Marquee.text; color: Theme.text; font.family: Theme.iconFont
-                    font.pixelSize: root.sz.marquee
-                    renderType: root.vertical ? Text.QtRendering : Text.NativeRendering
-                    width: index === 0 ? (Marquee.animating ? Marquee.textW
-                                                            : Math.min(Marquee.textW, Marquee.maxW))
-                                       : implicitWidth
-                    elide: index === 0 && !Marquee.animating ? Text.ElideRight : Text.ElideNone
+        id: strip
+        readonly property int glyphGap: 9
+        // widest of both glyphs, so toggling play/pause never shifts the title
+        readonly property real glyphW: Math.ceil(Math.max(gPlay.width, gPause.width))
+        readonly property real titleW: Math.min(Marquee.textW, Marquee.maxW)
+        readonly property real totalW: glyphW + glyphGap + titleW
+        TextMetrics { id: gPlay;  text: "\uDB81\uDC0A"; font.family: Theme.iconFont; font.pixelSize: root.sz.marquee }
+        TextMetrics { id: gPause; text: "\uDB80\uDFE4"; font.family: Theme.iconFont; font.pixelSize: root.sz.marquee }
+
+        // fixed icon
+        Item {
+            id: iconBox
+            width: strip.glyphW; height: parent.height
+            Text {
+                anchors.centerIn: parent
+                anchors.verticalCenterOffset: root.vertical ? 0 : root.iconYOffset
+                text: Marquee.glyph; color: Theme.text; font.family: Theme.iconFont
+                font.pixelSize: root.sz.marquee
+                renderType: root.vertical ? Text.QtRendering : Text.NativeRendering
+            }
+        }
+        // scrolling title
+        Item {
+            x: strip.glyphW + strip.glyphGap; width: strip.titleW; height: parent.height; clip: true
+            Row {
+                x: Marquee.animating ? Marquee.x : 0; spacing: Marquee.gap
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.verticalCenterOffset: root.vertical ? 0 : root.iconYOffset
+                Repeater {
+                    model: Marquee.animating ? 2 : 1
+                    delegate: Text {
+                        required property int index
+                        text: Marquee.text; color: Theme.text; font.family: Theme.iconFont
+                        font.pixelSize: root.sz.marquee
+                        renderType: root.vertical ? Text.QtRendering : Text.NativeRendering
+                        width: index === 0 ? (Marquee.animating ? Marquee.textW : strip.titleW)
+                                           : implicitWidth
+                        elide: index === 0 && !Marquee.animating ? Text.ElideRight : Text.ElideNone
+                    }
                 }
             }
         }
@@ -1017,8 +1041,12 @@ Scope {
             tertiaryHint: isSettings ? root.actionHint(cfg.settingsTertiary) : ""
             noSecondary: isSettings && cfg.settingsSecondary === "none"
             onPrimary: {
-                if (isSettings) root.doAction(cfg.settingsPrimary);
-                else if (def.cmd) root.run(def.cmd);
+                if (isSettings)
+                root.doAction(cfg.settingsPrimary);
+                else if (isNotif)
+                root.openSidepanelAt(null);   // same placement as the clock (centred)
+                else if (def.cmd)
+                root.run(def.cmd);
             }
             onSecondary: {
                 if (isSettings) root.doAction(cfg.settingsSecondary);
@@ -1199,26 +1227,14 @@ Component {
             rowSpacing: 2; columnSpacing: 3
 
             Rectangle {
-                id: ring
                 Layout.alignment: Qt.AlignCenter
                 implicitWidth: wm.circle; implicitHeight: wm.circle; radius: width / 2
                 color: "transparent"; border.width: 0
                 Text {
                     anchors.centerIn: parent; text: wm.focusedId > 0 ? wm.focusedId : ""
-                    color: ringMa.containsMouse ? Theme.accent2 : Theme.text
+                    color: wmMa.containsMouse ? Theme.accent2 : Theme.text
                     font.family: Theme.iconFont; font.bold: true
                     font.pixelSize: Math.round(wm.circle * 0.62); renderType: Text.NativeRendering
-                }
-                DMouseArea {
-                    id: ringMa; anchors.fill: parent; hoverEnabled: true
-                    acceptedButtons: Qt.RightButton; cursorShape: Qt.PointingHandCursor
-                    onPressed: ringTip.dismiss()
-                    onClicked: { if (!ringMa.suppressClick) root.openSettings(); }
-                }
-                Tip {
-                    id: ringTip; hot: ringMa.containsMouse
-                    title: "Workspace " + wm.focusedId
-                    hints: cfg.tooltipHints ? root.wsHints : ""
                 }
             }
             Grid {
@@ -1233,30 +1249,32 @@ Component {
                         required property var modelData
                         visible: modelData.id > 0
                         width: wm.hit; height: wm.hit
+                        // purely visual: no mouse input
                         Rectangle {
                             anchors.centerIn: parent; width: wm.dotPx; height: wm.dotPx; radius: width / 2
                             color: wd.modelData.urgent ? Theme.danger
                                  : wd.modelData.focused ? Theme.accent2
-                                 : dMa.containsMouse ? Qt.alpha(Theme.accent2, 0.8)
                                  : Qt.alpha(Theme.text, 0.3)
-                        }
-                        DMouseArea {
-                            id: dMa; anchors.fill: parent; hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onPressed: dTip.dismiss()
-                            onClicked: {
-                                if (dMa.suppressClick) return;
-                                Hyprland.dispatch("hl.dsp.focus({ workspace = " + wd.modelData.id + " })");
-                            }
-                        }
-                        Tip {
-                            id: dTip; hot: dMa.containsMouse
-                            title: "Workspace " + wd.modelData.id
-                                   + (wd.modelData.urgent ? " · urgent" : wd.modelData.focused ? " · focused" : "")
                         }
                     }
                 }
             }
+        }
+        // single mouse area over the whole module: drag from anywhere, right-click = settings
+        DMouseArea {
+            id: wmMa; anchors.fill: parent; hoverEnabled: true
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            cursorShape: Qt.PointingHandCursor
+            onPressed: wmTip.dismiss()
+            onClicked: mouse => {
+                if (wmMa.suppressClick) return;
+                if (mouse.button === Qt.RightButton) root.openSettings();
+            }
+        }
+        Tip {
+            id: wmTip; hot: wmMa.containsMouse
+            title: "Workspace " + wm.focusedId
+            hints: cfg.tooltipHints ? root.wsHints : ""
         }
         WheelHandler {
             enabled: cfg.wsScroll; acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
@@ -1424,18 +1442,18 @@ Component {
         }
     }
 }
-
     Component {
         id: mediaC
         Interactive {
             readonly property bool playing: Marquee.player !== null && Marquee.player.isPlaying === true
-            readonly property real len: Math.min(Marquee.textW, Marquee.maxW)
+            readonly property real len: strip.totalW
             implicitWidth: root.vertical ? root.panelThick : len + 20; implicitHeight: root.vertical ? len + 20 : 18
             tip: Marquee.text; primaryHint: playing ? "Pause" : "Play"; secondaryHint: "Next track"
             tertiaryHint: "Previous track"; onPrimary: root.mediaAct("toggle"); onSecondary: root.mediaAct("next")
             onTertiary: root.mediaAct("prev")
             MarqueeStrip {
-                anchors.centerIn: parent; width: parent.len; height: 18
+                id: strip
+                anchors.centerIn: parent; width: totalW; height: 18
                 rotation: root.vertical ? (cfg.position === "left" ? -90 : 90) : 0
             }
         }

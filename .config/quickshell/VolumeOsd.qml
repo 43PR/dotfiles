@@ -10,13 +10,15 @@ Scope {
 
     // ---- window lifecycle ------------------------------------------------
     property bool mounted: false
-    property real winW: 0; property real winH: 0; property real hitW: 0
+    property real winW: 0; property real winH: 0
+    // Card heights, reported by the OSD window (used to keep the cards apart while settings are open).
+    property var cardH: ({ media: 100, vol: 28, bright: 28 })
 
     // Must be longer than the fade-out (OsdCard opacity/scale = fadeMs).
     Timer {
         id: unmountTimer
         interval: root.fadeMs + 100
-        onTriggered: { root.mounted = false; root.winW = 0; root.winH = 0; root.hitW = 0; root.hovered = false; root.hoverTip = "" }
+        onTriggered: { root.mounted = false; root.winW = 0; root.winH = 0; root.hovered = false; root.hoverTip = "" }
     }
 
     // ---- constants / specs -----------------------------------------------
@@ -40,8 +42,15 @@ Scope {
         barSensitivity:{ min: 20,  max: 300,   def: 100,  step: 10,  unit: "%" },
         mediaTimeout:  { min: 250, max: 60000, def: 3000, step: 250, unit: "s" },
         volTimeout:    { min: 100, max: 30000, def: 1200, step: 100, unit: "s" },
+        flyoutHeight:  { min: 20,  max: 60,    def: 28,   step: 2,   unit: "px" },
+        flyoutRadius:  { min: 0,   max: 40,    def: 40,   step: 2,   unit: "px", full: true },
+        flyoutIconSize:{ min: 10,  max: 40,    def: 20,   step: 1,   unit: "px" },
+        flyoutTextSize:{ min: 8,   max: 24,    def: 12,   step: 1,   unit: "px" },
+        flyoutTrack:   { min: 2,   max: 16,    def: 5,    step: 1,   unit: "px" },
+        flyoutPad:     { min: 4,   max: 40,    def: 20,   step: 2,   unit: "px" },
         fadeMs:        { min: 0,   max: 1500,  def: 150,  step: 25,  unit: " ms" },
         bgOpacity:     { min: 0,   max: 100,   def: Math.max(10, Math.round((Theme.bg.a ?? 1) * 20) * 5),     step: 5, unit: "%" },
+        flyoutBgOpacity: { min: 0,   max: 100,   def: Math.max(10, Math.round((Theme.bg.a ?? 1) * 20) * 5),     step: 5, unit: "%" },
         artOpacity:    { min: 0,   max: 100,   def: Math.max(20, Math.round((Theme.bgAlpha ?? 1) * 20) * 5), step: 5, unit: "%" },
         barOpacity:    { min: 0,   max: 100,   def: 90,   step: 5,   unit: "%" },
         barDimOpacity: { min: 0,   max: 100,   def: 30,   step: 5,   unit: "%" }
@@ -49,14 +58,17 @@ Scope {
     readonly property var numKeys: Object.keys(numSpec)
 
     readonly property var boolDefaults: ({
+        volOsd: true, mediaOsd: true, brightOsd: true,
+        flyoutIcon: true, flyoutPercent: true, flyoutAccent: false, flyoutBorder: false,
         showTips: true, showTitle: true, showArtist: true, showBar: true, showVisualizer: true,
         trackChangeOsd: true, showArt: true, showControls: true, musicOnly: true, artistBelow: false,
         portrait: true, showBorder: false, accentBars: false
     })
     readonly property var boolKeys: Object.keys(boolDefaults)
-    readonly property var posKeys: ["offsetX", "offsetY", "volOffsetX", "volOffsetY"]
+    readonly property var posKeys: ["offsetX", "offsetY", "volOffsetX", "volOffsetY", "brightOffsetX", "brightOffsetY"]
 
     property real offsetX: 0; property real offsetY: 0; property real volOffsetX: 0; property real volOffsetY: 0
+    property real brightOffsetX: 0; property real brightOffsetY: 0
 
     // Settings window: remembered position (offset from screen centre) and zoom (%).
     // Saved in the same state file, but deliberately NOT part of "Reset all" /
@@ -80,9 +92,17 @@ Scope {
     property int mediaTimeout: numSpec.mediaTimeout.def
     property int volTimeout: numSpec.volTimeout.def; property int fadeMs: numSpec.fadeMs.def
     property int bgOpacity: numSpec.bgOpacity.def
+    property int flyoutBgOpacity: numSpec.flyoutBgOpacity.def
+    property int flyoutHeight: numSpec.flyoutHeight.def; property int flyoutRadius: numSpec.flyoutRadius.def
+    property int flyoutIconSize: numSpec.flyoutIconSize.def; property int flyoutTextSize: numSpec.flyoutTextSize.def
+    property int flyoutTrack: numSpec.flyoutTrack.def; property int flyoutPad: numSpec.flyoutPad.def
+    property bool flyoutIcon: boolDefaults.flyoutIcon; property bool flyoutPercent: boolDefaults.flyoutPercent
+    property bool flyoutAccent: boolDefaults.flyoutAccent; property bool flyoutBorder: boolDefaults.flyoutBorder
     property int artOpacity: numSpec.artOpacity.def; property int barOpacity: numSpec.barOpacity.def
     property int barDimOpacity: numSpec.barDimOpacity.def
 
+    property bool volOsd: boolDefaults.volOsd; property bool mediaOsd: boolDefaults.mediaOsd
+    property bool brightOsd: boolDefaults.brightOsd
     property bool showTips: boolDefaults.showTips; property bool showTitle: boolDefaults.showTitle
     property bool showArtist: boolDefaults.showArtist; property bool showBar: boolDefaults.showBar
     property bool showVisualizer: boolDefaults.showVisualizer; property bool trackChangeOsd: boolDefaults.trackChangeOsd
@@ -91,35 +111,112 @@ Scope {
     property bool portrait: boolDefaults.portrait; property bool showBorder: boolDefaults.showBorder
     property bool accentBars: boolDefaults.accentBars
 
-    readonly property real scaleFactor: (showMedia ? mediaScale : volScale) / 100
+    readonly property real scaleFactor: scaleOf(curKind)
     readonly property color cardColor: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, bgOpacity / 100)
-    readonly property real curX: showMedia ? offsetX : volOffsetX
-    readonly property real curY: showMedia ? offsetY : volOffsetY
+    readonly property real curX: offX(curKind)
+    readonly property real curY: offY(curKind)
     readonly property bool mediaMoved: offsetX !== 0 || offsetY !== 0
     readonly property bool volMoved: volOffsetX !== 0 || volOffsetY !== 0
+    readonly property bool brightMoved: brightOffsetX !== 0 || brightOffsetY !== 0
+
+    // ---- the three cards: "media", "vol", "bright" ----------------------------
+    // mode     : which card the OSD is showing right now (normal operation)
+    // focusKind: while the settings are open ALL cards are shown; this is the one
+    //            that owns the hint / pin bar (last hovered or dragged card)
+    // curKind  : the card that scaleFactor / curX / curY / tools bar refer to
+    property string focusKind: "media"
+    readonly property string mode: showMedia ? "media" : showBright ? "bright" : "vol"
+    readonly property string curKind: settingsOpen ? focusKind : mode
+
+    function offX(k) { return k === "media" ? offsetX : k === "bright" ? brightOffsetX : volOffsetX }
+    function offY(k) { return k === "media" ? offsetY : k === "bright" ? brightOffsetY : volOffsetY }
+    function setOff(k, x, y) {
+        if (k === "media") { offsetX = x; offsetY = y }
+        else if (k === "bright") { brightOffsetX = x; brightOffsetY = y }
+        else { volOffsetX = x; volOffsetY = y }
+    }
+    function scaleOf(k) { return (k === "media" ? mediaScale : volScale) / 100 }   // volume + brightness share one scale
+    function cardW(k) { return k === "media" ? (portrait ? portraitWidth : mediaWidth) : flyoutWidth }
+    function cardHt(k) { return cardH[k] ?? 28 }
+
+    // While the settings are open the cards are previewed together. Cards whose
+    // saved positions would overlap are pushed down (preview only, nothing is saved
+    // until you drag one). Each card reserves room for its hint bar underneath.
+    function computeShift() {
+        var out = { media: 0, vol: 0, bright: 0 }
+        var order = ["media", "vol", "bright"]
+        var gap = 6
+        for (var i = 1; i < order.length; i++) {
+            var k = order[i], s = scaleOf(k)
+            var x0 = offX(k) - cardW(k) * s / 2, x1 = offX(k) + cardW(k) * s / 2
+            var y = offY(k)
+            for (var pass = 0; pass < order.length; pass++) {
+                var moved = false
+                for (var j = 0; j < i; j++) {
+                    var o = order[j], so = scaleOf(o)
+                    var ox0 = offX(o) - cardW(o) * so / 2, ox1 = offX(o) + cardW(o) * so / 2
+                    if (x1 <= ox0 || x0 >= ox1) continue
+                    var oy0 = offY(o) + out[o]
+                    var oy1 = oy0 + (cardHt(o) + toolsHeight) * so + gap
+                    if (y < oy1 && y + cardHt(k) * s > oy0) { y = oy1; moved = true }
+                }
+                if (!moved) break
+            }
+            out[k] = y - offY(k)
+        }
+        return out
+    }
+
+    readonly property var noShift: ({ media: 0, vol: 0, bright: 0 })
+    property var frozenShift: ({ media: 0, vol: 0, bright: 0 })
+    readonly property var previewShift: !settingsOpen ? noShift : dragging ? frozenShift : computeShift()
+
+    // Called when a drag starts: the card's preview shift is baked into its saved
+    // offset so it does not jump, and the shifts are frozen until the drag ends.
+    function beginDrag(k) {
+        focusKind = k
+        if (settingsOpen) {
+            var sh = previewShift
+            var f = { media: sh.media, vol: sh.vol, bright: sh.bright }
+            setOff(k, offX(k), offY(k) + f[k])
+            f[k] = 0
+            frozenShift = f
+        }
+        dragging = true
+    }
     readonly property bool modified: posKeys.some(k => root[k] !== 0)
         || numKeys.some(k => root[k] !== numSpec[k].def)
         || boolKeys.some(k => root[k] !== boolDefaults[k])
     readonly property string statePath: Quickshell.env("HOME") + "/.config/quickshell/state/mediaosd-state.json"
 
     // ---- settings menu look / scale -----------------------------------------
-    // Same scale system as the wallpaper picker's menu:
+    // The settings controls (ActionButton, SectionHeader, ToggleRow, SliderRow)
+    // live in CustomizationSettings.qml, shared by all menus. They read from
+    // this Scope (the "host"): menuUi, th, cAccent, numSpec and the helper
+    // functions below (cellW, focusStep, ensureVisible, fmtValue, setNumber,
+    // toggleSetting, saveState).
+    //
+    // Scale system (same as the wallpaper picker's menu):
     //   ui            : screen height / 1080 (resolution independence)
     //   settingsScale : Theme.settingsScale (user's "settings scale" from hub.json)
     //   settingsZoom  : Shift+scroll zoom of the settings window (percent)
     //   menuUi        : ui * settingsScale * zoom, multiplies every size in the settings menu.
     // menuUi is kept up to date by a Binding inside the settings window (it knows its screen).
-    // Everything below falls back to the picker's defaults if Theme doesn't define it.
+    // Everything falls back to the picker's defaults if Theme doesn't define it.
     readonly property real settingsScale: Theme.settingsScale ?? 1
     property real menuUi: settingsScale
-    readonly property real menuRadius: Theme.radius ?? 20
-    readonly property string menuFont: Theme.fontFamily ?? "JetBrains Mono"
-    readonly property int menuAnimFast: Theme.animFast ?? 120
-    readonly property int menuAnimMed: Theme.animMed ?? 220
-    readonly property int textSizeSection: Theme.textSizeSection ?? 15
-    readonly property int textSizeGroup: Theme.textSizeGroup ?? 12
-    readonly property int textSizeBody: Theme.textSizeBody ?? 11
-    readonly property int textSizeSmall: Theme.textSizeSmall ?? 10
+    readonly property color cAccent: Theme.accent
+
+    readonly property QtObject th: QtObject {
+        readonly property string fontFamily: Theme.fontFamily ?? "JetBrains Mono"
+        readonly property int radius: Theme.radius ?? 20
+        readonly property int animFast: Theme.animFast ?? 120
+        readonly property int animMed: Theme.animMed ?? 220
+        readonly property int textSizeSection: Theme.textSizeSection ?? 15
+        readonly property int textSizeGroup: Theme.textSizeGroup ?? 12
+        readonly property int textSizeBody: Theme.textSizeBody ?? 11
+        readonly property int textSizeSmall: Theme.textSizeSmall ?? 10
+    }
 
     // ---- player detection --------------------------------------------------
     readonly property var musicPlayers: [
@@ -209,6 +306,7 @@ Scope {
     // Step / max come from the bar's settings file so both stay in sync.
     property int volStep: 2
     property int volMax: 100
+    property int brightStep: 5
     property real wheelAcc: 0
 
     FileView {
@@ -221,6 +319,7 @@ Scope {
                 var j = JSON.parse(text())
                 if (typeof j.volStep === "number") root.volStep = j.volStep
                 if (typeof j.volMax === "number") root.volMax = j.volMax
+                if (typeof j.brightStep === "number") root.brightStep = j.brightStep
             } catch (e) {}
         }
     }
@@ -243,8 +342,86 @@ Scope {
         sink.audio.volume = next / 100
     }
 
+    // ---- brightness watching ------------------------------------------------
+    // Same source as the bar (brightnessctl). brightnessctl is asked once for the
+    // backlight device; after that the device's sysfs "brightness" file is polled
+    // (sysfs has no inotify events), so keyboard keys, the bar scroll and
+    // `brightnessctl set` from anywhere all show the OSD.
+    property real brightness: -1          // 0..1, -1 = no backlight
+    property string brightDevPath: ""
+    property real brightMaxRaw: 0
+    property real brightAcc: 0
+    readonly property bool hasBacklight: brightness >= 0
+    readonly property int brightPct: Math.round(Math.max(0, brightness) * 100)
+
+    Process {
+        command: ["brightnessctl", "-m"]
+        running: true
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var lines = this.text.trim().split("\n").filter(l => l !== "")
+                var line = lines.find(l => l.split(",")[1] === "backlight") ?? lines[0]
+                if (!line) return
+                var f = line.split(",")
+                var cur = parseInt(f[2]), max = parseInt(f[4])
+                if (f.length < 5 || isNaN(cur) || isNaN(max) || max <= 0) return
+                root.brightMaxRaw = max
+                root.brightness = cur / max
+                root.brightDevPath = "/sys/class/" + f[1] + "/" + f[0]
+            }
+        }
+    }
+
+    FileView {
+        id: brightFile
+        path: root.brightDevPath !== "" ? root.brightDevPath + "/brightness" : ""
+        printErrors: false
+
+        onLoaded: {
+            var raw = parseInt(brightFile.text())
+            if (!isNaN(raw) && root.brightMaxRaw > 0) root.applyBrightness(raw / root.brightMaxRaw)
+        }
+    }
+
+    Timer {
+        interval: 250
+        repeat: true
+        running: root.brightDevPath !== "" && (root.brightOsd || root.settingsOpen)
+        onTriggered: brightFile.reload()
+    }
+
+    function applyBrightness(v) {
+        var changed = brightness >= 0 && Math.round(v * 100) !== Math.round(brightness * 100)
+        brightness = v
+        if (changed) triggerBrightOsd()
+    }
+
+    function scrollBrightness(delta) {
+        if (!hasBacklight) return
+        brightAcc += delta
+        if (Math.abs(brightAcc) < 120) return
+        var dir = brightAcc > 0 ? 1 : -1
+        brightAcc = 0
+        var step = Math.max(1, brightStep)
+        var cur = Math.round(brightness * 100)
+        var next = dir > 0 ? (Math.floor(cur / step) + 1) * step
+                           : (Math.ceil(cur / step) - 1) * step
+        next = Math.max(1, Math.min(100, next))
+        brightness = next / 100
+        Quickshell.execDetached(["brightnessctl", "set", next + "%"])
+        hideTimer.restart()
+    }
+
+    // scrolling on a card: brightness card -> brightness, everything else -> volume
+    function scrollFor(kind, delta) {
+        if (kind === "bright") scrollBrightness(delta)
+        else scrollVolume(delta)
+    }
+
     // ---- OSD state ---------------------------------------------------------
     property bool ready: false; property bool showing: false; property bool showMedia: false
+    property bool showBright: false
     property bool pendingShow: false; property bool settingsOpen: false; property bool dragging: false
     property bool pinned: false
     property bool hovered: false     // driven by a Binding inside the OSD window
@@ -254,7 +431,7 @@ Scope {
 
     Timer {
         id: hideTimer
-        interval: root.showMedia ? root.mediaTimeout : root.volTimeout
+        interval: root.showMedia ? root.mediaTimeout : root.volTimeout   // volume + brightness share one timeout
         onTriggered: {
             if (root.hovered || root.settingsOpen || root.dragging || (root.showMedia && root.pinned))
                 hideTimer.restart()
@@ -263,34 +440,53 @@ Scope {
         }
     }
 
+    // Volume change: shows the media card instead if a player is playing (and the
+    // media OSD is on), otherwise the volume card (if the volume OSD is on).
     function triggerOsd() {
-        if (!ready) return
-        if (showing) { hideTimer.restart(); return }
+        if (!ready || settingsOpen) return
+        if (showing && !showBright) { hideTimer.restart(); return }
+        if (!volOsd && !mediaOsd) return
         pendingShow = true
         updateMedia()
     }
 
+    function triggerBrightOsd() {
+        if (!ready || !brightOsd || settingsOpen) return
+        if (showing && showBright) { hideTimer.restart(); return }
+        pendingShow = false; showMedia = false; showBright = true; showing = true
+        hideTimer.restart()
+    }
+
     function showMediaOsd() {
-        pendingShow = false; showMedia = true; showing = true
+        pendingShow = false; showBright = false; showMedia = true; showing = true
         hideTimer.restart()
         updateMedia()
     }
 
-    function triggerMediaOsd() { if (ready) showMediaOsd() }
+    function triggerMediaOsd() { if (ready && mediaOsd) showMediaOsd() }
 
+    // Settings show ALL cards at once (the ones that are switched off are dimmed).
     function openSettings() {
-        pendingShow = false; settingsOpen = true; showMedia = true; showing = true
+        pendingShow = false; settingsOpen = true; showBright = false; showMedia = true; showing = true
+        focusKind = "media"
         hideTimer.restart()
     }
 
-    function closeSettings() { settingsOpen = false; dragging = false; hideTimer.restart() }
+    function closeSettings() {
+        settingsOpen = false; dragging = false
+        if (!mediaOsd) showing = false      // the media card was only up for the preview
+        else hideTimer.restart()
+    }
     function toggleSettings() { settingsOpen ? closeSettings() : openSettings() }
     function togglePinned() { pinned = !pinned; hideTimer.restart() }
     function closeAll() { settingsOpen = false; dragging = false; showing = false }
 
     function finishPendingShow() {
         if (!pendingShow) return
-        pendingShow = false; showMedia = playing; showing = true
+        pendingShow = false
+        var m = playing && mediaOsd
+        if (!m && !volOsd) return
+        showBright = false; showMedia = m; showing = true
         hideTimer.restart()
     }
 
@@ -299,7 +495,7 @@ Scope {
             unmountTimer.stop()
             mounted = true
         } else {
-            showMedia = false; settingsOpen = false; dragging = false; pinned = false; hoverTip = ""
+            showMedia = false; showBright = false; settingsOpen = false; dragging = false; pinned = false; hoverTip = ""
             unmountTimer.restart()
         }
     }
@@ -309,11 +505,12 @@ Scope {
     IpcHandler {
         target: "mediaosd"
         function media(): void { root.triggerMediaOsd() }
+        function brightness(): void { root.triggerBrightOsd() }
         function settings(): void { root.openSettings() }
         function hide(): void { root.closeAll() }
     }
 
-    // ---- settings helpers --------------------------------------------------
+    // ---- settings helpers (also the host API used by CustomizationSettings) --
     function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, Math.round(v))) }
 
     // width of one cell when `p` is a multi-column Grid, else the full width
@@ -359,18 +556,19 @@ Scope {
     }
 
     // Only called while dragging; saved offsets are never rewritten by window resizes.
-    function setPosition(x, y) {
+    function setPosition(kind, x, y) {
         var nx = x, ny = y
-        if (winW > 0 && winH > 0 && hitW > 0) {
+        var hw = cardW(kind) * scaleOf(kind)
+        if (winW > 0 && winH > 0) {
             var minY = -topGap
-            nx = Math.max(keepVisible - winW / 2 - hitW / 2, Math.min(winW / 2 - keepVisible + hitW / 2, x))
+            nx = Math.max(keepVisible - winW / 2 - hw / 2, Math.min(winW / 2 - keepVisible + hw / 2, x))
             ny = Math.max(minY, Math.min(Math.max(minY, winH - keepVisible - topGap), y))
         }
-        if (showMedia) { offsetX = nx; offsetY = ny } else { volOffsetX = nx; volOffsetY = ny }
+        setOff(kind, nx, ny)
     }
 
-    function resetPos(media) {
-        if (media) { offsetX = 0; offsetY = 0 } else { volOffsetX = 0; volOffsetY = 0 }
+    function resetPos(kind) {
+        setOff(kind, 0, 0)
         saveState()
     }
 
@@ -528,7 +726,8 @@ Scope {
 
             // Stays false until one tick after creation so cards animate in.
             property bool reveal: false
-            readonly property Item activeCard: root.showMedia ? mediaPanel : flyout
+            readonly property Item activeCard: root.curKind === "media" ? mediaPanel
+                                              : root.curKind === "bright" ? brightPanel : flyout
 
             anchors { top: true; bottom: true; left: true; right: true }
             color: "transparent"
@@ -538,7 +737,12 @@ Scope {
             WlrLayershell.namespace: "mediaosd"
             WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
-            mask: Region { item: root.showing ? hitbox : null }
+            // Every visible card (plus the hint bar of the focused one) takes input.
+            mask: Region {
+                Region { item: flyout.open ? hitVol : null }
+                Region { item: mediaPanel.open ? hitMedia : null }
+                Region { item: brightPanel.open ? hitBright : null }
+            }
 
             onWidthChanged: root.winW = width
             onHeightChanged: root.winH = height
@@ -552,7 +756,13 @@ Scope {
             Binding {
                 target: root
                 property: "hovered"
-                value: flyoutHover.hovered || mediaHover.hovered || toolsHover.hovered
+                value: flyout.hovered || mediaPanel.hovered || brightPanel.hovered || toolsHover.hovered
+            }
+
+            Binding {
+                target: root
+                property: "cardH"
+                value: ({ media: mediaPanel.height, vol: flyout.height, bright: brightPanel.height })
             }
 
             Item {
@@ -560,66 +770,148 @@ Scope {
                 anchors.fill: parent
 
                 Item {
-                    id: hitbox
-                    width: win.activeCard.width * root.scaleFactor
-                    height: (win.activeCard.height + root.toolsHeight) * root.scaleFactor
-                    x: (scene.width - width) / 2 + root.curX
-                    y: root.topGap + root.curY
-
-                    onWidthChanged: root.hitW = width
-                    Component.onCompleted: root.hitW = width
+                    id: hitVol
+                    readonly property real k: root.scaleOf("vol")
+                    width: flyout.width * k
+                    height: (flyout.height + (root.curKind === "vol" ? root.toolsHeight : 0)) * k
+                    x: (scene.width - width) / 2 + root.offX("vol")
+                    y: root.topGap + root.offY("vol") + root.previewShift.vol
+                }
+                Item {
+                    id: hitMedia
+                    readonly property real k: root.scaleOf("media")
+                    width: mediaPanel.width * k
+                    height: (mediaPanel.height + (root.curKind === "media" ? root.toolsHeight : 0)) * k
+                    x: (scene.width - width) / 2 + root.offX("media")
+                    y: root.topGap + root.offY("media") + root.previewShift.media
+                }
+                Item {
+                    id: hitBright
+                    readonly property real k: root.scaleOf("bright")
+                    width: brightPanel.width * k
+                    height: (brightPanel.height + (root.curKind === "bright" ? root.toolsHeight : 0)) * k
+                    x: (scene.width - width) / 2 + root.offX("bright")
+                    y: root.topGap + root.offY("bright") + root.previewShift.bright
                 }
 
                 // ---- volume popup ----
                 OsdCard {
                     id: flyout
+                    kind: "vol"
                     cardScale: root.volScale / 100
                     xOffset: root.volOffsetX
                     yOffset: root.volOffsetY
-                    open: win.reveal && root.showing && !root.showMedia
+                    shiftY: root.previewShift.vol
+                    open: win.reveal && root.showing && (root.settingsOpen || root.mode === "vol")
+                    dim: root.settingsOpen && !root.volOsd
                     width: root.flyoutWidth
-                    height: 28
-                    radius: 36
+                    height: root.flyoutHeight
+                    radius: Math.min(root.flyoutRadius, height / 2)
 
-                    HoverHandler { id: flyoutHover; enabled: flyout.open }
-                    DragArea { anchors.fill: parent; enabled: flyout.open; scene: scene }
+                    DragArea { anchors.fill: parent; enabled: flyout.open; scene: scene; kind: "vol" }
 
                     Text {
                         id: icon
                         anchors.left: parent.left
-                        anchors.leftMargin: 20
+                        anchors.leftMargin: root.flyoutPad
                         anchors.verticalCenter: parent.verticalCenter
-                        text: root.muted ? "󰖁" : root.volume <= 0 ? "󰕿" : root.volume < 0.5 ? "󰖀" : "󰕾"
+                        text: root.muted ? "\udb81\udd81"
+                            : root.volume <= 0 ? "\udb81\udd7f"
+                            : root.volume < 0.5 ? "\udb81\udd80"
+                            : "\udb81\udd7e"
+                        visible: root.flyoutIcon
                         font.family: "Symbols Nerd Font"
-                        font.pixelSize: 20
-                        color: Theme.text
+                        font.pixelSize: root.flyoutIconSize
+                        color: root.flyoutAccent ? Theme.accent : Theme.text
                     }
 
                     Text {
                         anchors.right: parent.right
-                        anchors.rightMargin: 20
+                        anchors.rightMargin: root.flyoutPad
+                        visible: root.flyoutPercent
                         anchors.verticalCenter: parent.verticalCenter
                         text: root.muted ? "Muted" : Math.round(root.volume * 100) + "%"
-                        font.pixelSize: 12
+                        font.pixelSize: root.flyoutTextSize
                         font.bold: true
                         color: Theme.text
                     }
 
                     Rectangle {
-                        anchors.left: icon.right
-                        anchors.leftMargin: 15
+                        anchors.left: icon.visible ? icon.right : parent.left
+                        anchors.leftMargin: icon.visible ? 15 : root.flyoutPad
                         anchors.right: parent.right
-                        anchors.rightMargin: 68
+                        anchors.rightMargin: root.flyoutPercent ? root.flyoutPad + 48 : root.flyoutPad
                         anchors.verticalCenter: parent.verticalCenter
-                        height: 5
-                        radius: 4
+                        height: root.flyoutTrack
+                        radius: height / 2
                         color: "#555555"
 
                         Rectangle {
                             width: root.muted ? 0 : parent.width * Math.min(root.volume, 1)
                             height: parent.height
-                            radius: 4
-                            color: Theme.text
+                            radius: parent.radius
+                            color: root.flyoutAccent ? Theme.accent : Theme.text
+                            Behavior on width { NumberAnimation { duration: 100 } }
+                        }
+                    }
+                }
+
+                // ---- brightness popup (same look as the volume popup) ----
+                OsdCard {
+                    id: brightPanel
+                    kind: "bright"
+                    cardScale: root.volScale / 100
+                    xOffset: root.brightOffsetX
+                    yOffset: root.brightOffsetY
+                    shiftY: root.previewShift.bright
+                    open: win.reveal && root.showing && (root.settingsOpen || root.mode === "bright")
+                    dim: root.settingsOpen && !root.brightOsd
+                    width: root.flyoutWidth
+                    height: root.flyoutHeight
+                    radius: Math.min(root.flyoutRadius, height / 2)
+
+                    DragArea { anchors.fill: parent; enabled: brightPanel.open; scene: scene; kind: "bright" }
+
+                    Text {
+                        id: brightIcon
+                        anchors.left: parent.left
+                        anchors.leftMargin: root.flyoutPad
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: root.brightness < 0.34 ? "\udb80\udcde"
+                            : root.brightness < 0.67 ? "\udb80\udcdf"
+                            : "\udb80\udce0"
+                        visible: root.flyoutIcon
+                        font.family: "Symbols Nerd Font"
+                        font.pixelSize: root.flyoutIconSize
+                        color: root.flyoutAccent ? Theme.accent : Theme.text
+                    }
+
+                    Text {
+                        anchors.right: parent.right
+                        anchors.rightMargin: root.flyoutPad
+                        visible: root.flyoutPercent
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: root.hasBacklight ? root.brightPct + "%" : "N/A"
+                        font.pixelSize: root.flyoutTextSize
+                        font.bold: true
+                        color: Theme.text
+                    }
+
+                    Rectangle {
+                        anchors.left: brightIcon.visible ? brightIcon.right : parent.left
+                        anchors.leftMargin: brightIcon.visible ? 15 : root.flyoutPad
+                        anchors.right: parent.right
+                        anchors.rightMargin: root.flyoutPercent ? root.flyoutPad + 48 : root.flyoutPad
+                        anchors.verticalCenter: parent.verticalCenter
+                        height: root.flyoutTrack
+                        radius: height / 2
+                        color: "#555555"
+
+                        Rectangle {
+                            width: parent.width * Math.max(0, Math.min(root.brightness, 1))
+                            height: parent.height
+                            radius: parent.radius
+                            color: root.flyoutAccent ? Theme.accent : Theme.text
                             Behavior on width { NumberAnimation { duration: 100 } }
                         }
                     }
@@ -628,10 +920,13 @@ Scope {
                 // ---- media popup ----
                 OsdCard {
                     id: mediaPanel
+                    kind: "media"
                     cardScale: root.mediaScale / 100
                     xOffset: root.offsetX
                     yOffset: root.offsetY
+                    shiftY: root.previewShift.media
                     open: win.reveal && root.showing && root.showMedia
+                    dim: root.settingsOpen && !root.mediaOsd
                     width: root.portrait ? root.portraitWidth : root.mediaWidth
                     height: mediaCol.height + 28
                     radius: root.cardRadius
@@ -641,10 +936,8 @@ Scope {
                     readonly property bool barShown: root.showBar && root.showVisualizer
                     readonly property bool lineShown: root.showBar && !root.showVisualizer
 
-                    HoverHandler { id: mediaHover; enabled: mediaPanel.open }
-
                     // Declared before the content so buttons stay clickable on top.
-                    DragArea { anchors.fill: parent; enabled: mediaPanel.open; scene: scene }
+                    DragArea { anchors.fill: parent; enabled: mediaPanel.open; scene: scene; kind: "media" }
 
                     Column {
                         id: mediaCol
@@ -812,19 +1105,19 @@ Scope {
                                 spacing: 28
 
                                 GlyphButton {
-                                    text: "󰒮"
+                                    text: "\udb81\udcae"
                                     font.pixelSize: 19
                                     onClicked: root.mediaCmd("previous")
                                     onHoveredChanged: root.hoverTip = hovered ? "Previous track" : ""
                                 }
                                 GlyphButton {
-                                    text: root.playing ? "󰏤" : "󰐊"
+                                    text: root.playing ? "\udb80\udfe4" : "\udb81\udc0a"
                                     font.pixelSize: 21
                                     onClicked: root.mediaCmd("play-pause")
                                     onHoveredChanged: root.hoverTip = hovered ? (root.playing ? "Pause" : "Play") : ""
                                 }
                                 GlyphButton {
-                                    text: "󰒭"
+                                    text: "\udb81\udcad"
                                     font.pixelSize: 19
                                     onClicked: root.mediaCmd("next")
                                     onHoveredChanged: root.hoverTip = hovered ? "Next track" : ""
@@ -842,7 +1135,8 @@ Scope {
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.horizontalCenterOffset: root.curX
                     anchors.top: parent.top
-                    anchors.topMargin: root.topGap + root.curY + win.activeCard.height * root.scaleFactor
+                    anchors.topMargin: root.topGap + root.curY + root.previewShift[root.curKind]
+                                       + win.activeCard.height * root.scaleFactor
                     transformOrigin: Item.Top
                     scale: root.scaleFactor
                     visible: opacity > 0
@@ -855,13 +1149,13 @@ Scope {
                         visible: root.showTips
                         anchors.left: parent.left
                         anchors.leftMargin: 10
-                        anchors.right: root.showMedia ? pinButton.left : parent.right
+                        anchors.right: root.curKind === "media" ? pinButton.left : parent.right
                         anchors.rightMargin: 8
                         anchors.verticalCenter: parent.verticalCenter
                         elide: Text.ElideRight
                         font.pixelSize: 10
                         color: Theme.textDim
-                        horizontalAlignment: root.showMedia ? Text.AlignLeft : Text.AlignHCenter
+                        horizontalAlignment: root.curKind === "media" ? Text.AlignLeft : Text.AlignHCenter
                         text: root.dragging ? ""
                             : root.hoverTip !== "" ? root.hoverTip
                             : "RMB for settings · Drag to move · double-click resets"
@@ -871,7 +1165,7 @@ Scope {
                     // always reasonably visible (was a tiny 18px, 30% opacity button).
                     FooterButton {
                         id: pinButton
-                        visible: root.showMedia
+                        visible: root.curKind === "media"
                         anchors.right: parent.right
                         anchors.rightMargin: 6
                         anchors.verticalCenter: parent.verticalCenter
@@ -899,7 +1193,8 @@ Scope {
     // anywhere without moving a layer-shell surface around.
     //
     // Every size below is multiplied by `u` (= ui * Theme.settingsScale * zoom), exactly like the
-    // wallpaper picker's menu, so both menus scale together.
+    // wallpaper picker's menu, so all menus scale together. The controls come
+    // from CustomizationSettings.qml.
     //
     // Mouse: drag the header (or the empty part of the footer) to move the
     // window; Shift + scroll zooms it (50 - 200 %); double-click the header /
@@ -931,7 +1226,7 @@ Scope {
             // Only the panel receives input; everything else passes through.
             mask: Region { item: panel }
 
-            // Shares the scale with the reusable components (they read root.menuUi).
+            // Shares the scale with the reusable components (they read host.menuUi).
             Binding { target: root; property: "menuUi"; value: settingsWin.u }
 
             // Keep the panel reachable after a resolution change / zoom.
@@ -988,7 +1283,7 @@ Scope {
 
                     Rectangle {
                         anchors.fill: parent
-                        radius: root.menuRadius * settingsWin.u
+                        radius: root.th.radius * settingsWin.u
                         color: Theme.bg
                         border.width: 1
                         border.color: Theme.alpha(Theme.text, 0.12)
@@ -1045,16 +1340,16 @@ Scope {
                             Text {
                                 x: 20 * settingsWin.u; y: 10 * settingsWin.u
                                 text: "OSD settings"
-                                font.family: root.menuFont
-                                font.pixelSize: root.textSizeSection * settingsWin.u
+                                font.family: root.th.fontFamily
+                                font.pixelSize: root.th.textSizeSection * settingsWin.u
                                 font.bold: true
                                 color: Theme.text
                             }
                             Text {
                                 x: 20 * settingsWin.u; y: 31 * settingsWin.u
                                 text: "Drag · Tab · Shift+scroll"
-                                font.family: root.menuFont
-                                font.pixelSize: root.textSizeSmall * settingsWin.u
+                                font.family: root.th.fontFamily
+                                font.pixelSize: root.th.textSizeSmall * settingsWin.u
                                 color: Theme.textDim
                             }
                             Text {
@@ -1065,7 +1360,7 @@ Scope {
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
                                 text: "×"
-                                font.family: root.menuFont
+                                font.family: root.th.fontFamily
                                 font.pixelSize: 22 * settingsWin.u
                                 color: closeArea.containsMouse ? Theme.text : Theme.textDim
                                 MouseArea { id: closeArea; anchors.fill: parent; hoverEnabled: true; onClicked: root.closeSettings() }
@@ -1094,77 +1389,106 @@ Scope {
                                 x: 20 * settingsWin.u
                                 width: flick.width - 48 * settingsWin.u
 
-                                SectionHeader { text: "Global" }
+                                CustomizationSettings.SectionHeader { host: root; text: "Show OSDs" }
                                 Grid {
                                     width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                                    ToggleRow { key: "showTips"; label: "Tooltips" }
-                                    SliderRow { key: "fadeMs"; label: "Animation" }
-                                    SliderRow { key: "mediaScale"; label: "Media scale" }
-                                    SliderRow { key: "volScale"; label: "Volume scale" }
+                                    CustomizationSettings.ToggleRow { host: root; key: "volOsd"; label: "Volume" }
+                                    CustomizationSettings.ToggleRow { host: root; key: "mediaOsd"; label: "Media" }
+                                    CustomizationSettings.ToggleRow { host: root; key: "brightOsd"; label: "Brightness" }
                                 }
 
-                                SectionHeader { text: "Content" }
+                                CustomizationSettings.SectionHeader { host: root; text: "Global" }
                                 Grid {
                                     width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                                    ToggleRow { key: "showArt"; label: "Album art" }
-                                    ToggleRow { key: "showTitle"; label: "Title" }
-                                    ToggleRow { key: "showArtist"; label: "Artist" }
-                                    ToggleRow { key: "showControls"; label: "Controls" }
-                                    ToggleRow { key: "showBar"; label: "Visualizer & bar" }
-                                    ToggleRow { key: "showVisualizer"; label: "Visualizer"; enabled: root.showBar }
+                                    CustomizationSettings.ToggleRow { host: root; key: "showTips"; label: "Tooltips" }
+                                    CustomizationSettings.SliderRow { host: root; key: "fadeMs"; label: "Animation" }
                                 }
 
-                                SectionHeader { text: "Layout" }
+                                // Volume and brightness are the same kind of card, so they share these settings.
+                                CustomizationSettings.SectionHeader { host: root; text: "Volume & brightness" }
                                 Grid {
                                     width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                                    ToggleRow { key: "portrait"; label: "Portrait" }
-                                    ToggleRow {
+                                    CustomizationSettings.SliderRow { host: root; key: "volScale"; label: "Scale"; enabled: root.volOsd || root.brightOsd }
+                                    CustomizationSettings.SliderRow { host: root; key: "volTimeout"; label: "Hide after"; enabled: root.volOsd || root.brightOsd }
+                                    CustomizationSettings.SliderRow { host: root; key: "flyoutWidth"; label: "Width"; enabled: root.volOsd || root.brightOsd }
+                                    CustomizationSettings.SliderRow { host: root; key: "flyoutHeight"; label: "Height"; enabled: root.volOsd || root.brightOsd }
+                                    CustomizationSettings.SliderRow { host: root; key: "flyoutRadius"; label: "Corner radius"; enabled: root.volOsd || root.brightOsd }
+                                    CustomizationSettings.SliderRow { host: root; key: "flyoutBgOpacity"; label: "Background"; enabled: root.volOsd || root.brightOsd }
+                                    CustomizationSettings.SliderRow { host: root; key: "flyoutIconSize"; label: "Icon size"; enabled: root.flyoutIcon && (root.volOsd || root.brightOsd) }
+                                    CustomizationSettings.SliderRow { host: root; key: "flyoutTextSize"; label: "Text size"; enabled: root.flyoutPercent && (root.volOsd || root.brightOsd) }
+                                    CustomizationSettings.SliderRow { host: root; key: "flyoutTrack"; label: "Bar thickness"; enabled: root.volOsd || root.brightOsd }
+                                    CustomizationSettings.SliderRow { host: root; key: "flyoutPad"; label: "Side padding"; enabled: root.volOsd || root.brightOsd }
+                                    CustomizationSettings.ToggleRow { host: root; key: "flyoutIcon"; label: "Icon"; enabled: root.volOsd || root.brightOsd }
+                                    CustomizationSettings.ToggleRow { host: root; key: "flyoutPercent"; label: "Percentage"; enabled: root.volOsd || root.brightOsd }
+                                    CustomizationSettings.ToggleRow { host: root; key: "flyoutAccent"; label: "Accent colour"; enabled: root.volOsd || root.brightOsd }
+                                    CustomizationSettings.ToggleRow { host: root; key: "flyoutBorder"; label: "Border"; enabled: root.volOsd || root.brightOsd }
+                                }
+
+                                CustomizationSettings.SectionHeader { host: root; text: "Media" }
+                                Grid {
+                                    width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                                    CustomizationSettings.SliderRow { host: root; key: "mediaScale"; label: "Scale"; enabled: root.mediaOsd }
+                                    CustomizationSettings.SliderRow { host: root; key: "mediaTimeout"; label: "Hide after"; enabled: root.mediaOsd }
+                                    CustomizationSettings.ToggleRow { host: root; key: "musicOnly"; label: "Music only" }
+                                    CustomizationSettings.ToggleRow { host: root; key: "trackChangeOsd"; label: "On track change" }
+                                }
+
+                                CustomizationSettings.SectionHeader { host: root; text: "Media content" }
+                                Grid {
+                                    width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                                    CustomizationSettings.ToggleRow { host: root; key: "showArt"; label: "Album art" }
+                                    CustomizationSettings.ToggleRow { host: root; key: "showTitle"; label: "Title" }
+                                    CustomizationSettings.ToggleRow { host: root; key: "showArtist"; label: "Artist" }
+                                    CustomizationSettings.ToggleRow { host: root; key: "showControls"; label: "Controls" }
+                                    CustomizationSettings.ToggleRow { host: root; key: "showBar"; label: "Visualizer & bar" }
+                                    CustomizationSettings.ToggleRow { host: root; key: "showVisualizer"; label: "Visualizer"; enabled: root.showBar }
+                                }
+
+                                CustomizationSettings.SectionHeader { host: root; text: "Media layout" }
+                                Grid {
+                                    width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                                    CustomizationSettings.ToggleRow { host: root; key: "portrait"; label: "Portrait" }
+                                    CustomizationSettings.ToggleRow {
+                                        host: root
                                         key: "artistBelow"
                                         label: "Artist below"
                                         checked: root.artistBelow || root.portrait
                                         enabled: !root.portrait && root.showTitle && root.showArtist
                                     }
-                                    ToggleRow { key: "showBorder"; label: "Border" }
-                                    SliderRow { key: root.portrait ? "portraitWidth" : "mediaWidth"; label: "Width" }
-                                    SliderRow { key: "artSize"; label: "Art size"; enabled: root.showArt && !root.portrait }
-                                    SliderRow { key: "cardRadius"; label: "Corner radius" }
+                                    CustomizationSettings.ToggleRow { host: root; key: "showBorder"; label: "Border" }
+                                    CustomizationSettings.SliderRow { host: root; key: root.portrait ? "portraitWidth" : "mediaWidth"; label: "Width" }
+                                    CustomizationSettings.SliderRow { host: root; key: "artSize"; label: "Art size"; enabled: root.showArt && !root.portrait }
+                                    CustomizationSettings.SliderRow { host: root; key: "cardRadius"; label: "Corner radius" }
                                 }
 
-                                SectionHeader { text: "Visualizer" }
+                                CustomizationSettings.SectionHeader { host: root; text: "Media visualizer" }
                                 Grid {
                                     width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                                    SliderRow { key: "barCount"; label: "Bars"; enabled: root.showBar && root.showVisualizer }
-                                    SliderRow { key: "barSpacing"; label: "Spacing"; enabled: root.showBar && root.showVisualizer }
-                                    SliderRow { key: "barHeight"; label: "Height"; enabled: root.showBar }
-                                    SliderRow { key: "barRadius"; label: "Round"; enabled: root.showBar }
-                                    SliderRow { key: "barFps"; label: "Frame rate"; enabled: root.showBar && root.showVisualizer }
-                                    SliderRow { key: "barSensitivity"; label: "Sensitivity"; enabled: root.showBar && root.showVisualizer }
-                                    ToggleRow { key: "accentBars"; label: "Accent colour"; enabled: root.showBar }
+                                    CustomizationSettings.SliderRow { host: root; key: "barCount"; label: "Bars"; enabled: root.showBar && root.showVisualizer }
+                                    CustomizationSettings.SliderRow { host: root; key: "barSpacing"; label: "Spacing"; enabled: root.showBar && root.showVisualizer }
+                                    CustomizationSettings.SliderRow { host: root; key: "barHeight"; label: "Height"; enabled: root.showBar }
+                                    CustomizationSettings.SliderRow { host: root; key: "barRadius"; label: "Round"; enabled: root.showBar }
+                                    CustomizationSettings.SliderRow { host: root; key: "barFps"; label: "Frame rate"; enabled: root.showBar && root.showVisualizer }
+                                    CustomizationSettings.SliderRow { host: root; key: "barSensitivity"; label: "Sensitivity"; enabled: root.showBar && root.showVisualizer }
+                                    CustomizationSettings.ToggleRow { host: root; key: "accentBars"; label: "Accent colour"; enabled: root.showBar }
                                 }
 
-                                SectionHeader { text: "Opacity" }
+                                CustomizationSettings.SectionHeader { host: root; text: "Media opacity" }
                                 Grid {
                                     width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                                    SliderRow { key: "bgOpacity"; label: "Background" }
-                                    SliderRow { key: "artOpacity"; label: "Album art"; enabled: root.showArt }
-                                    SliderRow { key: "barOpacity"; label: "Bars played"; enabled: root.showBar }
-                                    SliderRow { key: "barDimOpacity"; label: "Bars remaining"; enabled: root.showBar }
+                                    CustomizationSettings.SliderRow { host: root; key: "bgOpacity"; label: "Background"; enabled: root.mediaOsd }
+                                    CustomizationSettings.SliderRow { host: root; key: "artOpacity"; label: "Album art"; enabled: root.showArt }
+                                    CustomizationSettings.SliderRow { host: root; key: "barOpacity"; label: "Bars played"; enabled: root.showBar }
+                                    CustomizationSettings.SliderRow { host: root; key: "barDimOpacity"; label: "Bars remaining"; enabled: root.showBar }
                                 }
 
-                                SectionHeader { text: "Behavior" }
-                                Grid {
-                                    width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                                    ToggleRow { key: "musicOnly"; label: "Music only" }
-                                    ToggleRow { key: "trackChangeOsd"; label: "On track change" }
-                                    SliderRow { key: "mediaTimeout"; label: "Media hide after" }
-                                    SliderRow { key: "volTimeout"; label: "Volume hide after" }
-                                }
-
-                                SectionHeader { text: "Position" }
-                                Row {
+                                CustomizationSettings.SectionHeader { host: root; text: "Position" }
+                                Flow {
+                                    width: parent.width
                                     spacing: 8 * settingsWin.u
-                                    ActionButton { label: "Reset media position"; enabled: root.mediaMoved; onClicked: root.resetPos(true) }
-                                    ActionButton { label: "Reset volume position"; enabled: root.volMoved; onClicked: root.resetPos(false) }
+                                    CustomizationSettings.ActionButton { host: root; label: "Reset media position"; enabled: root.mediaMoved; onClicked: root.resetPos("media") }
+                                    CustomizationSettings.ActionButton { host: root; label: "Reset volume position"; enabled: root.volMoved; onClicked: root.resetPos("vol") }
+                                    CustomizationSettings.ActionButton { host: root; label: "Reset brightness position"; enabled: root.brightMoved; onClicked: root.resetPos("bright") }
                                 }
                             }
                         }
@@ -1235,7 +1559,8 @@ Scope {
                                 onDoubleClicked: root.resetSettingsWindow()
                             }
 
-                            ActionButton {
+                            CustomizationSettings.ActionButton {
+                                host: root
                                 x: 20 * settingsWin.u
                                 anchors.verticalCenter: parent.verticalCenter
                                 label: "Reset all"
@@ -1243,7 +1568,8 @@ Scope {
                                 onClicked: root.resetAll()
                             }
 
-                            ActionButton {
+                            CustomizationSettings.ActionButton {
+                                host: root
                                 anchors.right: parent.right
                                 anchors.rightMargin: 20 * settingsWin.u
                                 anchors.verticalCenter: parent.verticalCenter
@@ -1258,34 +1584,45 @@ Scope {
         }
     }
 
-    // ---- reusable components -----------------------------------------------
+    // ---- OSD-only components (not shared with the settings menus) ----------
     component OsdCard: Rectangle {
+        id: card
         property bool open: false
         property var host: root
+        property string kind: "vol"          // "vol" | "bright" | "media"
         property real xOffset: 0
         property real yOffset: 0
+        property real shiftY: 0              // settings preview only (keeps the cards apart)
         property real cardScale: 1
+        property bool dim: false             // OSD switched off, shown only for the settings preview
+        readonly property bool hovered: cardHover.hovered
 
-        color: host.cardColor
-        border.width: host.showBorder ? 1 : 0
+        color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, (kind === "media" ? host.bgOpacity : host.flyoutBgOpacity) / 100)
+        border.width: (kind === "media" ? host.showBorder : host.flyoutBorder) ? 1 : 0
         border.color: Theme.alpha(Theme.text, 0.12)
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.horizontalCenterOffset: xOffset
         anchors.top: parent.top
-        anchors.topMargin: host.topGap + yOffset
+        anchors.topMargin: host.topGap + yOffset + shiftY
         transformOrigin: Item.Top
-        opacity: open ? 1 : 0
+        opacity: open ? (dim ? 0.4 : 1) : 0
         visible: opacity > 0
         scale: (open ? 1 : 0.9) * cardScale
 
         Behavior on opacity { NumberAnimation { duration: host.fadeMs } }
         Behavior on scale { NumberAnimation { duration: host.fadeMs; easing.type: Easing.OutCubic } }
 
-        // scroll anywhere on the card to change the volume
+        HoverHandler {
+            id: cardHover
+            enabled: card.open
+            onHoveredChanged: if (hovered && card.host.settingsOpen) card.host.focusKind = card.kind
+        }
+
+        // scroll anywhere on the card: brightness card -> brightness, others -> volume
         WheelHandler {
-            enabled: parent.open
+            enabled: card.open
             acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-            onWheel: e => host.scrollVolume(e.angleDelta.y)
+            onWheel: e => host.scrollFor(card.kind, e.angleDelta.y)
         }
     }
 
@@ -1337,6 +1674,7 @@ Scope {
         id: da
         property var host: root
         property Item scene
+        property string kind: "vol"
         property real pressX: 0; property real pressY: 0; property real startX: 0; property real startY: 0
 
         hoverEnabled: true
@@ -1356,303 +1694,16 @@ Scope {
             }
             var p = da.mapToItem(da.scene, mouse.x, mouse.y)
             pressX = p.x; pressY = p.y
-            startX = host.curX; startY = host.curY
-            host.dragging = true
+            host.beginDrag(da.kind)          // bakes the preview shift into the offset first
+            startX = host.offX(da.kind); startY = host.offY(da.kind)
         }
         onPositionChanged: mouse => {
             if (!host.dragging) return
             var p = da.mapToItem(da.scene, mouse.x, mouse.y)
-            host.setPosition(startX + (p.x - pressX), startY + (p.y - pressY))
+            host.setPosition(da.kind, startX + (p.x - pressX), startY + (p.y - pressY))
         }
         onReleased: finish()
         onCanceled: finish()
-        onDoubleClicked: mouse => { if (mouse.button === Qt.LeftButton) host.resetPos(host.showMedia) }
-    }
-
-    // ---- settings-menu components (all sizes scale with host.menuUi) --------
-    // ActionButton, ToggleRow and SliderRow are Tab-focusable (activeFocusOnTab)
-    // and draw an accent ring while they hold keyboard focus. Disabled controls
-    // are skipped by Tab automatically.
-    component ActionButton: Rectangle {
-        id: ab
-        property var host: root
-        property string label: ""
-        property bool primary: false
-        readonly property real u: host.menuUi
-        signal clicked()
-
-        activeFocusOnTab: true
-
-        implicitWidth: abText.implicitWidth + 28 * u
-        width: implicitWidth
-        height: 30 * u
-        radius: Math.min(height / 2, ab.host.menuRadius * u)
-        opacity: enabled ? 1 : 0.4
-        color: primary ? Theme.accent : Theme.alpha(Theme.text, abArea.containsMouse && enabled ? 0.18 : 0.1)
-        border.width: ab.activeFocus ? Math.max(1, Math.round(2 * u)) : 0
-        border.color: ab.primary ? Theme.text : Theme.accent
-        Behavior on color { ColorAnimation { duration: ab.host.menuAnimFast } }
-
-        onActiveFocusChanged: if (activeFocus) ab.host.ensureVisible(ab, 32 * u)
-
-        Keys.onPressed: function (event) {
-            if (event.key === Qt.Key_Space
-                    || event.key === Qt.Key_Return
-                    || event.key === Qt.Key_Enter) {
-                if (ab.enabled)
-                    ab.clicked()
-                event.accepted = true
-            } else if (event.key === Qt.Key_Left || event.key === Qt.Key_Up) {
-                ab.host.focusStep(ab, false)
-                event.accepted = true
-            } else if (event.key === Qt.Key_Right || event.key === Qt.Key_Down) {
-                ab.host.focusStep(ab, true)
-                event.accepted = true
-            }
-        }
-
-        Text {
-            id: abText
-            anchors.centerIn: parent
-            text: ab.label
-            font.family: ab.host.menuFont
-            font.pixelSize: ab.host.textSizeBody * ab.u
-            font.bold: true
-            color: ab.primary ? Theme.bg : Theme.text
-        }
-
-        MouseArea {
-            id: abArea
-            anchors.fill: parent
-            hoverEnabled: true
-            enabled: ab.enabled
-            onClicked: {
-                ab.forceActiveFocus()
-                ab.clicked()
-            }
-        }
-    }
-
-    component SectionHeader: Item {
-        id: sh
-        property var host: root
-        property string text: ""
-        readonly property real u: host.menuUi
-        width: parent?.width ?? 0
-        height: 26 * u
-
-        Text {
-            anchors.left: parent.left
-            anchors.bottom: parent.bottom
-            anchors.bottomMargin: 3 * sh.u
-            text: sh.text
-            font.family: sh.host.menuFont
-            font.pixelSize: sh.host.textSizeSmall * sh.u
-            font.bold: true
-            font.letterSpacing: 1.2
-            font.capitalization: Font.AllUppercase
-            color: Theme.textDim
-        }
-    }
-
-    // Keyboard: Space / Enter toggles, Up / Down move focus.
-    component ToggleRow: Item {
-        id: tr
-        property var host: root
-        property string key: ""
-        property string label: ""
-        property bool checked: host[key]
-        readonly property real u: host.menuUi
-
-        activeFocusOnTab: true
-
-        width: host.cellW(parent)
-        height: 28 * u
-        opacity: enabled ? 1 : 0.4
-
-        onActiveFocusChanged: if (activeFocus) tr.host.ensureVisible(tr, 32 * u)
-
-        Keys.onPressed: function (event) {
-            if (event.key === Qt.Key_Space
-                    || event.key === Qt.Key_Return
-                    || event.key === Qt.Key_Enter) {
-                tr.host.toggleSetting(tr.key)
-                event.accepted = true
-            } else if (event.key === Qt.Key_Down) {
-                tr.host.focusStep(tr, true)
-                event.accepted = true
-            } else if (event.key === Qt.Key_Up) {
-                tr.host.focusStep(tr, false)
-                event.accepted = true
-            }
-        }
-
-        Rectangle {
-            anchors.fill: parent
-            anchors.leftMargin: -6 * tr.u
-            anchors.rightMargin: -6 * tr.u
-            radius: Math.min(8 * tr.u, tr.host.menuRadius * tr.u)
-            color: (trArea.containsMouse || tr.activeFocus) && tr.enabled
-                ? Theme.alpha(Theme.text, 0.06) : "transparent"
-            border.width: tr.activeFocus ? Math.max(1, Math.round(tr.u)) : 0
-            border.color: Theme.accent
-        }
-
-        Text {
-            anchors.left: parent.left
-            anchors.right: sw.left
-            anchors.rightMargin: 8 * tr.u
-            anchors.verticalCenter: parent.verticalCenter
-            text: tr.label
-            elide: Text.ElideRight
-            font.family: tr.host.menuFont
-            font.pixelSize: tr.host.textSizeGroup * tr.u
-            font.bold: true
-            color: Theme.text
-        }
-
-        Rectangle {
-            id: sw
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            width: 32 * tr.u; height: 18 * tr.u; radius: height / 2
-            color: tr.checked ? Theme.accent : "transparent"
-            border.width: 1
-            border.color: tr.checked ? Theme.accent : Theme.alpha(Theme.text, 0.3)
-            Behavior on color { ColorAnimation { duration: tr.host.menuAnimMed } }
-
-            Rectangle {
-                width: 12 * tr.u; height: 12 * tr.u; radius: width / 2
-                anchors.verticalCenter: parent.verticalCenter
-                x: tr.checked ? parent.width - width - 3 * tr.u : 3 * tr.u
-                color: tr.checked ? Theme.bg : Theme.text
-                Behavior on x { NumberAnimation { duration: tr.host.menuAnimMed; easing.type: Easing.OutCubic } }
-            }
-        }
-
-        MouseArea {
-            id: trArea
-            anchors.fill: parent
-            hoverEnabled: true
-            enabled: tr.enabled
-            onClicked: {
-                tr.forceActiveFocus()
-                tr.host.toggleSetting(tr.key)
-            }
-        }
-    }
-
-    // Minimal slider bound to a numSpec entry on the host; saves on release.
-    // Keyboard: Left / Right = one step, PgUp / PgDn = five steps,
-    // Home / End = min / max, Up / Down move focus.
-    component SliderRow: Item {
-        id: sr
-        property var host: root
-        property string key: ""
-        property string label: ""
-        readonly property real u: host.menuUi
-
-        readonly property var spec: host.numSpec[key]
-        readonly property real ratio: Math.max(0, Math.min(1, (host[key] - spec.min) / (spec.max - spec.min)))
-
-        activeFocusOnTab: true
-
-        width: host.cellW(parent)
-        height: 38 * u
-        opacity: enabled ? 1 : 0.4
-
-        onActiveFocusChanged: if (activeFocus) sr.host.ensureVisible(sr, 32 * u)
-
-        function nudge(delta) {
-            sr.host.setNumber(sr.key, sr.host[sr.key] + delta)
-            sr.host.saveState()
-        }
-
-        Keys.onPressed: function (event) {
-            var st = sr.spec.step
-            switch (event.key) {
-            case Qt.Key_Left:     sr.nudge(-st);     break
-            case Qt.Key_Right:    sr.nudge(st);      break
-            case Qt.Key_PageDown: sr.nudge(-st * 5); break
-            case Qt.Key_PageUp:   sr.nudge(st * 5);  break
-            case Qt.Key_Home:
-                sr.host.setNumber(sr.key, sr.spec.min); sr.host.saveState(); break
-            case Qt.Key_End:
-                sr.host.setNumber(sr.key, sr.spec.max); sr.host.saveState(); break
-            case Qt.Key_Down:     sr.host.focusStep(sr, true);  break
-            case Qt.Key_Up:       sr.host.focusStep(sr, false); break
-            default: return
-            }
-            event.accepted = true
-        }
-
-        Rectangle {
-            anchors.fill: parent
-            anchors.margins: -3 * sr.u
-            radius: Math.min(8 * sr.u, sr.host.menuRadius * sr.u)
-            color: "transparent"
-            visible: sr.activeFocus
-            border.width: Math.max(1, Math.round(sr.u))
-            border.color: Theme.accent
-        }
-
-        Text {
-            anchors.left: parent.left; anchors.right: srValue.left; anchors.rightMargin: 6 * sr.u; y: 4 * sr.u
-            elide: Text.ElideRight
-            text: sr.label
-            font.family: sr.host.menuFont
-            font.pixelSize: sr.host.textSizeGroup * sr.u
-            font.bold: true
-            color: Theme.text
-        }
-        Text {
-            id: srValue
-            anchors.right: parent.right; y: 5 * sr.u
-            text: sr.host.fmtValue(sr.key, sr.host[sr.key])
-            font.family: sr.host.menuFont
-            font.pixelSize: sr.host.textSizeBody * sr.u
-            color: Theme.textDim
-        }
-
-        Rectangle {
-            id: track
-            anchors.left: parent.left
-            anchors.right: parent.right
-            y: 27 * sr.u
-            height: 4 * sr.u
-            radius: height / 2
-            color: Theme.alpha(Theme.text, 0.15)
-
-            Rectangle { width: knob.x + knob.width / 2; height: parent.height; radius: parent.radius; color: Theme.accent }
-
-            Rectangle {
-                id: knob
-                width: 14 * sr.u; height: 14 * sr.u; radius: width / 2
-                anchors.verticalCenter: parent.verticalCenter
-                x: sr.ratio * (track.width - width)
-                color: Theme.text
-            }
-        }
-
-        MouseArea {
-            anchors.fill: parent
-            anchors.topMargin: 18 * sr.u
-            preventStealing: true
-            enabled: sr.enabled
-
-            function apply(mx) {
-                var usable = track.width - knob.width
-                if (usable <= 0) return
-                var r = Math.max(0, Math.min(1, (mx - knob.width / 2) / usable)), s = sr.spec
-                sr.host.setNumber(sr.key, s.min + Math.round(r * (s.max - s.min) / s.step) * s.step)
-            }
-
-            onPressed: mouse => {
-                sr.forceActiveFocus()
-                apply(mouse.x)
-            }
-            onPositionChanged: mouse => { if (pressed) apply(mouse.x) }
-            onReleased: sr.host.saveState()
-        }
+        onDoubleClicked: mouse => { if (mouse.button === Qt.LeftButton) host.resetPos(da.kind) }
     }
 }

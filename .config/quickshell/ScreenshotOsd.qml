@@ -47,6 +47,21 @@ Scope {
     readonly property var boolKeys: Object.keys(boolDefaults)
 
     readonly property var posKeys: ["offsetX", "offsetY"]
+    // ---- host interface required by CustomizationSettings.qml ----
+    readonly property real menuUi: 1          // UI scale factor
+    readonly property color cAccent: Theme.accent
+    readonly property QtObject th: QtObject {
+        readonly property int radius: 10
+        readonly property string fontFamily: "JetBrains Mono"
+        readonly property int animFast: 120
+        readonly property int animMed: 220
+        readonly property int textSizeGroup: 12   // row labels
+        readonly property int textSizeBody: 11    // values, button text
+        readonly property int textSizeSmall: 10   // section headers
+    }
+
+    // the settings Flickable registers itself here so ensureVisible() can scroll it
+    property var settingsFlick: null
 
     // rows of the settings window: header / slider / toggle
     readonly property var settingRows: [
@@ -142,7 +157,29 @@ Scope {
     function saveState() {
         saveTimer.restart()
     }
+    function cellW(p) { return p ? p.width : 0 }
 
+    function fmtValue(key, v) { return v + numSpec[key].unit }
+
+    // Tab / arrow navigation between rows
+    function focusStep(item, forward) {
+        var n = item.nextItemInFocusChain(forward)
+        if (n && n !== item)
+            n.forceActiveFocus(forward ? Qt.TabFocusReason : Qt.BacktabFocusReason)
+    }
+
+    // scroll the settings list so the focused row stays visible
+    function ensureVisible(item, margin) {
+        var f = settingsFlick
+        if (!f || !item) return
+        var y = item.mapToItem(f.contentItem, 0, 0).y
+        var h = item.height
+        if (y - margin < f.contentY)
+            f.contentY = Math.max(0, y - margin)
+        else if (y + h + margin > f.contentY + f.height)
+            f.contentY = Math.max(0, Math.min(f.contentHeight - f.height,
+                                              y + h + margin - f.height))
+    }
     Timer {
         id: saveTimer
         interval: 400
@@ -563,7 +600,8 @@ Scope {
                     clip: true
                     flickableDirection: Flickable.VerticalFlick
                     boundsBehavior: Flickable.StopAtBounds
-
+                    Component.onCompleted: root.settingsFlick = flick
+                    Component.onDestruction: if (root.settingsFlick === flick) root.settingsFlick = null
                     Column {
                         id: rowsCol
                         x: 20
@@ -571,241 +609,83 @@ Scope {
 
                         Repeater {
                             model: root.settingRows
-                            delegate: Item {
-                                id: row
+
+                            delegate: Loader {
+                                id: rowLoader
                                 required property var modelData
-                                readonly property string t: modelData.type
-                                readonly property var spec: t === "slider" ? root.numSpec[modelData.key] : null
-                                readonly property real ratio: spec
-                                    ? Math.max(0, Math.min(1, (root[modelData.key] - spec.min) / (spec.max - spec.min)))
-                                    : 0
-                                readonly property bool checked: t === "toggle" ? root[modelData.key] : false
 
                                 width: rowsCol.width
-                                height: t === "header" ? 32 : (t === "slider" ? 46 : 34)
+                                height: item ? item.height : 0
+                                sourceComponent: modelData.type === "header" ? headerC
+                                               : modelData.type === "slider" ? sliderC
+                                               : toggleC
 
-                                // ---- section header ----
-                                Text {
-                                    visible: row.t === "header"
-                                    anchors.left: parent.left
-                                    anchors.bottom: parent.bottom
-                                    anchors.bottomMargin: 4
-                                    text: row.modelData.label
-                                    font.family: "JetBrains Mono"
-                                    font.pixelSize: 10
-                                    font.bold: true
-                                    font.letterSpacing: 1.2
-                                    font.capitalization: Font.AllUppercase
-                                    color: Theme.textDim
-                                }
-
-                                // ---- slider ----
-                                Item {
-                                    visible: row.t === "slider"
-                                    anchors.fill: parent
-
-                                    Text {
-                                        anchors.left: parent.left
-                                        y: 6
-                                        text: row.modelData.label
-                                        font.family: "JetBrains Mono"
-                                        font.pixelSize: 12
-                                        font.bold: true
-                                        color: Theme.text
-                                    }
-                                    Text {
-                                        anchors.right: parent.right
-                                        y: 6
-                                        text: row.spec ? root[row.modelData.key] + row.spec.unit : ""
-                                        font.family: "JetBrains Mono"
-                                        font.pixelSize: 11
-                                        color: Theme.textDim
-                                    }
-
-                                    Rectangle {
-                                        id: track
-                                        anchors.left: parent.left
-                                        anchors.right: parent.right
-                                        y: 31
-                                        height: 4
-                                        radius: 2
-                                        color: Theme.alpha(Theme.text, 0.15)
-
-                                        Rectangle {
-                                            width: knob.x + knob.width / 2
-                                            height: parent.height
-                                            radius: parent.radius
-                                            color: Theme.accent
-                                        }
-                                        Rectangle {
-                                            id: knob
-                                            width: 14; height: 14; radius: 7
-                                            anchors.verticalCenter: parent.verticalCenter
-                                            x: row.ratio * (track.width - width)
-                                            color: Theme.text
-                                        }
-                                    }
-
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        anchors.topMargin: 20
-                                        preventStealing: true
-                                        enabled: row.t === "slider"
-
-                                        function apply(mx) {
-                                            var usable = track.width - knob.width
-                                            if (usable <= 0) return
-                                            var r = Math.max(0, Math.min(1, (mx - knob.width / 2) / usable))
-                                            var s = row.spec
-                                            root.setNumber(row.modelData.key,
-                                                s.min + Math.round(r * (s.max - s.min) / s.step) * s.step)
-                                        }
-
-                                        onPressed: mouse => apply(mouse.x)
-                                        onPositionChanged: mouse => { if (pressed) apply(mouse.x) }
-                                        onReleased: root.saveState()
+                                Component {
+                                    id: headerC
+                                    CustomizationSettings.SectionHeader {
+                                        host: root
+                                        text: rowLoader.modelData.label
                                     }
                                 }
-
-                                // ---- toggle ----
-                                Item {
-                                    visible: row.t === "toggle"
-                                    anchors.fill: parent
-
-                                    Rectangle {
-                                        anchors.fill: parent
-                                        anchors.leftMargin: -6
-                                        anchors.rightMargin: -6
-                                        radius: 8
-                                        color: toggleArea.containsMouse ? Theme.alpha(Theme.text, 0.06) : "transparent"
+                                Component {
+                                    id: sliderC
+                                    CustomizationSettings.SliderRow {
+                                        host: root
+                                        key: rowLoader.modelData.key
+                                        label: rowLoader.modelData.label
                                     }
-                                    Text {
-                                        anchors.left: parent.left
-                                        anchors.right: sw.left
-                                        anchors.rightMargin: 8
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        text: row.modelData.label
-                                        elide: Text.ElideRight
-                                        font.family: "JetBrains Mono"
-                                        font.pixelSize: 12
-                                        font.bold: true
-                                        color: Theme.text
-                                    }
-                                    Rectangle {
-                                        id: sw
-                                        anchors.right: parent.right
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        width: 36; height: 20; radius: 10
-                                        color: row.checked ? Theme.accent : "transparent"
-                                        border.width: 1
-                                        border.color: row.checked ? Theme.accent : Theme.alpha(Theme.text, 0.3)
-                                        Behavior on color { ColorAnimation { duration: 220 } }
-
-                                        Rectangle {
-                                            width: 14; height: 14; radius: 7
-                                            anchors.verticalCenter: parent.verticalCenter
-                                            x: row.checked ? parent.width - width - 3 : 3
-                                            color: row.checked ? Theme.bg : Theme.text
-                                            Behavior on x { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
-                                        }
-                                    }
-                                    MouseArea {
-                                        id: toggleArea
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        enabled: row.t === "toggle"
-                                        onClicked: root.toggleSetting(row.modelData.key)
+                                }
+                                Component {
+                                    id: toggleC
+                                    CustomizationSettings.ToggleRow {
+                                        host: root
+                                        key: rowLoader.modelData.key
+                                        label: rowLoader.modelData.label
                                     }
                                 }
                             }
                         }
                     }
                 }
-
                 Item {
                     id: foot
                     anchors.bottom: parent.bottom
                     width: parent.width
                     height: 56
 
-                    Rectangle { width: parent.width; height: 1; color: Theme.alpha(Theme.text, 0.08) }
-
                     Rectangle {
+                        width: parent.width
+                        height: 1
+                        color: Theme.alpha(Theme.text, 0.08)
+                    }
+
+                    CustomizationSettings.ActionButton {
                         id: resetAllBtn
+                        host: root
                         x: 20
                         anchors.verticalCenter: parent.verticalCenter
-                        width: resetAllText.implicitWidth + 28
-                        height: 30
-                        radius: 10
+                        label: "Reset all"
                         enabled: root.modified
-                        opacity: enabled ? 1 : 0.4
-                        color: Theme.alpha(Theme.text, resetAllArea.containsMouse && enabled ? 0.18 : 0.1)
-                        Text {
-                            id: resetAllText
-                            anchors.centerIn: parent
-                            text: "Reset all"
-                            font.family: "JetBrains Mono"
-                            font.pixelSize: 11
-                            font.bold: true
-                            color: Theme.text
-                        }
-                        MouseArea {
-                            id: resetAllArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            enabled: parent.enabled
-                            onClicked: root.resetAll()
-                        }
+                        onClicked: root.resetAll()
                     }
 
-                    Rectangle {
+                    CustomizationSettings.ActionButton {
+                        host: root
                         x: resetAllBtn.x + resetAllBtn.width + 8
                         anchors.verticalCenter: parent.verticalCenter
-                        width: resetPosText.implicitWidth + 28
-                        height: 30
-                        radius: 10
+                        label: "Reset position"
                         enabled: root.moved
-                        opacity: enabled ? 1 : 0.4
-                        color: Theme.alpha(Theme.text, resetPosArea.containsMouse && enabled ? 0.18 : 0.1)
-                        Text {
-                            id: resetPosText
-                            anchors.centerIn: parent
-                            text: "Reset position"
-                            font.family: "JetBrains Mono"
-                            font.pixelSize: 11
-                            font.bold: true
-                            color: Theme.text
-                        }
-                        MouseArea {
-                            id: resetPosArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            enabled: parent.enabled
-                            onClicked: root.resetPosition()
-                        }
+                        onClicked: root.resetPosition()
                     }
 
-                    Rectangle {
+                    CustomizationSettings.ActionButton {
+                        host: root
                         anchors.right: parent.right
                         anchors.rightMargin: 20
                         anchors.verticalCenter: parent.verticalCenter
-                        width: doneText.implicitWidth + 28
-                        height: 30
-                        radius: 10
-                        color: Theme.accent
-                        Text {
-                            id: doneText
-                            anchors.centerIn: parent
-                            text: "Done"
-                            font.family: "JetBrains Mono"
-                            font.pixelSize: 11
-                            font.bold: true
-                            color: Theme.bg
-                        }
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: root.closeSettings()
-                        }
+                        label: "Done"
+                        primary: true
+                        onClicked: root.closeSettings()
                     }
                 }
             }

@@ -53,6 +53,10 @@ Scope {
     //   ui     : resolution scale (1.0 at 1080p height)
     //   menuUi : ui * hub "settingsScale" * settingsZoom; multiply every
     //            settings-window size by it
+    //
+    // The reusable settings controls (ActionButton, SectionHeader, KeyRow,
+    // ToggleRow, SliderRow) live in CustomizationSettings.qml and read `th`,
+    // `menuUi`, `cAccent`, `numSpec` and the helper functions from this Scope.
     readonly property QtObject th: QtObject {
         property real settingsScale: 1.0
         property int radius: 10
@@ -539,7 +543,7 @@ Scope {
     }
 
     function resetAll() {
-        root.hiddenNames = hiddenDefaults.slice()      
+        root.hiddenNames = hiddenDefaults.slice()
         numKeys.forEach(function (k) { root[k] = numSpec[k].def })
         boolKeys.forEach(function (k) { root[k] = boolDefaults[k] })
         colorKeys.forEach(function (k) { root[k] = colorDefaults[k] })
@@ -1280,55 +1284,55 @@ Scope {
                             width: flick.width - 48 * settingsWin.u
 
                             // ---------------- GENERAL ----------------
-                            SectionHeader { host: root; text: "General" }
+                            CustomizationSettings.SectionHeader { host: root; text: "General" }
                             Grid {
                                 width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                                ToggleRow {
+                                CustomizationSettings.ToggleRow {
                                     host: root
                                     key: "showTooltips"
                                     label: "Tooltips"
                                     checked: root.showTooltips
                                 }
-                                SliderRow { host: root; key: "menuSize"; label: "Scale" }
-                                SliderRow { host: root; key: "animMs"; label: "Animation" }
+                                CustomizationSettings.SliderRow { host: root; key: "menuSize"; label: "Scale" }
+                                CustomizationSettings.SliderRow { host: root; key: "animMs"; label: "Animation" }
                             }
 
                             // ---------------- LAYOUT & CONTENT ----------------
-                            SectionHeader { host: root; text: "Layout & content" }
+                            CustomizationSettings.SectionHeader { host: root; text: "Layout & content" }
                             Grid {
                                 width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                                ToggleRow { host: root; key: "horizontal"; label: "Horizontal"; checked: root.horizontal }
-                                ToggleRow { host: root; key: "showIcons"; label: "Icons"; checked: root.showIcons }
-                                ToggleRow { host: root; key: "showLabels"; label: "Labels"; checked: root.showLabels }
-                                ToggleRow {
+                                CustomizationSettings.ToggleRow { host: root; key: "horizontal"; label: "Horizontal"; checked: root.horizontal }
+                                CustomizationSettings.ToggleRow { host: root; key: "showIcons"; label: "Icons"; checked: root.showIcons }
+                                CustomizationSettings.ToggleRow { host: root; key: "showLabels"; label: "Labels"; checked: root.showLabels }
+                                CustomizationSettings.ToggleRow {
                                     host: root
                                     key: "showKeyHints"
                                     label: "Key hints"
                                     checked: root.showKeyHints
                                     enabled: !root.horizontal
                                 }
-                                SliderRow { host: root; key: "cardWidth"; label: "Width" }
-                                SliderRow { host: root; key: "itemHeight"; label: "Item height" }
-                                SliderRow { host: root; key: "itemSpacing"; label: "Item spacing" }
-                                SliderRow { host: root; key: "panelPadding"; label: "Panel padding" }
+                                CustomizationSettings.SliderRow { host: root; key: "cardWidth"; label: "Width" }
+                                CustomizationSettings.SliderRow { host: root; key: "itemHeight"; label: "Item height" }
+                                CustomizationSettings.SliderRow { host: root; key: "itemSpacing"; label: "Item spacing" }
+                                CustomizationSettings.SliderRow { host: root; key: "panelPadding"; label: "Panel padding" }
                             }
 
                             // ---------------- APPEARANCE ----------------
-                            SectionHeader { host: root; text: "Appearance" }
+                            CustomizationSettings.SectionHeader { host: root; text: "Appearance" }
                             Grid {
                                 width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                                SliderRow { host: root; key: "panelRadius"; label: "Panel roundness" }
-                                SliderRow { host: root; key: "itemRadius"; label: "Item roundness" }
-                                SliderRow { host: root; key: "iconSize"; label: "Icon size"; enabled: root.showIcons }
-                                SliderRow { host: root; key: "labelSize"; label: "Label size"; enabled: root.showLabels }
-                                SliderRow { host: root; key: "borderWidth"; label: "Active border" }
-                                SliderRow { host: root; key: "inactiveBorderWidth"; label: "Inactive border" }
-                                SliderRow { host: root; key: "panelOpacity"; label: "Panel opacity" }
-                                SliderRow { host: root; key: "dimOpacity"; label: "Screen dim" }
+                                CustomizationSettings.SliderRow { host: root; key: "panelRadius"; label: "Panel roundness" }
+                                CustomizationSettings.SliderRow { host: root; key: "itemRadius"; label: "Item roundness" }
+                                CustomizationSettings.SliderRow { host: root; key: "iconSize"; label: "Icon size"; enabled: root.showIcons }
+                                CustomizationSettings.SliderRow { host: root; key: "labelSize"; label: "Label size"; enabled: root.showLabels }
+                                CustomizationSettings.SliderRow { host: root; key: "borderWidth"; label: "Active border" }
+                                CustomizationSettings.SliderRow { host: root; key: "inactiveBorderWidth"; label: "Inactive border" }
+                                CustomizationSettings.SliderRow { host: root; key: "panelOpacity"; label: "Panel opacity" }
+                                CustomizationSettings.SliderRow { host: root; key: "dimOpacity"; label: "Screen dim" }
                             }
 
                             // ---------------- COLORS ----------------
-                            SectionHeader { host: root; text: "Colors" }
+                            CustomizationSettings.SectionHeader { host: root; text: "Colors" }
                             Item {
                                 id: acRow
                                 width: contentCol.width
@@ -1437,66 +1441,66 @@ Scope {
                             }
                             Grid {
                                 width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                                ToggleRow { host: root; colorKey: "panelBgColor"; label: "Panel background" }
+                                CustomizationSettings.ToggleRow { host: root; colorKey: "panelBgColor"; label: "Panel background" }
                             }
 
                             // ---------------- INACTIVE ITEMS ----------------
-                            SectionHeader { host: root; text: "Inactive items" }
+                            CustomizationSettings.SectionHeader { host: root; text: "Inactive items" }
                             Grid {
                                 width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                                ToggleRow { host: root; colorKey: "itemBgColor"; label: "Background" }
-                                SliderRow { host: root; key: "itemOpacity"; label: "Background opacity" }
-                                ToggleRow { host: root; colorKey: "labelColor"; label: "Label color"; enabled: root.showLabels }
-                                SliderRow { host: root; key: "labelOpacity"; label: "Label opacity"; enabled: root.showLabels }
-                                ToggleRow { host: root; colorKey: "iconColor"; label: "Icon color"; enabled: root.showIcons }
-                                SliderRow { host: root; key: "iconOpacity"; label: "Icon opacity"; enabled: root.showIcons }
-                                ToggleRow { host: root; colorKey: "inactiveBorderColor"; label: "Border color" }
-                                SliderRow { host: root; key: "inactiveBorderOpacity"; label: "Border opacity" }
+                                CustomizationSettings.ToggleRow { host: root; colorKey: "itemBgColor"; label: "Background" }
+                                CustomizationSettings.SliderRow { host: root; key: "itemOpacity"; label: "Background opacity" }
+                                CustomizationSettings.ToggleRow { host: root; colorKey: "labelColor"; label: "Label color"; enabled: root.showLabels }
+                                CustomizationSettings.SliderRow { host: root; key: "labelOpacity"; label: "Label opacity"; enabled: root.showLabels }
+                                CustomizationSettings.ToggleRow { host: root; colorKey: "iconColor"; label: "Icon color"; enabled: root.showIcons }
+                                CustomizationSettings.SliderRow { host: root; key: "iconOpacity"; label: "Icon opacity"; enabled: root.showIcons }
+                                CustomizationSettings.ToggleRow { host: root; colorKey: "inactiveBorderColor"; label: "Border color" }
+                                CustomizationSettings.SliderRow { host: root; key: "inactiveBorderOpacity"; label: "Border opacity" }
                             }
 
                             // ---------------- ACTIVE ITEMS ----------------
-                            SectionHeader { host: root; text: "Active items" }
+                            CustomizationSettings.SectionHeader { host: root; text: "Active items" }
                             Grid {
                                 width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                                ToggleRow { host: root; colorKey: "itemBgActiveColor"; label: "Background" }
-                                SliderRow { host: root; key: "hoverBoost"; label: "Background boost" }
-                                ToggleRow { host: root; colorKey: "labelActiveColor"; label: "Label color"; enabled: root.showLabels }
-                                SliderRow { host: root; key: "labelActiveOpacity"; label: "Label opacity"; enabled: root.showLabels }
-                                ToggleRow { host: root; colorKey: "iconActiveColor"; label: "Icon color"; enabled: root.showIcons }
-                                SliderRow { host: root; key: "iconActiveOpacity"; label: "Icon opacity"; enabled: root.showIcons }
-                                ToggleRow { host: root; colorKey: "borderColor"; label: "Border color" }
-                                SliderRow { host: root; key: "borderOpacity"; label: "Border opacity" }
+                                CustomizationSettings.ToggleRow { host: root; colorKey: "itemBgActiveColor"; label: "Background" }
+                                CustomizationSettings.SliderRow { host: root; key: "hoverBoost"; label: "Background boost" }
+                                CustomizationSettings.ToggleRow { host: root; colorKey: "labelActiveColor"; label: "Label color"; enabled: root.showLabels }
+                                CustomizationSettings.SliderRow { host: root; key: "labelActiveOpacity"; label: "Label opacity"; enabled: root.showLabels }
+                                CustomizationSettings.ToggleRow { host: root; colorKey: "iconActiveColor"; label: "Icon color"; enabled: root.showIcons }
+                                CustomizationSettings.SliderRow { host: root; key: "iconActiveOpacity"; label: "Icon opacity"; enabled: root.showIcons }
+                                CustomizationSettings.ToggleRow { host: root; colorKey: "borderColor"; label: "Border color" }
+                                CustomizationSettings.SliderRow { host: root; key: "borderOpacity"; label: "Border opacity" }
                             }
 
                             // ---------------- KEY HINTS & CONFIRM ----------------
-                            SectionHeader { host: root; text: "Key hints & confirm" }
+                            CustomizationSettings.SectionHeader { host: root; text: "Key hints & confirm" }
                             Grid {
                                 width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                                ToggleRow { host: root; colorKey: "keyHintColor"; label: "Hint text color"; enabled: !root.horizontal && root.showKeyHints }
-                                SliderRow { host: root; key: "keyHintOpacity"; label: "Hint text opacity"; enabled: !root.horizontal && root.showKeyHints }
-                                ToggleRow { host: root; colorKey: "keyHintBgColor"; label: "Hint badge color"; enabled: !root.horizontal && root.showKeyHints }
-                                SliderRow { host: root; key: "keyHintBgOpacity"; label: "Hint badge opacity"; enabled: !root.horizontal && root.showKeyHints }
-                                ToggleRow { host: root; colorKey: "pendingColor"; label: "Confirm text / icon" }
-                                ToggleRow { host: root; colorKey: "pendingBorderColor"; label: "Confirm border" }
+                                CustomizationSettings.ToggleRow { host: root; colorKey: "keyHintColor"; label: "Hint text color"; enabled: !root.horizontal && root.showKeyHints }
+                                CustomizationSettings.SliderRow { host: root; key: "keyHintOpacity"; label: "Hint text opacity"; enabled: !root.horizontal && root.showKeyHints }
+                                CustomizationSettings.ToggleRow { host: root; colorKey: "keyHintBgColor"; label: "Hint badge color"; enabled: !root.horizontal && root.showKeyHints }
+                                CustomizationSettings.SliderRow { host: root; key: "keyHintBgOpacity"; label: "Hint badge opacity"; enabled: !root.horizontal && root.showKeyHints }
+                                CustomizationSettings.ToggleRow { host: root; colorKey: "pendingColor"; label: "Confirm text / icon" }
+                                CustomizationSettings.ToggleRow { host: root; colorKey: "pendingBorderColor"; label: "Confirm border" }
                             }
 
                             // ---------------- BEHAVIOR ----------------
-                            SectionHeader { host: root; text: "Behavior" }
+                            CustomizationSettings.SectionHeader { host: root; text: "Behavior" }
                             Grid {
                                 width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                                ToggleRow { host: root; key: "confirmDangerous"; label: "Confirm danger"; checked: root.confirmDangerous }
-                                ToggleRow { host: root; key: "wrapNav"; label: "Wrap around"; checked: root.wrapNav }
-                                ToggleRow { host: root; key: "hoverSelect"; label: "Hover selects"; checked: root.hoverSelect }
-                                ToggleRow { host: root; key: "closeOnOutside"; label: "Click outside"; checked: root.closeOnOutside }
+                                CustomizationSettings.ToggleRow { host: root; key: "confirmDangerous"; label: "Confirm danger"; checked: root.confirmDangerous }
+                                CustomizationSettings.ToggleRow { host: root; key: "wrapNav"; label: "Wrap around"; checked: root.wrapNav }
+                                CustomizationSettings.ToggleRow { host: root; key: "hoverSelect"; label: "Hover selects"; checked: root.hoverSelect }
+                                CustomizationSettings.ToggleRow { host: root; key: "closeOnOutside"; label: "Click outside"; checked: root.closeOnOutside }
                             }
 
                             // ---------------- VISIBLE ACTIONS ----------------
-                            SectionHeader { host: root; text: "Visible actions" }
+                            CustomizationSettings.SectionHeader { host: root; text: "Visible actions" }
                             Grid {
                                 width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
                                 Repeater {
                                     model: root.actions
-                                    delegate: ToggleRow {
+                                    delegate: CustomizationSettings.ToggleRow {
                                         required property var modelData
                                         host: root
                                         label: modelData.label + " (" + modelData.key.toUpperCase() + ")"
@@ -1579,13 +1583,13 @@ Scope {
                             anchors.verticalCenter: parent.verticalCenter
                             spacing: 8 * settingsWin.u
 
-                            ActionButton {
+                            CustomizationSettings.ActionButton {
                                 host: root
                                 label: "Reset all"
                                 enabled: root.modified
                                 onClicked: root.resetAll()
                             }
-                            ActionButton {
+                            CustomizationSettings.ActionButton {
                                 host: root
                                 label: "Reset position"
                                 enabled: root.movedFromDefault
@@ -1593,7 +1597,7 @@ Scope {
                             }
                         }
 
-                        ActionButton {
+                        CustomizationSettings.ActionButton {
                             host: root
                             anchors.right: parent.right
                             anchors.rightMargin: 20 * settingsWin.u
@@ -1630,12 +1634,12 @@ Scope {
         }
     }
 
-    // ---- reusable components -----------------------------------------------
-
+    // ---- menu-only component -----------------------------------------------
     // Lightweight hover hint drawn inside the host's own window (no extra
     // popup surface). Appears after a short delay, only if `allowed`.
     // The host should raise its own z while `shown` so the hint isn't covered
     // by siblings. Used by the main menu only; always renders at 12px on screen.
+    // (Stays here because it depends on the menu's own scale, root.menuSize.)
     component Tip: Rectangle {
         id: tp
         property string text: ""
@@ -1691,436 +1695,6 @@ Scope {
             font.family: tp.family
             font.pixelSize: 12 * tp.u
             color: Theme.text
-        }
-    }
-
-    // Settings-window components below take `host` (the root Scope) and read the
-    // shared scale / font / sizes from host.menuUi and host.th, like the picker's.
-    //
-    // Sliders, colour rows, toggles and key rows size themselves from their parent:
-    // inside a multi-column `Grid` they take one cell (see cellW() on the root),
-    // anywhere else the full width.
-    //
-    // ActionButton, ToggleRow and SliderRow are Tab-focusable
-    // (activeFocusOnTab) and draw a highlight-colour ring while they hold keyboard
-    // focus. Disabled controls are skipped by Tab automatically.
-
-    component ActionButton: Rectangle {
-        id: ab
-        property var host
-        property string label: ""
-        property bool primary: false
-        readonly property real u: host.menuUi
-        readonly property QtObject th: host.th
-        readonly property color cAccent: host.cAccent
-        signal clicked()
-
-        activeFocusOnTab: true
-
-        implicitWidth: abText.implicitWidth + 28 * u
-        width: implicitWidth
-        height: 28 * u
-        radius: Math.min(height / 2, ab.th.radius * u)
-        opacity: enabled ? 1 : 0.4
-        color: primary
-            ? ab.cAccent
-            : Theme.alpha(Theme.text, abArea.containsMouse && enabled ? 0.18 : 0.1)
-        border.width: ab.activeFocus ? Math.max(1, Math.round(2 * u)) : 0
-        border.color: ab.primary ? Theme.text : ab.cAccent
-        Behavior on color { ColorAnimation { duration: ab.th.animFast } }
-
-        Keys.onPressed: function (event) {
-            if (event.key === Qt.Key_Space
-                    || event.key === Qt.Key_Return
-                    || event.key === Qt.Key_Enter) {
-                if (ab.enabled)
-                    ab.clicked()
-                event.accepted = true
-            } else if (event.key === Qt.Key_Left || event.key === Qt.Key_Up) {
-                ab.host.focusStep(ab, false)
-                event.accepted = true
-            } else if (event.key === Qt.Key_Right || event.key === Qt.Key_Down) {
-                ab.host.focusStep(ab, true)
-                event.accepted = true
-            }
-        }
-
-        Text {
-            id: abText
-            anchors.centerIn: parent
-            text: ab.label
-            font.family: ab.th.fontFamily
-            font.pixelSize: ab.th.textSizeBody * ab.u
-            font.bold: true
-            color: ab.primary ? Theme.bg : Theme.text
-        }
-
-        MouseArea {
-            id: abArea
-            anchors.fill: parent
-            hoverEnabled: true
-            enabled: ab.enabled
-            onClicked: {
-                ab.forceActiveFocus()
-                ab.clicked()
-            }
-        }
-    }
-
-    component SectionHeader: Item {
-        id: sh
-        property var host
-        property string text: ""
-        readonly property real u: host.menuUi
-        readonly property QtObject th: host.th
-        width: parent?.width ?? 0
-        height: 26 * u
-
-        Text {
-            anchors.left: parent.left
-            anchors.bottom: parent.bottom
-            anchors.bottomMargin: 3 * sh.u
-            text: sh.text
-            font.family: sh.th.fontFamily
-            font.pixelSize: sh.th.textSizeSmall * sh.u
-            font.bold: true
-            font.letterSpacing: 1.2
-            font.capitalization: Font.AllUppercase
-            color: Theme.textDim
-        }
-    }
-
-    // One line of the keybind cheat-sheet: description left, key chip right.
-    component KeyRow: Item {
-        id: kr
-        property var host
-        property string keys: ""
-        property string desc: ""
-        readonly property real u: host.menuUi
-        readonly property QtObject th: host.th
-
-        width: host.cellW(parent)
-        height: 22 * u
-
-        Text {
-            anchors.left: parent.left
-            anchors.right: chip.left
-            anchors.rightMargin: 8 * kr.u
-            anchors.verticalCenter: parent.verticalCenter
-            text: kr.desc
-            elide: Text.ElideRight
-            font.family: kr.th.fontFamily
-            font.pixelSize: kr.th.textSizeBody * kr.u
-            color: Theme.text
-        }
-
-        Rectangle {
-            id: chip
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            width: chipText.implicitWidth + 14 * kr.u
-            height: 18 * kr.u
-            radius: 5 * kr.u
-            color: Theme.alpha(Theme.text, 0.08)
-
-            Text {
-                id: chipText
-                anchors.centerIn: parent
-                text: kr.keys
-                font.family: kr.th.fontFamily
-                font.pixelSize: kr.th.textSizeSmall * kr.u
-                font.bold: true
-                color: Theme.textDim
-            }
-        }
-    }
-
-    // Toggle row. With a `key` it flips that boolean setting on the host;
-    // without one it just emits `toggled()` (used for the action list).
-    // Keyboard: Space / Enter toggles, Up / Down move focus.
-    component ToggleRow: Item {
-        id: tr
-        property var host
-        property string key: ""
-        property string label: ""
-        property bool checked: false
-        // when set, the row is a colour picker for that host property instead of a switch
-        property string colorKey: ""
-        readonly property real u: host.menuUi
-        readonly property QtObject th: host.th
-        readonly property color cAccent: host.cAccent
-        signal toggled()
-
-        activeFocusOnTab: true
-
-        width: host.cellW(parent)
-        height: (colorKey !== "" ? 38 : 28) * u
-        opacity: enabled ? 1 : 0.4
-
-        function activate() {
-            if (tr.colorKey !== "")
-                tr.host.cycleColor(tr.colorKey, 1)
-            else if (tr.key !== "")
-                tr.host.toggleSetting(tr.key)
-            else
-                tr.toggled()
-        }
-
-        onActiveFocusChanged: if (activeFocus) tr.host.ensureVisible(tr, 32 * u)
-
-        Keys.onPressed: function (event) {
-            if (event.key === Qt.Key_Space
-                    || event.key === Qt.Key_Return
-                    || event.key === Qt.Key_Enter) {
-                tr.activate()
-                event.accepted = true
-            } else if (tr.colorKey !== "" && event.key === Qt.Key_Left) {
-                tr.host.cycleColor(tr.colorKey, -1)
-                event.accepted = true
-            } else if (tr.colorKey !== "" && event.key === Qt.Key_Right) {
-                tr.activate()
-                event.accepted = true
-            } else if (event.key === Qt.Key_Down) {
-                tr.host.focusStep(tr, true)
-                event.accepted = true
-            } else if (event.key === Qt.Key_Up) {
-                tr.host.focusStep(tr, false)
-                event.accepted = true
-            }
-        }
-
-        Rectangle {
-            anchors.fill: parent
-            anchors.leftMargin: -6 * tr.u
-            anchors.rightMargin: -6 * tr.u
-            radius: Math.min(8 * tr.u, tr.th.radius * tr.u)
-            color: (trArea.containsMouse || tr.activeFocus) && tr.enabled
-                ? Theme.alpha(Theme.text, 0.06) : "transparent"
-            border.width: tr.activeFocus ? Math.max(1, Math.round(tr.u)) : 0
-            border.color: tr.cAccent
-        }
-
-        Text {
-            anchors.left: parent.left
-            anchors.right: tr.colorKey !== "" ? chip.left : sw.left
-            anchors.rightMargin: 8 * tr.u
-            anchors.verticalCenter: parent.verticalCenter
-            text: tr.label
-            elide: Text.ElideRight
-            font.family: tr.th.fontFamily
-            font.pixelSize: tr.th.textSizeGroup * tr.u
-            font.bold: true
-            color: Theme.text
-        }
-
-        Rectangle {
-            id: sw
-            visible: tr.colorKey === ""
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            width: 32 * tr.u; height: 18 * tr.u; radius: height / 2
-            color: tr.checked ? tr.cAccent : "transparent"
-            border.width: 1
-            border.color: tr.checked ? tr.cAccent : Theme.alpha(Theme.text, 0.3)
-            Behavior on color { ColorAnimation { duration: tr.th.animMed } }
-
-            Rectangle {
-                width: 12 * tr.u; height: 12 * tr.u; radius: width / 2
-                anchors.verticalCenter: parent.verticalCenter
-                x: tr.checked ? parent.width - width - 3 * tr.u : 3 * tr.u
-                color: tr.checked ? Theme.bg : Theme.text
-                Behavior on x { NumberAnimation { duration: tr.th.animMed; easing.type: Easing.OutCubic } }
-            }
-        }
-
-        // colour chip (only when colorKey is set): swatch + colour name
-        Rectangle {
-            id: chip
-            visible: tr.colorKey !== ""
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            width: 96 * tr.u
-            height: 24 * tr.u
-            radius: Math.min(8 * tr.u, tr.th.radius * tr.u)
-            color: "transparent"
-            border.width: 1
-            border.color: Theme.alpha(Theme.text, 0.2)
-
-            Rectangle {
-                id: chipDot
-                anchors.left: parent.left
-                anchors.leftMargin: 8 * tr.u
-                anchors.verticalCenter: parent.verticalCenter
-                width: 10 * tr.u
-                height: 10 * tr.u
-                radius: width / 2
-                color: tr.colorKey !== "" ? tr.host.themeColor(tr.host[tr.colorKey]) : "transparent"
-                border.width: 1
-                border.color: Theme.alpha(Theme.text, 0.3)
-            }
-
-            Text {
-                anchors.left: chipDot.right
-                anchors.leftMargin: 6 * tr.u
-                anchors.right: parent.right
-                anchors.rightMargin: 4 * tr.u
-                anchors.verticalCenter: parent.verticalCenter
-                elide: Text.ElideRight
-                text: tr.colorKey !== "" ? tr.host.colorLabel(tr.host[tr.colorKey]) : ""
-                font.family: tr.th.fontFamily
-                font.pixelSize: tr.th.textSizeBody * tr.u
-                color: Theme.text
-            }
-        }
-
-        MouseArea {
-            id: trArea
-            anchors.fill: parent
-            hoverEnabled: true
-            enabled: tr.enabled
-            acceptedButtons: Qt.LeftButton | Qt.RightButton
-            onClicked: mouse => {
-                tr.forceActiveFocus()
-                if (tr.colorKey !== "" && mouse.button === Qt.RightButton)
-                    tr.host.cycleColor(tr.colorKey, -1)
-                else
-                    tr.activate()
-            }
-        }
-    }
-
-    // Self-contained minimal slider. Reads/writes a numSpec entry on the
-    // host and saves on release. Label and value share the top line.
-    // Keyboard: Left / Right = one step, PgUp / PgDn = five steps,
-    // Home / End = min / max, Up / Down move focus.
-    component SliderRow: Item {
-        id: sr
-        property var host
-        property string key: ""
-        property string label: ""
-        readonly property real u: host.menuUi
-        readonly property QtObject th: host.th
-        readonly property color cAccent: host.cAccent
-
-        readonly property var spec: host.numSpec[key]
-        readonly property real ratio: Math.max(0, Math.min(1,
-            (host[key] - spec.min) / (spec.max - spec.min)))
-
-        activeFocusOnTab: true
-
-        width: host.cellW(parent)
-        height: 38 * u
-        opacity: enabled ? 1 : 0.4
-
-        onActiveFocusChanged: if (activeFocus) sr.host.ensureVisible(sr, 32 * u)
-
-        function nudge(delta) {
-            sr.host.setNumber(sr.key, sr.host[sr.key] + delta)
-            sr.host.saveState()
-        }
-
-        Keys.onPressed: function (event) {
-            var st = sr.spec.step
-            switch (event.key) {
-            case Qt.Key_Left:     sr.nudge(-st);     break
-            case Qt.Key_Right:    sr.nudge(st);      break
-            case Qt.Key_PageDown: sr.nudge(-st * 5); break
-            case Qt.Key_PageUp:   sr.nudge(st * 5);  break
-            case Qt.Key_Home:
-                sr.host.setNumber(sr.key, sr.spec.min); sr.host.saveState(); break
-            case Qt.Key_End:
-                sr.host.setNumber(sr.key, sr.spec.max); sr.host.saveState(); break
-            case Qt.Key_Down:     sr.host.focusStep(sr, true);  break
-            case Qt.Key_Up:       sr.host.focusStep(sr, false); break
-            default: return
-            }
-            event.accepted = true
-        }
-
-        Rectangle {
-            anchors.fill: parent
-            anchors.margins: -3 * sr.u
-            radius: Math.min(8 * sr.u, sr.th.radius * sr.u)
-            color: "transparent"
-            visible: sr.activeFocus
-            border.width: Math.max(1, Math.round(sr.u))
-            border.color: sr.cAccent
-        }
-
-        Text {
-            anchors.left: parent.left
-            anchors.right: srValue.left
-            anchors.rightMargin: 6 * sr.u
-            y: 4 * sr.u
-            text: sr.label
-            elide: Text.ElideRight
-            font.family: sr.th.fontFamily
-            font.pixelSize: sr.th.textSizeGroup * sr.u
-            font.bold: true
-            color: Theme.text
-        }
-
-        Text {
-            id: srValue
-            anchors.right: parent.right
-            y: 5 * sr.u
-            text: sr.host.fmtValue(sr.key, sr.host[sr.key])
-            font.family: sr.th.fontFamily
-            font.pixelSize: sr.th.textSizeBody * sr.u
-            color: Theme.textDim
-        }
-
-        Rectangle {
-            id: track
-            anchors.left: parent.left
-            anchors.right: parent.right
-            y: 27 * sr.u
-            height: 4 * sr.u
-            radius: height / 2
-            color: Theme.alpha(Theme.text, 0.15)
-
-            Rectangle {
-                width: knob.x + knob.width / 2
-                height: parent.height
-                radius: parent.radius
-                color: sr.cAccent
-            }
-
-            Rectangle {
-                id: knob
-                width: 14 * sr.u
-                height: 14 * sr.u
-                radius: width / 2
-                anchors.verticalCenter: parent.verticalCenter
-                x: sr.ratio * (track.width - width)
-                color: Theme.text
-            }
-        }
-
-        MouseArea {
-            id: sliderArea
-            anchors.fill: parent
-            anchors.topMargin: 18 * sr.u
-            hoverEnabled: true
-            preventStealing: true
-            enabled: sr.enabled
-
-            function apply(mx) {
-                var usable = track.width - knob.width
-                if (usable <= 0)
-                    return
-                var r = Math.max(0, Math.min(1, (mx - knob.width / 2) / usable))
-                var s = sr.spec
-                sr.host.setNumber(sr.key,
-                    s.min + Math.round(r * (s.max - s.min) / s.step) * s.step)
-            }
-
-            onPressed: mouse => {
-                sr.forceActiveFocus()
-                apply(mouse.x)
-            }
-            onPositionChanged: mouse => { if (pressed) apply(mouse.x) }
-            onReleased: sr.host.saveState()
         }
     }
 }

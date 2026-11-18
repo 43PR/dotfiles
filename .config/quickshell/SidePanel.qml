@@ -27,7 +27,8 @@ Scope {
         brightnessStep: { min: 1,    max: 20,   def: 5,    step: 1,   unit: "%" },
         nightTemp:      { min: 2500, max: 6500, def: 4800, step: 100, unit: " K" },
         nightStep:      { min: 50,   max: 500,  def: 100,  step: 50,  unit: " K" },
-        tiltStrength:   { min: 0,    max: 15,   def: 1,    step: 1,   unit: "" }
+        tiltStrength:   { min: 0,    max: 15,   def: 1,    step: 1,   unit: "" },
+        notifTextSize:  { min: 70,   max: 200,  def: 100,  step: 5,   unit: "%" }
     })
     readonly property var numKeys: Object.keys(numSpec)
     readonly property var boolDefaults: ({
@@ -61,6 +62,7 @@ Scope {
     property int nightTemp: numSpec.nightTemp.def
     property int nightStep: numSpec.nightStep.def
     property int tiltStrength: numSpec.tiltStrength.def
+    property int notifTextSize: numSpec.notifTextSize.def
 
     property bool showCalendar: boolDefaults.showCalendar
     property bool showQuick: boolDefaults.showQuick
@@ -130,6 +132,7 @@ Scope {
     // ───────────────────────── Scale helpers ─────────────────────────
     readonly property real ui: uiScale / 100
     readonly property real tx: textSize / 100
+    readonly property real ntx: notifTextSize / 100
     function px(n) { return Math.round(n * ui); }              // layout sizes
     function fs(n) { return Math.round(n * ui * tx); }         // font sizes
     function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, Math.round(v))); }
@@ -846,6 +849,55 @@ Scope {
         }
         onLoadFailed: root.historyReady = true
     }
+    // true while the notification settings window is open (written by Notifications.qml)
+    property bool settingsOpenUi: false
+    FileView {
+        path: Quickshell.env("HOME") + "/.config/quickshell/state/notifications-ui.json"
+        printErrors: false
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: {
+            try { root.settingsOpenUi = !!JSON.parse(text()).open } catch (e) {}
+        }
+    }
+    // ---- popup (toast) settings, written by Notifications.qml ----
+    property int toastW: 340
+    property int toastH: 90
+    property int toastScalePct: 100
+    property int toastText: 13
+    property int toastBgPct: 85
+    property int toastRadius: 12
+    property int toastShowMs: 5000
+    property int toastAnim: 150
+    property bool toastIcon: true
+    property bool toastBody: true
+    property bool toastBorder: false
+    property bool toastHoverPause: true
+    readonly property real toastK: toastScalePct / 100
+
+    FileView {
+        path: root.home + "/.config/quickshell/state/notifications-state.json"
+        printErrors: false
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: {
+            try {
+                const s = JSON.parse(text())
+                if (typeof s.popupWidth  === "number") root.toastW = s.popupWidth
+                if (typeof s.popupHeight === "number") root.toastH = s.popupHeight
+                if (typeof s.uiScale     === "number") root.toastScalePct = s.uiScale
+                if (typeof s.textSize    === "number") root.toastText = s.textSize
+                if (typeof s.bgOpacity   === "number") root.toastBgPct = s.bgOpacity
+                if (typeof s.radius      === "number") root.toastRadius = s.radius
+                if (typeof s.showMs      === "number") root.toastShowMs = s.showMs
+                if (typeof s.animMs      === "number") root.toastAnim = s.animMs
+                if (typeof s.showIcon    === "boolean") root.toastIcon = s.showIcon
+                if (typeof s.showBody    === "boolean") root.toastBody = s.showBody
+                if (typeof s.showBorder  === "boolean") root.toastBorder = s.showBorder
+                if (typeof s.hoverPause  === "boolean") root.toastHoverPause = s.hoverPause
+            } catch (e) {}
+        }
+    }
     Timer {
         id: saveTimer
         interval: 400
@@ -1071,7 +1123,7 @@ Scope {
                 Column {
                     id: stack
                     visible: !root.panelOpen
-                    width: Math.round(root.panelWidth * root.ui)
+                    width: Math.round(root.toastW * root.toastK)
                     spacing: root.px(8)
 
                     // default: top centre (below the bar if it is on top)
@@ -1120,13 +1172,12 @@ Scope {
                             property real lifeLeft: 1      // invisible countdown = toast lifetime
                             readonly property bool critical: modelData.urgency === NotificationUrgency.Critical
                             readonly property bool persistent: modelData.expireTimeout === 0
-                            readonly property int lifetime: persistent ? 0 : modelData.expireTimeout > 0
-                                ? modelData.expireTimeout : (critical ? root.criticalTimeout : root.normalTimeout)
+                            readonly property int lifetime: persistent ? 0 : (critical ? root.toastShowMs * 2 : root.toastShowMs)
                             function restartLifetime() {
                                 if (persistent) progAnim.stop()
                                 else if (!leaving && !notificationClosed) progAnim.restart()
                             }
-                            width: root.panelWidth * root.ui
+                            width: root.toastW * root.toastK
                             height: card.height
 
                             function close(expired) {
@@ -1157,7 +1208,7 @@ Scope {
                                 to: 0
                                 duration: wrapper.lifetime
                                 running: !wrapper.leaving && !wrapper.persistent && !wrapper.notificationClosed
-                                paused: hh.hovered || wrapper.expanded
+                                paused: (root.toastHoverPause && hh.hovered) || wrapper.expanded || root.settingsOpenUi
                                 onFinished: wrapper.close(true)
                             }
                             Connections {
@@ -1171,27 +1222,24 @@ Scope {
                             Rectangle {
                                 id: card
                                 width: parent.width
-                                height: Math.max(root.px(64), content.implicitHeight + root.px(24))
-                                radius: Math.min(root.cornerRadius, root.px(16))
-                                color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, Math.max(0.5, root.bgFrac))
-                                border.width: wrapper.critical ? 1 : 0
-                                border.color: root.cAccent
+                                height: Math.max(root.toastH * root.toastK, content.implicitHeight + 24 * root.toastK)
+                                radius: root.toastRadius * root.toastK
+                                color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, root.toastBgPct / 100)
+                                border.width: (root.toastBorder || wrapper.critical) ? 1 : 0
+                                border.color: wrapper.critical ? root.cAccent : Theme.alpha(Theme.text, 0.12)
                                 opacity: wrapper.shown ? 1 : 0
                                 y: wrapper.shown ? 0 : -(height + 20)
-                                Behavior on y { NumberAnimation { duration: 380; easing.type: Easing.OutCubic } }
-                                Behavior on opacity { NumberAnimation { duration: 320; easing.type: Easing.InOutQuad } }
+                                Behavior on y { NumberAnimation { duration: root.toastAnim; easing.type: Easing.OutCubic } }
+                                Behavior on opacity { NumberAnimation { duration: root.toastAnim; easing.type: Easing.InOutQuad } }
                                 HoverHandler { id: hh }
-
-                                // left click: dismiss, right click: copy
+                                // left click: dismiss, right click: open notification settings
                                 MouseArea {
                                     anchors.fill: parent
                                     acceptedButtons: Qt.LeftButton | Qt.RightButton
                                     cursorShape: stackDrag.active ? Qt.ClosedHandCursor : Qt.OpenHandCursor
                                     onClicked: mouse => {
                                         if (mouse.button === Qt.RightButton) {
-                                            root.copyText(wrapper.modelData.summary, wrapper.modelData.body)
-                                            wrapper.copied = true
-                                            copiedTimer.restart()
+                                            Quickshell.execDetached(["qs", "ipc", "call", "notifications", "settings"])
                                         } else {
                                             wrapper.close(false)
                                         }
@@ -1205,7 +1253,8 @@ Scope {
 
                                     Thumb {
                                         id: thumb
-                                        size: 40
+                                        size: 40 * root.toastK / root.ui
+                                        visible: root.toastIcon
                                         color: "transparent"
                                         src: root.resolveIcon(wrapper.modelData.image, wrapper.modelData.appIcon,
                                                               wrapper.modelData.appName, wrapper.modelData.summary)
@@ -1213,10 +1262,11 @@ Scope {
                                         anchors.verticalCenter: parent.verticalCenter
                                     }
 
+
                                     Column {
                                         anchors.verticalCenter: parent.verticalCenter
                                         spacing: root.px(3)
-                                        width: parent.width - thumb.width - btnCol.width - parent.spacing * 2
+                                        width: parent.width - (thumb.visible ? thumb.width + parent.spacing : 0) - btnCol.width - parent.spacing
 
                                         Lbl {
                                             sz: 12
@@ -1224,17 +1274,19 @@ Scope {
                                             width: parent.width
                                             text: wrapper.modelData.summary
                                             wrapMode: wrapper.expanded ? Text.WordWrap : Text.NoWrap
+                                            font.pixelSize: Math.round(root.toastText * root.toastK)
                                         }
                                         Lbl {
                                             width: parent.width
-                                            visible: text !== ""
+                                            visible: root.toastBody && text !== ""
                                             text: wrapper.modelData.body
                                             color: Theme.textDim
                                             textFormat: Text.PlainText
                                             wrapMode: Text.WordWrap
                                             maximumLineCount: wrapper.expanded ? 200 : 3
+                                            font.pixelSize: Math.round((root.toastText - 2) * root.toastK)
                                         }
-                                        Lbl { sz: 9; width: parent.width; text: wrapper.modelData.appName; color: Theme.textDim; opacity: 0.7 }
+                                        Lbl { sz: 9; font.pixelSize: Math.round((root.toastText - 4) * root.toastK); width: parent.width; text: wrapper.modelData.appName; color: Theme.textDim; opacity: 0.7 }
 
                                         Row {
                                             visible: wrapper.modelData.actions.length > 0
@@ -1710,7 +1762,7 @@ Scope {
                                                     visible: rowItem.isHeader
                                                     y: rowItem.pad
                                                     width: parent.width
-                                                    height: root.px(30)
+                                                    height: Math.max(root.px(22), pagerLabel.implicitHeight + root.px(6))
                                                     radius: root.px(10)
                                                     color: Theme.alpha(Theme.text, hdrArea.containsMouse ? 0.1 : 0.04)
 
@@ -1742,6 +1794,7 @@ Scope {
                                                         sz: 11
                                                         font.bold: true
                                                         text: rowItem.groupName
+                                                        k: root.ntx
                                                     }
                                                     Rectangle {
                                                         id: badge
@@ -1750,7 +1803,7 @@ Scope {
                                                         height: root.px(16)
                                                         radius: height / 2
                                                         color: Theme.alpha(Theme.text, 0.12)
-                                                        Lbl { id: badgeTxt; anchors.centerIn: parent; sz: 9; text: rowItem.grpCount }
+                                                        Lbl { id: badgeTxt; anchors.centerIn: parent; sz: 9; text: rowItem.grpCount; k: root.ntx }
                                                     }
                                                     // latest message as a preview while collapsed
                                                     Lbl {
@@ -1763,6 +1816,7 @@ Scope {
                                                         sz: 9
                                                         color: Theme.textDim
                                                         text: rowItem.summary
+                                                        k: root.ntx
                                                     }
                                                     IconBtn {
                                                         id: hClear
@@ -1783,12 +1837,14 @@ Scope {
                                                     visible: rowItem.isPager
                                                     x: root.px(6)
                                                     width: parent.width - root.px(6)
-                                                    height: root.px(22)
+                                                    height: Math.max(root.px(22), pagerLabel.implicitHeight + root.px(6))
                                                     Lbl {
+                                                        id: pagerLabel
                                                         anchors { left: parent.left; leftMargin: root.px(6); verticalCenter: parent.verticalCenter }
                                                         sz: 9
                                                         color: Theme.textDim
                                                         text: rowItem.summary
+                                                        k: root.ntx
                                                     }
                                                     Row {
                                                         anchors { right: parent.right; rightMargin: root.px(6); verticalCenter: parent.verticalCenter }
@@ -1867,6 +1923,7 @@ Scope {
                                                                 font.bold: true
                                                                 text: rowItem.summary
                                                                 wrapMode: rowItem.expanded ? Text.WordWrap : Text.NoWrap
+                                                                k: root.ntx
                                                             }
                                                             Row {
                                                                 id: eBtns
@@ -1912,6 +1969,7 @@ Scope {
                                                             textFormat: Text.PlainText
                                                             wrapMode: Text.WordWrap
                                                             maximumLineCount: 2
+                                                            k: root.ntx
                                                         }
 
                                                         // expanded body: selectable. Selecting copies it to the clipboard.
@@ -1929,7 +1987,7 @@ Scope {
                                                             color: Theme.text
                                                             selectionColor: Theme.alpha(Theme.text, 0.3)
                                                             selectedTextColor: Theme.text
-                                                            font.pixelSize: root.fs(10)
+                                                            font.pixelSize: Math.round(root.fs(10) * root.ntx)
                                                             Keys.onEscapePressed: root.closePanel()
                                                             onSelectedTextChanged: selTimer.restart()
                                                             Timer {
@@ -1951,6 +2009,7 @@ Scope {
                                                             color: Theme.textDim
                                                             opacity: 0.7
                                                             text: (rowItem.appName !== "" ? rowItem.appName + " · " : "") + root.fmtTime(rowItem.time)
+                                                            k: root.ntx
                                                         }
                                                     }
                                                 }
@@ -1971,7 +2030,8 @@ Scope {
     // text follows the component scale AND the text size
     component Lbl: Text {
         property real sz: 10
-        font.pixelSize: root.fs(sz)
+        property real k: 1
+        font.pixelSize: Math.round(sz * root.ui * root.tx * k)
         color: Theme.text
         elide: Text.ElideRight
     }

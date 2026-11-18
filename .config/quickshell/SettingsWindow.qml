@@ -75,7 +75,7 @@ Scope {
         { name: "Side Panel", icon: "\uec02",  page: "SidePanelPage" },
         { name: "Input", icon: "\udb83\udfb0", page: "InputPage" },
         { name: "Network", icon: "󰖩", page: "NetworkPage" },
-        { name: "Bluetooth", icon: "\uf293", page: "BluetoothPage" },
+        { name: "Bluetooth", icon: "\uf294", page: "BluetoothPage" },
         { name: "Storage", icon: "\uf0a0", page: "StoragePage" },
         { name: "Updates", icon: "󰚰",  page: "UpdatesPage" },
     ]

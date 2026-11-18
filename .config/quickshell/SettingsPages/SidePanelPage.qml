@@ -36,7 +36,8 @@ Item {
         notifBgOpacity: { min: 0,    max: 100,  def: 30,   step: 5,   unit: "%" },
         brightnessStep: { min: 1,    max: 20,   def: 5,    step: 1,   unit: "%" },
         nightStep:      { min: 50,   max: 500,  def: 100,  step: 50,  unit: " K" },
-        tiltStrength:   { min: 0,    max: 15,   def: 1,    step: 1,   unit: "" }
+        tiltStrength:   { min: 0,    max: 15,   def: 1,    step: 1,   unit: "" },
+        notifTextSize:  { min: 70,   max: 200,  def: 100,  step: 5,   unit: "%" }
     })
     readonly property var numKeys: Object.keys(numSpec)
     readonly property var boolDefaults: ({
@@ -171,7 +172,12 @@ Item {
         return p
     }
     function pickImage() { if (!pickProc.running) pickProc.running = true }
-
+    function sendTestNotification() {
+        Quickshell.execDetached([
+            "notify-send", "-a", "Side panel", "-i", "dialog-information",
+            "Test notification", "Body message."
+        ])
+    }
     // ------------------------------------------------------------------
     // Persistence — merge with SidePanel runtime fields
     // ------------------------------------------------------------------
@@ -705,112 +711,6 @@ Item {
                     }
                 }
             }
-
-            // ---------------- NOTIFICATIONS ----------------
-            Column {
-                width: parent.width; spacing: 6
-                topPadding: 2
-
-                SectionTitle { text: "NOTIFICATIONS" }
-
-                Note {
-                    visible: !page.val("showNotifs")
-                    text: "Turn on NOTIFICATIONS under Sections to use these options."
-                }
-
-                Card {
-                    enabled: page.val("showNotifs")
-                    Cols {
-                        ToggleRow {
-                            label: "POPUPS (TOASTS)"; checked: page.val("toasts")
-                            onToggled: v => page.set("toasts", v)
-                        }
-                        ToggleRow {
-                            label: "SOUND"; checked: page.val("soundEnabled")
-                            onToggled: v => page.set("soundEnabled", v)
-                        }
-                        BarSlider {
-                            label: "ENTRIES PER GROUP"
-                            from: page.numSpec.groupLimit.min; to: page.numSpec.groupLimit.max
-                            step: page.numSpec.groupLimit.step; unit: page.numSpec.groupLimit.unit
-                            value: page.val("groupLimit")
-                            onMoved: v => page.set("groupLimit", v)
-                        }
-                        BarSlider {
-                            label: "LIST HEIGHT"
-                            from: page.numSpec.notifsHeight.min; to: page.numSpec.notifsHeight.max
-                            step: page.numSpec.notifsHeight.step; unit: " " + page.numSpec.notifsHeight.unit
-                            zeroText: "AUTO"
-                            value: page.val("notifsHeight")
-                            onMoved: v => page.set("notifsHeight", v)
-                        }
-                    }
-
-                    Divider {}
-
-                    GroupLabel { text: "BACKGROUND IMAGE" }
-
-                    Row {
-                        width: parent.width; spacing: 6
-
-                        SmallButton {
-                            id: useBtn
-                            width: 110
-                            label: (page.val("notifBgEnabled") ? "● " : "○ ") + "USE PICTURE"
-                            current: page.val("notifBgEnabled")
-                            onClicked: page.set("notifBgEnabled", !page.val("notifBgEnabled"))
-                        }
-
-                        Rectangle {
-                            width: parent.width - parent.spacing * 2 - useBtn.width - browseBtn.width
-                            height: 26; radius: Theme.radius
-                            color: "#00000000"; clip: true
-                            border.width: 1
-                            border.color: pathInput.activeFocus ? Theme.accent : Theme.border
-
-                            TextInput {
-                                id: pathInput
-                                anchors.fill: parent; anchors.leftMargin: 8; anchors.rightMargin: 8
-                                verticalAlignment: TextInput.AlignVCenter
-                                clip: true; selectByMouse: true
-                                text: page.val("notifBgPath")
-                                color: Theme.text
-                                selectionColor: Theme.accent
-                                font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
-                                onEditingFinished: page.set("notifBgPath", page.cleanPath(text))
-                            }
-
-                            Text {
-                                anchors.fill: parent; anchors.leftMargin: 8
-                                verticalAlignment: Text.AlignVCenter
-                                visible: pathInput.text === "" && !pathInput.activeFocus
-                                text: "/path/to/picture.jpg"
-                                color: Theme.textFaint
-                                font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
-                            }
-                        }
-
-                        SmallButton {
-                            id: browseBtn
-                            width: 80
-                            label: "BROWSE"
-                            onClicked: page.pickImage()
-                        }
-                    }
-
-                    Cols {
-                        enabled: page.val("notifBgEnabled")
-                        BarSlider {
-                            label: "IMAGE OPACITY"
-                            from: page.numSpec.notifBgOpacity.min; to: page.numSpec.notifBgOpacity.max
-                            step: page.numSpec.notifBgOpacity.step; unit: page.numSpec.notifBgOpacity.unit
-                            value: page.val("notifBgOpacity")
-                            onMoved: v => page.set("notifBgOpacity", v)
-                        }
-                    }
-                }
-            }
-
             // ---------------- QUICK ACTIONS ----------------
             Column {
                 width: parent.width; spacing: 6
@@ -914,6 +814,116 @@ Item {
                                     onToggled: v => page.set(page.sectionBoolKey[modelData], v)
                                 }
                             }
+                        }
+                    }
+                }
+            }
+            // ---------------- NOTIFICATIONS ----------------
+            Column {
+                width: parent.width; spacing: 6
+                topPadding: 2
+
+                SectionTitle { text: "NOTIFICATIONS" }
+
+                Note {
+                    visible: !page.val("showNotifs")
+                    text: "Turn on NOTIFICATIONS under Sections to use these options."
+                }
+
+                Card {
+                    enabled: page.val("showNotifs")
+                    Cols {
+                        cols: 3
+                        ToggleRow {
+                            label: "POPUPS (TOASTS)"; checked: page.val("toasts")
+                            onToggled: v => page.set("toasts", v)
+                        }
+                        ToggleRow {
+                            label: "SOUND"; checked: page.val("soundEnabled")
+                            onToggled: v => page.set("soundEnabled", v)
+                        }
+                        ToggleRow {
+                            label: "SEND TEST"; checked: false
+                            onToggled: page.sendTestNotification()
+                        }
+                        BarSlider {
+                            label: "ENTRIES PER GROUP"
+                            from: page.numSpec.groupLimit.min; to: page.numSpec.groupLimit.max
+                            step: page.numSpec.groupLimit.step; unit: page.numSpec.groupLimit.unit
+                            value: page.val("groupLimit")
+                            onMoved: v => page.set("groupLimit", v)
+                        }
+                        BarSlider {
+                            label: "TEXT SIZE"
+                            from: page.numSpec.notifTextSize.min; to: page.numSpec.notifTextSize.max
+                            step: page.numSpec.notifTextSize.step; unit: page.numSpec.notifTextSize.unit
+                            value: page.val("notifTextSize")
+                            onMoved: v => page.set("notifTextSize", v)
+                        }
+                        BarSlider {
+                            label: "LIST HEIGHT"
+                            from: page.numSpec.notifsHeight.min; to: page.numSpec.notifsHeight.max
+                            step: page.numSpec.notifsHeight.step; unit: " " + page.numSpec.notifsHeight.unit
+                            zeroText: "AUTO"
+                            value: page.val("notifsHeight")
+                            onMoved: v => page.set("notifsHeight", v)
+                        }
+                    }
+                    Divider {}
+                    GroupLabel { text: "BACKGROUND IMAGE" }
+                    Row {
+                        width: parent.width; spacing: 6
+                        SmallButton {
+                            id: useBtn
+                            width: 110
+                            label: (page.val("notifBgEnabled") ? "● " : "○ ") + "USE PICTURE"
+                            current: page.val("notifBgEnabled")
+                            onClicked: page.set("notifBgEnabled", !page.val("notifBgEnabled"))
+                        }
+                        Rectangle {
+                            width: parent.width - parent.spacing * 2 - useBtn.width - browseBtn.width
+                            height: 26; radius: Theme.radius
+                            color: "#00000000"; clip: true
+                            border.width: 1
+                            border.color: pathInput.activeFocus ? Theme.accent : Theme.border
+                            TextInput {
+                                id: pathInput
+                                anchors.fill: parent; anchors.leftMargin: 8; anchors.rightMargin: 8
+                                verticalAlignment: TextInput.AlignVCenter
+                                clip: true; selectByMouse: true
+                                text: page.val("notifBgPath")
+                                color: Theme.text
+                                selectionColor: Theme.accent
+                                font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
+                                onEditingFinished: page.set("notifBgPath", page.cleanPath(text))
+                            }
+
+                            Text {
+                                anchors.fill: parent; anchors.leftMargin: 8
+                                verticalAlignment: Text.AlignVCenter
+                                visible: pathInput.text === "" && !pathInput.activeFocus
+                                text: "/path/to/picture.jpg"
+                                color: Theme.textFaint
+                                font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody
+                            }
+                        }
+
+                        SmallButton {
+                            id: browseBtn
+                            width: 80
+                            label: "BROWSE"
+                            onClicked: page.pickImage()
+                        }
+                    }
+
+                    Cols {
+                        enabled: page.val("notifBgEnabled")
+                        BarSlider {
+                            label: "IMAGE OPACITY"
+                            from: page.numSpec.notifBgOpacity.min; to: page.numSpec.notifBgOpacity.max
+                            step: page.numSpec.notifBgOpacity.step; unit: page.numSpec.notifBgOpacity.unit
+                            value: page.val("notifBgOpacity")
+                            onMoved: v => page.set("notifBgOpacity", v)
                         }
                     }
                 }

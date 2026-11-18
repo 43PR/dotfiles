@@ -61,7 +61,7 @@ Singleton {
         clock:    { h: { y: 1, textY: -1 },              v: {} },
         // ── network / bluetooth ──
         net:      { h: { x: -1, y: 1, iconY: -1 },              v: { x: -1, iconY: 0 } },
-        bt:       { all: { scaleX: 1.2 },
+        bt:       { all: { scaleX: 1.17 },
                     h: { x: -1, y: 1, iconY: -1 },              v: { x: -1, iconY: 0 } },
         // ── meters ──
         volume:   { h: { y: 1.25, iconY: -1, textY: -1 }, v: { x: -1, iconY: 0, textY: -1 } },
