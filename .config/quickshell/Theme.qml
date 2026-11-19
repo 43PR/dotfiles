@@ -17,9 +17,9 @@ QtObject {
     onStatusChanged: console.log("[tabler] status:", status, "name:", name)
     }
     property string tablerFont: tablerLoader.name
-    readonly property int animFast: 120
-    readonly property int animMed: 220
-    readonly property int animSlow: 380
+    readonly property int animFast: 100
+    readonly property int animMed: 200
+    readonly property int animSlow: 280
 
     // ---- Global text sizes (px) ----
     readonly property int textSizeTitle: 18

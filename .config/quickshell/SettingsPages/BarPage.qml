@@ -26,7 +26,8 @@ Item {
         batNumber: false, batPercent: false, batRing: true, batLabel: false,
         volStep: 5, volMax: 100, volNumber: false, volPercent: false, volRing: true, volLabel: false,
         trayArrow: true, lightIcons: "star", brightStep: 5, nightStep: 100, brightRing: true, nightRing: true,
-        clock24: true, clockSeconds: false, clockPadHour: true, clockDate: true, clockDay: false, clockCase: "normal", dateOrder: "md", weekMonday: true,
+        clock24: true, clockSeconds: false, clockPadHour: true, clockAmPm: true, clockDate: true, clockDay: false, clockCase: "normal", dateOrder: "md", weekMonday: true,
+        weatherIcon: false, weatherF: false, weatherCity: "", weatherCase: "upper", weatherSymbol: true,
         clockPrimary: "calendar", clockSecondary: "settings", clockTertiary: "barsettings",
         settingsPrimary: "settings", settingsSecondary: "barsettings", settingsTertiary: "none",
         hidden: "gputemp,gpu,settings,bright,night,wall",
@@ -66,6 +67,7 @@ Item {
         { id: "battery",  l: "BATTERY" },
         { id: "bt",       l: "BLUETOOTH" },
         { id: "net",      l: "NETWORK" },
+        { id: "weather",  l: "WEATHER" },
         { id: "notif",    l: "NOTIFS" },
         { id: "wall",     l: "WALLPAPERS" },
         { id: "settings", l: "SETTINGS" },
@@ -246,6 +248,7 @@ Item {
         property string label: ""
         property bool current: false
         property bool buttonEnabled: true
+        property string labelFont: Theme.fontFamily
         signal clicked()
         height: 26; radius: Theme.radius
         opacity: buttonEnabled ? 1.0 : 0.35
@@ -260,7 +263,7 @@ Item {
             elide: Text.ElideRight
             text: sb.label
             color: sb.current ? Theme.accent : Theme.text
-            font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeBody; font.bold: true; font.letterSpacing: 1
+            font.family: sb.labelFont; font.pixelSize: Theme.textSizeBody; font.bold: true; font.letterSpacing: 1
         }
 
         MouseArea {
@@ -370,6 +373,7 @@ Item {
         signal picked(string v)
 
         width: parent.cellWidth ?? parent.width
+        property string valueFont: Theme.fontFamily
         height: cyLabel.implicitHeight + 3 + 26
         opacity: enabled ? 1.0 : 0.4
 
@@ -383,6 +387,7 @@ Item {
         SmallButton {
             y: cyLabel.implicitHeight + 3
             width: cy.width
+            labelFont: cy.valueFont
             label: (cy.labels[cy.current] ?? cy.current.toUpperCase()) + "  ›"
             buttonEnabled: cy.enabled
             onClicked: {
@@ -641,6 +646,11 @@ Item {
                             onToggled: v => page.set("clockPadHour", v)
                         }
                         ToggleRow {
+                            label: "AM/PM"; checked: page.val("clockAmPm")
+                            enabled: !page.val("clock24")
+                            onToggled: v => page.set("clockAmPm", v)
+                        }
+                        ToggleRow {
                             label: "SHOW DATE"; checked: page.val("clockDate")
                             onToggled: v => page.set("clockDate", v)
                         }
@@ -657,7 +667,7 @@ Item {
                         CycleChoice {
                             label: "DAY & AM/PM CASE"
                             // only matters while the weekday or the AM/PM suffix is visible
-                            enabled: (page.val("clockDate") && page.val("clockDay")) || !page.val("clock24")
+                            enabled: (page.val("clockDate") && page.val("clockDay")) || (!page.val("clock24") && page.val("clockAmPm"))
                             options: page.caseOptions; labels: page.caseLabels
                             current: page.val("clockCase")
                             onPicked: v => page.set("clockCase", v)
@@ -671,7 +681,60 @@ Item {
                     }
                 }
             }
+            // ---------------- WEATHER ----------------
+            Column {
+                id: secWeather
+                width: parent.width; spacing: 6
+                topPadding: 2
 
+                SectionTitle { text: "WEATHER" }
+
+                Note {
+                    visible: !page.isOn("weather")
+                    text: "Turn on the WEATHER module in MODULES to use these options."
+                }
+
+                Card {
+                    enabled: page.isOn("weather")
+
+                    Cols {
+                        cols: 3
+                        ToggleRow {
+                            label: "FAHRENHEIT"; checked: page.val("weatherF")
+                            onToggled: v => page.set("weatherF", v)
+                        }
+                        ToggleRow {
+                            label: "° SYMBOL"; checked: page.val("weatherSymbol")
+                            onToggled: v => page.set("weatherSymbol", v)
+                        }
+                    }
+                    Cols {
+                        CycleChoice {
+                            label: "CONDITION DISPLAY"
+                            options: ["text", "icon"]
+                            labels: ({
+                                text: page.val("weatherCase") === "upper" ? "OVERCAST"
+                                    : page.val("weatherCase") === "lower" ? "overcast" : "Overcast",
+                                icon: "\uDB81\uDD90"
+                            })
+                            valueFont: page.val("weatherIcon") ? Theme.iconFont : Theme.fontFamily
+                            current: page.val("weatherIcon") ? "icon" : "text"
+                            onPicked: v => page.set("weatherIcon", v === "icon")
+                        }
+                        CycleChoice {
+                            label: "CONDITION TEXT CASE"
+                            enabled: !page.val("weatherIcon")
+                            options: ["upper", "normal", "lower"]
+                            labels: ({ upper: "OVERCAST", normal: "Overcast", lower: "overcast" })
+                            current: page.val("weatherCase")
+                            onPicked: v => page.set("weatherCase", v)
+                        }
+                    }
+                    Note {
+                        text: "Location is detected from your IP. To pin a city, set \"weatherCity\" in state/bar-state.json."
+                    }
+                }
+            }
             // ---------------- WORKSPACES + OPEN APPS ----------------
             Column {
                 id: secWorkspaces

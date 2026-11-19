@@ -52,13 +52,14 @@ Singleton {
     readonly property var table: ({
         // Applied to every module first. Example: "*": { all: { y: 0 } }
         "*": {},
-        notif:         { h: { x: -1, y: 0.5, textY: -1 }, v: { x: -1, textY: 0 } },
+        notif:         { h: { x: -1, y: 0.5, textY: -1, pad: 4 }, v: { x: -1, textY: 0 } },
         wall:          { h: { x: -1, y: 1 }, v: {} },
         settings:      { h: { x: -1, y: 0 }, v: { x: -1 } },
-        power:         { h: { x: -1, y: 1, textY: -1 }, v: { x: 0, textY: 0 } },
-        clock:         { h: { y: 1, textY: -1 }, v: {} },
+        power:         { h: { x: -1, y: 1, textY: -1, pad: 4 }, v: { x: 0, textY: 0 } },
+        clock:         { h: { y: 2, textY: -1 }, v: {} },
+        weather:       { h: { y: 1, iconY: -1, textY: -1, spacing: -3, pad: 4 }, v: { iconX: -1 } },
         net:           { h: { x: -1, y: 1, iconY: -1 }, v: { x: -1, iconY: 0 } },
-        bt:            { all: { scaleX: 1.17 }, h: { x: 0, y: 1, iconY: -1 }, v: { x: 1, iconY: 0 } },
+        bt:            { all: { scaleX: 1.17 }, h: { x: 1, y: 1, iconY: -1, pad: 4 }, v: { x: 1, iconY: 0 } },
         volume:        { h: { y: 1.25, iconY: -1, textY: -1 }, v: { x: 0, iconY: 0, textY: -1 } },
         battery:       { h: { y: 1.25, iconY: -1.25, ringIconY: 0, textY: -1 }, v: { textY: -1 } },
         bright:        { h: { y: 0 }, v: { x: 0 } },

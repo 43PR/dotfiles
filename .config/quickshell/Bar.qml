@@ -23,7 +23,8 @@ Scope {
         batNumber: false, batPercent: false, batRing: true, batLabel: false,
         volStep: 5, volMax: 100, volNumber: false, volPercent: false, volRing: true, volLabel: false,
         trayArrow: true, lightIcons: "star", brightStep: 5, nightStep: 100, brightRing: true, nightRing: true,
-        clock24: true, clockSeconds: false, clockPadHour: true, clockDate: true, clockDay: false, clockCase: "normal", dateOrder: "md", weekMonday: true,
+        clock24: true, clockSeconds: false, clockPadHour: true, clockAmPm: true, clockDate: true, clockDay: false, clockCase: "normal", dateOrder: "md", weekMonday: true,
+        weatherIcon: false, weatherF: false, weatherCity: "", weatherCase: "upper", weatherSymbol: true,
         clockPrimary: "calendar", clockSecondary: "settings", clockTertiary: "barsettings",
         settingsPrimary: "settings", settingsSecondary: "barsettings", settingsTertiary: "none",
         hidden: "gputemp,gpu,settings,bright,night,wall",
@@ -73,7 +74,8 @@ Scope {
             property bool trayArrow: root.defaults.trayArrow
             property bool nightRing: root.defaults.nightRing; property string lightIcons: root.defaults.lightIcons
             property bool clock24: root.defaults.clock24; property bool clockSeconds: root.defaults.clockSeconds
-            property bool clockPadHour: root.defaults.clockPadHour; property bool clockDate: root.defaults.clockDate
+            property bool clockPadHour: root.defaults.clockPadHour; property bool clockAmPm: root.defaults.clockAmPm
+            property bool clockDate: root.defaults.clockDate
             property bool clockDay: root.defaults.clockDay; property string clockCase: root.defaults.clockCase
             property string dateOrder: root.defaults.dateOrder; property bool weekMonday: root.defaults.weekMonday
             property string clockPrimary: root.defaults.clockPrimary
@@ -82,6 +84,9 @@ Scope {
             property string settingsPrimary: root.defaults.settingsPrimary
             property string settingsSecondary: root.defaults.settingsSecondary
             property string settingsTertiary: root.defaults.settingsTertiary
+            property bool weatherIcon: root.defaults.weatherIcon; property bool weatherF: root.defaults.weatherF
+            property string weatherCity: root.defaults.weatherCity; property string weatherCase: root.defaults.weatherCase
+            property bool weatherSymbol: root.defaults.weatherSymbol
             property string hidden: root.defaults.hidden; property string startMods: root.defaults.startMods
             property string midLeftMods: root.defaults.midLeftMods
             property string centerMods: root.defaults.centerMods
@@ -207,11 +212,11 @@ Scope {
     }
     function clockText(d) {
         const t = clockParts(d).join(":");
-        return cfg.clock24 ? t : t + " " + ampmText(d);
+        return cfg.clock24 || !cfg.clockAmPm ? t : t + " " + ampmText(d);
     }
     function clockVText(d) {
         const p = clockParts(d);
-        if (!cfg.clock24) p.push(ampmText(d));
+        if (!cfg.clock24 && cfg.clockAmPm) p.push(ampmText(d));
         return p.join("\n");
     }
     function clockBarText(d) {
@@ -304,6 +309,7 @@ Scope {
         { id: "battery",  l: "Battery" },
         { id: "bt",       l: "Bluetooth" },
         { id: "net",      l: "Network" },
+        { id: "weather",  l: "Weather" },
         { id: "notif",    l: "Notifications", cmd: "qs ipc call notifications toggle", g: "\uDB80\uDC9C",
                                               tip: "Notifications", hint: "Toggle notification panel" },
         { id: "wall",     l: "Wallpapers",    cmd: "qs -n -p ~/.config/quickshell/hyprquickpaper", g: "\uDB80\uDEE9",
@@ -319,7 +325,7 @@ Scope {
         cpu: cpuC, ram: ramC, gpu: gpuC, cputemp: cpuTempC, gputemp: gpuTempC,
         ws: wsMinimal ? wsMinC : wsDotsC, tasks: tasksC, tray: trayC, media: mediaC, volume: volumeC,
         bright: brightC, night: nightC, battery: batteryC,
-        bt: btC, net: netC, clock: clockC, icon: iconC
+        bt: btC, net: netC, weather: weatherC, clock: clockC, icon: iconC
     })
     function csv(str) {
         if (str === "") return [];
@@ -481,6 +487,93 @@ Scope {
     function tempTip(name, v) {
         return name + " temperature: " + (v >= 0 ? v + "°C" : "no sensor detected");
     }
+    property bool wxOk: false; property real wxTempC: 0; property int wxCode: 0; property bool wxDay: true
+    property bool wxHave: false; property real wxLat: 0; property real wxLon: 0
+    property string wxReal: ""
+    readonly property var wxNames: ({
+        0: "Clear sky", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast",
+        45: "Fog", 48: "Fog", 51: "Light drizzle", 53: "Drizzle", 55: "Heavy drizzle",
+        56: "Freezing drizzle", 57: "Freezing drizzle", 61: "Light rain", 63: "Rain", 65: "Heavy rain",
+        66: "Freezing rain", 67: "Freezing rain", 71: "Light snow", 73: "Snow", 75: "Heavy snow",
+        77: "Snow grains", 80: "Rain showers", 81: "Rain showers", 82: "Heavy showers",
+        85: "Snow showers", 86: "Snow showers", 95: "Thunderstorm", 96: "Thunderstorm", 99: "Thunderstorm"
+    })
+    readonly property string wxDesc: wxNames[wxCode] ?? ""
+    function wxGlyph(c) {
+        if (c === 0 || c === 1) return wxDay ? "\uDB81\uDD99" : "\uDB81\uDD94";
+        if (c === 2) return wxDay ? "\uDB81\uDD95" : "\uDB83\uDF31";
+        if (c === 3) return "\uDB81\uDD90";
+        if (c === 45 || c === 48) return "\uDB81\uDD91";
+        if (c >= 95) return "\uDB81\uDE7E";
+        if (c === 56 || c === 57 || c === 66 || c === 67) return "\uDB81\uDE7F";
+        if ((c >= 71 && c <= 77) || c === 85 || c === 86) return "\uDB81\uDD98";
+        if (c === 65 || c === 82) return "\uDB81\uDD96";
+        return "\uDB81\uDD97";
+    }
+    readonly property string wxTemp: wxOk
+        ? Math.round(cfg.weatherF ? wxTempC * 9 / 5 + 32 : wxTempC) + (cfg.weatherSymbol ? "°" : "") : "–"
+    readonly property string wxText: cfg.weatherCase === "upper" ? wxDesc.toUpperCase()
+                                   : cfg.weatherCase === "lower" ? wxDesc.toLowerCase() : wxDesc
+    function wxDeg(c) { return Math.round(cfg.weatherF ? c * 9 / 5 + 32 : c) + "°" + (cfg.weatherF ? "F" : "C"); }
+    readonly property string wxTip: wxOk ? (wxReal !== "" ? wxReal : wxDesc) + " · " + wxDeg(wxTempC)
+                                         : "Weather: unavailable"
+    function fetchWx() {
+        if (!wxProc.running) wxProc.running = true;
+        if (!wxRealProc.running) wxRealProc.running = true;
+    }
+    function refreshWeather() {
+        if (wxHave) fetchWx();
+        else if (!geoProc.running) geoProc.running = true;
+    }
+    Process {
+        id: geoProc
+        command: cfg.weatherCity === ""
+            ? ["curl", "-sf", "-m", "10", "http://ip-api.com/json/?fields=status,lat,lon"]
+            : ["curl", "-sf", "-m", "10",
+               "https://geocoding-api.open-meteo.com/v1/search?count=1&name=" + encodeURIComponent(cfg.weatherCity)]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const j = JSON.parse(text);
+                    const r = cfg.weatherCity === "" ? j : j.results[0];
+                    root.wxLat = r.lat ?? r.latitude; root.wxLon = r.lon ?? r.longitude;
+                    root.wxHave = true;
+                    root.fetchWx();
+                } catch (e) {}
+            }
+        }
+    }
+    Process {
+        id: wxProc
+        command: ["curl", "-sf", "-m", "15",
+                  "https://api.open-meteo.com/v1/forecast?latitude=" + root.wxLat + "&longitude=" + root.wxLon
+                  + "&current=temperature_2m,weather_code,is_day&timezone=auto"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const c = JSON.parse(text).current;
+                    root.wxTempC = c.temperature_2m; root.wxCode = c.weather_code;
+                    root.wxDay = c.is_day === 1; root.wxOk = true;
+                } catch (e) {}
+            }
+        }
+    }
+    Process {
+        id: wxRealProc
+        command: ["curl", "-sf", "-m", "15", "https://wttr.in/" + root.wxLat + "," + root.wxLon + "?format=%25C"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const t = text.trim();
+                if (t !== "" && t.length < 40 && t.indexOf("<") < 0) root.wxReal = t;
+            }
+        }
+    }
+    Timer {
+        interval: 900000; repeat: true; triggeredOnStart: true
+        running: root.barVisible && root.isOn("weather"); onTriggered: root.refreshWeather()
+    }
+    Timer { id: wxRecheck; interval: 800; onTriggered: root.refreshWeather() }
+    Connections { target: cfg; function onWeatherCityChanged() { root.wxHave = false; wxRecheck.restart(); } }
     property string netState: "disconnected"; property string netName: ""; property bool wifiOn: true
     readonly property bool netOff: !wifiOn && netState === "disconnected"
     readonly property string netGlyph: netState === "wifi" ? "\uDB81\uDDA9"
@@ -1099,6 +1192,18 @@ Scope {
     }
     SystemClock {
         id: clk; enabled: root.isOn("clock"); precision: cfg.clockSeconds ? SystemClock.Seconds : SystemClock.Minutes
+    }
+    Component {
+        id: weatherC
+        Mod {
+            glyph: cfg.weatherIcon ? root.wxGlyph(root.wxCode) : ""
+            vglyph: root.wxGlyph(root.wxCode)
+            text: cfg.weatherIcon || !root.wxOk ? root.wxTemp : root.wxText + "  " + root.wxTemp
+            vtext: root.wxTemp
+            glyphSize: root.sz.icon - 2; baseSize: root.sz.clock; bold: true
+            tip: root.wxTip; primaryHint: "Refresh"; secondaryHint: "Bar settings"
+            onPrimary: root.refreshWeather(); onSecondary: root.openSettings()
+        }
     }
     Component {
         id: netC
