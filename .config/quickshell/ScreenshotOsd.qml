@@ -1,6 +1,7 @@
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Io
+import Quickshell.Hyprland
 import QtQuick
 import QtQuick.Effects
 
@@ -12,7 +13,10 @@ Scope {
     property bool cancelled: false
     property string imagePath: ""
 
-    property string kind: "screenshot"   // "screenshot" | "ocr"
+    property string kind: "screenshot"   // "screenshot" | "ocr" | "keyboard"
+    property string kbLayout: ""         // xkb description, e.g. "English (US)"
+    property string kbDevice: ""         // keyboard device name
+    property double kbLastShown: 0
     property string ocrState: ""         // "working" | "done" | "empty" | "cancelled"
     property string ocrText: ""
 
@@ -42,7 +46,8 @@ Scope {
         showThumb: true,
         showDetail: true,
         showBorder: false,
-        hoverPause: true
+        hoverPause: true,
+        kbOsd: true
     })
     readonly property var boolKeys: Object.keys(boolDefaults)
 
@@ -86,7 +91,8 @@ Scope {
         { type: "header", label: "Behavior" },
         { type: "slider", key: "showMs",      label: "Display time" },
         { type: "slider", key: "animMs",      label: "Animation duration" },
-        { type: "toggle", key: "hoverPause",  label: "Stay open while hovered" }
+        { type: "toggle", key: "hoverPause",  label: "Stay open while hovered" },
+        { type: "toggle", key: "kbOsd",       label: "Show on layout change" }
     ]
 
     property real offsetX: 0
@@ -106,6 +112,7 @@ Scope {
     property bool showDetail: boolDefaults.showDetail
     property bool showBorder: boolDefaults.showBorder
     property bool hoverPause: boolDefaults.hoverPause
+    property bool kbOsd: boolDefaults.kbOsd
 
     property bool settingsOpen: false
     property bool dragging: false
@@ -231,7 +238,9 @@ Scope {
     function toggleSettings() { settingsOpen ? closeSettings() : openSettings() }
 
     readonly property bool isOcr: kind === "ocr"
+    readonly property bool isKb: kind === "keyboard"
     readonly property string titleText: {
+        if (isKb) return kbLayout
         if (isOcr) {
             switch (ocrState) {
             case "working":   return "Reading text…"
@@ -243,6 +252,7 @@ Scope {
         return cancelled ? "Screenshot cancelled" : "Screenshot saved"
     }
     readonly property string subText: {
+        if (isKb) return "Keyboard layout"
         if (isOcr) {
             switch (ocrState) {
             case "working":   return "Please wait"
@@ -260,6 +270,25 @@ Scope {
         ocrState = ""
         ocrText = ""
         imagePath = path
+        showing = true
+        hideTimer.interval = root.showMs
+        hideTimer.restart()
+    }
+
+    function showKeyboard(device, layoutName) {
+        if (!kbOsd || settingsOpen) return
+        // Hyprland fires one event per keyboard device, so collapse duplicates
+        var now = Date.now()
+        if (layoutName === kbLayout && now - kbLastShown < 200) return
+        kbLastShown = now
+
+        kind = "keyboard"
+        kbDevice = device
+        kbLayout = layoutName
+        cancelled = false
+        ocrState = ""
+        ocrText = ""
+        imagePath = ""
         showing = true
         hideTimer.interval = root.showMs
         hideTimer.restart()
@@ -312,6 +341,24 @@ Scope {
         function settings(): void {
             root.openSettings()
         }
+    }
+
+    // "activelayout>>keyboardname,layoutname", also fired by the SUPER+X bind
+    Connections {
+        target: Hyprland
+        function onRawEvent(event) {
+            if (event.name !== "activelayout") return
+            const data = String(event.data)
+            const comma = data.indexOf(",")
+            if (comma < 0) return
+            root.showKeyboard(data.substring(0, comma), data.substring(comma + 1))
+        }
+    }
+
+    // test: qs ipc call keyboard show "English (US)"
+    IpcHandler {
+        target: "keyboard"
+        function show(name: string): void { root.showKeyboard("test", name) }
     }
 
     IpcHandler {
@@ -434,7 +481,8 @@ Scope {
                     Text {
                         anchors.centerIn: parent
                         visible: !root.imagePath
-                        text: root.isOcr
+                        text: root.isKb ? "󰌌"
+                              : root.isOcr
                               ? (root.ocrState === "done" || root.ocrState === "working" ? "Aa" : "󰜺")
                               : (root.cancelled ? "󰜺" : "󰄀")
                         font.family: "Symbols Nerd Font"
@@ -459,8 +507,12 @@ Scope {
                     }
                     // middle line: filename for screenshots, text preview for OCR
                     Text {
-                        visible: root.showDetail && (root.isOcr ? root.ocrState === "done" : !root.cancelled)
-                        text: root.isOcr ? root.ocrText : root.imagePath.split("/").pop()
+                        visible: root.showDetail && (root.isOcr ? root.ocrState === "done"
+                                                   : root.isKb ? root.kbDevice !== ""
+                                                   : !root.cancelled)
+                        text: root.isOcr ? root.ocrText
+                              : root.isKb ? root.kbDevice
+                              : root.imagePath.split("/").pop()
                         font.pixelSize: Math.max(8, root.textSize - 2)
                         color: Theme.textDim
                         elide: root.isOcr ? Text.ElideRight : Text.ElideMiddle
@@ -560,7 +612,7 @@ Scope {
 
                     Text {
                         x: 20; y: 10
-                        text: "Screenshot OSD settings"
+                        text: "OSD settings"
                         font.family: "JetBrains Mono"
                         font.pixelSize: 14
                         font.bold: true

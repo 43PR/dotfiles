@@ -1399,7 +1399,7 @@ Component {
         id: arrow
         property bool open: false
         mid: "tray"; glyphSize: root.sz.icon - 2; glyph: root.trayChevron(open)
-        tip: "Show hidden icons"; primaryHint: open ? "Hide tray" : "Show tray"
+        tip: "System tray"; primaryHint: open ? "Hide tray" : "Show tray"
         noSecondary: true; noTip: open
         onPrimary: open = !open
 
