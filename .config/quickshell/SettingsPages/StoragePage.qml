@@ -530,7 +530,7 @@ Item {
     //   LABEL                (top, elided)
     //   VALUE        ACTION  (middle)
     //   RESULT TEXT          (bottom, only when there is one)
-    // Fixed height so every card in a grid row lines up.
+    // Fixed height (label / value+action / result lines never overlap) so every card in a grid row lines up.
     component CleanupButton: Rectangle {
         id: cleanupRoot
         required property string label
@@ -543,7 +543,7 @@ Item {
         readonly property bool hasResult: resultText !== ""
 
         width: parent.width
-        height: 58
+        height: 74
         radius: Theme.radius
         color: "#00000000"
         border.width: 1
@@ -574,7 +574,7 @@ Item {
             anchors.right: parent.right
             anchors.rightMargin: 12
             anchors.top: parent.top
-            anchors.topMargin: 32
+            anchors.topMargin: 29
             height: 18
 
             Text {

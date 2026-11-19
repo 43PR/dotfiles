@@ -28,6 +28,7 @@ Item {
         trayArrow: true, lightIcons: "star", brightStep: 5, nightStep: 100, brightRing: true, nightRing: true,
         clock24: true, clockSeconds: false, clockPadHour: true, clockAmPm: true, clockDate: true, clockDay: false, clockCase: "normal", dateOrder: "md", weekMonday: true,
         weatherIcon: false, weatherF: false, weatherCity: "", weatherCase: "upper", weatherSymbol: true,
+        mediaMaxW: 120, mediaScroll: true,
         clockPrimary: "calendar", clockSecondary: "settings", clockTertiary: "barsettings",
         settingsPrimary: "settings", settingsSecondary: "barsettings", settingsTertiary: "none",
         hidden: "gputemp,gpu,settings,bright,night,wall",
@@ -802,6 +803,39 @@ Item {
                                 onPicked: v => page.set("tasksColor", v)
                             }
                         }
+                    }
+                }
+            }
+            // ---------------- MEDIA ----------------
+            Column {
+                id: secMedia
+                width: parent.width; spacing: 6
+                topPadding: 2
+
+                SectionTitle { text: "MEDIA" }
+
+                Note {
+                    visible: !page.isOn("media")
+                    text: "Turn on the MEDIA module in MODULES to use these options."
+                }
+
+                Card {
+                    enabled: page.isOn("media")
+
+                    Cols {
+                        ToggleRow {
+                            label: "MARQUEE EFFECT ON/OFF"; checked: page.val("mediaScroll")
+                            onToggled: v => page.set("mediaScroll", v)
+                        }
+                        BarSlider {
+                            label: "MAX WIDTH"
+                            from: 60; to: 400; step: 10; unit: " px"
+                            value: page.val("mediaMaxW")
+                            onMoved: v => page.set("mediaMaxW", v)
+                        }
+                    }
+                    Note {
+                        text: "On: long titles loop across the max width. Off: they are cut off with “…” (the tooltip still shows the full title)."
                     }
                 }
             }

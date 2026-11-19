@@ -10,6 +10,7 @@ import Quickshell.Bluetooth
 import Quickshell.Services.SystemTray
 import Quickshell.Services.Pipewire
 import Quickshell.Services.UPower
+import Quickshell.Services.Mpris
 Scope {
     id: root
     readonly property var defaults: ({
@@ -25,6 +26,7 @@ Scope {
         trayArrow: true, lightIcons: "star", brightStep: 5, nightStep: 100, brightRing: true, nightRing: true,
         clock24: true, clockSeconds: false, clockPadHour: true, clockAmPm: true, clockDate: true, clockDay: false, clockCase: "normal", dateOrder: "md", weekMonday: true,
         weatherIcon: false, weatherF: false, weatherCity: "", weatherCase: "upper", weatherSymbol: true,
+        mediaMaxW: 120, mediaScroll: true,
         clockPrimary: "calendar", clockSecondary: "settings", clockTertiary: "barsettings",
         settingsPrimary: "settings", settingsSecondary: "barsettings", settingsTertiary: "none",
         hidden: "gputemp,gpu,settings,bright,night,wall",
@@ -87,10 +89,69 @@ Scope {
             property bool weatherIcon: root.defaults.weatherIcon; property bool weatherF: root.defaults.weatherF
             property string weatherCity: root.defaults.weatherCity; property string weatherCase: root.defaults.weatherCase
             property bool weatherSymbol: root.defaults.weatherSymbol
+            property int mediaMaxW: root.defaults.mediaMaxW; property bool mediaScroll: root.defaults.mediaScroll
             property string hidden: root.defaults.hidden; property string startMods: root.defaults.startMods
             property string midLeftMods: root.defaults.midLeftMods
             property string centerMods: root.defaults.centerMods
             property string midRightMods: root.defaults.midRightMods; property string endMods: root.defaults.endMods
+        }
+    }
+    Scope {
+        id: mq
+        readonly property var player: {
+            const ps = Mpris.players.values;
+            return ps.find(p => p.isPlaying) ?? ps[0] ?? null;
+        }
+        readonly property bool playing: player !== null && player.isPlaying
+        readonly property string title: player
+            ? ((player.trackArtist ? player.trackArtist + " - " : "") + player.trackTitle)
+            : ""
+        readonly property string glyph: playing ? "\uDB81\uDC0A" : "\uDB80\uDFE4"
+        readonly property string text: title
+        readonly property int maxW: cfg.mediaMaxW          // from the slider
+        readonly property bool scrollOn: cfg.mediaScroll   // from the toggle
+        readonly property int gap: 20
+        readonly property int step: 1
+        readonly property int interval: 33
+        readonly property int holdMs: 2500
+
+        readonly property real textW: measure.implicitWidth
+        readonly property bool animating: scrollOn && playing && textW > maxW
+
+        property int x: 0
+        property bool hold: true
+
+        Item {
+            visible: false
+            Text {
+                id: measure
+                text: mq.text
+                font.family: Theme.iconFont
+                font.pixelSize: root.sz.mq
+            }
+        }
+
+        onAnimatingChanged: { x = 0; hold = true; }
+        onTitleChanged: { x = 0; hold = true; }
+        onMaxWChanged: { x = 0; hold = true; }
+
+        Timer {
+            interval: mq.holdMs
+            repeat: false
+            running: mq.animating && mq.hold
+            onTriggered: mq.hold = false
+        }
+        Timer {
+            interval: mq.interval
+            repeat: true
+            running: mq.animating && !mq.hold
+            onTriggered: {
+                mq.x -= mq.step;
+                if (mq.x <= -(mq.textW + mq.gap)) {
+                    mq.x = 0;
+                    mq.hold = true;
+                }
+            }
         }
     }
     Timer { id: saveTimer; interval: 300; onTriggered: cfgFile.writeAdapter() }
@@ -117,7 +178,7 @@ Scope {
     readonly property color borderColor: Qt.alpha(Theme.accent, cfg.borderOpacity)
     function s(n) { return Math.round(n * cfg.scale * cfg.barScale); }
     readonly property var sz: ({
-        stat: s(12), clock: s(12), marquee: s(12),
+        stat: s(12), clock: s(12), mq: s(12),
         icon: s(16), batText: s(12), power: s(16), taskIcon: s(18)
     })
     readonly property int sizeIconGap: Math.round(12 * bs); readonly property int iconYOffset: 1
@@ -348,7 +409,7 @@ Scope {
     function modVisible(id) {
         if (!isOn(id)) return false;
         switch (id) {
-        case "media":   return Marquee.player !== null && Marquee.title !== "";
+        case "media":   return mq.player !== null && mq.title !== "";
         case "battery": return hasBattery;
         case "bt":      return hasBt;
         case "tray":    return cfg.trayArrow ? SystemTray.items.values.length > 0 : hasTray;
@@ -699,7 +760,7 @@ Scope {
     Process { id: runner }
     function run(cmd) { runner.command = ["sh", "-c", cmd]; runner.running = true; }
     function mediaAct(kind) {
-        const p = Marquee.player;
+        const p = mq.player;
         if (!p) return;
         if (kind === "toggle") p.togglePlaying();
         else if (kind === "next") p.next();
@@ -1090,10 +1151,10 @@ Scope {
         readonly property int glyphGap: 9
         // widest of both glyphs, so toggling play/pause never shifts the title
         readonly property real glyphW: Math.ceil(Math.max(gPlay.width, gPause.width))
-        readonly property real titleW: Math.min(Marquee.textW, Marquee.maxW)
+        readonly property real titleW: Math.min(mq.textW, mq.maxW)
         readonly property real totalW: glyphW + glyphGap + titleW
-        TextMetrics { id: gPlay;  text: "\uDB81\uDC0A"; font.family: Theme.iconFont; font.pixelSize: root.sz.marquee }
-        TextMetrics { id: gPause; text: "\uDB80\uDFE4"; font.family: Theme.iconFont; font.pixelSize: root.sz.marquee }
+        TextMetrics { id: gPlay;  text: "\uDB81\uDC0A"; font.family: Theme.iconFont; font.pixelSize: root.sz.mq }
+        TextMetrics { id: gPause; text: "\uDB80\uDFE4"; font.family: Theme.iconFont; font.pixelSize: root.sz.mq }
 
         // fixed icon
         Item {
@@ -1102,8 +1163,8 @@ Scope {
             Text {
                 anchors.centerIn: parent
                 anchors.verticalCenterOffset: root.vertical ? 0 : root.iconYOffset
-                text: Marquee.glyph; color: Theme.text; font.family: Theme.iconFont
-                font.pixelSize: root.sz.marquee
+                text: mq.glyph; color: Theme.text; font.family: Theme.iconFont
+                font.pixelSize: root.sz.mq
                 renderType: root.vertical ? Text.QtRendering : Text.NativeRendering
             }
         }
@@ -1111,19 +1172,19 @@ Scope {
         Item {
             x: strip.glyphW + strip.glyphGap; width: strip.titleW; height: parent.height; clip: true
             Row {
-                x: Marquee.animating ? Marquee.x : 0; spacing: Marquee.gap
+                x: mq.animating ? mq.x : 0; spacing: mq.gap
                 anchors.verticalCenter: parent.verticalCenter
                 anchors.verticalCenterOffset: root.vertical ? 0 : root.iconYOffset
                 Repeater {
-                    model: Marquee.animating ? 2 : 1
+                    model: mq.animating ? 2 : 1
                     delegate: Text {
                         required property int index
-                        text: Marquee.text; color: Theme.text; font.family: Theme.iconFont
-                        font.pixelSize: root.sz.marquee
+                        text: mq.text; color: Theme.text; font.family: Theme.iconFont
+                        font.pixelSize: root.sz.mq
                         renderType: root.vertical ? Text.QtRendering : Text.NativeRendering
-                        width: index === 0 ? (Marquee.animating ? Marquee.textW : strip.titleW)
+                        width: index === 0 ? (mq.animating ? mq.textW : strip.titleW)
                                            : implicitWidth
-                        elide: index === 0 && !Marquee.animating ? Text.ElideRight : Text.ElideNone
+                        elide: index === 0 && !mq.animating ? Text.ElideRight : Text.ElideNone
                     }
                 }
             }
@@ -1553,7 +1614,6 @@ Component {
         }
     }
 
-
 Component {
     id: trayC
     Lane {
@@ -1572,10 +1632,10 @@ Component {
     Component {
         id: mediaC
         Interactive {
-            readonly property bool playing: Marquee.player !== null && Marquee.player.isPlaying === true
+            readonly property bool playing: mq.player !== null && mq.player.isPlaying === true
             readonly property real len: strip.totalW
             implicitWidth: root.vertical ? root.panelThick : len + 20; implicitHeight: root.vertical ? len + 20 : 18
-            tip: Marquee.text; primaryHint: playing ? "Pause" : "Play"; secondaryHint: "Next track"
+            tip: mq.text; primaryHint: playing ? "Pause" : "Play"; secondaryHint: "Next track"
             tertiaryHint: "Previous track"; onPrimary: root.mediaAct("toggle"); onSecondary: root.mediaAct("next")
             onTertiary: root.mediaAct("prev")
             MarqueeStrip {

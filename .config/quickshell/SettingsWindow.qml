@@ -988,7 +988,11 @@ Scope {
                                             MouseArea {
                                                 anchors.fill: parent
                                                 cursorShape: Qt.PointingHandCursor
-                                                onClicked: root.selectedIndex = modelData.origIndex
+                                                onClicked: {
+                                                    root.selectedIndex = modelData.origIndex
+                                                    if (root.focusTarget !== "search")
+                                                        backdrop.forceActiveFocus()
+                                                }
                                             }
                                         }
                                     }
@@ -1062,7 +1066,13 @@ Scope {
                                     + ".qml"
 
                                 // quick fade for every freshly loaded page
-                                onLoaded: fadeIn.restart()
+                                onLoaded: {
+                                    fadeIn.restart()
+                                    // The previous page (and whichever slider had focus) was destroyed,
+                                    // so hand keyboard focus back to the backdrop or Esc/Tab stop working.
+                                    if (root.focusTarget !== "search")
+                                        backdrop.forceActiveFocus()
+                                }
 
                                 SequentialAnimation {
                                     id: fadeIn

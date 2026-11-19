@@ -160,6 +160,51 @@ Scope {
             } catch (e) {}
         }
     }
+    // ───────────────────────── Reminders (shared with the todo panel) ─────────────────────────
+    FileView {
+        path: root.home + "/.config/quickshell/state/todo-state.json"
+        printErrors: false
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: {
+            try {
+                const d = JSON.parse(text())
+                const arr = Array.isArray(d) ? d : (d.items || [])
+                root.reminders = arr
+                    .filter(e => typeof e.remindAt === "number" && e.remindAt > 0 && e.done !== true)
+                    .map(e => ({ ts: e.remindAt, text: String(e.heading || e.title || ""), notified: e.notified === true }))
+            } catch (err) { root.reminders = [] }
+        }
+    }
+    function remindersOnDay(dayTs) {
+        const s = new Date(dayTs)
+        const e = new Date(s.getFullYear(), s.getMonth(), s.getDate() + 1).getTime()
+        return reminders.filter(r => r.ts >= dayTs && r.ts < e).sort((a, b) => a.ts - b.ts)
+    }
+    // "14:30" "9" "2pm" "2:30 pm" -> { h, m } or null
+    function parseClock(s) {
+        const m = s.trim().toLowerCase().match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/)
+        if (!m) return null
+        let h = parseInt(m[1])
+        const mi = m[2] !== undefined ? parseInt(m[2]) : 0
+        if (mi > 59) return null
+        if (m[3]) {
+            if (h < 1 || h > 12) return null
+            h = (h % 12) + (m[3] === "pm" ? 12 : 0)
+        } else if (h > 23) return null
+        return { h: h, m: mi }
+    }
+    // returns false when the time is invalid or already in the past
+    function addReminder(dayTs, clockStr, text) {
+        const c = parseClock(clockStr)
+        if (!c) return false
+        const d = new Date(dayTs)
+        d.setHours(c.h, c.m, 0, 0)
+        if (d.getTime() <= Date.now()) return false
+        Quickshell.execDetached(["qs", "ipc", "call", "todo", "remind", text, String(d.getTime())])
+        return true
+    }
+
     // bar thickness + outer margin = distance from the screen edge to the bar's inner edge
     readonly property int barEdge: {
         const v = barPos === "left" || barPos === "right"
@@ -202,6 +247,8 @@ Scope {
     // ───────────────────────── Lifecycle ─────────────────────────
     property bool panelOpen: false
     property int calMonthOffset: 0
+    property real selTs: -1          // local-midnight epoch ms of the selected day, -1 = none
+    property var reminders: []       // pending reminders read from the todo state file
 
     // window is needed while the panel is open or toasts are showing
     readonly property bool wanted: panelOpen || (toasts && server.trackedNotifications.values.length > 0)
@@ -217,6 +264,7 @@ Scope {
     function openPanel() {
         if (!anchorSet) pickScreen()
         calMonthOffset = 0
+        selTs = -1
         refreshStates()
         panelOpen = true
     }
@@ -1453,9 +1501,16 @@ Scope {
                                         const first = (view.getDay() - firstDay + 7) % 7
                                         const y = view.getFullYear(), m = view.getMonth()
                                         const ty = now.getFullYear(), tm = now.getMonth(), td = now.getDate()
+                                        const marks = {}
+                                        root.reminders.forEach(r => {
+                                            const rd = new Date(r.ts)
+                                            marks[new Date(rd.getFullYear(), rd.getMonth(), rd.getDate()).getTime()] = true
+                                        })
                                         return Array.from({ length: 42 }, (_, i) => {
                                             const d = new Date(y, m, i - first + 1)
                                             return {
+                                                ts: d.getTime(),
+                                                hasRem: marks[d.getTime()] === true,
                                                 n: d.getDate(),
                                                 inMonth: d.getMonth() === m,
                                                 today: d.getFullYear() === ty && d.getMonth() === tm && d.getDate() === td
@@ -1568,6 +1623,16 @@ Scope {
                                                     border.width: 1
                                                     border.color: root.cAccent
                                                 }
+                                                // selected day
+                                                Rectangle {
+                                                    visible: root.selTs === dayCell.modelData.ts
+                                                    anchors.fill: parent
+                                                    anchors.margins: 2
+                                                    radius: Theme.radius
+                                                    color: "transparent"
+                                                    border.width: 1
+                                                    border.color: Theme.alpha(Theme.text, 0.5)
+                                                }
                                                 Lbl {
                                                     anchors.centerIn: parent
                                                     sz: 12
@@ -1575,9 +1640,128 @@ Scope {
                                                     color: dayCell.modelData.inMonth ? Theme.text : Theme.textFaint
                                                     text: dayCell.modelData.n
                                                 }
+                                                // reminder dot
+                                                Rectangle {
+                                                    visible: dayCell.modelData.hasRem
+                                                    width: root.px(4)
+                                                    height: width
+                                                    radius: width / 2
+                                                    color: root.cAccent
+                                                    anchors.horizontalCenter: parent.horizontalCenter
+                                                    anchors.bottom: parent.bottom
+                                                    anchors.bottomMargin: root.px(3)
+                                                }
+                                                MouseArea {
+                                                    anchors.fill: parent
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: {
+                                                        root.selTs = (root.selTs === dayCell.modelData.ts) ? -1 : dayCell.modelData.ts
+                                                        if (root.selTs >= 0) Qt.callLater(function () { textIn.forceActiveFocus() })
+                                                    }
+                                                }
                                             }
                                         }
                                     }
+                                    // ---- reminders for the selected day ----
+                                    Column {
+                                        id: remBox
+                                        visible: root.selTs >= 0
+                                        width: parent.width
+                                        spacing: root.px(6)
+
+                                        function submit() {
+                                            if (root.addReminder(root.selTs, timeIn.text, textIn.text)) {
+                                                textIn.text = ""
+                                            } else {
+                                                timeBox.bad = true
+                                            }
+                                        }
+
+                                        Lbl {
+                                            width: parent.width
+                                            sz: 11
+                                            font.bold: true
+                                            text: root.selTs >= 0 ? Qt.formatDate(new Date(root.selTs), "dddd, d MMMM") : ""
+                                        }
+
+                                        Repeater {
+                                            model: root.selTs >= 0 ? root.remindersOnDay(root.selTs) : []
+                                            delegate: Lbl {
+                                                required property var modelData
+                                                width: remBox.width
+                                                sz: 10
+                                                color: modelData.notified ? Theme.textDim : root.cAccent
+                                                text: Qt.formatTime(new Date(modelData.ts), "HH:mm") + "   " + modelData.text.split("\n")[0]
+                                            }
+                                        }
+
+                                        Row {
+                                            width: parent.width
+                                            spacing: root.px(6)
+
+                                            Rectangle {
+                                                id: timeBox
+                                                property bool bad: false
+                                                width: root.px(70)
+                                                height: root.px(28)
+                                                radius: root.px(8)
+                                                color: Theme.alpha(Theme.text, 0.08)
+                                                border.width: (timeIn.activeFocus || bad) ? 1 : 0
+                                                border.color: bad ? Theme.danger : root.cAccent
+
+                                                TextInput {
+                                                    id: timeIn
+                                                    anchors.fill: parent
+                                                    anchors.leftMargin: root.px(8)
+                                                    anchors.rightMargin: root.px(8)
+                                                    verticalAlignment: TextInput.AlignVCenter
+                                                    font.pixelSize: root.fs(11)
+                                                    color: Theme.text
+                                                    selectionColor: root.cAccent
+                                                    selectedTextColor: Theme.bg
+                                                    clip: true
+                                                    text: "09:00"
+                                                    onTextChanged: timeBox.bad = false
+                                                    Keys.onReturnPressed: textIn.forceActiveFocus()
+                                                    Keys.onEnterPressed: textIn.forceActiveFocus()
+                                                }
+                                            }
+
+                                            Rectangle {
+                                                width: parent.width - timeBox.width - parent.spacing
+                                                height: root.px(28)
+                                                radius: root.px(8)
+                                                color: Theme.alpha(Theme.text, 0.08)
+                                                border.width: textIn.activeFocus ? 1 : 0
+                                                border.color: root.cAccent
+
+                                                TextInput {
+                                                    id: textIn
+                                                    anchors.fill: parent
+                                                    anchors.leftMargin: root.px(8)
+                                                    anchors.rightMargin: root.px(8)
+                                                    verticalAlignment: TextInput.AlignVCenter
+                                                    font.pixelSize: root.fs(11)
+                                                    color: Theme.text
+                                                    selectionColor: root.cAccent
+                                                    selectedTextColor: Theme.bg
+                                                    clip: true
+                                                    Keys.onReturnPressed: remBox.submit()
+                                                    Keys.onEnterPressed: remBox.submit()
+
+                                                    Text {
+                                                        visible: textIn.text === "" && !textIn.inputMethodComposing
+                                                        anchors.verticalCenter: parent.verticalCenter
+                                                        text: "Remind me to… (Enter)"
+                                                        font.pixelSize: root.fs(11)
+                                                        color: Theme.textDim
+                                                        opacity: 0.7
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
                                     // wheel over the calendar = change month
                                     WheelHandler {
                                         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad

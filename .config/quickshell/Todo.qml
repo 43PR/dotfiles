@@ -202,6 +202,24 @@ Scope {
         return true
     }
 
+    // add a note that already has a reminder (called from the side panel's calendar)
+    function addReminderNote(t, ts) {
+        t = t.trim()
+        if (t === "") t = "Reminder"
+        if (!(ts > 0) || todos.count >= root.maxItems) return false
+        todos.insert(0, {
+            heading: "",
+            title: t,
+            done: false,
+            remindAt: ts,
+            notified: false,
+            collapsed: false
+        })
+        saveTimer.restart()
+        root.checkReminders()
+        return true
+    }
+
     // body text
     function editTodo(i, t) {
         if (i < 0 || i >= todos.count) return
@@ -237,6 +255,102 @@ Scope {
         if (from === to || from < 0 || to < 0 || from >= todos.count || to >= todos.count) return
         todos.move(from, to, 1)
         saveTimer.restart()
+    }
+
+    // ---- timer / stopwatch -------------------------------------------------
+    // State lives here (not in the window), so it keeps running while the panel is closed.
+    property string tMode: "timer"        // "timer" | "stopwatch"
+    property bool tRunning: false
+    property real tDur: 300000            // timer length (ms), default 5 min
+    property real tLeft: 300000           // timer: remaining while idle / paused
+    property real tEndAt: 0               // timer: epoch ms when it ends
+    property real tAccum: 0               // stopwatch: elapsed ms while paused
+    property real tStartAt: 0             // stopwatch: epoch ms of the last start
+    property real tNow: 0                 // updated by the ticker while running
+
+    // value shown on the display (ms)
+    readonly property real tShown: tMode === "timer"
+        ? (tRunning ? Math.max(0, tEndAt - tNow) : tLeft)
+        : tAccum + (tRunning ? tNow - tStartAt : 0)
+
+    function fmtDur(ms, roundUp) {
+        var t = Math.max(0, roundUp ? Math.ceil(ms / 1000) : Math.floor(ms / 1000))
+        var h = Math.floor(t / 3600)
+        var m = Math.floor((t % 3600) / 60)
+        var s = t % 60
+        var p = function (n) { return (n < 10 ? "0" : "") + n }
+        return h > 0 ? h + ":" + p(m) + ":" + p(s) : p(m) + ":" + p(s)
+    }
+
+    // "5" (min) "25m" "90s" "1h" "1:30" (mm:ss) "1:02:03" -> ms, or 0 if invalid
+    function parseDur(s) {
+        s = s.trim().toLowerCase()
+        var m = s.match(/^(\d+)\s*(s|sec|m|min|h|hr)?$/)
+        if (m) {
+            var u = m[2] || "m"
+            var f = u.charAt(0) === "s" ? 1000 : (u.charAt(0) === "h" ? 3600000 : 60000)
+            return parseInt(m[1]) * f
+        }
+        m = s.match(/^(\d+):(\d{1,2})(?::(\d{1,2}))?$/)
+        if (m) {
+            if (m[3] !== undefined)
+                return ((parseInt(m[1]) * 60 + parseInt(m[2])) * 60 + parseInt(m[3])) * 1000
+            return (parseInt(m[1]) * 60 + parseInt(m[2])) * 1000
+        }
+        return 0
+    }
+
+    function tSetDur(ms) {
+        root.tDur = Math.max(1000, Math.min(99 * 3600000, ms))
+        if (!root.tRunning) root.tLeft = root.tDur
+    }
+
+    function tStart() {
+        var n = Date.now()
+        root.tNow = n
+        if (root.tMode === "timer") {
+            if (root.tLeft <= 0) root.tLeft = root.tDur
+            root.tEndAt = n + root.tLeft
+        } else {
+            root.tStartAt = n
+        }
+        root.tRunning = true
+    }
+
+    function tPause() {
+        var n = Date.now()
+        if (root.tMode === "timer") root.tLeft = Math.max(0, root.tEndAt - n)
+        else root.tAccum += n - root.tStartAt
+        root.tRunning = false
+    }
+
+    function tToggle() { if (root.tRunning) root.tPause(); else root.tStart() }
+
+    function tReset() {
+        root.tRunning = false
+        root.tAccum = 0
+        root.tLeft = root.tDur
+    }
+
+    function tSetMode(m) {
+        if (m === root.tMode) return
+        root.tReset()
+        root.tMode = m
+    }
+
+    Timer {
+        id: clockTicker
+        interval: 200
+        repeat: true
+        running: root.tRunning
+        onTriggered: {
+            root.tNow = Date.now()
+            if (root.tMode === "timer" && root.tNow >= root.tEndAt) {
+                root.tRunning = false
+                root.tLeft = root.tDur
+                root.notify("Timer finished")
+            }
+        }
     }
 
     // ---- reminders ---------------------------------------------------------
@@ -432,6 +546,8 @@ Scope {
     IpcHandler {
         target: "todo"
         function toggle(): void { root.toggleMenu() }
+        // epoch ms is passed as a string because IPC ints are 32-bit
+        function remind(text: string, whenMs: string): void { root.addReminderNote(text, parseFloat(whenMs)) }
         function show(): void { root.openMenu() }
         function hide(): void { root.closeMenu() }
     }
@@ -536,7 +652,7 @@ Scope {
                     visible: opacity > 0
 
                     // Height of the input box plus the gap below it.
-                    readonly property real chromeH: inputBox.height + panelCol.spacing
+                    readonly property real chromeH: inputBox.height + panelCol.spacing + timerBox.height + panelCol.spacing
                     // Where the panel's top / left edge will be once margin animations settle.
                     readonly property real targetTop: root.topGap + root.offsetY
                     readonly property real targetX: root.winW - (root.sideGap - root.offsetX) - root.cardWidth
@@ -591,7 +707,7 @@ Scope {
                             radius: root.px(12)
                             color: Theme.bg
                             border.width: input.activeFocus ? 1 : 0
-                            border.color: Theme.accent
+                            border.color: Theme.text
                             Behavior on color { ColorAnimation { duration: 120 } }
 
                             // click anywhere in the box (not just on the text) to focus the input
@@ -615,7 +731,7 @@ Scope {
                                 font.pixelSize: root.fpx(12)
                                 color: Theme.text
                                 selectionColor: Theme.accent
-                                selectedTextColor: Theme.bg
+                                selectedTextColor: Theme.text
                                 wrapMode: TextEdit.Wrap
                                 selectByMouse: true
                                 textFormat: TextEdit.PlainText
@@ -644,6 +760,109 @@ Scope {
                                     color: Theme.textDim
                                     opacity: 0.7
                                 }
+                            }
+                        }
+
+                        // ---- timer / stopwatch (same height as the input box) ----
+                        Rectangle {
+                            id: timerBox
+                            width: parent.width
+                            height: root.rowHeight
+                            radius: root.px(12)
+                            color: Theme.bg
+                            border.width: tIn.activeFocus ? 1 : 0
+                            border.color: Theme.accent
+
+                            ChipBtn {
+                                id: modeBtn
+                                ui: root.ui
+                                tx: root.tx
+                                anchors.left: parent.left
+                                anchors.leftMargin: root.px(12)
+                                anchors.verticalCenter: parent.verticalCenter
+                                label: root.tMode === "timer" ? "Timer" : "Stopwatch"
+                                onClicked: root.tSetMode(root.tMode === "timer" ? "stopwatch" : "timer")
+                            }
+
+                            Row {
+                                id: tBtns
+                                anchors.right: parent.right
+                                anchors.rightMargin: root.px(12)
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: root.px(6)
+
+                                ChipBtn {
+                                    ui: root.ui
+                                    tx: root.tx
+                                    visible: root.tRunning || root.tAccum > 0 || root.tLeft !== root.tDur
+                                    label: "Reset"
+                                    onClicked: root.tReset()
+                                }
+                                ChipBtn {
+                                    ui: root.ui
+                                    tx: root.tx
+                                    label: root.tRunning ? "Pause" : "Start"
+                                    onClicked: {
+                                        tIn.apply()        // take any typed duration first
+                                        root.tToggle()
+                                    }
+                                }
+                            }
+
+                            TextInput {
+                                id: tIn
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: Math.max(root.px(110), implicitWidth + root.px(20))
+                                horizontalAlignment: TextInput.AlignHCenter
+                                font.family: "JetBrainsMono Nerd Font"
+                                font.pixelSize: root.fpx(17)
+                                font.bold: true
+                                color: Theme.text
+                                opacity: 0.8
+                                selectionColor: Theme.accent
+                                selectedTextColor: Theme.bg
+                                selectByMouse: false
+                                clip: true
+                                // only the idle timer is editable
+                                readOnly: root.tRunning || root.tMode !== "timer"
+
+                                readonly property string shown: root.fmtDur(root.tShown, root.tMode === "timer")
+
+                                Component.onCompleted: text = shown
+                                onShownChanged: if (!activeFocus || readOnly) text = shown
+                                onReadOnlyChanged: text = shown
+
+                                function apply() {
+                                    if (readOnly) return
+                                    var ms = root.parseDur(text)
+                                    if (ms > 0) root.tSetDur(ms)
+                                    text = shown
+                                }
+
+                                onActiveFocusChanged: {
+                                    if (activeFocus) { if (!readOnly) selectAll() }
+                                    else apply()
+                                }
+
+                                Keys.onPressed: function (e) {
+                                    if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter) {
+                                        e.accepted = true
+                                        apply()
+                                        if (!root.tRunning) root.tStart()
+                                        input.forceActiveFocus()
+                                    } else if (e.key === Qt.Key_Escape) {
+                                        e.accepted = true
+                                        root.closeMenu()
+                                    }
+                                }
+                            }
+
+                            // click the time to edit it (selects everything so you can just type)
+                            MouseArea {
+                                anchors.fill: tIn
+                                cursorShape: tIn.readOnly ? Qt.ArrowCursor : Qt.IBeamCursor
+                                onClicked: if (!tIn.readOnly) { tIn.forceActiveFocus(); tIn.selectAll() }
                             }
                         }
 
@@ -1166,8 +1385,9 @@ Scope {
                                             spacing: root.px(6)
 
                                             Text {
+                                                font.family: "JetBrainsMono Nerd Font"
                                                 visible: entry.remindAt > 0
-                                                text: "⏰ " + root.formatWhen(entry.remindAt)
+                                                text: "\uf017  " + root.formatWhen(entry.remindAt)
                                                       + (entry.notified ? "  ·  sent" : "")
                                                 font.pixelSize: root.fpx(10)
                                                 color: entry.notified ? Theme.textDim : Theme.accent
