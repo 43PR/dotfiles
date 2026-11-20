@@ -44,6 +44,9 @@ QtObject {
     property real bgImageBlur: 0.0            // 0..1, 0 = sharp (blur pass is skipped entirely)
     property real bgImageFadeTop: 1.0         // 0..1, picture opacity at the top edge
     property real bgImageFadeBottom: 0.0      // 0..1, picture opacity at the bottom edge
+    property real bgImageZoom: 1.0            // 0.5..3, 1 = fills the panel
+    property real bgImagePosX: 0.0            // -1..1, shift as a fraction of panel width
+    property real bgImagePosY: 0.0            // -1..1, shift as a fraction of panel height
 
     // file:// URL for the Image element ("" when no usable path is set).
     readonly property string bgImageSource: {
@@ -85,7 +88,8 @@ QtObject {
         "tiltStrength", "settingsScale", "bgAlpha", "radius", "hideSettingsIcons",
         "borderOpacity", "hyprBorderStyle",
         "bgImageEnabled", "bgImagePath", "bgImageOpacity", "bgImageBlur",
-        "bgImageFadeTop", "bgImageFadeBottom"
+        "bgImageFadeTop", "bgImageFadeBottom",
+        "bgImageZoom", "bgImagePosX", "bgImagePosY"
     ]
 
     function setHub(key, value) {
@@ -108,6 +112,9 @@ QtObject {
         bgImageBlur = 0.0
         bgImageFadeTop = 1.0
         bgImageFadeBottom = 0.0
+        bgImageZoom = 1.0
+        bgImagePosX = 0.0
+        bgImagePosY = 0.0
         hubSaveTimer.restart()
     }
 
@@ -125,7 +132,10 @@ QtObject {
             bgImageOpacity: bgImageOpacity,
             bgImageBlur: bgImageBlur,
             bgImageFadeTop: bgImageFadeTop,
-            bgImageFadeBottom: bgImageFadeBottom
+            bgImageFadeBottom: bgImageFadeBottom,
+            bgImageZoom: bgImageZoom,
+            bgImagePosX: bgImagePosX,
+            bgImagePosY: bgImagePosY
         }, null, 2))
     }
 
@@ -166,6 +176,9 @@ QtObject {
                 if (typeof s.bgImageBlur === "number") root.bgImageBlur = clamp01(s.bgImageBlur)
                 if (typeof s.bgImageFadeTop === "number") root.bgImageFadeTop = clamp01(s.bgImageFadeTop)
                 if (typeof s.bgImageFadeBottom === "number") root.bgImageFadeBottom = clamp01(s.bgImageFadeBottom)
+                if (typeof s.bgImageZoom === "number") root.bgImageZoom = Math.max(0.5, Math.min(3, s.bgImageZoom))
+                if (typeof s.bgImagePosX === "number") root.bgImagePosX = Math.max(-1, Math.min(1, s.bgImagePosX))
+                if (typeof s.bgImagePosY === "number") root.bgImagePosY = Math.max(-1, Math.min(1, s.bgImagePosY))
             } catch (e) {
                 console.warn("Theme.qml: malformed hub.json: " + e)
             }
@@ -204,6 +217,13 @@ QtObject {
         }
         function setBgImageEnabled(on: bool): void {
             root.setHub("bgImageEnabled", on)
+        }
+        function setBgImageZoom(value: real): void {
+            root.setHub("bgImageZoom", Math.max(0.5, Math.min(3, value)))
+        }
+        function setBgImagePos(x: real, y: real): void {
+            root.setHub("bgImagePosX", Math.max(-1, Math.min(1, x)))
+            root.setHub("bgImagePosY", Math.max(-1, Math.min(1, y)))
         }
         function reloadHub(): void {
             hubFile.reload()

@@ -53,7 +53,8 @@ Scope {
         flyoutBgOpacity: { min: 0,   max: 100,   def: Math.max(10, Math.round((Theme.bg.a ?? 1) * 20) * 5),     step: 5, unit: "%" },
         artOpacity:    { min: 0,   max: 100,   def: Math.max(20, Math.round((Theme.bgAlpha ?? 1) * 20) * 5), step: 5, unit: "%" },
         barOpacity:    { min: 0,   max: 100,   def: 90,   step: 5,   unit: "%" },
-        barDimOpacity: { min: 0,   max: 100,   def: 30,   step: 5,   unit: "%" }
+        barDimOpacity: { min: 0,   max: 100,   def: 30,   step: 5,   unit: "%" },
+        mediaTextSize: { min: 8,   max: 28,    def: 13,   step: 1,   unit: "px" }
     })
     readonly property var numKeys: Object.keys(numSpec)
 
@@ -62,7 +63,7 @@ Scope {
         flyoutIcon: true, flyoutPercent: true, flyoutAccent: false, flyoutBorder: false,
         showTips: true, showTitle: true, showArtist: true, showBar: true, showVisualizer: true,
         trackChangeOsd: true, showArt: true, showControls: true, musicOnly: true, artistBelow: false,
-        portrait: true, showBorder: false, accentBars: false
+        portrait: true, showBorder: false, accentBars: false, controlsBorder: false
     })
     readonly property var boolKeys: Object.keys(boolDefaults)
     readonly property var posKeys: ["offsetX", "offsetY", "volOffsetX", "volOffsetY", "brightOffsetX", "brightOffsetY"]
@@ -110,6 +111,8 @@ Scope {
     property bool musicOnly: boolDefaults.musicOnly; property bool artistBelow: boolDefaults.artistBelow
     property bool portrait: boolDefaults.portrait; property bool showBorder: boolDefaults.showBorder
     property bool accentBars: boolDefaults.accentBars
+    property bool controlsBorder: boolDefaults.controlsBorder
+    property int mediaTextSize: numSpec.mediaTextSize.def
 
     readonly property real scaleFactor: scaleOf(curKind)
     readonly property color cardColor: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, bgOpacity / 100)
@@ -998,7 +1001,7 @@ Scope {
                                     ? (topBlock.artSize > 0 ? topBlock.artSize + 8 : 0)
                                     : (topBlock.height - height) / 2
                                 width: topBlock.width - x
-                                spacing: 2
+                                spacing: sameLine ? 2 : 6
 
                                 Item {
                                     visible: root.showTitle
@@ -1011,7 +1014,7 @@ Scope {
                                         text: root.title || "Nothing playing"
                                         horizontalAlignment: root.portrait ? Text.AlignHCenter : Text.AlignLeft
                                         elide: Text.ElideRight
-                                        font.pixelSize: 13
+                                        font.pixelSize: root.mediaTextSize
                                         font.bold: true
                                         color: Theme.text
                                     }
@@ -1022,7 +1025,7 @@ Scope {
                                         text: root.artist || "No artist"
                                         horizontalAlignment: Text.AlignRight
                                         elide: Text.ElideLeft
-                                        font.pixelSize: 11
+                                        font.pixelSize: Math.max(6, root.mediaTextSize - 2)
                                         color: Theme.text
                                         opacity: 0.65
                                     }
@@ -1034,7 +1037,7 @@ Scope {
                                     text: root.artist || "No artist"
                                     horizontalAlignment: root.portrait ? Text.AlignHCenter : Text.AlignLeft
                                     elide: Text.ElideRight
-                                    font.pixelSize: 11
+                                    font.pixelSize: Math.max(6, root.mediaTextSize - 2)
                                     color: Theme.text
                                     opacity: 0.65
                                 }
@@ -1098,11 +1101,13 @@ Scope {
                         Item {
                             visible: root.showControls
                             width: parent.width
-                            height: 26
+                            height: root.controlsBorder ? 44 : 26
 
                             Row {
-                                anchors.centerIn: parent
-                                spacing: 28
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.verticalCenterOffset: root.controlsBorder ? 5 : 0
+                                spacing: root.controlsBorder ? 30 : 28
 
                                 GlyphButton {
                                     text: "\udb81\udcae"
@@ -1388,7 +1393,6 @@ Scope {
                                 id: contentCol
                                 x: 20 * settingsWin.u
                                 width: flick.width - 48 * settingsWin.u
-
                                 CustomizationSettings.SectionHeader { host: root; text: "Show OSDs" }
                                 Grid {
                                     width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
@@ -1396,14 +1400,12 @@ Scope {
                                     CustomizationSettings.ToggleRow { host: root; key: "mediaOsd"; label: "Media" }
                                     CustomizationSettings.ToggleRow { host: root; key: "brightOsd"; label: "Brightness" }
                                 }
-
                                 CustomizationSettings.SectionHeader { host: root; text: "Global" }
                                 Grid {
                                     width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
                                     CustomizationSettings.ToggleRow { host: root; key: "showTips"; label: "Tooltips" }
                                     CustomizationSettings.SliderRow { host: root; key: "fadeMs"; label: "Animation" }
                                 }
-
                                 // Volume and brightness are the same kind of card, so they share these settings.
                                 CustomizationSettings.SectionHeader { host: root; text: "Volume & brightness" }
                                 Grid {
@@ -1423,7 +1425,6 @@ Scope {
                                     CustomizationSettings.ToggleRow { host: root; key: "flyoutAccent"; label: "Accent colour"; enabled: root.volOsd || root.brightOsd }
                                     CustomizationSettings.ToggleRow { host: root; key: "flyoutBorder"; label: "Border"; enabled: root.volOsd || root.brightOsd }
                                 }
-
                                 CustomizationSettings.SectionHeader { host: root; text: "Media" }
                                 Grid {
                                     width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
@@ -1432,7 +1433,6 @@ Scope {
                                     CustomizationSettings.ToggleRow { host: root; key: "musicOnly"; label: "Music only" }
                                     CustomizationSettings.ToggleRow { host: root; key: "trackChangeOsd"; label: "On track change" }
                                 }
-
                                 CustomizationSettings.SectionHeader { host: root; text: "Media content" }
                                 Grid {
                                     width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
@@ -1440,10 +1440,11 @@ Scope {
                                     CustomizationSettings.ToggleRow { host: root; key: "showTitle"; label: "Title" }
                                     CustomizationSettings.ToggleRow { host: root; key: "showArtist"; label: "Artist" }
                                     CustomizationSettings.ToggleRow { host: root; key: "showControls"; label: "Controls" }
+                                    CustomizationSettings.ToggleRow { host: root; key: "controlsBorder"; label: "Controls border"; enabled: root.showControls }
                                     CustomizationSettings.ToggleRow { host: root; key: "showBar"; label: "Visualizer & bar" }
                                     CustomizationSettings.ToggleRow { host: root; key: "showVisualizer"; label: "Visualizer"; enabled: root.showBar }
+                                    CustomizationSettings.SliderRow { host: root; key: "mediaTextSize"; label: "Text size"; enabled: root.showTitle || root.showArtist }
                                 }
-
                                 CustomizationSettings.SectionHeader { host: root; text: "Media layout" }
                                 Grid {
                                     width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
@@ -1460,7 +1461,14 @@ Scope {
                                     CustomizationSettings.SliderRow { host: root; key: "artSize"; label: "Art size"; enabled: root.showArt && !root.portrait }
                                     CustomizationSettings.SliderRow { host: root; key: "cardRadius"; label: "Corner radius" }
                                 }
-
+                                CustomizationSettings.SectionHeader { host: root; text: "Media opacity" }
+                                Grid {
+                                    width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                                    CustomizationSettings.SliderRow { host: root; key: "bgOpacity"; label: "Background"; enabled: root.mediaOsd }
+                                    CustomizationSettings.SliderRow { host: root; key: "artOpacity"; label: "Album art"; enabled: root.showArt }
+                                    CustomizationSettings.SliderRow { host: root; key: "barOpacity"; label: "Bars played"; enabled: root.showBar }
+                                    CustomizationSettings.SliderRow { host: root; key: "barDimOpacity"; label: "Bars remaining"; enabled: root.showBar }
+                                }
                                 CustomizationSettings.SectionHeader { host: root; text: "Media visualizer" }
                                 Grid {
                                     width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
@@ -1472,16 +1480,6 @@ Scope {
                                     CustomizationSettings.SliderRow { host: root; key: "barSensitivity"; label: "Sensitivity"; enabled: root.showBar && root.showVisualizer }
                                     CustomizationSettings.ToggleRow { host: root; key: "accentBars"; label: "Accent colour"; enabled: root.showBar }
                                 }
-
-                                CustomizationSettings.SectionHeader { host: root; text: "Media opacity" }
-                                Grid {
-                                    width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                                    CustomizationSettings.SliderRow { host: root; key: "bgOpacity"; label: "Background"; enabled: root.mediaOsd }
-                                    CustomizationSettings.SliderRow { host: root; key: "artOpacity"; label: "Album art"; enabled: root.showArt }
-                                    CustomizationSettings.SliderRow { host: root; key: "barOpacity"; label: "Bars played"; enabled: root.showBar }
-                                    CustomizationSettings.SliderRow { host: root; key: "barDimOpacity"; label: "Bars remaining"; enabled: root.showBar }
-                                }
-
                                 CustomizationSettings.SectionHeader { host: root; text: "Position" }
                                 Flow {
                                     width: parent.width
@@ -1657,18 +1655,40 @@ Scope {
             onClicked: fb.clicked()
         }
     }
-
     component GlyphButton: Text {
         id: gb
         readonly property bool hovered: gbArea.containsMouse
+        property real ringSize: 32          // same circle for every button
         signal clicked()
         font.family: "Symbols Nerd Font"
         color: Theme.text
         opacity: hovered ? 1 : 0.8
+        horizontalAlignment: Text.AlignHCenter
+        verticalAlignment: Text.AlignVCenter
+        // With the border on, the button is exactly the circle, so the whole circle is clickable
+        // and the glyph is centred inside it. With it off, the size is unchanged from before.
+        width: root.controlsBorder ? ringSize : implicitWidth
+        height: root.controlsBorder ? ringSize : implicitHeight
         Behavior on opacity { NumberAnimation { duration: 120 } }
-        MouseArea { id: gbArea; anchors.fill: parent; hoverEnabled: true; onClicked: gb.clicked() }
-    }
+        Rectangle {
+            visible: root.controlsBorder
+            anchors.centerIn: parent
+            width: gb.ringSize
+            height: gb.ringSize
+            radius: width / 2
+            color: "transparent"
+            border.width: 1
+            border.color: gb.color
+        }
 
+        MouseArea {
+            id: gbArea
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: gb.clicked()
+        }
+    }
     // Fill a card with this to make the whole card draggable.
     component DragArea: MouseArea {
         id: da

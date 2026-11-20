@@ -100,7 +100,9 @@ Scope {
         id: mq
         readonly property var player: {
             const ps = Mpris.players.values;
-            return ps.find(p => p.isPlaying) ?? ps[0] ?? null;
+            return ps.find(p => p.isPlaying)
+                ?? ps.find(p => (p.trackTitle ?? "") !== "")
+                ?? ps[0] ?? null;
         }
         readonly property bool playing: player !== null && player.isPlaying
         readonly property string title: player
@@ -413,6 +415,7 @@ Scope {
         case "battery": return hasBattery;
         case "bt":      return hasBt;
         case "tray":    return cfg.trayArrow ? SystemTray.items.values.length > 0 : hasTray;
+        case "tasks":   return ToplevelManager.toplevels.values.length > 0;
         default:        return true;
         }
     }
@@ -762,9 +765,13 @@ Scope {
     function mediaAct(kind) {
         const p = mq.player;
         if (!p) return;
-        if (kind === "toggle") p.togglePlaying();
-        else if (kind === "next") p.next();
-        else p.previous();
+        if (kind === "toggle") {
+            if (p.canTogglePlaying) p.togglePlaying();
+            else if (p.isPlaying && p.canPause) p.pause();
+            else if (p.canPlay) p.play();
+        }
+        else if (kind === "next") { if (p.canGoNext) p.next(); }
+        else { if (p.canGoPrevious) p.previous(); }
     }
     readonly property string wsHints: "Scroll: Previous / next workspace"
     readonly property bool wsMinimal: cfg.wsStyle === "minimal"
@@ -1034,6 +1041,7 @@ Scope {
         readonly property string shownLabel: useIcon ? icon : label
         readonly property string shownValue: valueText + (cfg.statsPercent ? unit : "")
         readonly property color fg: IconTune.color(mid, warning ? "warning" : "normal")
+        readonly property var tn: IconTune.resolve(mid, root.vertical)
         readonly property int maxCross: Math.max(8, root.panelThick - (cfg.border ? 2 : 0))
         readonly property int crossPad: root.vertical ? 8 : 6
         readonly property int wantedPx: Math.max(4, Math.round(10 * cfg.statsScale * cfg.scale * cfg.barScale))
@@ -1042,10 +1050,8 @@ Scope {
         readonly property real contentCross: root.vertical
             ? Math.max(mLabel.width, mValue.width)
             : Math.max(mLabel.height, mValue.height)
-        readonly property int fontPx: contentCross + crossPad > maxCross
-            ? Math.max(4, Math.floor(wantedPx * (maxCross - crossPad) / contentCross))
-            : wantedPx
-        readonly property int ringPx: Math.max(10, Math.min(maxCross - 2, Math.round(wantedPx * 2.3)))
+        readonly property int fontPx: wantedPx
+        readonly property int ringPx: Math.max(10, Math.round(wantedPx * 2.3))
         secondaryHint: "Open system settings"
         onSecondary: root.run("qs ipc call settings system")
         TextMetrics {
@@ -1062,12 +1068,8 @@ Scope {
         interactive: false
         Rectangle {
             id: badge; anchors.centerIn: parent
-            width: root.vertical
-                   ? Math.min(stat.maxCross, statRow.implicitWidth + 8)
-                   : statRow.implicitWidth + 12
-            height: root.vertical
-                    ? statRow.implicitHeight + 8
-                    : Math.min(stat.maxCross, statRow.implicitHeight + 4)
+            width: root.vertical ? statRow.implicitWidth + 8 : statRow.implicitWidth + 12
+            height: root.vertical ? statRow.implicitHeight + 8 : statRow.implicitHeight + 4
             clip: true; radius: Math.min(cfg.statsRadius, Math.min(width, height) / 2); color: "transparent"
             border.width: cfg.statsBorder ? 1 : 0; border.color: Qt.alpha(stat.fg, 0.18)
             GridLayout {
@@ -1078,17 +1080,20 @@ Scope {
                     mid: stat.mid; visible: stat.ring; Layout.alignment: Qt.AlignCenter; size: stat.ringPx
                     strokeRatio: 0.08; minStroke: 1.2; level: stat.level; glyph: stat.icon; glyphFont: stat.iconFont
                     fg: stat.fg; warning: stat.warning
+                    transform: Translate { y: stat.tn.iconY }
                 }
                 Text {
                     visible: !stat.ring; Layout.alignment: Qt.AlignCenter; text: stat.shownLabel
                     color: Qt.alpha(stat.fg, 0.75); font.family: stat.useIcon ? stat.iconFont : Theme.iconFont
                     font.pixelSize: stat.useIcon ? stat.fontPx + 2 : Math.max(4, stat.fontPx - 1)
+                    transform: Translate { y: stat.useIcon ? stat.tn.iconY : stat.tn.y + stat.tn.textY }
                     renderType: Text.NativeRendering
                 }
                 Text {
                     visible: cfg.statsNumbers; Layout.alignment: Qt.AlignCenter; text: stat.shownValue; color: stat.fg
                     font.family: Theme.iconFont; font.bold: true; font.pixelSize: stat.fontPx
                     renderType: Text.NativeRendering
+                    transform: Translate { y: stat.tn.y + stat.tn.textY }
                 }
             }
         }

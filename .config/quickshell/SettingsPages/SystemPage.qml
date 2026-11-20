@@ -20,6 +20,35 @@ Item {
     readonly property string customAvatar: imgDir + "/pfp_custom"
     readonly property string fastfetchLogo: imgDir + "/pfp_anim.gif" 
 
+    // ── Avatar opacity (scroll over the picture to change, saved to disk) ──
+    readonly property string stateDir: homeDir + "/.config/quickshell/state"
+    property real avatarOpacity: 0.7
+
+    function setAvatarOpacity(v) {
+        const n = Math.round(Math.max(0.1, Math.min(1, v)) * 100) / 100
+        if (n === avatarOpacity) return
+        avatarOpacity = n
+        pfpSaveTimer.restart()
+    }
+
+    FileView {
+        id: pfpState
+        path: page.stateDir + "/pfp.json"
+        printErrors: false
+        onLoaded: {
+            try {
+                const j = JSON.parse(text())
+                if (typeof j.opacity === "number")
+                    page.avatarOpacity = Math.max(0.1, Math.min(1, j.opacity))
+            } catch (e) {}
+        }
+    }
+    Timer {
+        id: pfpSaveTimer
+        interval: 400
+        onTriggered: pfpState.setText(JSON.stringify({ opacity: page.avatarOpacity }))
+    } 
+
     // ── State ─────────────────────────────────────────────────
     // CPU / GPU / memory / network / temperatures come from the shared
     // SystemStats singleton. The bar reads the same one, so both always agree.
@@ -495,6 +524,7 @@ Process {
         boundsBehavior: Flickable.StopAtBounds
 
         WheelHandler {
+            enabled: !avatarHover.hovered
             onWheel: function(event) {
                 var maxY = Math.max(0, scrollArea.contentHeight - scrollArea.height)
                 scrollArea.contentY = Math.max(0, Math.min(maxY, scrollArea.contentY - event.angleDelta.y))
@@ -591,7 +621,7 @@ Process {
                         source: avatar
                         maskEnabled: true
                         maskSource: avatarMask
-                        opacity: 0.7
+                        opacity: page.avatarOpacity
                     }
 
                     // Barely-visible change button: left click = pick, right click = reset
@@ -618,7 +648,6 @@ Process {
                             }
                         }
                     }
-
                     // lets the button fade in when hovering the picture
                     MouseArea {
                         id: hoverArea
@@ -627,8 +656,18 @@ Process {
                         acceptedButtons: Qt.NoButton
                         z: -1
                     }
+                    // hover state for the picture
+                    HoverHandler { id: avatarHover }
+                    // scroll over the picture = change its opacity (5% per wheel notch)
+                    WheelHandler {
+                        enabled: avatarHover.hovered
+                        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                        onWheel: function(event) {
+                            page.setAvatarOpacity(page.avatarOpacity + event.angleDelta.y / 120 * 0.05)
+                            event.accepted = true
+                        }
+                    }
                 }
-
                 Column {
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 14
@@ -637,7 +676,6 @@ Process {
                     InfoRow { icon: "󰔛"; label: "UPTIME"; value: page.uptime }
                 }
             }
-
             HardwareGraph {
                 label: "CPU"
                 valueText: SystemStats.cpuName

@@ -67,6 +67,11 @@ Singleton {
         "bright.star": { all: { glyphSize: -2 } },
         "night.star":  { all: { glyphSize: -2 } },
         tray:          { all: { glyphSize: -1 }, h: { x: -1 }, v: { x: 1 } },
+        cpu:           { h: { iconY: 0, textY: 1 } },
+        ram:           { h: { iconY: 0, textY: 1 } },
+        gpu:           { h: { iconY: 0, textY: 1 } },
+        cputemp:       { h: { iconY: 0, textY: 1 } },
+        gputemp:       { h: { iconY: 0, textY: 1 } },
     })
     // ───────────────────────── Colours ─────────────────────────
     // Every icon colour role lives here. Bar.qml asks IconTune.color(moduleId, role).

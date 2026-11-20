@@ -1840,7 +1840,7 @@ Scope {
                                         width: parent.width
                                         height: root.px(24)
                                         Lbl {
-                                            anchors { left: parent.left; verticalCenter: parent.verticalCenter }
+                                            anchors { left: parent.left; leftMargin: root.px(8); verticalCenter: parent.verticalCenter }
                                             sz: 13
                                             font.bold: true
                                             text: "Notifications" + (history.count > 0 ? "  " + history.count : "")

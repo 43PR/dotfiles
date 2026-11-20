@@ -19,24 +19,41 @@ Item {
 
     visible: Theme.bgImageActive
 
-    Image {
-        id: img
+    // Clipped holder: the picture is enlarged around its centre inside it,
+    // so the blur/fade stages below stay fixed to the panel.
+    Item {
+        id: imgHolder
         anchors.fill: parent
         visible: false
-        source: root.visible ? Theme.bgImageSource : ""
-        fillMode: Image.PreserveAspectCrop
-        asynchronous: true
-        cache: true
-        mipmap: true
-        // Fixed decode width so every panel shares one cached pixmap.
-        sourceSize.width: 1920
+        clip: true
+
+        Image {
+            id: img
+            // picture's own aspect ratio (1 while still loading)
+            readonly property real aspect: implicitHeight > 0 ? implicitWidth / implicitHeight : 1
+            // smallest size that fully covers the panel, then scaled by ZOOM
+            readonly property real coverW: Math.max(parent.width, parent.height * aspect)
+
+            width: coverW * Theme.bgImageZoom
+            height: width / aspect
+            // centred, then shifted by POSITION X / Y (fraction of the panel)
+            x: (parent.width - width) / 2 + parent.width * Theme.bgImagePosX
+            y: (parent.height - height) / 2 + parent.height * Theme.bgImagePosY
+            source: root.visible ? Theme.bgImageSource : ""
+            fillMode: Image.Stretch      // the box already has the right aspect
+            asynchronous: true
+            cache: true
+            mipmap: true
+            // Fixed decode width so every panel shares one cached pixmap.
+            sourceSize.width: 1920
+        }
     }
 
     // Blur stage (hidden; feeds the mask stage). Disabled blur = plain passthrough.
     MultiEffect {
         id: blurred
         anchors.fill: parent
-        source: img
+        source: imgHolder
         visible: false
         blurEnabled: Theme.bgImageBlur > 0.001
         blurMax: 64

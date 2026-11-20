@@ -1267,11 +1267,11 @@ Item {
                             onCommitted: v => Theme.setHub("bgImageOpacity", page.round2(v))
                         }
                         BarSlider {
-                            label: "IMAGE BLUR"
-                            from: 0; to: 1; step: 0.01; unit: "%"; displayScale: 100
-                            value: Theme.bgImageBlur
-                            onMoved: v => Theme.bgImageBlur = v
-                            onCommitted: v => Theme.setHub("bgImageBlur", page.round2(v))
+                            label: "IMAGE ZOOM"
+                            from: 0.5; to: 3; step: 0.05; unit: "%"; displayScale: 100
+                            value: Theme.bgImageZoom
+                            onMoved: v => Theme.bgImageZoom = v
+                            onCommitted: v => Theme.setHub("bgImageZoom", page.round2(v))
                         }
                         BarSlider {
                             label: "FADE: TOP OPACITY"
@@ -1286,6 +1286,27 @@ Item {
                             value: Theme.bgImageFadeBottom
                             onMoved: v => Theme.bgImageFadeBottom = v
                             onCommitted: v => Theme.setHub("bgImageFadeBottom", page.round2(v))
+                        }
+                        BarSlider {
+                            label: "POSITION X"
+                            from: -1; to: 1; step: 0.01; unit: "%"; displayScale: 100
+                            value: Theme.bgImagePosX
+                            onMoved: v => Theme.bgImagePosX = v
+                            onCommitted: v => Theme.setHub("bgImagePosX", page.round2(v))
+                        }
+                        BarSlider {
+                            label: "POSITION Y"
+                            from: -1; to: 1; step: 0.01; unit: "%"; displayScale: 100
+                            value: Theme.bgImagePosY
+                            onMoved: v => Theme.bgImagePosY = v
+                            onCommitted: v => Theme.setHub("bgImagePosY", page.round2(v))
+                        }
+                        BarSlider {
+                            label: "IMAGE BLUR"
+                            from: 0; to: 1; step: 0.01; unit: "%"; displayScale: 100
+                            value: Theme.bgImageBlur
+                            onMoved: v => Theme.bgImageBlur = v
+                            onCommitted: v => Theme.setHub("bgImageBlur", page.round2(v))
                         }
                     }
                 }

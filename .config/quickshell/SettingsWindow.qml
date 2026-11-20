@@ -12,7 +12,7 @@ Scope {
     property real minCardWidth: 700
     property real minCardHeight: 255
     property real maxCardWidth: 1600
-    property real maxCardHeight: 1100
+    property real maxCardHeight: 1500
     property real resizeGripSize: 40     // hit area of each corner grip (px)
 
     // ---- sidebar collapse (tweak these) ----------------------------------
