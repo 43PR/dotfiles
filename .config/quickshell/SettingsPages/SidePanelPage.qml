@@ -35,6 +35,11 @@ Item {
         animMs:         { min: 0,    max: 500,  def: 200,  step: 20,  unit: " ms" },
         groupLimit:     { min: 2,    max: 8,    def: 3,    step: 1,   unit: "" },
         notifBgOpacity: { min: 0,    max: 100,  def: 30,   step: 5,   unit: "%" },
+        notifBgFadeTop:    { min: 0, max: 100,  def: 100,  step: 5,   unit: "%" },
+        notifBgFadeBottom: { min: 0, max: 100,  def: 100,  step: 5,   unit: "%" },
+        notifBgZoom:       { min: 50, max: 300, def: 100,  step: 5,   unit: "%" },
+        notifBgPosX:       { min: -100, max: 100, def: 0,  step: 1,   unit: "%" },
+        notifBgPosY:       { min: -100, max: 100, def: 0,  step: 1,   unit: "%" },
         brightnessStep: { min: 1,    max: 20,   def: 5,    step: 1,   unit: "%" },
         nightStep:      { min: 50,   max: 500,  def: 100,  step: 50,  unit: " K" },
         tiltStrength:   { min: 0,    max: 15,   def: 1,    step: 1,   unit: "" },
@@ -851,6 +856,41 @@ Item {
                             step: page.numSpec.notifBgOpacity.step; unit: page.numSpec.notifBgOpacity.unit
                             value: page.val("notifBgOpacity")
                             onMoved: v => page.set("notifBgOpacity", v)
+                        }
+                        BarSlider {
+                            label: "IMAGE ZOOM"
+                            from: page.numSpec.notifBgZoom.min; to: page.numSpec.notifBgZoom.max
+                            step: page.numSpec.notifBgZoom.step; unit: page.numSpec.notifBgZoom.unit
+                            value: page.val("notifBgZoom")
+                            onMoved: v => page.set("notifBgZoom", v)
+                        }
+                        BarSlider {
+                            label: "FADE: TOP OPACITY"
+                            from: page.numSpec.notifBgFadeTop.min; to: page.numSpec.notifBgFadeTop.max
+                            step: page.numSpec.notifBgFadeTop.step; unit: page.numSpec.notifBgFadeTop.unit
+                            value: page.val("notifBgFadeTop")
+                            onMoved: v => page.set("notifBgFadeTop", v)
+                        }
+                        BarSlider {
+                            label: "FADE: BOTTOM OPACITY"
+                            from: page.numSpec.notifBgFadeBottom.min; to: page.numSpec.notifBgFadeBottom.max
+                            step: page.numSpec.notifBgFadeBottom.step; unit: page.numSpec.notifBgFadeBottom.unit
+                            value: page.val("notifBgFadeBottom")
+                            onMoved: v => page.set("notifBgFadeBottom", v)
+                        }
+                        BarSlider {
+                            label: "IMAGE POSITION X"
+                            from: page.numSpec.notifBgPosX.min; to: page.numSpec.notifBgPosX.max
+                            step: page.numSpec.notifBgPosX.step; unit: page.numSpec.notifBgPosX.unit
+                            value: page.val("notifBgPosX")
+                            onMoved: v => page.set("notifBgPosX", v)
+                        }
+                        BarSlider {
+                            label: "IMAGE POSITION Y"
+                            from: page.numSpec.notifBgPosY.min; to: page.numSpec.notifBgPosY.max
+                            step: page.numSpec.notifBgPosY.step; unit: page.numSpec.notifBgPosY.unit
+                            value: page.val("notifBgPosY")
+                            onMoved: v => page.set("notifBgPosY", v)
                         }
                     }
                 }

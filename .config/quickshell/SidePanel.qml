@@ -1,5 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
+import Qt5Compat.GraphicalEffects
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
@@ -24,6 +25,11 @@ Scope {
         animMs:         { min: 0,    max: 500,  def: 200,  step: 20,  unit: " ms" },
         groupLimit:     { min: 2,    max: 8,    def: 3,    step: 1,   unit: "" },
         notifBgOpacity: { min: 0,    max: 100,  def: 30,   step: 5,   unit: "%" },
+        notifBgFadeTop:    { min: 0, max: 100,  def: 100,  step: 5,   unit: "%" },
+        notifBgFadeBottom: { min: 0, max: 100,  def: 100,  step: 5,   unit: "%" },
+        notifBgZoom:       { min: 50, max: 300, def: 100,  step: 5,   unit: "%" },
+        notifBgPosX:       { min: -100, max: 100, def: 0,  step: 1,   unit: "%" },
+        notifBgPosY:       { min: -100, max: 100, def: 0,  step: 1,   unit: "%" },
         brightnessStep: { min: 1,    max: 20,   def: 5,    step: 1,   unit: "%" },
         nightTemp:      { min: 2500, max: 6500, def: 4800, step: 100, unit: " K" },
         nightStep:      { min: 50,   max: 500,  def: 100,  step: 50,  unit: " K" },
@@ -58,6 +64,11 @@ Scope {
     property int animMs: numSpec.animMs.def
     property int groupLimit: numSpec.groupLimit.def
     property int notifBgOpacity: numSpec.notifBgOpacity.def
+    property int notifBgFadeTop: numSpec.notifBgFadeTop.def
+    property int notifBgFadeBottom: numSpec.notifBgFadeBottom.def
+    property int notifBgZoom: numSpec.notifBgZoom.def
+    property int notifBgPosX: numSpec.notifBgPosX.def
+    property int notifBgPosY: numSpec.notifBgPosY.def
     property int brightnessStep: numSpec.brightnessStep.def
     property int nightTemp: numSpec.nightTemp.def
     property int nightStep: numSpec.nightStep.def
@@ -1868,17 +1879,50 @@ Scope {
                                         width: parent.width
                                         height: notifsCol.listH
 
-                                        Image {
-                                            id: notifBg
-                                            readonly property bool active: root.notifBgEnabled && root.notifBgPath !== ""
+                                        // background picture: same pipeline as BackgroundImage.qml
+                                        // Image (hidden) -> OpacityMask with a top->bottom alpha gradient
+                                        // clipped holder: the picture is enlarged around its centre
+                                        // inside it, so the fade mask below stays fixed to the list area
+                                        Item {
+                                            id: notifBgSrc
                                             anchors.fill: parent
-                                            fillMode: Image.PreserveAspectFit      // centered, never cropped or stretched
-                                            asynchronous: true
-                                            cache: false
-                                            sourceSize.width: Math.round(width * 2) // cap decode size to the panel
-                                            source: active ? root.imgSrc(root.notifBgPath) : ""
-                                            opacity: root.notifBgOpacity / 100
-                                            visible: active && status === Image.Ready
+                                            visible: false
+                                            clip: true
+
+                                            Image {
+                                                id: notifBgImg
+                                                readonly property bool active: root.notifBgEnabled && root.notifBgPath !== ""
+                                                width: parent.width * root.notifBgZoom / 100
+                                                height: parent.height * root.notifBgZoom / 100
+                                                // centred, then shifted by POSITION X / Y (% of the list area)
+                                                x: (parent.width - width) / 2 + parent.width * root.notifBgPosX / 100
+                                                y: (parent.height - height) / 2 + parent.height * root.notifBgPosY / 100
+                                                source: active ? root.imgSrc(root.notifBgPath) : ""
+                                                fillMode: Image.PreserveAspectCrop
+                                                asynchronous: true
+                                                cache: false
+                                                mipmap: true
+                                                sourceSize.width: Math.min(2560, Math.round(width * 2))
+                                            }
+                                        }
+
+                                        Rectangle {
+                                            id: notifFadeMask
+                                            anchors.fill: parent
+                                            visible: false
+                                            gradient: Gradient {
+                                                GradientStop { position: 0.0; color: Qt.rgba(0, 0, 0, root.notifBgFadeTop / 100) }
+                                                GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, root.notifBgFadeBottom / 100) }
+                                            }
+                                        }
+
+                                        OpacityMask {
+                                            id: notifBg
+                                            anchors.fill: parent
+                                            source: notifBgSrc
+                                            maskSource: notifFadeMask
+                                            visible: notifBgImg.active && notifBgImg.status === Image.Ready
+                                            opacity: (root.notifBgOpacity / 100) * root.bgFrac
                                         }
 
                                         Lbl {
