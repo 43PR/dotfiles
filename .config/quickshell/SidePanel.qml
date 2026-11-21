@@ -49,7 +49,8 @@ Scope {
         toasts: true,
         soundEnabled: true,
         notifBgEnabled: false,
-        syncOpacity: true
+        syncOpacity: true,
+        scrollSwitch: true
     })
     readonly property var boolKeys: Object.keys(boolDefaults)
 
@@ -87,6 +88,7 @@ Scope {
     property bool soundEnabled: boolDefaults.soundEnabled
     property bool notifBgEnabled: boolDefaults.notifBgEnabled
     property bool syncOpacity: boolDefaults.syncOpacity
+    property bool scrollSwitch: boolDefaults.scrollSwitch
     // background picture shown centered behind the notification list
     readonly property string defaultNotifBg: ""
     property string notifBgPath: defaultNotifBg
@@ -96,6 +98,7 @@ Scope {
     // highlight colour: accent | accent2 | text
     property string accentSource: "accent"
     property string panelSide: "auto"
+    property string defaultView: "last"       // last | calendar | weather
     readonly property var accentChoices: [
         { id: "accent",  label: "Accent" },
         { id: "accent2", label: "Accent 2" },
@@ -135,6 +138,7 @@ Scope {
         numKeys.some(k => root[k] !== numSpec[k].def)
         || boolKeys.some(k => root[k] !== boolDefaults[k])
         || accentSource !== "accent"
+        || defaultView !== "last"
         || panelSide !== "auto"
         || notifBgPath !== defaultNotifBg
         || toastSet
@@ -258,6 +262,8 @@ Scope {
     // ───────────────────────── Lifecycle ─────────────────────────
     property bool panelOpen: false
     property int calMonthOffset: 0
+    property string calMode: "calendar"   // "calendar" | "weather"
+    property bool viewPinned: false       // set when the bar asks for a specific view
     property real selTs: -1          // local-midnight epoch ms of the selected day, -1 = none
     property var reminders: []       // pending reminders read from the todo state file
 
@@ -276,6 +282,8 @@ Scope {
         if (!anchorSet) pickScreen()
         calMonthOffset = 0
         selTs = -1
+        if (!viewPinned && defaultView !== "last") calMode = defaultView
+        viewPinned = false
         refreshStates()
         panelOpen = true
     }
@@ -339,6 +347,7 @@ Scope {
                 night: root.nightOn,
                 accentSource: root.accentSource,
                 panelSide: root.panelSide,
+                defaultView: root.defaultView,
                 notifBgPath: root.notifBgPath,
                 sectionOrder: root.sectionOrder,
                 toastSet: root.toastSet,
@@ -376,6 +385,8 @@ Scope {
                     root.accentSource = s.accentSource
                 if (s.panelSide === "auto" || s.panelSide === "left" || s.panelSide === "right")
                     root.panelSide = s.panelSide
+                if (s.defaultView === "last" || s.defaultView === "calendar" || s.defaultView === "weather")
+                    root.defaultView = s.defaultView
                 if (typeof s.notifBgPath === "string") root.notifBgPath = s.notifBgPath
                 if (typeof s.toastSet === "boolean") root.toastSet = s.toastSet
                 if (typeof s.toastFx === "number") root.toastFx = Math.max(0, Math.min(1, s.toastFx))
@@ -437,6 +448,7 @@ Scope {
         boolKeys.forEach(k => root[k] = boolDefaults[k])
         accentSource = "accent"
         panelSide = "auto"
+        defaultView = "last"
         notifBgPath = defaultNotifBg
         sectionOrder = defaultSectionOrder.slice()
         toastSet = false
@@ -1088,6 +1100,19 @@ Scope {
             root.setAnchor(screen, position, along, edge)
             root.openPanel()
         }
+        function toggleAtView(screen: string, position: string, along: int, edge: int, view: string): void {
+            if (root.panelOpen) { root.closePanel(); return }
+            if (view === "calendar" || view === "weather") { root.calMode = view; root.viewPinned = true }
+            root.setAnchor(screen, position, along, edge)
+            root.openPanel()
+        }
+        // keybind: qs ipc call sidepanel view weather
+        function view(name: string): void {
+            if (name === "calendar" || name === "weather") {
+                root.calMode = name
+                if (!root.panelOpen) root.viewPinned = true
+            }
+        }
     }
     // kept so existing keybinds / bar calls keep working
     IpcHandler {
@@ -1121,7 +1146,7 @@ Scope {
 
             // Feed the window's readiness into the lifecycle (restored when the window is destroyed)
             Binding { target: life; property: "sized"; value: win.width > 0 && win.height > 0 }
-            Binding { target: life; property: "contentReady"; value: true }
+            Binding { target: life; property: "contentReady"; value: mainCol.height > 0 && calBox.height > 0 && panelClip.height > 0 }
             Binding { target: life; property: "frameWindow"; value: panelClip.Window.window }
 
             anchors { top: true; bottom: true; left: true; right: true }
@@ -1440,7 +1465,7 @@ Scope {
 
                     open: life.opened && root.panelOpen
                     cacheContent: true
-                    prewarm: !life.opened
+                    prewarm: win.width > 0 && win.height > 0 && !life.opened
                     fadeDuration: root.animMs * 1.3
                     popDuration: root.animMs * 1.7
                     tiltDuration: root.animMs * 1.9
@@ -1554,291 +1579,31 @@ Scope {
                                     target: root
                                     function onSectionOrderChanged() { sectionsCol.applyOrder() }
                                 }
-
-                                // ---- calendar ----
-                                Column {
+                                // ---- calendar + weather (CalendarWeather.qml) ----
+                                CalendarWeather {
                                     id: calBox
                                     visible: root.showCalendar
                                     width: parent.width
-                                    spacing: root.px(8)
-
-                                    readonly property int firstDay: root.weekMonday ? 1 : 0
-                                    readonly property int cellW: Math.floor(width / 7)
-                                    readonly property int cellH: root.px(28)
-                                    readonly property date now: clk.date
-                                    readonly property date view: new Date(now.getFullYear(), now.getMonth() + root.calMonthOffset, 1)
-                                    readonly property var cells: {
-                                        const first = (view.getDay() - firstDay + 7) % 7
-                                        const y = view.getFullYear(), m = view.getMonth()
-                                        const ty = now.getFullYear(), tm = now.getMonth(), td = now.getDate()
-                                        const marks = {}
-                                        root.reminders.forEach(r => {
-                                            const rd = new Date(r.ts)
-                                            marks[new Date(rd.getFullYear(), rd.getMonth(), rd.getDate()).getTime()] = true
-                                        })
-                                        return Array.from({ length: 42 }, (_, i) => {
-                                            const d = new Date(y, m, i - first + 1)
-                                            return {
-                                                ts: d.getTime(),
-                                                hasRem: marks[d.getTime()] === true,
-                                                n: d.getDate(),
-                                                inMonth: d.getMonth() === m,
-                                                today: d.getFullYear() === ty && d.getMonth() === tm && d.getDate() === td
-                                            }
-                                        })
-                                    }
-
-                                    // no divider needed when the calendar is the first section
-                                    Rectangle {
-                                        visible: root.sectionOrder[0] !== "calendar"
-                                        width: parent.width
-                                        height: 1
-                                        color: Theme.alpha(Theme.text, 0.12)
-                                    }
-
-                                    // ---- clock + date (left-aligned) ----
-                                    Column {
-                                        id: clockCol
-                                        width: parent.width
-                                        spacing: root.px(4)
-
-                                        Lbl {
-                                            width: parent.width
-                                            horizontalAlignment: Text.AlignLeft
-                                            sz: 30
-                                            font.bold: true
-                                            text: root.clockText(clk.date)
-                                        }
-                                        Lbl {
-                                            width: parent.width
-                                            horizontalAlignment: Text.AlignLeft
-                                            sz: 12
-                                            color: Theme.textDim
-                                            text: Qt.formatDate(clk.date, "dddd, d MMMM yyyy")
-                                        }
-                                    }
-                                    Item {
-                                        width: parent.width
-                                        height: root.px(26)
-
-                                        IconBtn {
-                                            anchors.left: parent.left
-                                            anchors.verticalCenter: parent.verticalCenter
-                                            base: 24
-                                            rest: 0
-                                            icon: root.icLeft
-                                            tip: "Previous month (PgUp)"
-                                            onClicked: root.calMonthOffset -= 1
-                                        }
-                                        Item {
-                                            anchors.centerIn: parent
-                                            width: monthTitle.implicitWidth + 16
-                                            height: parent.height
-
-                                            Lbl {
-                                                id: monthTitle
-                                                anchors.centerIn: parent
-                                                sz: 13
-                                                font.bold: true
-                                                color: titleMa.containsMouse ? root.cAccent : Theme.text
-                                                text: Qt.formatDate(calBox.view, "MMMM yyyy")
-                                            }
-                                            MouseArea {
-                                                id: titleMa
-                                                anchors.fill: parent
-                                                hoverEnabled: true
-                                                cursorShape: Qt.PointingHandCursor
-                                                onClicked: root.calMonthOffset = 0
-                                            }
-                                        }
-                                        IconBtn {
-                                            anchors.right: parent.right
-                                            anchors.verticalCenter: parent.verticalCenter
-                                            base: 24
-                                            rest: 0
-                                            icon: root.icRight
-                                            tip: "Next month (PgDn)"
-                                            onClicked: root.calMonthOffset += 1
-                                        }
-                                    }
-                                    Row {
-                                        Repeater {
-                                            model: 7
-                                            delegate: Lbl {
-                                                required property int index
-                                                width: calBox.cellW
-                                                horizontalAlignment: Text.AlignHCenter
-                                                sz: 11
-                                                color: Theme.textDim
-                                                text: Qt.locale().dayName((index + calBox.firstDay) % 7, Locale.ShortFormat)
-                                            }
-                                        }
-                                    }
-                                    Grid {
-                                        columns: 7
-                                        Repeater {
-                                            model: calBox.cells
-                                            delegate: Item {
-                                                id: dayCell
-                                                required property var modelData
-                                                width: calBox.cellW
-                                                height: calBox.cellH
-
-                                                Rectangle {
-                                                    visible: dayCell.modelData.today
-                                                    anchors.fill: parent
-                                                    anchors.margins: 2
-                                                    radius: Theme.radius
-                                                    color: Theme.alpha(root.cAccent, 0.2)
-                                                    border.width: 1
-                                                    border.color: root.cAccent
-                                                }
-                                                // selected day
-                                                Rectangle {
-                                                    visible: root.selTs === dayCell.modelData.ts
-                                                    anchors.fill: parent
-                                                    anchors.margins: 2
-                                                    radius: Theme.radius
-                                                    color: "transparent"
-                                                    border.width: 1
-                                                    border.color: Theme.alpha(Theme.text, 0.5)
-                                                }
-                                                Lbl {
-                                                    anchors.centerIn: parent
-                                                    sz: 12
-                                                    font.bold: dayCell.modelData.today
-                                                    color: dayCell.modelData.inMonth ? Theme.text : Theme.textFaint
-                                                    text: dayCell.modelData.n
-                                                }
-                                                // reminder dot
-                                                Rectangle {
-                                                    visible: dayCell.modelData.hasRem
-                                                    width: root.px(4)
-                                                    height: width
-                                                    radius: width / 2
-                                                    color: root.cAccent
-                                                    anchors.horizontalCenter: parent.horizontalCenter
-                                                    anchors.bottom: parent.bottom
-                                                    anchors.bottomMargin: root.px(3)
-                                                }
-                                                MouseArea {
-                                                    anchors.fill: parent
-                                                    cursorShape: Qt.PointingHandCursor
-                                                    onClicked: {
-                                                        root.selTs = (root.selTs === dayCell.modelData.ts) ? -1 : dayCell.modelData.ts
-                                                        if (root.selTs >= 0) Qt.callLater(function () { textIn.forceActiveFocus() })
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                    // ---- reminders for the selected day ----
-                                    Column {
-                                        id: remBox
-                                        visible: root.selTs >= 0
-                                        width: parent.width
-                                        spacing: root.px(6)
-
-                                        function submit() {
-                                            if (root.addReminder(root.selTs, timeIn.text, textIn.text)) {
-                                                textIn.text = ""
-                                            } else {
-                                                timeBox.bad = true
-                                            }
-                                        }
-
-                                        Lbl {
-                                            width: parent.width
-                                            sz: 11
-                                            font.bold: true
-                                            text: root.selTs >= 0 ? Qt.formatDate(new Date(root.selTs), "dddd, d MMMM") : ""
-                                        }
-
-                                        Repeater {
-                                            model: root.selTs >= 0 ? root.remindersOnDay(root.selTs) : []
-                                            delegate: Lbl {
-                                                required property var modelData
-                                                width: remBox.width
-                                                sz: 10
-                                                color: modelData.notified ? Theme.textDim : root.cAccent
-                                                text: Qt.formatTime(new Date(modelData.ts), "HH:mm") + "   " + modelData.text.split("\n")[0]
-                                            }
-                                        }
-
-                                        Row {
-                                            width: parent.width
-                                            spacing: root.px(6)
-
-                                            Rectangle {
-                                                id: timeBox
-                                                property bool bad: false
-                                                width: root.px(70)
-                                                height: root.px(28)
-                                                radius: root.px(8)
-                                                color: Theme.alpha(Theme.text, 0.08)
-                                                border.width: (timeIn.activeFocus || bad) ? 1 : 0
-                                                border.color: bad ? Theme.danger : root.cAccent
-
-                                                TextInput {
-                                                    id: timeIn
-                                                    anchors.fill: parent
-                                                    anchors.leftMargin: root.px(8)
-                                                    anchors.rightMargin: root.px(8)
-                                                    verticalAlignment: TextInput.AlignVCenter
-                                                    font.pixelSize: root.fs(11)
-                                                    color: Theme.text
-                                                    selectionColor: root.cAccent
-                                                    selectedTextColor: Theme.bg
-                                                    clip: true
-                                                    text: "09:00"
-                                                    onTextChanged: timeBox.bad = false
-                                                    Keys.onReturnPressed: textIn.forceActiveFocus()
-                                                    Keys.onEnterPressed: textIn.forceActiveFocus()
-                                                }
-                                            }
-
-                                            Rectangle {
-                                                width: parent.width - timeBox.width - parent.spacing
-                                                height: root.px(28)
-                                                radius: root.px(8)
-                                                color: Theme.alpha(Theme.text, 0.08)
-                                                border.width: textIn.activeFocus ? 1 : 0
-                                                border.color: root.cAccent
-
-                                                TextInput {
-                                                    id: textIn
-                                                    anchors.fill: parent
-                                                    anchors.leftMargin: root.px(8)
-                                                    anchors.rightMargin: root.px(8)
-                                                    verticalAlignment: TextInput.AlignVCenter
-                                                    font.pixelSize: root.fs(11)
-                                                    color: Theme.text
-                                                    selectionColor: root.cAccent
-                                                    selectedTextColor: Theme.bg
-                                                    clip: true
-                                                    Keys.onReturnPressed: remBox.submit()
-                                                    Keys.onEnterPressed: remBox.submit()
-
-                                                    Text {
-                                                        visible: textIn.text === "" && !textIn.inputMethodComposing
-                                                        anchors.verticalCenter: parent.verticalCenter
-                                                        text: "Remind me to… (Enter)"
-                                                        font.pixelSize: root.fs(11)
-                                                        color: Theme.textDim
-                                                        opacity: 0.7
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    // wheel over the calendar = change month
-                                    WheelHandler {
-                                        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-                                        onWheel: e => root.calMonthOffset += (e.angleDelta.y > 0 ? -1 : 1)
-                                    }
+                                    ui: root.ui
+                                    tx: root.tx
+                                    accent: root.cAccent
+                                    animMs: root.animMs
+                                    active: root.panelOpen
+                                    mode: root.calMode
+                                    scrollSwitch: root.scrollSwitch
+                                    now: clk.date
+                                    weekMonday: root.weekMonday
+                                    clock24: root.clock24
+                                    clockSeconds: root.clockSeconds
+                                    reminders: root.reminders
+                                    monthOffset: root.calMonthOffset
+                                    selTs: root.selTs
+                                    showDivider: root.sectionOrder[0] !== "calendar"
+                                    tryAddReminder: root.addReminder
+                                    onModeRequested: m => root.calMode = m
+                                    onMonthOffsetRequested: v => root.calMonthOffset = v
+                                    onSelTsRequested: v => root.selTs = v
                                 }
-
                                 // ---- quick actions ----
                                 Column {
                                     id: qaBox

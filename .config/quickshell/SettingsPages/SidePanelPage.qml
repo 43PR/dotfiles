@@ -58,7 +58,8 @@ Item {
         clockSeconds: false,
         toasts: true,
         soundEnabled: true,
-        notifBgEnabled: false
+        notifBgEnabled: false,
+        scrollSwitch: true
     })
     readonly property var boolKeys: Object.keys(boolDefaults)
 
@@ -71,6 +72,9 @@ Item {
     readonly property var accentLabels: ({
         accent: "ACCENT", accent2: "ACCENT 2", text: "TEXT"
     })
+
+    readonly property var viewIds: ["last", "calendar", "weather"]
+    readonly property var viewLabels: ({ last: "LAST USED", calendar: "CALENDAR", weather: "WEATHER" })
 
     // quick-action tiles that can be shown / hidden (matches SidePanel.allActions)
     readonly property var allActions: [
@@ -98,6 +102,7 @@ Item {
         const o = {
             accentSource: "accent",
             panelSide: "auto",
+            defaultView: "last",
             notifBgPath: "",
             hidden: [],                 // array of action names
             sectionOrder: sectionIds.slice()
@@ -237,6 +242,8 @@ Item {
             if (j.panelSide === "auto" || j.panelSide === "left" || j.panelSide === "right")
                 o.panelSide = j.panelSide
             if (typeof j.notifBgPath === "string") o.notifBgPath = j.notifBgPath
+            if (j.defaultView === "last" || j.defaultView === "calendar" || j.defaultView === "weather")
+                o.defaultView = j.defaultView
             if (Array.isArray(j.hidden))
                 o.hidden = j.hidden.filter(n => allActions.some(a => a.name === n))
             if (Array.isArray(j.sectionOrder)) {
@@ -617,7 +624,7 @@ Item {
                 width: parent.width; spacing: 6
                 topPadding: 2
 
-                SectionTitle { text: "CALENDAR" }
+                SectionTitle { text: "CALENDAR & WEATHER" }
 
                 Note {
                     visible: !page.val("showCalendar")
@@ -640,6 +647,25 @@ Item {
                             label: "SHOW SECONDS"; checked: page.val("clockSeconds")
                             onToggled: v => page.set("clockSeconds", v)
                         }
+                    }
+
+                    Divider {}
+
+                    Cols {
+                        ToggleRow {
+                            label: "SCROLL SWITCHES VIEW"; checked: page.val("scrollSwitch")
+                            onToggled: v => page.set("scrollSwitch", v)
+                        }
+                        CycleChoice {
+                            label: "OPEN WITH"
+                            options: page.viewIds
+                            labels: page.viewLabels
+                            current: page.val("defaultView")
+                            onPicked: v => page.set("defaultView", v)
+                        }
+                    }
+                    Note {
+                        text: "Scroll down over the calendar for the weather, up to come back. Ctrl + scroll changes the month. Temperature unit and city come from BAR → WEATHER."
                     }
                 }
             }

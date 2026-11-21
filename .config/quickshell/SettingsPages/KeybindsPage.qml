@@ -83,7 +83,7 @@ Item {
         { id: "fx_move",      label: "MOVE WINDOW",               chord: "SUPER + SHIFT + H / J / K / L" },
         { id: "fx_ws",        label: "SWITCH WORKSPACE",          chord: "SUPER + 1 - 0" },
         { id: "fx_ws_move",   label: "MOVE WINDOW TO WORKSPACE",  chord: "SUPER + SHIFT + 1 - 0" },
-        { id: "fx_zoom",      label: "ZOOM IN / OUT",             chord: "SUPER + MOUSE WHEEL" }
+        { id: "fx_zoom",      label: "ZOOM IN / OUT",             chord: "SUPER + SCROLL" }
     ]
 
     property var bindKeys: ({})

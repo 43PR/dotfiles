@@ -18,9 +18,9 @@ Item {
     readonly property var defaults: ({
         position: "left", style: "islands", thickness: 22, margin: 4, insetH: 11, insetV: 4,
         reserveSpace: true, allScreens: true, dragModules: true,
-        scale: 0.9, barScale: 0.75, bgOpacity: 0.1, border: true, borderOpacity: 0.1, radius: 15, calRadius: 15, calScale: 0.9,
+        scale: 0.9, barScale: 0.75, bgOpacity: 0.3, border: true, borderOpacity: 0.1, radius: 15, calRadius: 15, calScale: 0.9,
         tooltips: true, tooltipHints: true, tooltipBorder: true, tipDelay: 450, tooltipScale: 0.85,
-        modPad: 3, islandGap: 4, wsDot: 15, wsGap: 10, wsScroll: true, wsStyle: "minimal",
+        modPad: 0, islandGap: 4, wsDot: 15, wsGap: 10, wsScroll: true, wsStyle: "minimal",
         tasksScale: 0.75, tasksGap: 2, tasksColor: "accent",
         statsRing: true, statsNumbers: false, statsPercent: false, statsIcons: false, statsScale: 1, statsBorder: false, statsRadius: 24, statsGap: 0, statsWarn: 85, tempWarn: 85, batLowPct: 15,
         batNumber: false, batPercent: false, batRing: true, batLabel: false,
@@ -28,15 +28,15 @@ Item {
         trayArrow: true, lightIcons: "star", brightStep: 5, nightStep: 100, brightRing: true, nightRing: true,
         clock24: true, clockSeconds: false, clockPadHour: true, clockAmPm: true, clockDate: true, clockDay: false, clockDot: true, clockDayOnly: false, clockCase: "normal", dateOrder: "md", weekMonday: true,
         weatherIcon: false, weatherF: false, weatherCity: "", weatherCase: "upper", weatherSymbol: true, weatherNumber: true,
-        mediaMaxW: 120, mediaScroll: true,
+        mediaMaxW: 110, mediaScroll: true,
         clockPrimary: "calendar", clockSecondary: "settings", clockTertiary: "barsettings",
         settingsPrimary: "settings", settingsSecondary: "barsettings", settingsTertiary: "none",
-        hidden: "gputemp,gpu,settings,bright,night,wall",
-        startMods: "cputemp,ram,cpu,gpu,gputemp",
+        hidden: "gputemp,gpu,settings,bright,night,wall,weather",
+        startMods: "cputemp,ram,cpu,notif,gpu,gputemp",
         midLeftMods: "tasks,tray,ws",
-        centerMods: "clock",
+        centerMods: "weather,clock",
         midRightMods: "media",
-        endMods: "volume,net,bt,notif,power,bright,night,battery,settings,wall"
+        endMods: "volume,net,bt,power,bright,night,battery,settings,wall"
     })
 
     readonly property var positions: ["top", "right", "bottom", "left"]
