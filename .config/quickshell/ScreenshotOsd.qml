@@ -30,13 +30,14 @@ Scope {
     // ---- settings (right-click the OSD, or `qs ipc call screenshot settings`) ----
     // radius and imageRadius share the same default on purpose.
     readonly property var numSpec: ({
+        uiScale:     { min: 50,   max: 200,  def: 85,   step: 5,   unit: " %" },
         osdWidth:    { min: 240,  max: 600,  def: 320,  step: 10,  unit: " px" },
-        osdHeight:   { min: 56,   max: 200,  def: 84,   step: 2,   unit: " px" },
+        osdHeight:   { min: 56,   max: 200,  def: 70,   step: 2,   unit: " px" },
         radius:      { min: 0,    max: 100,  def: 20,   step: 1,   unit: " px" },
         thumbSize:   { min: 24,   max: 150,  def: 60,   step: 2,   unit: " px" },
         imageRadius: { min: 0,    max: 75,   def: 20,   step: 1,   unit: " px" },
         textSize:    { min: 9,    max: 28,   def: 13,   step: 1,   unit: " px" },
-        bgOpacity:   { min: 0,    max: 100,  def: 80,   step: 5,   unit: " %" },
+        bgOpacity:   { min: 0,    max: 100,  def: 60,   step: 5,   unit: " %" },
         showMs:      { min: 1000, max: 8000, def: 2200, step: 200, unit: " ms" },
         animMs:      { min: 0,    max: 500,  def: 150,  step: 25,  unit: " ms" }
     })
@@ -44,7 +45,7 @@ Scope {
 
     readonly property var boolDefaults: ({
         showThumb: true,
-        showDetail: true,
+        showDetail: false,
         showBorder: false,
         hoverPause: true,
         kbOsd: true
@@ -71,6 +72,7 @@ Scope {
     // rows of the settings window: header / slider / toggle
     readonly property var settingRows: [
         { type: "header", label: "Size" },
+        { type: "slider", key: "uiScale",     label: "Scale" },
         { type: "slider", key: "osdWidth",    label: "Width" },
         { type: "slider", key: "osdHeight",   label: "Height" },
         { type: "slider", key: "radius",      label: "Corner radius" },
@@ -97,6 +99,10 @@ Scope {
 
     property real offsetX: 0
     property real offsetY: 0
+
+    property int uiScale: numSpec.uiScale.def
+    readonly property real k: uiScale / 100
+    readonly property int ts: Math.round(textSize * k)   // scaled text size
 
     property int osdWidth: numSpec.osdWidth.def
     property int osdHeight: numSpec.osdHeight.def
@@ -139,8 +145,9 @@ Scope {
     function setPosition(x, y) {
         var nx = x, ny = y
         if (winW > 0 && winH > 0) {
-            nx = Math.max(keepVisible - winW / 2 - osdWidth / 2,
-                          Math.min(winW / 2 - keepVisible + osdWidth / 2, x))
+            var w = osdWidth * k
+            nx = Math.max(keepVisible - winW / 2 - w / 2,
+                          Math.min(winW / 2 - keepVisible + w / 2, x))
             ny = Math.max(-topGap, Math.min(Math.max(-topGap, winH - keepVisible - topGap), y))
         }
         offsetX = nx
@@ -404,14 +411,14 @@ Scope {
 
         Rectangle {
             id: flyout
-            width: root.osdWidth
-            height: root.osdHeight
+            width: root.osdWidth * root.k
+            height: root.osdHeight * root.k
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.horizontalCenterOffset: root.offsetX
             anchors.top: parent.top
             anchors.topMargin: root.topGap + root.offsetY
             transformOrigin: Item.Top
-            radius: root.radius
+            radius: root.radius * root.k
             color: Theme.alpha(Theme.bg, root.bgOpacity / 100)
             border.width: root.showBorder ? 1 : 0
             border.color: Theme.alpha(Theme.text, 0.12)
@@ -437,15 +444,15 @@ Scope {
 
             Row {
                 anchors.fill: parent
-                anchors.margins: 12
-                spacing: 14
+                anchors.margins: 12 * root.k
+                spacing: 14 * root.k
 
                 Rectangle {
                     id: thumb
                     visible: root.showThumb
-                    width: Math.min(root.thumbSize, root.osdHeight - 24)
+                    width: Math.min(root.thumbSize * root.k, (root.osdHeight - 24) * root.k)
                     height: width
-                    radius: root.imageRadius
+                    radius: root.imageRadius * root.k
                     color: "#33ffffff"
                     anchors.verticalCenter: parent.verticalCenter
 
@@ -465,7 +472,7 @@ Scope {
                     Rectangle {
                         id: shotMask
                         anchors.fill: parent
-                        radius: root.imageRadius
+                        radius: root.imageRadius * root.k
                         visible: false
                         layer.enabled: true
                     }
@@ -501,7 +508,7 @@ Scope {
                         width: parent.width
                         elide: Text.ElideRight
                         text: root.titleText
-                        font.pixelSize: root.textSize
+                        font.pixelSize: root.ts
                         font.bold: true
                         color: Theme.text
                     }
@@ -513,7 +520,7 @@ Scope {
                         text: root.isOcr ? root.ocrText
                               : root.isKb ? root.kbDevice
                               : root.imagePath.split("/").pop()
-                        font.pixelSize: Math.max(8, root.textSize - 2)
+                        font.pixelSize: Math.max(8, root.ts - 2)
                         color: Theme.textDim
                         elide: root.isOcr ? Text.ElideRight : Text.ElideMiddle
                         width: parent.width
@@ -523,7 +530,7 @@ Scope {
                         width: parent.width
                         elide: Text.ElideRight
                         text: root.subText
-                        font.pixelSize: Math.max(8, root.textSize - 3)
+                        font.pixelSize: Math.max(8, root.ts - 3)
                         color: Theme.textDim
                     }
                 }

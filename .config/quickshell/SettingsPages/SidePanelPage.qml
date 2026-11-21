@@ -97,7 +97,7 @@ Item {
     readonly property var defaults: {
         const o = {
             accentSource: "accent",
-            panelSide: "left",
+            panelSide: "auto",
             notifBgPath: "",
             hidden: [],                 // array of action names
             sectionOrder: sectionIds.slice()
@@ -234,7 +234,7 @@ Item {
                 if (typeof j[k] === "boolean") o[k] = j[k]
             if (typeof j.accentSource === "string" && accentIds.indexOf(j.accentSource) >= 0)
                 o.accentSource = j.accentSource
-            if (j.panelSide === "left" || j.panelSide === "right")
+            if (j.panelSide === "auto" || j.panelSide === "left" || j.panelSide === "right")
                 o.panelSide = j.panelSide
             if (typeof j.notifBgPath === "string") o.notifBgPath = j.notifBgPath
             if (Array.isArray(j.hidden))
@@ -602,9 +602,9 @@ Item {
                             onPicked: v => page.set("accentSource", v)
                         }
                         BarChoice {
-                            label: "PANEL SIDE (TOP / BOTTOM BAR)"
-                            options: ["left", "right"]
-                            maxCols: 2
+                            label: "PANEL SIDE"
+                            options: ["auto", "left", "right"]
+                            maxCols: 3
                             current: page.val("panelSide")
                             onPicked: v => page.set("panelSide", v)
                         }

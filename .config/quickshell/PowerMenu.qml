@@ -13,6 +13,7 @@ Scope {
     property var targetScreen: Quickshell.screens[0]
     property real winW: 0             // reported by the window while mounted
     property real winH: 0
+    property real panelH: 0           // unscaled panel height, reported by the panel
 
     // ---- per-icon size tweaks ----------------------------------------------
     // Multiplier applied on top of the "Icon size" setting, one per action.
@@ -46,17 +47,6 @@ Scope {
     }
 
     // ---- settings window look (same properties as the wallpaper picker) ----
-    // Font, text sizes, radius and the menu scale are the same values the wallpaper
-    // picker's settings menu uses; scale / radius come from the same hub.json.
-    // Colours still come from the Theme singleton; the "Colors" settings sections
-    // only choose WHICH Theme colour is used for each element (see themeColor).
-    //   ui     : resolution scale (1.0 at 1080p height)
-    //   menuUi : ui * hub "settingsScale" * settingsZoom; multiply every
-    //            settings-window size by it
-    //
-    // The reusable settings controls (ActionButton, SectionHeader, KeyRow,
-    // ToggleRow, SliderRow) live in CustomizationSettings.qml and read `th`,
-    // `menuUi`, `cAccent`, `numSpec` and the helper functions from this Scope.
     readonly property QtObject th: QtObject {
         property real settingsScale: 1.0
         property int radius: 10
@@ -332,8 +322,20 @@ Scope {
     readonly property color itemHoverColor: solid(themeColor(itemBgActiveColor),
                                                   Math.min(100, itemOpacity + hoverBoost))
 
+    // Offsets that put the (scaled) panel in the middle of the screen.
+    // The panel is anchored top/right and scaled from its top-right corner,
+    // so: right edge = winW - sideGap + offsetX, top edge = topGap + offsetY.
+    readonly property real panelScale: menuSize / 100
+    readonly property real centerOffsetX: winW > 0
+        ? sideGap - winW / 2 + cardWidth * panelScale / 2
+        : posDefaults.offsetX
+    readonly property real centerOffsetY: (winH > 0 && panelH > 0)
+        ? winH / 2 - panelH * panelScale / 2 - topGap
+        : posDefaults.offsetY
+
     readonly property bool movedFromDefault:
-    posKeys.some(k => Math.abs(root[k] - posDefaults[k]) > 0.5)
+        Math.abs(offsetX - centerOffsetX) > 0.5
+        || Math.abs(offsetY - centerOffsetY) > 0.5
     readonly property bool modified:
     movedFromDefault
     || numKeys.some(k => root[k] !== numSpec[k].def)
@@ -537,8 +539,7 @@ Scope {
     }
 
     function resetPosition() {
-        root.offsetX = posDefaults.offsetX
-        root.offsetY = posDefaults.offsetY
+        root.setPosition(root.centerOffsetX, root.centerOffsetY)
         root.saveState()
     }
 
@@ -867,7 +868,11 @@ Scope {
                     Behavior on opacity {
                         NumberAnimation { duration: root.animMs * 0.9; easing.type: Easing.OutCubic }
                     }
-                    onHeightChanged: if (root.showing) root.setPosition(root.offsetX, root.offsetY)
+                    onHeightChanged: {
+                        root.panelH = height
+                        if (root.showing) root.setPosition(root.offsetX, root.offsetY)
+                    }
+                    Component.onCompleted: root.panelH = height
 
                     // swallow clicks on the panel background (also right clicks)
                     MouseArea {

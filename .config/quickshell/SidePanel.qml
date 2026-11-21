@@ -95,7 +95,7 @@ Scope {
     property real toastY: 0
     // highlight colour: accent | accent2 | text
     property string accentSource: "accent"
-    property string panelSide: "left"
+    property string panelSide: "auto"
     readonly property var accentChoices: [
         { id: "accent",  label: "Accent" },
         { id: "accent2", label: "Accent 2" },
@@ -135,7 +135,7 @@ Scope {
         numKeys.some(k => root[k] !== numSpec[k].def)
         || boolKeys.some(k => root[k] !== boolDefaults[k])
         || accentSource !== "accent"
-        || panelSide !== "left"
+        || panelSide !== "auto"
         || notifBgPath !== defaultNotifBg
         || toastSet
         || hiddenNames.length > 0
@@ -374,7 +374,7 @@ Scope {
                 root.boolKeys.forEach(k => { if (typeof s[k] === "boolean") root[k] = s[k] })
                 if (typeof s.accentSource === "string" && root.accentChoices.some(c => c.id === s.accentSource))
                     root.accentSource = s.accentSource
-                if (s.panelSide === "left" || s.panelSide === "right")
+                if (s.panelSide === "auto" || s.panelSide === "left" || s.panelSide === "right")
                     root.panelSide = s.panelSide
                 if (typeof s.notifBgPath === "string") root.notifBgPath = s.notifBgPath
                 if (typeof s.toastSet === "boolean") root.toastSet = s.toastSet
@@ -436,7 +436,7 @@ Scope {
         numKeys.forEach(k => root[k] = numSpec[k].def)
         boolKeys.forEach(k => root[k] = boolDefaults[k])
         accentSource = "accent"
-        panelSide = "left"
+        panelSide = "auto"
         notifBgPath = defaultNotifBg
         sectionOrder = defaultSectionOrder.slice()
         toastSet = false
@@ -1423,9 +1423,12 @@ Scope {
                     readonly property real along: root.anchorAlong >= 0 ? root.anchorAlong
                                                 : (root.vert ? win.height / 2 : win.width / 2)
                     // which screen edge the panel hugs
-                    readonly property bool leftSide: root.vert ? root.sidePos === "left"
-                                                               : root.panelSide === "left"
-                    readonly property real sideGap: root.vert ? root.edgePx + 6 : 8
+                    readonly property bool leftSide: root.panelSide === "auto"
+                                                     ? (root.vert ? root.sidePos === "left" : true)
+                                                     : root.panelSide === "left"
+                    // full gap only when the panel is on the same side as a vertical bar
+                    readonly property real sideGap: (root.vert && leftSide === (root.sidePos === "left"))
+                                                    ? root.edgePx + 6 : 8
                     readonly property real maxH: (win.height - (root.vert ? 0 : root.edgePx + 4)) * root.panelHeight / 100
                     readonly property int fullW: Math.round(root.panelWidth * root.ui)
                     readonly property int fullH: root.notifsHeight > 0
@@ -1456,16 +1459,57 @@ Scope {
                         readonly property int pad: root.px(14)
                         implicitHeight: mainCol.height + 2 * pad
                         anchors.fill: parent
-
                         radius: root.cornerRadius
                         color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, root.bgFrac)
                         border.width: root.border ? 1 : 0
                         border.color: Theme.alpha(root.cAccent, root.borderOpacity / 100)
                         clip: true
-
-                        // swallow clicks on the panel background
+                         // swallow clicks on the panel background
                         MouseArea { anchors.fill: parent; acceptedButtons: Qt.LeftButton | Qt.RightButton }
-
+                        // background picture: fills the whole panel, edge to edge
+                        Item {
+                            id: notifBgSrc
+                            anchors.fill: parent
+                            visible: false
+                            clip: true
+                            Image {
+                                id: notifBgImg
+                                readonly property bool active: root.notifBgEnabled && root.notifBgPath !== ""
+                                // picture's own aspect ratio (1 while still loading)
+                                readonly property real aspect: implicitHeight > 0 ? implicitWidth / implicitHeight : 1
+                                // smallest size that fully covers the panel, then scaled by ZOOM
+                                readonly property real coverW: Math.max(parent.width, parent.height * aspect)
+                                width: coverW * root.notifBgZoom / 100
+                                height: width / aspect
+                                // centred, then shifted by POSITION X / Y (% of the panel)
+                                x: (parent.width - width) / 2 + parent.width * root.notifBgPosX / 100
+                                y: (parent.height - height) / 2 + parent.height * root.notifBgPosY / 100
+                                source: active ? root.imgSrc(root.notifBgPath) : ""
+                                fillMode: Image.Stretch
+                                asynchronous: true
+                                cache: true
+                                mipmap: true
+                                sourceSize.width: 1920
+                            }
+                        }
+                        Rectangle {
+                            id: notifFadeMask
+                            anchors.fill: parent
+                            visible: false
+                            radius: root.cornerRadius
+                            gradient: Gradient {
+                                GradientStop { position: 0.0; color: Qt.rgba(0, 0, 0, root.notifBgFadeTop / 100) }
+                                GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, root.notifBgFadeBottom / 100) }
+                            }
+                        }
+                        OpacityMask {
+                            id: notifBg
+                            anchors.fill: parent
+                            source: notifBgSrc
+                            maskSource: notifFadeMask
+                            visible: notifBgImg.active && notifBgImg.status === Image.Ready
+                            opacity: (root.notifBgOpacity / 100) * root.bgFrac
+                        }
                         // ═════════ main view ═════════
                         Column {
                             id: mainCol
@@ -1878,53 +1922,6 @@ Scope {
                                         id: listArea
                                         width: parent.width
                                         height: notifsCol.listH
-
-                                        // background picture: same pipeline as BackgroundImage.qml
-                                        // Image (hidden) -> OpacityMask with a top->bottom alpha gradient
-                                        // clipped holder: the picture is enlarged around its centre
-                                        // inside it, so the fade mask below stays fixed to the list area
-                                        Item {
-                                            id: notifBgSrc
-                                            anchors.fill: parent
-                                            visible: false
-                                            clip: true
-
-                                            Image {
-                                                id: notifBgImg
-                                                readonly property bool active: root.notifBgEnabled && root.notifBgPath !== ""
-                                                width: parent.width * root.notifBgZoom / 100
-                                                height: parent.height * root.notifBgZoom / 100
-                                                // centred, then shifted by POSITION X / Y (% of the list area)
-                                                x: (parent.width - width) / 2 + parent.width * root.notifBgPosX / 100
-                                                y: (parent.height - height) / 2 + parent.height * root.notifBgPosY / 100
-                                                source: active ? root.imgSrc(root.notifBgPath) : ""
-                                                fillMode: Image.PreserveAspectCrop
-                                                asynchronous: true
-                                                cache: false
-                                                mipmap: true
-                                                sourceSize.width: Math.min(2560, Math.round(width * 2))
-                                            }
-                                        }
-
-                                        Rectangle {
-                                            id: notifFadeMask
-                                            anchors.fill: parent
-                                            visible: false
-                                            gradient: Gradient {
-                                                GradientStop { position: 0.0; color: Qt.rgba(0, 0, 0, root.notifBgFadeTop / 100) }
-                                                GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, root.notifBgFadeBottom / 100) }
-                                            }
-                                        }
-
-                                        OpacityMask {
-                                            id: notifBg
-                                            anchors.fill: parent
-                                            source: notifBgSrc
-                                            maskSource: notifFadeMask
-                                            visible: notifBgImg.active && notifBgImg.status === Image.Ready
-                                            opacity: (root.notifBgOpacity / 100) * root.bgFrac
-                                        }
-
                                         Lbl {
                                             anchors.fill: parent
                                             visible: history.count === 0
