@@ -545,14 +545,14 @@ Scope {
                     color: Theme.bg
                     radius: Theme.radius
                     border.color: Theme.accent
-                    border.width: 1
+                    border.width: Theme.settingsBorder ? 1 : 0
                     scale: Theme.settingsScale
                     transformOrigin: Item.Center
                     BackgroundImage {
                         id: bgPic
                         anchors.fill: parent
-                        anchors.margins: 1
-                        radius: Math.max(0, Theme.radius - 1)
+                        anchors.margins: Theme.settingsBorder ? 1 : 0
+                        radius: Math.max(0, Theme.radius - (Theme.settingsBorder ? 1 : 0))
                     }
                     MouseArea {
                         anchors.fill: parent

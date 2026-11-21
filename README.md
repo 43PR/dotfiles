@@ -43,9 +43,9 @@ This setup aims to keep things simple, fast, practical, and easy to make your ow
 
 - RAM: 4 GB minimum, 8 GB recommended.
 - GPU: Intel, AMD or NVIDIA with compatible wayland drivers.
-- Display: Will look much better in FHD or higher.
+- Display: FHD or > recommended.
 
-As reference I made this project with a i5 6th dell laptop with integrated graphics so it should be really smooth in other potatoes too.
+For reference, I made this project on a 6th-gen i5 Dell laptop with integrated graphics, so it should run really smoothly on other potatoes too :).
 
 </details>
 
@@ -68,6 +68,7 @@ Hover over elements to see actions.
 | `Super + T`             | Terminal                  |
 | `Super + Q`             | Close active window       |
 | `Super + D`             | Application launcher      |
+| `Super + I`             | Settings menu             |
 | `Super + Space`         | Toggle floating window    |
 | `Super + F`             | Toggle fullscreen         |
 | `Super + 1, 2, 3..`     | Change workspaces         |
@@ -75,24 +76,42 @@ Hover over elements to see actions.
 | `Super + E`             | File manager              |
 | `Super + B`             | Browser                   |
 | `Super + V`             | Clipboard history         |
-| `Super + I`             | Settings menu             |
-| `Super + Grave`         | Logout menu               |
 | `Super + S`             | Side panel                |
 | `Super + O`             | Switch opacity            |
 | `Super + C`             | Notes & Reminders         |
 | `Super + W`             | Wallpaper selector        |
-| `Super + Shift + C`     | Color picker tool         |
-| `Super + Mouse wheel`   | Zoom in/out               |
-| `Super + Shift + W`     | Toggle bar                |
-| `Super + Tab`           | Lock screen               |
-| `Super + R`             | Toggle screen recorder    |
-| `SHIFT + F12`           | Text extractor (OCR)      |
+
+<details>
+<summary><b>✧ More keybinds</b></summary>
+
+<br>
+
+| Keybind                          | Action                        |
+| -------------------------------- | ----------------------------- |
+| `Super + Grave`                  | Logout menu                   |
+| `Super + Shift + C`              | Color picker tool             |
+| `Super + Mouse wheel`            | Zoom in/out                   |
+| `Super + Shift + W`              | Toggle bar                    |
+| `Super + Tab`                    | Lock screen                   |
+| `Super + R`                      | Toggle screen recorder        |
+| `SHIFT + F12`                    | Text extractor (OCR)          |
+| `Super + H / J / K / L`          | Focus window                  |
+| `Super + Shift + H / J / K / L`  | Move window                   |
+| `Super + .`                      | Toggle dark/light mode        |
+| `Super + X`                      | Switch keyboard layout        |
+| `Super + M`                      | Toggle mic mute               |
+| `Delete`                         | Screenshot (full screen)      |
+| `Shift + Delete`                 | Screenshot (area)             |
+
+> [!tip]
+>
+> Keybinds can be changed from **Settings → Keybinds**, you can create your own custom keybinds, choose your default browser, set screenshot options (save to folder / copy to clipboard) and manage OCR languages.
+
+</details>
 
 > [!note]
 >
 > Move and resize windows with Super + left/right mouse drag.
->
-> All keybinds: [.config/hypr/keybinds.lua](.config/hypr/keybinds.lua)
 
 ---
 ## Installation 

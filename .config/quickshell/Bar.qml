@@ -24,8 +24,8 @@ Scope {
         batNumber: false, batPercent: false, batRing: true, batLabel: false,
         volStep: 5, volMax: 100, volNumber: false, volPercent: false, volRing: true, volLabel: false,
         trayArrow: true, lightIcons: "star", brightStep: 5, nightStep: 100, brightRing: true, nightRing: true,
-        clock24: true, clockSeconds: false, clockPadHour: true, clockAmPm: true, clockDate: true, clockDay: false, clockCase: "normal", dateOrder: "md", weekMonday: true,
-        weatherIcon: false, weatherF: false, weatherCity: "", weatherCase: "upper", weatherSymbol: true,
+        clock24: true, clockSeconds: false, clockPadHour: true, clockAmPm: true, clockDate: true, clockDay: false, clockDot: true, clockDayOnly: false, clockCase: "normal", dateOrder: "md", weekMonday: true,
+        weatherIcon: false, weatherF: false, weatherCity: "", weatherCase: "upper", weatherSymbol: true, weatherNumber: true,
         mediaMaxW: 120, mediaScroll: true,
         clockPrimary: "calendar", clockSecondary: "settings", clockTertiary: "barsettings",
         settingsPrimary: "settings", settingsSecondary: "barsettings", settingsTertiary: "none",
@@ -78,6 +78,8 @@ Scope {
             property bool clock24: root.defaults.clock24; property bool clockSeconds: root.defaults.clockSeconds
             property bool clockPadHour: root.defaults.clockPadHour; property bool clockAmPm: root.defaults.clockAmPm
             property bool clockDate: root.defaults.clockDate
+            property bool clockDot: root.defaults.clockDot
+            property bool clockDayOnly: root.defaults.clockDayOnly
             property bool clockDay: root.defaults.clockDay; property string clockCase: root.defaults.clockCase
             property string dateOrder: root.defaults.dateOrder; property bool weekMonday: root.defaults.weekMonday
             property string clockPrimary: root.defaults.clockPrimary
@@ -89,6 +91,7 @@ Scope {
             property bool weatherIcon: root.defaults.weatherIcon; property bool weatherF: root.defaults.weatherF
             property string weatherCity: root.defaults.weatherCity; property string weatherCase: root.defaults.weatherCase
             property bool weatherSymbol: root.defaults.weatherSymbol
+            property bool weatherNumber: root.defaults.weatherNumber
             property int mediaMaxW: root.defaults.mediaMaxW; property bool mediaScroll: root.defaults.mediaScroll
             property string hidden: root.defaults.hidden; property string startMods: root.defaults.startMods
             property string midLeftMods: root.defaults.midLeftMods
@@ -285,15 +288,20 @@ Scope {
     function clockBarText(d) {
         const t = clockText(d);
         if (!cfg.clockDate) return t;
-        return t + "  \u2022  " + (cfg.clockDay ? dayText(d) + ", " : "")
-             + Qt.formatDate(d, cfg.dateOrder === "md" ? "MM/dd" : "dd/MM");
+        const sep = cfg.clockDot ? "  \u2022  " : "  ";
+        const date = cfg.clockDayOnly
+            ? (cfg.clockDay ? dayText(d) + " " : "") + Qt.formatDate(d, "dd")
+            : (cfg.clockDay ? dayText(d) + ", " : "")
+              + Qt.formatDate(d, cfg.dateOrder === "md" ? "MM/dd" : "dd/MM");
+        return t + sep + date;
     }
     function clockBarVText(d) {
         const t = clockVText(d);
         if (!cfg.clockDate) return t;
         const dd = Qt.formatDate(d, "dd"), mm = Qt.formatDate(d, "MM");
-        return t + "\n\u2022\n" + (cfg.clockDay ? dayText(d) + "\n" : "")
-             + (cfg.dateOrder === "md" ? mm + "\n" + dd : dd + "\n" + mm);
+        const date = cfg.clockDayOnly ? dd
+                   : (cfg.dateOrder === "md" ? mm + "\n" + dd : dd + "\n" + mm);
+        return t + (cfg.clockDot ? "\n\u2022\n" : "\n") + (cfg.clockDay ? dayText(d) + "\n" : "") + date;
     }
     property bool batTest: false
     property int batTestPct: 60
@@ -574,7 +582,8 @@ Scope {
         if (c === 65 || c === 82) return "\uDB81\uDD96";
         return "\uDB81\uDD97";
     }
-    readonly property string wxTemp: wxOk
+    readonly property string wxTemp: !cfg.weatherNumber ? ""
+        : wxOk
         ? Math.round(cfg.weatherF ? wxTempC * 9 / 5 + 32 : wxTempC) + (cfg.weatherSymbol ? "°" : "") : "–"
     readonly property string wxText: cfg.weatherCase === "upper" ? wxDesc.toUpperCase()
                                    : cfg.weatherCase === "lower" ? wxDesc.toLowerCase() : wxDesc
@@ -1264,7 +1273,8 @@ Scope {
         Mod {
             glyph: cfg.weatherIcon ? root.wxGlyph(root.wxCode) : ""
             vglyph: root.wxGlyph(root.wxCode)
-            text: cfg.weatherIcon || !root.wxOk ? root.wxTemp : root.wxText + "  " + root.wxTemp
+            text: cfg.weatherIcon || !root.wxOk ? root.wxTemp
+                : root.wxText + (root.wxTemp !== "" ? "  " + root.wxTemp : "")
             vtext: root.wxTemp
             glyphSize: root.sz.icon - 2; baseSize: root.sz.clock; bold: true
             tip: root.wxTip; primaryHint: "Refresh"; secondaryHint: "Bar settings"

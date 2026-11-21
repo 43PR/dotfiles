@@ -26,8 +26,8 @@ Item {
         batNumber: false, batPercent: false, batRing: true, batLabel: false,
         volStep: 5, volMax: 100, volNumber: false, volPercent: false, volRing: true, volLabel: false,
         trayArrow: true, lightIcons: "star", brightStep: 5, nightStep: 100, brightRing: true, nightRing: true,
-        clock24: true, clockSeconds: false, clockPadHour: true, clockAmPm: true, clockDate: true, clockDay: false, clockCase: "normal", dateOrder: "md", weekMonday: true,
-        weatherIcon: false, weatherF: false, weatherCity: "", weatherCase: "upper", weatherSymbol: true,
+        clock24: true, clockSeconds: false, clockPadHour: true, clockAmPm: true, clockDate: true, clockDay: false, clockDot: true, clockDayOnly: false, clockCase: "normal", dateOrder: "md", weekMonday: true,
+        weatherIcon: false, weatherF: false, weatherCity: "", weatherCase: "upper", weatherSymbol: true, weatherNumber: true,
         mediaMaxW: 120, mediaScroll: true,
         clockPrimary: "calendar", clockSecondary: "settings", clockTertiary: "barsettings",
         settingsPrimary: "settings", settingsSecondary: "barsettings", settingsTertiary: "none",
@@ -660,6 +660,16 @@ Item {
                             enabled: page.val("clockDate")
                             onToggled: v => page.set("clockDay", v)
                         }
+                        ToggleRow {
+                            label: "DOT"; checked: page.val("clockDot")
+                            enabled: page.val("clockDate")
+                            onToggled: v => page.set("clockDot", v)
+                        }
+                        ToggleRow {
+                            label: "DAY NUMBER ONLY"; checked: page.val("clockDayOnly")
+                            enabled: page.val("clockDate")
+                            onToggled: v => page.set("clockDayOnly", v)
+                        }
                     }
 
                     Divider {}
@@ -675,6 +685,7 @@ Item {
                         }
                         CycleChoice {
                             label: "DATE ORDER"
+                            enabled: page.val("clockDate") && !page.val("clockDayOnly")
                             options: page.dateOrderOptions; labels: page.dateOrderLabels
                             current: page.val("dateOrder")
                             onPicked: v => page.set("dateOrder", v)
@@ -706,7 +717,12 @@ Item {
                         }
                         ToggleRow {
                             label: "° SYMBOL"; checked: page.val("weatherSymbol")
+                            enabled: page.val("weatherNumber")
                             onToggled: v => page.set("weatherSymbol", v)
+                        }
+                        ToggleRow {
+                            label: "NUMBER"; checked: page.val("weatherNumber")
+                            onToggled: v => page.set("weatherNumber", v)
                         }
                     }
                     Cols {

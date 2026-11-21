@@ -10,6 +10,7 @@ QtObject {
     property int radius: 10
     property real tiltStrength: 7
     property real settingsScale: 1.0
+    property bool settingsBorder: true
     readonly property string fontFamily: "JetBrains Mono"
     property string iconFont: "JetBrainsMono Nerd Font"
     property FontLoader tablerLoader: FontLoader {
@@ -85,7 +86,7 @@ QtObject {
     property bool hideSettingsIcons: false
 
     readonly property var hubKeys: [
-        "tiltStrength", "settingsScale", "bgAlpha", "radius", "hideSettingsIcons",
+        "tiltStrength", "settingsScale", "settingsBorder", "bgAlpha", "radius", "hideSettingsIcons",
         "borderOpacity", "hyprBorderStyle",
         "bgImageEnabled", "bgImagePath", "bgImageOpacity", "bgImageBlur",
         "bgImageFadeTop", "bgImageFadeBottom",
@@ -101,6 +102,7 @@ QtObject {
     function resetHub() {
         tiltStrength = 7
         settingsScale = 1.0
+        settingsBorder = true
         bgAlpha = 0.7
         radius = 10
         borderOpacity = 1.0
@@ -122,6 +124,7 @@ QtObject {
         hubFile.setText(JSON.stringify({
             tiltStrength: tiltStrength,
             settingsScale: settingsScale,
+            settingsBorder: settingsBorder,
             bgAlpha: bgAlpha,
             radius: radius,
             borderOpacity: borderOpacity,
@@ -165,6 +168,7 @@ QtObject {
                 const clamp01 = v => Math.max(0, Math.min(1, v))
                 if (typeof s.tiltStrength === "number") root.tiltStrength = Math.max(0, Math.min(15, s.tiltStrength))
                 if (typeof s.settingsScale === "number") root.settingsScale = Math.max(0.6, Math.min(1.2, s.settingsScale))
+                if (typeof s.settingsBorder === "boolean") root.settingsBorder = s.settingsBorder
                 if (typeof s.bgAlpha === "number") root.bgAlpha = Math.max(0, Math.min(1, s.bgAlpha))
                 if (typeof s.radius === "number") root.radius = Math.round(Math.max(0, Math.min(50, s.radius)))
                 if (typeof s.borderOpacity === "number") root.borderOpacity = Math.max(0.1, Math.min(1, s.borderOpacity))
@@ -210,6 +214,9 @@ QtObject {
         }
         function setSettingsScale(value: real): void {
             root.setHub("settingsScale", Math.max(0.6, Math.min(1.2, value)))
+        }
+        function setSettingsBorder(on: bool): void {
+            root.setHub("settingsBorder", on)
         }
         function setBgImage(path: string): void {
             root.setHub("bgImagePath", path)

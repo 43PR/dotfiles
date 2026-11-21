@@ -1436,9 +1436,10 @@ Scope {
                     : maxH
 
                     width: fullW
-                    height: fullH
+                    height: Math.round(fullH)
 
                     open: life.opened && root.panelOpen
+                    cacheContent: true
                     prewarm: !life.opened
                     fadeDuration: root.animMs * 1.3
                     popDuration: root.animMs * 1.7
@@ -1461,15 +1462,27 @@ Scope {
                         anchors.fill: parent
                         radius: root.cornerRadius
                         color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, root.bgFrac)
-                        border.width: root.border ? 1 : 0
-                        border.color: Theme.alpha(root.cAccent, root.borderOpacity / 100)
+                        antialiasing: true
                         clip: true
-                         // swallow clicks on the panel background
+                        // swallow clicks on the panel background
                         MouseArea { anchors.fill: parent; acceptedButtons: Qt.LeftButton | Qt.RightButton }
+
+                        // border drawn above everything (picture, content), antialiased so it
+                        // survives the tilt / scale transform
+                        Rectangle {
+                            anchors.fill: parent
+                            z: 50
+                            color: "transparent"
+                            radius: root.cornerRadius
+                            antialiasing: true
+                            border.width: root.border ? 1 : 0
+                            border.color: Theme.alpha(root.cAccent, root.borderOpacity / 100)
+                        }
                         // background picture: fills the whole panel, edge to edge
                         Item {
                             id: notifBgSrc
                             anchors.fill: parent
+                            anchors.margins: panel.border.width
                             visible: false
                             clip: true
                             Image {
@@ -1495,8 +1508,9 @@ Scope {
                         Rectangle {
                             id: notifFadeMask
                             anchors.fill: parent
+                            anchors.margins: panel.border.width
                             visible: false
-                            radius: root.cornerRadius
+                            radius: Math.max(0, root.cornerRadius - panel.border.width)
                             gradient: Gradient {
                                 GradientStop { position: 0.0; color: Qt.rgba(0, 0, 0, root.notifBgFadeTop / 100) }
                                 GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, root.notifBgFadeBottom / 100) }
@@ -1505,6 +1519,7 @@ Scope {
                         OpacityMask {
                             id: notifBg
                             anchors.fill: parent
+                            anchors.margins: panel.border.width
                             source: notifBgSrc
                             maskSource: notifFadeMask
                             visible: notifBgImg.active && notifBgImg.status === Image.Ready
@@ -1912,6 +1927,11 @@ Scope {
                                                 rest: 0.1
                                                 hot: 0.25
                                                 onClicked: root.clearHistory()
+                                            }
+                                            IconBtn {
+                                                icon: "󰅖"
+                                                tip: "Close (Esc)"
+                                                onClicked: root.closePanel()
                                             }
                                         }
                                     }

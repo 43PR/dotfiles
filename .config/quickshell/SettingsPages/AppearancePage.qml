@@ -1186,9 +1186,15 @@ Item {
                         }
                     }
 
-                    ToggleRow {
-                        label: "SYNC OPACITY"; checked: page.qsOpacityFollow
-                        onToggled: v => page.setQsOpacityFollow(v)
+                    Cols {
+                        ToggleRow {
+                            label: "SYNC OPACITY"; checked: page.qsOpacityFollow
+                            onToggled: v => page.setQsOpacityFollow(v)
+                        }
+                        ToggleRow {
+                            label: "WINDOW BORDER"; checked: Theme.settingsBorder
+                            onToggled: v => Theme.setHub("settingsBorder", v)
+                        }
                     }
                 }
             }

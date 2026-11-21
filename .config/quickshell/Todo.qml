@@ -707,7 +707,7 @@ Scope {
                             radius: root.px(12)
                             color: Theme.bg
                             border.width: input.activeFocus ? 1 : 0
-                            border.color: Theme.text
+                            border.color: Theme.accent
                             Behavior on color { ColorAnimation { duration: 120 } }
 
                             // click anywhere in the box (not just on the text) to focus the input
@@ -725,7 +725,7 @@ Scope {
                                 anchors.left: parent.left
                                 anchors.leftMargin: root.px(14)
                                 anchors.right: parent.right
-                                anchors.rightMargin: root.px(12)
+                                anchors.rightMargin: root.px(34)
                                 anchors.top: parent.top
                                 anchors.topMargin: root.px(12)
                                 font.pixelSize: root.fpx(12)
@@ -755,10 +755,39 @@ Scope {
                                     visible: input.text === "" && !input.inputMethodComposing
                                     width: parent.width
                                     wrapMode: Text.WordWrap
-                                    text: "Enter: Save | Shift+Enter: New line | Ctrl+Scroll/Shift+Scroll"
+                                    text: "Enter | Shift+Enter | Ctrl+Scroll | Shift+Scroll"
                                     font.pixelSize: root.fpx(11)
                                     color: Theme.textDim
                                     opacity: 0.7
+                                }
+                            }
+
+                            // close button, top right of the input box
+                            Item {
+                                id: closeBtn
+                                width: root.px(22)
+                                height: width
+                                anchors.top: parent.top
+                                anchors.topMargin: root.px(6)
+                                anchors.right: parent.right
+                                anchors.rightMargin: root.px(8)
+                                z: 5
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "✕"
+                                    font.pixelSize: root.fpx(12)
+                                    color: closeArea.containsMouse ? Theme.danger : Theme.textDim
+                                    opacity: closeArea.containsMouse ? 1 : 0.6
+                                    Behavior on opacity { NumberAnimation { duration: 120 } }
+                                }
+
+                                MouseArea {
+                                    id: closeArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: root.closeMenu()
                                 }
                             }
                         }
