@@ -624,11 +624,6 @@ Item {
 
                 SectionTitle { text: "CLOCK" }
 
-                Note {
-                    visible: !page.isOn("clock")
-                    text: "Turn on the CLOCK module to use these options."
-                }
-
                 Card {
                     enabled: page.isOn("clock")
 
@@ -701,11 +696,6 @@ Item {
 
                 SectionTitle { text: "WEATHER" }
 
-                Note {
-                    visible: !page.isOn("weather")
-                    text: "Turn on the WEATHER module in MODULES to use these options."
-                }
-
                 Card {
                     enabled: page.isOn("weather")
 
@@ -746,9 +736,6 @@ Item {
                             current: page.val("weatherCase")
                             onPicked: v => page.set("weatherCase", v)
                         }
-                    }
-                    Note {
-                        text: "Location is detected from your IP. To pin a city, set \"weatherCity\" in state/bar-state.json."
                     }
                 }
             }
@@ -830,11 +817,6 @@ Item {
 
                 SectionTitle { text: "MEDIA" }
 
-                Note {
-                    visible: !page.isOn("media")
-                    text: "Turn on the MEDIA module in MODULES to use these options."
-                }
-
                 Card {
                     enabled: page.isOn("media")
 
@@ -850,9 +832,6 @@ Item {
                             onMoved: v => page.set("mediaMaxW", v)
                         }
                     }
-                    Note {
-                        text: "On: long titles loop across the max width. Off: they are cut off with “…” (the tooltip still shows the full title)."
-                    }
                 }
             }
             // ---------------- SYSTEM TRAY ----------------
@@ -863,11 +842,6 @@ Item {
 
                 SectionTitle { text: "SYSTEM TRAY" }
 
-                Note {
-                    visible: !page.isOn("tray")
-                    text: "Turn on the SYSTEM TRAY module in MODULES to use these options."
-                }
-
                 Card {
                     enabled: page.isOn("tray")
 
@@ -876,9 +850,6 @@ Item {
                             label: "ARROW + FLYOUT"; checked: page.val("trayArrow")
                             onToggled: v => page.set("trayArrow", v)
                         }
-                    }
-                    Note {
-                        text: "On: one arrow button opens the tray icons in a popup. Off: icons sit directly in the bar."
                     }
                 }
             }
@@ -890,11 +861,6 @@ Item {
                 topPadding: 2
 
                 SectionTitle { text: "SYSTEM STATS" }
-
-                Note {
-                    visible: !page.statsOn
-                    text: "Turn on CPU, RAM, GPU, CPU TEMP or GPU TEMP in MODULES to use these options."
-                }
 
                 Card {
                     enabled: page.statsOn
@@ -1052,11 +1018,6 @@ Item {
                 topPadding: 2
 
                 SectionTitle { text: "BRIGHTNESS & NIGHT LIGHT" }
-
-                Note {
-                    visible: !page.isOn("bright") && !page.isOn("night")
-                    text: "Turn on BRIGHTNESS or NIGHT LIGHT in MODULES to use these options."
-                }
 
                 Card {
                     BarChoice {

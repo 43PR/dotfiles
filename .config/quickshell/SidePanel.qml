@@ -27,7 +27,7 @@ Scope {
         notifBgOpacity: { min: 0,    max: 100,  def: 30,   step: 5,   unit: "%" },
         notifBgFadeTop:    { min: 0, max: 100,  def: 100,  step: 5,   unit: "%" },
         notifBgFadeBottom: { min: 0, max: 100,  def: 100,  step: 5,   unit: "%" },
-        notifBgZoom:       { min: 50, max: 300, def: 100,  step: 5,   unit: "%" },
+        notifBgZoom:       { min: 30, max: 300, def: 100,  step: 5,   unit: "%" },
         notifBgPosX:       { min: -100, max: 100, def: 0,  step: 1,   unit: "%" },
         notifBgPosY:       { min: -100, max: 100, def: 0,  step: 1,   unit: "%" },
         brightnessStep: { min: 1,    max: 20,   def: 5,    step: 1,   unit: "%" },
@@ -274,7 +274,7 @@ Scope {
     PopupLifecycle {
         id: life
         showing: root.wanted
-        keepAliveMs: 20000      // lower this to free the window sooner after closing
+        keepAliveMs: 3600000
     }
     readonly property bool mounted: life.mounted
 
@@ -809,11 +809,18 @@ Scope {
         saveState()
         scheduleRebuild()
     }
+    // direction + flag used by the slide-in animation of the entries
+    property int scrollDir: 0            // 1 = older (entries come from below), -1 = newer
+    property string scrollGroupName: ""
+    property int scrollEnterIdx: -1      // history index of the entry that enters the window
+    property bool scrollAnimating: false
+    Timer { id: scrollAnimTimer; interval: 350; onTriggered: root.scrollAnimating = false }
     // scrolls a group's visible window by `delta` entries; true if it moved
     function scrollGroup(name, delta) {
-        let total = 0
+        const idxs = []
         for (let i = 0; i < history.count; i++)
-            if (groupKey(history.get(i).appName) === name) total++
+            if (groupKey(history.get(i).appName) === name) idxs.push(i)
+        const total = idxs.length
         const maxOff = Math.max(0, total - groupLimit)
         const cur = Math.min(groupOffsets[name] || 0, maxOff)
         const next = Math.max(0, Math.min(maxOff, cur + delta))
@@ -822,6 +829,11 @@ Scope {
         for (const k in groupOffsets) o[k] = groupOffsets[k]
         o[name] = next
         groupOffsets = o
+        scrollDir = delta > 0 ? 1 : -1
+        scrollGroupName = name
+        scrollEnterIdx = delta > 0 ? idxs[next + groupLimit - 1] : idxs[next]
+        scrollAnimating = true
+        scrollAnimTimer.restart()
         scheduleRebuild()
         return true
     }
@@ -1146,7 +1158,13 @@ Scope {
 
             // Feed the window's readiness into the lifecycle (restored when the window is destroyed)
             Binding { target: life; property: "sized"; value: win.width > 0 && win.height > 0 }
-            Binding { target: life; property: "contentReady"; value: mainCol.height > 0 && calBox.height > 0 && panelClip.height > 0 }
+            // contentReady only becomes true once the layout has stopped changing for 180 ms
+            readonly property string layoutSig: mainCol.height + "|" + calBox.height + "|" + notifsCol.height
+                                                + "|" + panelClip.width + "|" + panelClip.height
+            property bool layoutStable: false
+            onLayoutSigChanged: { layoutStable = false; stableTimer.restart() }
+            Timer { id: stableTimer; interval: 180; running: true; onTriggered: win.layoutStable = true }
+            Binding { target: life; property: "contentReady"; value: win.layoutStable && mainCol.height > 0 }
             Binding { target: life; property: "frameWindow"; value: panelClip.Window.window }
 
             anchors { top: true; bottom: true; left: true; right: true }
@@ -1464,11 +1482,11 @@ Scope {
                     height: Math.round(fullH)
 
                     open: life.opened && root.panelOpen
-                    cacheContent: true
+                    cacheContent: false
                     prewarm: win.width > 0 && win.height > 0 && !life.opened
-                    fadeDuration: root.animMs * 1.3
-                    popDuration: root.animMs * 1.7
-                    tiltDuration: root.animMs * 1.9
+                    fadeDuration: 260
+                    popDuration: 340
+                    tiltDuration: 380
                     popEasing: Easing.OutCubic
                     closedScale: 0.7
 
@@ -1559,29 +1577,39 @@ Scope {
                             spacing: root.px(12)
 
                             // Body sections — order controlled by root.sectionOrder
-                            Column {
+                            Item {
                                 id: sectionsCol
                                 width: parent.width
-                                spacing: root.px(12)
+                                readonly property real spacing: root.px(12)
 
-                                function applyOrder() {
-                                    const map = { calendar: calBox, quick: qaBox, notifs: notifsCol }
+                                function itemOf(id) {
+                                    return id === "calendar" ? calBox : (id === "quick" ? qaBox : notifsCol)
+                                }
+                                // y offset of a section = heights of the visible sections above it
+                                function slotY(id) {
+                                    let y = 0
                                     const ord = root.sectionOrder
                                     for (let i = 0; i < ord.length; i++) {
-                                        const item = map[ord[i]]
-                                        if (!item) continue
-                                        item.parent = null
-                                        item.parent = sectionsCol
+                                        if (ord[i] === id) return y
+                                        const it = itemOf(ord[i])
+                                        if (it.visible) y += it.height + spacing
                                     }
+                                    return y
                                 }
-                                Component.onCompleted: applyOrder()
-                                Connections {
-                                    target: root
-                                    function onSectionOrderChanged() { sectionsCol.applyOrder() }
+                                function totalH() {
+                                    let h = 0, n = 0
+                                    const ord = root.sectionOrder
+                                    for (let i = 0; i < ord.length; i++) {
+                                        const it = itemOf(ord[i])
+                                        if (it.visible) { h += it.height; n++ }
+                                    }
+                                    return h + Math.max(0, n - 1) * spacing
                                 }
+                                height: totalH()
                                 // ---- calendar + weather (CalendarWeather.qml) ----
                                 CalendarWeather {
                                     id: calBox
+                                    y: sectionsCol.slotY("calendar")
                                     visible: root.showCalendar
                                     width: parent.width
                                     ui: root.ui
@@ -1607,6 +1635,7 @@ Scope {
                                 // ---- quick actions ----
                                 Column {
                                     id: qaBox
+                                    y: sectionsCol.slotY("quick")
                                     visible: root.showQuick && root.visibleTiles.length > 0
                                     width: parent.width
                                     spacing: root.px(8)
@@ -1642,6 +1671,7 @@ Scope {
                                 // ---- notifications ----
                                 Column {
                                     id: notifsCol
+                                    y: sectionsCol.slotY("notifs")
                                     width: parent.width
                                     spacing: root.px(6)
                                     visible: root.showNotifs
@@ -1891,7 +1921,25 @@ Scope {
                                                     Behavior on height {
                                                         NumberAnimation { id: heightAnim; duration: 220; easing.type: Easing.OutCubic }
                                                     }
-
+                                                    transform: Translate { id: slideTr }
+                                                    Component.onCompleted: {
+                                                        if (!root.scrollAnimating || root.animMs <= 0) return
+                                                        if (rowItem.rowType !== "item" || rowItem.groupName !== root.scrollGroupName) return
+                                                        // start one slot away, where the entry was before the scroll
+                                                        slideTr.y = root.scrollDir * (itemBox.height + root.px(6))
+                                                        // only the entry entering the window fades and scales in
+                                                        if (rowItem.hIndex === root.scrollEnterIdx) {
+                                                            opacity = 0
+                                                            scale = 0.92
+                                                        }
+                                                        enterAnim.start()
+                                                    }
+                                                    ParallelAnimation {
+                                                        id: enterAnim
+                                                        NumberAnimation { target: slideTr; property: "y"; to: 0; duration: root.animMs * 2.2; easing.type: Easing.OutQuint }
+                                                        NumberAnimation { target: itemBox; property: "opacity"; to: 1; duration: root.animMs * 2.2; easing.type: Easing.OutQuint }
+                                                        NumberAnimation { target: itemBox; property: "scale"; to: 1; duration: root.animMs * 2.2; easing.type: Easing.OutQuint }
+                                                    }
                                                     // wheel scrolls through the group's entries; at either end
                                                     // the event is passed on so the whole list scrolls
                                                     WheelHandler {

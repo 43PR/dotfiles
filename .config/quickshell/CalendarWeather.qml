@@ -266,13 +266,10 @@ Item {
             if (wheelLock.running) return
             cw.wheelAcc += e.angleDelta.y
             if (Math.abs(cw.wheelAcc) < 120) return
-            const down = cw.wheelAcc < 0
             cw.wheelAcc = 0
             wheelLock.restart()
-            // down -> weather, up -> calendar. To let ANY direction toggle instead, replace the next line with:
-            //   cw.modeRequested(cw.showWx ? "calendar" : "weather")
-            const target = down ? "weather" : "calendar"
-            if (target !== cw.mode) cw.modeRequested(target)
+            // any scroll direction toggles between calendar and weather
+            cw.modeRequested(cw.showWx ? "calendar" : "weather")
         }
     }
     WheelHandler {

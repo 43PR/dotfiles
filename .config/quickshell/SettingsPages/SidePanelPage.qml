@@ -665,7 +665,7 @@ Item {
                         }
                     }
                     Note {
-                        text: "Scroll down over the calendar for the weather, up to come back. Ctrl + scroll changes the month. Temperature unit and city come from BAR → WEATHER."
+                        text: "Scroll over the calendar to switch between calendar and weather. Ctrl + scroll changes the month. Switch temp unit in Bar page."
                     }
                 }
             }
@@ -723,54 +723,6 @@ Item {
                                 label: modelData.label
                                 current: page.isActionOn(modelData.name)
                                 onClicked: page.setActionOn(modelData.name, !page.isActionOn(modelData.name))
-                            }
-                        }
-                    }
-                }
-            }
-            // ---------------- SECTIONS ----------------
-            Column {
-                width: parent.width; spacing: 6
-                topPadding: 2
-
-                SectionTitle { text: "SECTIONS" }
-                Note { text: "Toggle visibility and reorder with the arrows (top to bottom in the panel)." }
-
-                Card {
-                    Column {
-                        width: parent.width
-                        spacing: 6
-
-                        Repeater {
-                            model: page.sectionOrder()
-                            delegate: Row {
-                                required property string modelData
-                                required property int index
-                                width: parent.width
-                                spacing: 6
-                                height: 26
-
-                                // up / down
-                                SmallButton {
-                                    width: 28; height: 26
-                                    label: "▲"
-                                    buttonEnabled: index > 0
-                                    onClicked: page.moveSection(modelData, -1)
-                                }
-                                SmallButton {
-                                    width: 28; height: 26
-                                    label: "▼"
-                                    buttonEnabled: index < page.sectionOrder().length - 1
-                                    onClicked: page.moveSection(modelData, 1)
-                                }
-
-                                // visibility toggle fills the rest
-                                ToggleRow {
-                                    width: parent.width - 28 * 2 - 6 * 2
-                                    label: page.sectionLabels[modelData] ?? modelData.toUpperCase()
-                                    checked: page.val(page.sectionBoolKey[modelData])
-                                    onToggled: v => page.set(page.sectionBoolKey[modelData], v)
-                                }
                             }
                         }
                     }
@@ -917,6 +869,54 @@ Item {
                             step: page.numSpec.notifBgPosY.step; unit: page.numSpec.notifBgPosY.unit
                             value: page.val("notifBgPosY")
                             onMoved: v => page.set("notifBgPosY", v)
+                        }
+                    }
+                }
+            }
+            // ---------------- SECTIONS ----------------
+            Column {
+                width: parent.width; spacing: 6
+                topPadding: 2
+
+                SectionTitle { text: "SECTIONS" }
+                Note { text: "Toggle visibility and reorder with the arrows (top to bottom in the panel)." }
+
+                Card {
+                    Column {
+                        width: parent.width
+                        spacing: 6
+
+                        Repeater {
+                            model: page.sectionOrder()
+                            delegate: Row {
+                                required property string modelData
+                                required property int index
+                                width: parent.width
+                                spacing: 6
+                                height: 26
+
+                                // up / down
+                                SmallButton {
+                                    width: 28; height: 26
+                                    label: "▲"
+                                    buttonEnabled: index > 0
+                                    onClicked: page.moveSection(modelData, -1)
+                                }
+                                SmallButton {
+                                    width: 28; height: 26
+                                    label: "▼"
+                                    buttonEnabled: index < page.sectionOrder().length - 1
+                                    onClicked: page.moveSection(modelData, 1)
+                                }
+
+                                // visibility toggle fills the rest
+                                ToggleRow {
+                                    width: parent.width - 28 * 2 - 6 * 2
+                                    label: page.sectionLabels[modelData] ?? modelData.toUpperCase()
+                                    checked: page.val(page.sectionBoolKey[modelData])
+                                    onToggled: v => page.set(page.sectionBoolKey[modelData], v)
+                                }
+                            }
                         }
                     }
                 }
