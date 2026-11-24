@@ -16,8 +16,8 @@ Scope {
     readonly property var defaults: ({
         position: "left", style: "islands", thickness: 22, margin: 4, insetH: 11, insetV: 4,
         reserveSpace: true, allScreens: true, dragModules: true,
-        scale: 0.9, barScale: 0.75, bgOpacity: 0.3, border: true, borderOpacity: 0.1, radius: 15, calRadius: 15, calScale: 0.9,
-        tooltips: true, tooltipHints: true, tooltipBorder: true, tipDelay: 450, tooltipScale: 0.85,
+        scale: 1, barScale: 0.75, bgOpacity: 0.2, border: true, borderOpacity: 0.05, radius: 15, calRadius: 15, calScale: 0.9,
+        tooltips: true, tooltipHints: false, tooltipBorder: true, tipDelay: 450, tooltipScale: 0.85,
         modPad: 0, islandGap: 4, wsDot: 15, wsGap: 10, wsScroll: true, wsStyle: "minimal",
         tasksScale: 0.75, tasksGap: 2, tasksColor: "accent",
         statsRing: true, statsNumbers: false, statsPercent: false, statsIcons: false, statsScale: 1, statsBorder: false, statsRadius: 24, statsGap: 0, statsWarn: 85, tempWarn: 85, batLowPct: 15,
@@ -25,12 +25,12 @@ Scope {
         volStep: 5, volMax: 100, volNumber: false, volPercent: false, volRing: true, volLabel: false,
         trayArrow: true, lightIcons: "star", brightStep: 5, nightStep: 100, brightRing: true, nightRing: true,
         clock24: true, clockSeconds: false, clockPadHour: true, clockAmPm: true, clockDate: true, clockDay: false, clockDot: true, clockDayOnly: false, clockCase: "normal", dateOrder: "md", weekMonday: true,
-        weatherIcon: false, weatherF: false, weatherCity: "", weatherCase: "upper", weatherSymbol: true, weatherNumber: true,
+        weatherIcon: false, weatherF: false, weatherCity: "", weatherCase: "upper", weatherSymbol: false, weatherNumber: true,
         mediaMaxW: 110, mediaScroll: true,
         clockPrimary: "calendar", clockSecondary: "settings", clockTertiary: "barsettings",
         settingsPrimary: "settings", settingsSecondary: "barsettings", settingsTertiary: "none",
-        hidden: "gputemp,gpu,settings,bright,night,wall,weather",
-        startMods: "cputemp,ram,cpu,notif,gpu,gputemp",
+        hidden: "gputemp,settings,bright,night,wall,weather,ram",
+        startMods: "cputemp,cpu,gpu,ram,notif,gputemp",
         midLeftMods: "tasks,tray,ws",
         centerMods: "weather,clock",
         midRightMods: "media",
@@ -131,7 +131,7 @@ Scope {
             Text {
                 id: measure
                 text: mq.text
-                font.family: Theme.iconFont
+                font.family: Theme.fontFamily
                 font.pixelSize: root.sz.mq
             }
         }
@@ -863,12 +863,12 @@ Scope {
                     Column {
                         id: tcol; anchors.centerIn: parent; spacing: Math.round(3 * k)
                         Text {
-                            visible: tp.title !== ""; text: tp.title; color: Theme.text; font.family: Theme.iconFont
+                            visible: tp.title !== ""; text: tp.title; color: Theme.text; font.family: Theme.fontFamily
                             font.pixelSize: Math.max(6, Math.round(12 * k)); font.bold: true
                         }
                         Text {
                             visible: tp.hints !== ""; text: tp.hints; color: Theme.textDim
-                            font.family: Theme.iconFont; font.pixelSize: Math.max(6, Math.round(11 * k))
+                            font.family: Theme.fontFamily; font.pixelSize: Math.max(6, Math.round(11 * k))
                         }
                     }
                 }
@@ -1041,7 +1041,9 @@ Scope {
             }
             Text {
                 visible: mod.shown !== ""; Layout.alignment: Qt.AlignCenter; horizontalAlignment: Text.AlignHCenter
-                text: mod.shown; color: mod.fg; font.family: Theme.iconFont; font.bold: mod.bold
+                text: mod.shown; color: mod.fg
+                font.family: (root.defMap[mod.mid] && root.defMap[mod.mid].g) ? Theme.iconFont : Theme.fontFamily
+                font.bold: mod.bold
                 font.pixelSize: mod.baseSize + mod.tn.textSize; renderType: Text.NativeRendering
                 transform: Translate { x: mod.textX + mod.tn.textX; y: mod.textY + mod.tn.textY }
             }
@@ -1072,11 +1074,11 @@ Scope {
         secondaryHint: "Open system settings"
         onSecondary: root.run("qs ipc call settings system")
         TextMetrics {
-            id: mLabel; text: stat.shownLabel; font.family: stat.useIcon ? stat.iconFont : Theme.iconFont
+            id: mLabel; text: stat.shownLabel; font.family: stat.useIcon ? stat.iconFont : Theme.fontFamily
             font.pixelSize: stat.labelWantedPx
         }
         TextMetrics {
-            id: mValue; text: cfg.statsNumbers ? stat.sampleValue : ""; font.family: Theme.iconFont; font.bold: true
+            id: mValue; text: cfg.statsNumbers ? stat.sampleValue : ""; font.family: Theme.fontFamily; font.bold: true
             font.pixelSize: stat.wantedPx
         }
         Layout.alignment: Qt.AlignCenter; implicitWidth: root.vertical ? root.panelThick : badge.width + cfg.statsGap
@@ -1101,14 +1103,14 @@ Scope {
                 }
                 Text {
                     visible: !stat.ring; Layout.alignment: Qt.AlignCenter; text: stat.shownLabel
-                    color: Qt.alpha(stat.fg, 0.75); font.family: stat.useIcon ? stat.iconFont : Theme.iconFont
+                    color: Qt.alpha(stat.fg, 0.75); font.family: stat.useIcon ? stat.iconFont : Theme.fontFamily
                     font.pixelSize: stat.useIcon ? stat.fontPx + 2 : Math.max(4, stat.fontPx - 1)
                     transform: Translate { y: stat.useIcon ? stat.tn.iconY : stat.tn.y + stat.tn.textY }
                     renderType: Text.NativeRendering
                 }
                 Text {
                     visible: cfg.statsNumbers; Layout.alignment: Qt.AlignCenter; text: stat.shownValue; color: stat.fg
-                    font.family: Theme.iconFont; font.bold: true; font.pixelSize: stat.fontPx
+                    font.family: Theme.fontFamily; font.bold: true; font.pixelSize: stat.fontPx
                     renderType: Text.NativeRendering
                     transform: Translate { y: stat.tn.y + stat.tn.textY }
                 }
@@ -1200,7 +1202,7 @@ Scope {
                     model: mq.animating ? 2 : 1
                     delegate: Text {
                         required property int index
-                        text: mq.text; color: Theme.text; font.family: Theme.iconFont
+                        text: mq.text; color: Theme.text; font.family: Theme.fontFamily
                         font.pixelSize: root.sz.mq
                         renderType: root.vertical ? Text.QtRendering : Text.NativeRendering
                         width: index === 0 ? (mq.animating ? mq.textW : strip.titleW)
@@ -1250,7 +1252,7 @@ Scope {
                 color: Qt.alpha(Theme.bg, cfg.bgOpacity)
                 Text {
                     id: badgeText; anchors.centerIn: parent; text: root.notifCount > 9 ? "9+" : root.notifCount
-                    color: Theme.text; font.family: Theme.iconFont; font.pixelSize: Math.max(8, root.s(8))
+                    color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Math.max(8, root.s(8))
                     font.bold: true; renderType: Text.NativeRendering
                 }
             }
@@ -1373,7 +1375,7 @@ Scope {
                             anchors.centerIn: parent
                             active: root.wsNumbers
                             sourceComponent: Text {
-                                text: dot.modelData.id; color: Theme.text; font.family: Theme.iconFont
+                                text: dot.modelData.id; color: Theme.text; font.family: Theme.fontFamily
                                 font.pixelSize: Math.round(root.wsBoxPx * 0.62); font.bold: dot.modelData.focused
                                 renderType: Text.NativeRendering
                             }
@@ -1441,7 +1443,7 @@ Component {
                     anchors.verticalCenterOffset: root.vertical ? 0 : ct.y + ct.textY
                     text: wm.focusedId > 0 ? wm.focusedId : ""
                     color: wmMa.containsMouse ? Theme.accent2 : Theme.text
-                    font.family: Theme.iconFont; font.bold: true
+                    font.family: Theme.fontFamily; font.bold: true
                     font.pixelSize: root.sz.clock + ct.textSize
                     renderType: Text.NativeRendering
                 }

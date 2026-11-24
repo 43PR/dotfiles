@@ -120,7 +120,16 @@ Item {
     readonly property var layoutOptions: ["dwindle", "scrolling", "master"]
     readonly property var borderStyleOptions: ["full", "corner"]
     readonly property var workspaceStyleOptions: ["slide", "slidefade", "slidevert", "slidefadevert"]
-
+    // ids are the exact font family names (check with: fc-list : family | sort -u)
+    readonly property var fontOptions: [
+        "JetBrains Mono", "JetBrainsMono Nerd Font", "Iosevka Nerd Font", "Roboto Mono"
+    ]
+    readonly property var fontLabels: ({
+        "JetBrains Mono": "JETBRAINS",
+        "JetBrainsMono Nerd Font": "JETBRAINS NF",
+        "Iosevka Nerd Font": "IOSEVKA NF",
+        "Roboto Mono": "ROBOTO MONO"
+    })
     readonly property var profileLabels: ({ "power-saver": "POWER SAVER", balanced: "BALANCED", performance: "PERFORMANCE" })
     readonly property var workspaceStyleLabels: ({ slide: "SLIDE", slidefade: "FADE", slidevert: "VERT", slidefadevert: "VERT FADE" })
 
@@ -1184,6 +1193,15 @@ Item {
                             onMoved: v => Theme.settingsScale = page.round2(v)
                             onCommitted: v => Theme.setHub("settingsScale", page.round2(v))
                         }
+                    }
+
+                    BarChoice {
+                        label: "FONT"
+                        options: page.fontOptions
+                        labels: page.fontLabels
+                        maxCols: 4
+                        current: Theme.fontFamily
+                        onPicked: v => Theme.setHub("fontFamily", v)
                     }
 
                     Cols {

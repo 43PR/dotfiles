@@ -59,7 +59,8 @@ Item {
         toasts: true,
         soundEnabled: true,
         notifBgEnabled: false,
-        scrollSwitch: true
+        scrollSwitch: true,
+        showCity: true
     })
     readonly property var boolKeys: Object.keys(boolDefaults)
 
@@ -655,6 +656,10 @@ Item {
                         ToggleRow {
                             label: "SCROLL SWITCHES VIEW"; checked: page.val("scrollSwitch")
                             onToggled: v => page.set("scrollSwitch", v)
+                        }
+                        ToggleRow {
+                            label: "SHOW CITY NAME"; checked: page.val("showCity")
+                            onToggled: v => page.set("showCity", v)
                         }
                         CycleChoice {
                             label: "OPEN WITH"

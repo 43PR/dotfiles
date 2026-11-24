@@ -11,7 +11,7 @@ QtObject {
     property real tiltStrength: 7
     property real settingsScale: 1.0
     property bool settingsBorder: true
-    readonly property string fontFamily: "JetBrains Mono"
+    property string fontFamily: "JetBrains Mono"
     property string iconFont: "JetBrainsMono Nerd Font"
     property FontLoader tablerLoader: FontLoader {
     source: "file://" + Quickshell.env("HOME") + "/.config/quickshell/fonts/TablerIconsBar.ttf"
@@ -87,7 +87,7 @@ QtObject {
 
     readonly property var hubKeys: [
         "tiltStrength", "settingsScale", "settingsBorder", "bgAlpha", "radius", "hideSettingsIcons",
-        "borderOpacity", "hyprBorderStyle",
+        "borderOpacity", "hyprBorderStyle", "fontFamily",
         "bgImageEnabled", "bgImagePath", "bgImageOpacity", "bgImageBlur",
         "bgImageFadeTop", "bgImageFadeBottom",
         "bgImageZoom", "bgImagePosX", "bgImagePosY"
@@ -107,6 +107,7 @@ QtObject {
         radius = 10
         borderOpacity = 1.0
         hyprBorderStyle = "full"
+        fontFamily = "JetBrains Mono"
         hideSettingsIcons = false
         // The picture path is kept on purpose; only the look is reset.
         bgImageEnabled = false
@@ -129,6 +130,7 @@ QtObject {
             radius: radius,
             borderOpacity: borderOpacity,
             hyprBorderStyle: hyprBorderStyle,
+            fontFamily: fontFamily,
             hideSettingsIcons: hideSettingsIcons,
             bgImageEnabled: bgImageEnabled,
             bgImagePath: bgImagePath,
@@ -174,6 +176,7 @@ QtObject {
                 if (typeof s.borderOpacity === "number") root.borderOpacity = Math.max(0.1, Math.min(1, s.borderOpacity))
                 if (s.hyprBorderStyle === "full" || s.hyprBorderStyle === "corner") root.hyprBorderStyle = s.hyprBorderStyle
                 if (typeof s.hideSettingsIcons === "boolean") root.hideSettingsIcons = s.hideSettingsIcons
+                if (typeof s.fontFamily === "string" && s.fontFamily.trim() !== "") root.fontFamily = s.fontFamily
                 if (typeof s.bgImageEnabled === "boolean") root.bgImageEnabled = s.bgImageEnabled
                 if (typeof s.bgImagePath === "string") root.bgImagePath = s.bgImagePath
                 if (typeof s.bgImageOpacity === "number") root.bgImageOpacity = clamp01(s.bgImageOpacity)
@@ -217,6 +220,9 @@ QtObject {
         }
         function setSettingsBorder(on: bool): void {
             root.setHub("settingsBorder", on)
+        }
+        function setFont(family: string): void {
+            if (family.trim() !== "") root.setHub("fontFamily", family)
         }
         function setBgImage(path: string): void {
             root.setHub("bgImagePath", path)

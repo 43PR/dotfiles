@@ -50,7 +50,8 @@ Scope {
         soundEnabled: true,
         notifBgEnabled: false,
         syncOpacity: true,
-        scrollSwitch: true
+        scrollSwitch: true,
+        showCity: true
     })
     readonly property var boolKeys: Object.keys(boolDefaults)
 
@@ -89,6 +90,7 @@ Scope {
     property bool notifBgEnabled: boolDefaults.notifBgEnabled
     property bool syncOpacity: boolDefaults.syncOpacity
     property bool scrollSwitch: boolDefaults.scrollSwitch
+    property bool showCity: boolDefaults.showCity
     // background picture shown centered behind the notification list
     readonly property string defaultNotifBg: ""
     property string notifBgPath: defaultNotifBg
@@ -1619,6 +1621,7 @@ Scope {
                                     active: root.panelOpen
                                     mode: root.calMode
                                     scrollSwitch: root.scrollSwitch
+                                    showCity: root.showCity
                                     now: clk.date
                                     weekMonday: root.weekMonday
                                     clock24: root.clock24
@@ -2045,6 +2048,7 @@ Scope {
                                                             color: Theme.text
                                                             selectionColor: Theme.alpha(Theme.text, 0.3)
                                                             selectedTextColor: Theme.text
+                                                            font.family: Theme.fontFamily
                                                             font.pixelSize: Math.round(root.fs(10) * root.ntx)
                                                             Keys.onEscapePressed: root.closePanel()
                                                             onSelectedTextChanged: selTimer.restart()
@@ -2089,6 +2093,7 @@ Scope {
     component Lbl: Text {
         property real sz: 10
         property real k: 1
+        font.family: Theme.fontFamily
         font.pixelSize: Math.round(sz * root.ui * root.tx * k)
         color: Theme.text
         elide: Text.ElideRight

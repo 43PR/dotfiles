@@ -25,6 +25,7 @@ Item {
     property bool showDivider: false
     property var tryAddReminder: null         // function (dayTs, clockStr, text) -> bool
     property bool scrollSwitch: true          // scroll over the block switches calendar / weather
+    property bool showCity: true              // show the city name under the temperature
 
     signal modeRequested(string m)
     signal monthOffsetRequested(int v)
@@ -69,7 +70,7 @@ Item {
     property int rainPct: 0
     property int code: 0
     property bool isDay: true
-    property var hourly: []                   // [{ h, t, code, day }] (8 entries, first = current hour)
+    property var hourly: []                   // [{ h, t, code, day }] (8 entries, 2 hours apart, first = current hour)
     property real lat: 0
     property real lon: 0
     property string loc: ""
@@ -160,7 +161,7 @@ Item {
             if (String(h.time[i]).slice(0, 13) >= key) { i0 = i; break }
         }
         const out = []
-        for (let i = i0; i < Math.min(h.time.length, i0 + 8); i++)
+        for (let i = i0; i < h.time.length && out.length < 8; i += 2)
             out.push({
                 h: parseInt(String(h.time[i]).slice(11, 13)),
                 t: h.temperature_2m[i],
@@ -282,7 +283,7 @@ Item {
     component Lbl: Text {
         property real sz: 10
         property real k: 1
-        font.family: Theme.iconFont
+        font.family: Theme.fontFamily
         font.pixelSize: Math.round(sz * cw.ui * cw.tx * k)
         color: Theme.text
         elide: Text.ElideRight
@@ -434,7 +435,7 @@ Item {
                         sz: 34
                         color: Theme.textDim
                         font.bold: true
-                        font.family: Theme.iconFont
+                        font.family: Theme.fontFamily
                         textFormat: Text.RichText
                         elide: Text.ElideNone
                         text: cw.clockHtml(cw.now)
@@ -476,7 +477,7 @@ Item {
                             anchors.centerIn: parent
                             sz: 13
                             font.bold: true
-                            font.family: Theme.iconFont
+                            font.family: Theme.fontFamily
                             color: titleMa.containsMouse ? cw.accent : Theme.text
                             text: Qt.formatDate(calView.view, "MMMM yyyy")
                         }
@@ -631,6 +632,7 @@ Item {
 
                             TextInput {
                                 id: timeIn
+                                font.family: Theme.fontFamily
                                 anchors.fill: parent
                                 anchors.leftMargin: cw.px(8)
                                 anchors.rightMargin: cw.px(8)
@@ -657,6 +659,7 @@ Item {
 
                             TextInput {
                                 id: textIn
+                                font.family: Theme.fontFamily
                                 anchors.fill: parent
                                 anchors.leftMargin: cw.px(8)
                                 anchors.rightMargin: cw.px(8)
@@ -673,6 +676,7 @@ Item {
                                     visible: textIn.text === "" && !textIn.inputMethodComposing
                                     anchors.verticalCenter: parent.verticalCenter
                                     text: "Remind me to… (Enter)"
+                                    font.family: Theme.fontFamily
                                     font.pixelSize: cw.fs(11)
                                     color: Theme.textDim
                                     opacity: 0.7
@@ -739,6 +743,7 @@ Item {
                                 }
                             }
                             Lbl {
+                                visible: cw.showCity
                                 width: parent.width
                                 sz: 11
                                 color: Theme.textDim
@@ -761,7 +766,7 @@ Item {
                         }
                     }
 
-                    // ---- next 8 hours ----
+                    // ---- next 16 hours (every 2 hours) ----
                     Item {
                         id: chart
                         width: parent.width
