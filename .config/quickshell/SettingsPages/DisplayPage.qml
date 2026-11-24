@@ -77,13 +77,13 @@ Item {
 
     function luaFileText() {
         const lines = []
+        const offNames = []
         const names = Object.keys(savedState)
         for (let i = 0; i < names.length; i++) {
             const entry = savedState[names[i]]
             if (!entry) continue
-            // Never write "disabled" to the boot file: if the other monitor is unplugged
-            // at the next boot, the only screen would stay off and leave a black screen.
-            if (entry.disabled === true) continue
+            // Disabled monitors are written below, guarded by a "is another screen connected" check.
+            if (entry.disabled === true) { offNames.push(names[i]); continue }
             if (typeof entry.mode !== "string") continue
             lines.push(monitorLua({ name: names[i] }, {
                 mode: entry.mode,
@@ -92,6 +92,25 @@ Item {
                 transform: typeof entry.transform === "number" ? entry.transform : 0,
                 disabled: false
             }))
+        }
+        if (offNames.length > 0) {
+            const set = offNames.map(n => "[\"" + luaString(n) + "\"] = true").join(", ")
+            lines.push("local off = { " + set + " }")
+            lines.push("local function other_screen_connected()")
+            lines.push("    local ok, p = pcall(io.popen, \"grep -l '^connected' /sys/class/drm/card*-*/status 2>/dev/null\")")
+            lines.push("    if not ok or not p then return false end")
+            lines.push("    local found = false")
+            lines.push("    for path in p:lines() do")
+            lines.push("        local name = path:match(\"card%d+%-(.+)/status$\")")
+            lines.push("        if name and not off[name] then found = true end")
+            lines.push("    end")
+            lines.push("    p:close()")
+            lines.push("    return found")
+            lines.push("end")
+            lines.push("if other_screen_connected() then")
+            for (let i = 0; i < offNames.length; i++)
+                lines.push("    hl.monitor({ output = \"" + luaString(offNames[i]) + "\", disabled = true })")
+            lines.push("end")
         }
         return lines.join("\n") + "\n"
     }

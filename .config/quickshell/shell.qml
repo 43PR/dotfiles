@@ -13,4 +13,5 @@ ShellRoot {
     Todo {}
     Notifications {}
     ColorPicker {}
+    DisplayGuard {}
 }
