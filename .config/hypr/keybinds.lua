@@ -282,5 +282,10 @@ bind("XF86AudioPlay", hl.dsp.exec_cmd("playerctl play-pause"), { locked = true }
 bind("XF86AudioNext", hl.dsp.exec_cmd("playerctl next"), { locked = true })
 bind("XF86AudioPrev", hl.dsp.exec_cmd("playerctl previous"), { locked = true })
 
-bind(mainMod .. " + " .. mic_key, hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"))
-bind("XF86AudioMicMute", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"), { locked = true })
+local mic_toggle_cmd = [==[sh -c '
+wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle
+if wpctl get-volume @DEFAULT_AUDIO_SOURCE@ | grep -q MUTED; then m=true; else m=false; fi
+qs ipc call mic state "$m"
+']==]
+bind(mainMod .. " + " .. mic_key, hl.dsp.exec_cmd(mic_toggle_cmd))
+bind("XF86AudioMicMute", hl.dsp.exec_cmd(mic_toggle_cmd), { locked = true })

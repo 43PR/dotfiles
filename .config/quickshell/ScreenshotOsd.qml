@@ -18,6 +18,7 @@ Scope {
     property string kbDevice: ""         // keyboard device name
     property double kbLastShown: 0
     property string ocrState: ""         // "working" | "done" | "empty" | "cancelled"
+    property bool micMuted: false        // used when kind === "mic"
     property string ocrText: ""
 
     // window size, reported by the OSD window (used to keep the card on screen)
@@ -246,7 +247,9 @@ Scope {
 
     readonly property bool isOcr: kind === "ocr"
     readonly property bool isKb: kind === "keyboard"
+    readonly property bool isMic: kind === "mic"
     readonly property string titleText: {
+        if (isMic) return micMuted ? "Microphone muted" : "Microphone on"
         if (isKb) return kbLayout
         if (isOcr) {
             switch (ocrState) {
@@ -259,6 +262,7 @@ Scope {
         return cancelled ? "Screenshot cancelled" : "Screenshot saved"
     }
     readonly property string subText: {
+        if (isMic) return micMuted ? "Input is off" : "Input is live"
         if (isKb) return "Keyboard layout"
         if (isOcr) {
             switch (ocrState) {
@@ -292,6 +296,19 @@ Scope {
         kind = "keyboard"
         kbDevice = device
         kbLayout = layoutName
+        cancelled = false
+        ocrState = ""
+        ocrText = ""
+        imagePath = ""
+        showing = true
+        hideTimer.interval = root.showMs
+        hideTimer.restart()
+    }
+
+    function showMic(muted) {
+        if (settingsOpen) return
+        kind = "mic"
+        micMuted = muted
         cancelled = false
         ocrState = ""
         ocrText = ""
@@ -360,6 +377,12 @@ Scope {
             if (comma < 0) return
             root.showKeyboard(data.substring(0, comma), data.substring(comma + 1))
         }
+    }
+
+    // test: qs ipc call mic state true
+    IpcHandler {
+        target: "mic"
+        function state(muted: bool): void { root.showMic(muted) }
     }
 
     // test: qs ipc call keyboard show "English (US)"
@@ -488,7 +511,8 @@ Scope {
                     Text {
                         anchors.centerIn: parent
                         visible: !root.imagePath
-                        text: root.isKb ? "󰌌"
+                        text: root.isMic ? (root.micMuted ? "󰍭" : "󰍬")
+                              : root.isKb ? "󰌌"
                               : root.isOcr
                               ? (root.ocrState === "done" || root.ocrState === "working" ? "Aa" : "󰜺")
                               : (root.cancelled ? "󰜺" : "󰄀")
@@ -514,7 +538,7 @@ Scope {
                     }
                     // middle line: filename for screenshots, text preview for OCR
                     Text {
-                        visible: root.showDetail && (root.isOcr ? root.ocrState === "done"
+                        visible: root.showDetail && !root.isMic && (root.isOcr ? root.ocrState === "done"
                                                    : root.isKb ? root.kbDevice !== ""
                                                    : !root.cancelled)
                         text: root.isOcr ? root.ocrText

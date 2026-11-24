@@ -56,8 +56,8 @@ Singleton {
         wall:          { h: { x: -1, y: 1 }, v: {} },
         settings:      { h: { x: -1, y: 0 }, v: { x: -1 } },
         power:         { h: { x: -1, y: 1, textY: -1, pad: 4 }, v: { x: 0, textY: 0 } },
-        clock:         { h: { y: 2, textY: -1 }, v: {} },
-        weather:       { h: { y: 1, iconY: -1, textY: -1, spacing: -3, pad: 4 }, v: { iconX: -1 } },
+        clock:         { h: { y: 2, textY: -1, pad: 8 }, v: { pad: 8 } },
+        weather:       { h: { y: 2, iconY: -1, textY: -1, spacing: -3, pad: 4 }, v: { iconX: -1 } },
         net:           { h: { x: -1, y: 1, iconY: -1 }, v: { x: -1, iconY: 0 } },
         bt:            { all: { scaleX: 1.17 }, h: { x: 1, y: 1, iconY: -1, pad: 4 }, v: { x: 1, iconY: 0 } },
         volume:        { h: { y: 1.25, iconY: -1, textY: -1 }, v: { x: 0, iconY: 0, textY: -1 } },
@@ -72,6 +72,9 @@ Singleton {
         gpu:           { h: { iconY: 0, textY: 1 } },
         cputemp:       { h: { iconY: 0, textY: 1 } },
         gputemp:       { h: { iconY: 0, textY: 1 } },
+        ws:            { h: {}, v: { x: 1 } },
+        tasks:         { h: {}, v: { x: 1 } },
+        media:         { h: {}, v: { x: 1 } },
     })
     // ───────────────────────── Colours ─────────────────────────
     // Every icon colour role lives here. Bar.qml asks IconTune.color(moduleId, role).

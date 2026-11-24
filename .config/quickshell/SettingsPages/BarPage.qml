@@ -29,7 +29,7 @@ Item {
         clock24: true, clockSeconds: false, clockPadHour: true, clockAmPm: true, clockDate: true, clockDay: false, clockDot: true, clockDayOnly: false, clockCase: "normal", dateOrder: "md", weekMonday: true,
         weatherIcon: false, weatherF: false, weatherCity: "", weatherCase: "upper", weatherSymbol: false, weatherNumber: true,
         mediaMaxW: 110, mediaScroll: true,
-        stripCorner: "square", stripRadius: 12, stripFlare: 10, stripDivide: "none",
+        stripCorner: "square", stripRadius: 12, stripFlare: 10, stripDivide: "none", stripPad: 16, stripFrame: false, frameRadius: 16, borderWidth: 1,
         iconHX: 0, iconHY: 0, textHX: 0, textHY: 0, iconVX: 0, iconVY: 0, textVX: 0, textVY: 0,
         clockPrimary: "calendar", clockSecondary: "settings", clockTertiary: "barsettings",
         settingsPrimary: "settings", settingsSecondary: "barsettings", settingsTertiary: "none",
@@ -559,14 +559,14 @@ Item {
                         BarSlider {
                             label: "H-BAR END INSET"
                             enabled: !page.vertical
-                            from: 0; to: 600; step: 1; unit: " px"
+                            from: -20; to: 600; step: 1; unit: " px"
                             value: page.val("insetH")
                             onMoved: v => page.set("insetH", v)
                         }
                         BarSlider {
                             label: "V-BAR END INSET"
                             enabled: page.vertical
-                            from: 0; to: 600; step: 1; unit: " px"
+                            from: -20; to: 600; step: 1; unit: " px"
                             value: page.val("insetV")
                             onMoved: v => page.set("insetV", v)
                         }
@@ -585,11 +585,32 @@ Item {
                             onMoved: v => page.set("stripFlare", v)
                         }
                         BarSlider {
+                            label: "SECTION PADDING"
+                            visible: page.strip
+                            from: 0; to: 60; step: 1; unit: " px"
+                            value: page.val("stripPad")
+                            onMoved: v => page.set("stripPad", v)
+                        }
+                        BarSlider {
+                            label: "FRAME CORNER RADIUS"
+                            visible: page.strip && page.val("stripFrame")
+                            from: 0; to: 20; step: 1; unit: " px"
+                            value: page.val("frameRadius")
+                            onMoved: v => page.set("frameRadius", v)
+                        }
+                        BarSlider {
                             label: "BORDER OPACITY"
                             enabled: page.val("border")
                             from: 0; to: 1; step: 0.05; unit: "%"; displayScale: 100
                             value: page.val("borderOpacity")
                             onMoved: v => page.set("borderOpacity", v)
+                        }
+                        BarSlider {
+                            label: "BORDER WIDTH"
+                            enabled: page.val("border")
+                            from: 0.5; to: 4; step: 0.5; unit: " px"; decimals: 1
+                            value: page.val("borderWidth")
+                            onMoved: v => page.set("borderWidth", v)
                         }
                     }
 
@@ -612,6 +633,11 @@ Item {
                         ToggleRow {
                             label: "DRAG MODULES"; checked: page.val("dragModules")
                             onToggled: v => page.set("dragModules", v)
+                        }
+                        ToggleRow {
+                            label: "SCREEN FRAME"; checked: page.val("stripFrame")
+                            enabled: page.strip && page.val("stripDivide") === "sections"
+                            onToggled: v => page.set("stripFrame", v)
                         }
                     }
                 }
@@ -1093,6 +1119,60 @@ Item {
                     }
                 }
             }
+            // ---------------- ICON / TEXT POSITION ----------------
+            Column {
+                id: secNudge
+                width: parent.width; spacing: 6
+                topPadding: 2
+
+                SectionTitle { text: "ICON & TEXT POSITION" }
+
+                Card {
+                    Note { text: "Moves every icon / label on the bar. Added on top of the per-module values in IconTune. + is right / down." }
+
+                    GroupLabel {
+                        text: "HORIZONTAL BAR (TOP / BOTTOM)"
+                        opacity: page.vertical ? 0.4 : 1.0
+                    }
+                    Cols {
+                        enabled: !page.vertical
+                        BarSlider {
+                            label: "ICONS Y"
+                            from: -10; to: 10; step: 0.5; unit: " px"; decimals: 1
+                            value: page.val("iconHY")
+                            onMoved: v => page.set("iconHY", v)
+                        }
+                        BarSlider {
+                            label: "TEXT Y"
+                            from: -10; to: 10; step: 0.5; unit: " px"; decimals: 1
+                            value: page.val("textHY")
+                            onMoved: v => page.set("textHY", v)
+                        }
+                    }
+
+                    Divider {}
+
+                    GroupLabel {
+                        text: "VERTICAL BAR (LEFT / RIGHT)"
+                        opacity: page.vertical ? 1.0 : 0.4
+                    }
+                    Cols {
+                        enabled: page.vertical
+                        BarSlider {
+                            label: "ICONS X"
+                            from: -10; to: 10; step: 0.5; unit: " px"; decimals: 1
+                            value: page.val("iconVX")
+                            onMoved: v => page.set("iconVX", v)
+                        }
+                        BarSlider {
+                            label: "TEXT X"
+                            from: -10; to: 10; step: 0.5; unit: " px"; decimals: 1
+                            value: page.val("textVX")
+                            onMoved: v => page.set("textVX", v)
+                        }
+                    }
+                }
+            }
             // ---------------- TOOLTIPS ----------------
             Column {
                 id: secTooltips
@@ -1140,9 +1220,6 @@ Item {
             }
 
             // ---------------- CLICK ACTIONS ----------------
-            // What a click on the clock / settings button does.
-            // "SIDE PANEL" = open SidePanel (calendar + quick actions + notifications).
-            // Click a button to cycle through the available actions.
             Column {
                 id: secActions
                 width: parent.width; spacing: 6
@@ -1198,77 +1275,6 @@ Item {
                             options: page.settingsActions; labels: page.actionLabels
                             current: page.val("settingsTertiary")
                             onPicked: v => page.set("settingsTertiary", v)
-                        }
-                    }
-                }
-            }
-
-            // ---------------- ICON / TEXT POSITION ----------------
-            Column {
-                id: secNudge
-                width: parent.width; spacing: 6
-                topPadding: 2
-
-                SectionTitle { text: "ICON & TEXT POSITION" }
-
-                Card {
-                    Note { text: "Moves every icon / label on the bar. Added on top of the per-module values in IconTune. + is right / down." }
-
-                    GroupLabel { text: "HORIZONTAL BAR (TOP / BOTTOM)" }
-                    Cols {
-                        BarSlider {
-                            label: "ICONS X"
-                            from: -10; to: 10; step: 0.5; unit: " px"; decimals: 1
-                            value: page.val("iconHX")
-                            onMoved: v => page.set("iconHX", v)
-                        }
-                        BarSlider {
-                            label: "ICONS Y"
-                            from: -10; to: 10; step: 0.5; unit: " px"; decimals: 1
-                            value: page.val("iconHY")
-                            onMoved: v => page.set("iconHY", v)
-                        }
-                        BarSlider {
-                            label: "TEXT X"
-                            from: -10; to: 10; step: 0.5; unit: " px"; decimals: 1
-                            value: page.val("textHX")
-                            onMoved: v => page.set("textHX", v)
-                        }
-                        BarSlider {
-                            label: "TEXT Y"
-                            from: -10; to: 10; step: 0.5; unit: " px"; decimals: 1
-                            value: page.val("textHY")
-                            onMoved: v => page.set("textHY", v)
-                        }
-                    }
-
-                    Divider {}
-
-                    GroupLabel { text: "VERTICAL BAR (LEFT / RIGHT)" }
-                    Cols {
-                        BarSlider {
-                            label: "ICONS X"
-                            from: -10; to: 10; step: 0.5; unit: " px"; decimals: 1
-                            value: page.val("iconVX")
-                            onMoved: v => page.set("iconVX", v)
-                        }
-                        BarSlider {
-                            label: "ICONS Y"
-                            from: -10; to: 10; step: 0.5; unit: " px"; decimals: 1
-                            value: page.val("iconVY")
-                            onMoved: v => page.set("iconVY", v)
-                        }
-                        BarSlider {
-                            label: "TEXT X"
-                            from: -10; to: 10; step: 0.5; unit: " px"; decimals: 1
-                            value: page.val("textVX")
-                            onMoved: v => page.set("textVX", v)
-                        }
-                        BarSlider {
-                            label: "TEXT Y"
-                            from: -10; to: 10; step: 0.5; unit: " px"; decimals: 1
-                            value: page.val("textVY")
-                            onMoved: v => page.set("textVY", v)
                         }
                     }
                 }

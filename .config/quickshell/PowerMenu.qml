@@ -879,7 +879,63 @@ Scope {
                         anchors.fill: parent
                         acceptedButtons: Qt.LeftButton | Qt.RightButton
                     }
+                    // Drag strip: invisible, runs along the whole top edge of the panel,
+                    // on top of the buttons. Left-drag moves the menu, right-click opens settings.
+                    MouseArea {
+                        id: dragArea
+                        anchors.top: parent.top
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        height: 10
+                        z: 50
+                        hoverEnabled: true
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                        cursorShape: root.dragging ? Qt.ClosedHandCursor : Qt.OpenHandCursor
 
+                        property real pressX: 0
+                        property real pressY: 0
+                        property real startX: 0
+                        property real startY: 0
+
+                        onPressed: function (mouse) {
+                            if (mouse.button === Qt.RightButton) {
+                                root.openSettings()
+                                return
+                            }
+                            var p = dragArea.mapToItem(menuRoot, mouse.x, mouse.y)
+                            pressX = p.x
+                            pressY = p.y
+                            startX = root.offsetX
+                            startY = root.offsetY
+                            root.dragging = true
+                        }
+
+                        onPositionChanged: function (mouse) {
+                            if (!root.dragging) return
+                            var p = dragArea.mapToItem(menuRoot, mouse.x, mouse.y)
+                            root.setPosition(startX + (p.x - pressX), startY + (p.y - pressY))
+                        }
+
+                        onReleased: {
+                            if (!root.dragging) return
+                            root.dragging = false
+                            root.saveState()
+                        }
+
+                        onCanceled: {
+                            if (!root.dragging) return
+                            root.dragging = false
+                            root.saveState()
+                        }
+
+                        Tip {
+                            id: headerTip
+                            allowed: root.showTooltips
+                            hovered: dragArea.containsMouse && !root.dragging
+                            side: "below"
+                            text: "Drag to move · right-click: settings"
+                        }
+                    }
                     Column {
                         id: panelCol
                         anchors.top: parent.top
@@ -888,68 +944,6 @@ Scope {
                         anchors.margins: root.panelPadding
                         spacing: 6
 
-                        // ---- drag handle (right click opens settings) ----
-                        Item {
-                            id: header
-                            width: parent.width
-                            height: 12
-                            z: headerTip.shown ? 100 : 0
-
-                            Rectangle {
-                                anchors.centerIn: parent
-                                width: 36; height: 4; radius: 2
-                                color: Theme.bg
-                                opacity: (dragArea.containsMouse || root.dragging) ? 1 : 0
-                                Behavior on opacity { NumberAnimation { duration: 150 } }
-                            }
-
-                            MouseArea {
-                                id: dragArea
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                acceptedButtons: Qt.LeftButton | Qt.RightButton
-                                cursorShape: root.dragging ? Qt.ClosedHandCursor : Qt.OpenHandCursor
-                                property real pressX: 0
-                                property real pressY: 0
-                                property real startX: 0
-                                property real startY: 0
-                                onPressed: function (mouse) {
-                                    if (mouse.button === Qt.RightButton) {
-                                        root.openSettings()
-                                        return
-                                    }
-                                    var p = dragArea.mapToItem(menuRoot, mouse.x, mouse.y)
-                                    pressX = p.x
-                                    pressY = p.y
-                                    startX = root.offsetX
-                                    startY = root.offsetY
-                                    root.dragging = true
-                                }
-                                onPositionChanged: function (mouse) {
-                                    if (!root.dragging) return
-                                    var p = dragArea.mapToItem(menuRoot, mouse.x, mouse.y)
-                                    root.setPosition(startX + (p.x - pressX), startY + (p.y - pressY))
-                                }
-                                onReleased: {
-                                    if (!root.dragging) return
-                                    root.dragging = false
-                                    root.saveState()
-                                }
-                                onCanceled: {
-                                    if (!root.dragging) return
-                                    root.dragging = false
-                                    root.saveState()
-                                }
-                            }
-
-                            Tip {
-                                id: headerTip
-                                allowed: root.showTooltips
-                                hovered: dragArea.containsMouse && !root.dragging
-                                side: "below"
-                                text: "Drag to move · right-click: settings"
-                            }
-                        }
 
                         // ---- action list (vertical list or horizontal row) ----
                         Grid {

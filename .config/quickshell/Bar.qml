@@ -27,7 +27,7 @@ Scope {
         clock24: true, clockSeconds: false, clockPadHour: true, clockAmPm: true, clockDate: true, clockDay: false, clockDot: true, clockDayOnly: false, clockCase: "normal", dateOrder: "md", weekMonday: true,
         weatherIcon: false, weatherF: false, weatherCity: "", weatherCase: "upper", weatherSymbol: false, weatherNumber: true,
         mediaMaxW: 110, mediaScroll: true,
-        stripCorner: "square", stripRadius: 12, stripFlare: 10, stripDivide: "none",
+        stripCorner: "square", stripRadius: 12, stripFlare: 10, stripDivide: "none", stripPad: 16, stripFrame: false, frameRadius: 16, borderWidth: 1,
         iconHX: 0, iconHY: 0, textHX: 0, textHY: 0, iconVX: 0, iconVY: 0, textVX: 0, textVY: 0,
         clockPrimary: "calendar", clockSecondary: "settings", clockTertiary: "barsettings",
         settingsPrimary: "settings", settingsSecondary: "barsettings", settingsTertiary: "none",
@@ -99,6 +99,10 @@ Scope {
             property int stripRadius: root.defaults.stripRadius
             property int stripFlare: root.defaults.stripFlare
             property string stripDivide: root.defaults.stripDivide
+            property int stripPad: root.defaults.stripPad
+            property bool stripFrame: root.defaults.stripFrame
+            property int frameRadius: root.defaults.frameRadius
+            property real borderWidth: root.defaults.borderWidth
             property real iconHX: root.defaults.iconHX; property real iconHY: root.defaults.iconHY
             property real textHX: root.defaults.textHX; property real textHY: root.defaults.textHY
             property real iconVX: root.defaults.iconVX; property real iconVY: root.defaults.iconVY
@@ -182,6 +186,70 @@ Scope {
     readonly property int cornerPad: cfg.stripCorner === "tab"
         ? 2 * Math.round(Math.min(cfg.stripFlare, panelThick)) : 0
     readonly property real bs: cfg.barScale
+
+    readonly property bool frameOn: stripSections && cfg.stripFrame
+    readonly property real bw: cfg.borderWidth > 0 ? cfg.borderWidth : defaults.borderWidth
+    readonly property real borderW: cfg.border ? bw : 0
+    // line centre sits this far inside the window edge so the anti-aliased fringe is never clipped
+    readonly property real bInset: Math.round(bw) / 2 + 1
+    readonly property real frameR: Math.max(0, cfg.frameRadius)
+    property var frameSpans: ({})
+    property int spanTick: 0
+    property var lastSpans: []
+    function setSpans(name, v) {
+        const m = Object.assign({}, frameSpans); m[name] = v; frameSpans = m;
+        lastSpans = v;
+    }
+    function arcTo(rad, sweep, x, y) {
+        return rad > 0 ? " A " + rad + " " + rad + " 0 0 " + sweep + " " + x + " " + y
+                       : " L " + x + " " + y;
+    }
+    function tabRadii(w, h) {
+        const room = h - 2 * bInset;
+        let f = cfg.stripCorner === "tab" ? cfg.stripFlare : 0;
+        let r = cfg.stripCorner === "square" ? 0 : cfg.stripRadius;
+        if (f + r > room) { const s = room / (f + r); f *= s; r *= s; }
+        f = Math.min(f, w / 4);
+        r = Math.min(r, (w - 2 * f) / 2);
+        return { f: f, r: r };
+    }
+    function tabPath(x0, w, h, skipL, skipR) {
+        const k = bInset, b = h - k, x1 = x0 + w;
+        const q = tabRadii(w, h), f = q.f, r = q.r;
+        let d = "";
+        if (!skipL)
+            d += arcTo(f, 1, x0 + f, k + f) + " L " + (x0 + f) + " " + (b - r) + arcTo(r, 0, x0 + f + r, b);
+        if (!skipR)
+            d += " L " + (x1 - f - r) + " " + b + arcTo(r, 0, x1 - f, b - r)
+               + " L " + (x1 - f) + " " + (k + f) + arcTo(f, 1, x1, k);
+        return d;
+    }
+    function framePath(spans, len, h, fill) {
+        const k = bInset, b = h - k, R = frameR, n = spans.length;
+        let d = (fill ? "M 0 0 L 0 " + b + " L " : "M ") + (k + R) + " " + b;
+        let prev = 0;
+        for (let i = 0; i < n; i++) {
+            const a = i === 0 ? 0 : spans[i].a, e = i === n - 1 ? len : spans[i].b;
+            if (i > 0) {
+                if (fill) d += " L " + prev + " 0 L " + a + " 0";
+                d += " L " + a + " " + k;
+            }
+            d += tabPath(a, e - a, h, i === 0, i === n - 1);
+            prev = e;
+        }
+        d += " L " + (len - k - R) + " " + b;
+        return fill ? d + " L " + len + " " + b + " L " + len + " 0 Z" : d;
+    }
+    // The complete outline as ONE closed path: bar bottom line + S-curves, then the screen sides
+    function fullPath(spans, len, cross) {
+        const k = bInset, R = frameR, h = panelThick + effEdge, b = h - k;
+        return framePath(spans, len, h, false)
+             + arcTo(R, 1, len - k, b + R)
+             + " L " + (len - k) + " " + (cross - k - R) + arcTo(R, 1, len - k - R, cross - k)
+             + " L " + (k + R) + " " + (cross - k) + arcTo(R, 1, k, cross - k - R)
+             + " L " + k + " " + (b + R) + arcTo(R, 1, k + R, b) + " Z";
+    }
+
     readonly property int panelThick: Math.round((vertical ? cfg.thickness + 12 : cfg.thickness) * bs)
     readonly property int effEdge: strip ? 0 : Math.round(cfg.margin * bs)
     readonly property int effGap: strip ? 0 : Math.round(6 * bs)
@@ -195,7 +263,7 @@ Scope {
     readonly property int wsGapPx: Math.round(cfg.wsGap * bs)
     readonly property real barRadius: strip ? 0 : cfg.radius
     readonly property color bgColor: Qt.alpha(Theme.bg, cfg.bgOpacity)
-    readonly property color borderColor: Qt.alpha(Theme.accent, cfg.borderOpacity)
+    readonly property color borderColor: Qt.alpha(IconTune.color("*", "ringArc"), cfg.borderOpacity)
     function s(n) { return Math.round(n * cfg.scale * cfg.barScale); }
     // IconTune values plus the global offsets from the Bar settings page
     function tune(id, vert, variant) {
@@ -825,8 +893,12 @@ Scope {
         run("hyprctl dispatch 'hl.dsp.focus({workspace=\"e" + (dy > 0 ? "+1" : "-1") + "\"})'");
     }
     component Lane: GridLayout {
-        property int gap: 0; flow: root.vertical ? GridLayout.TopToBottom : GridLayout.LeftToRight; rowSpacing: gap
-        columnSpacing: gap
+        property int gap: 0
+        flow: root.vertical ? GridLayout.TopToBottom : GridLayout.LeftToRight
+        // one single line along the bar, however many items there are (default is 4 per line)
+        rows: root.vertical ? 999 : 1
+        columns: root.vertical ? 1 : 999
+        rowSpacing: gap; columnSpacing: gap
     }
     component DMouseArea: MouseArea {
         id: dm; property bool suppressClick: false; property bool dragging: false
@@ -1203,13 +1275,18 @@ Scope {
         readonly property bool hasVisible: model.some(id => root.modVisible(id)); visible: hasVisible
         readonly property var visIds: model.filter(id => root.modVisible(id))
         readonly property int padAlong: root.islands ? 0
-            : 4 + (root.stripSections ? root.cornerPad : 0)
+            : cfg.stripPad + (root.stripSections ? root.cornerPad : 0)
         z: dragActive ? 100 : 0
+        onXChanged: root.spanTick++
+        onYChanged: root.spanTick++
+        onWidthChanged: root.spanTick++
+        onHeightChanged: root.spanTick++
+        onVisibleChanged: root.spanTick++
         width: root.vertical ? root.panelThick : laneItem.implicitWidth + padAlong
         height: root.vertical ? laneItem.implicitHeight + padAlong : root.panelThick
         radius: root.barRadius; color: root.joined || root.islands ? "transparent" : root.bgColor
         border.width: cfg.border && !root.joined && !root.islands ? 1 : 0; border.color: root.borderColor
-        Loader { anchors.fill: parent; active: root.stripSections; visible: active; sourceComponent: root.cornerComp }
+        Loader { anchors.fill: parent; active: root.stripSections && !root.frameOn; visible: active; sourceComponent: root.cornerComp }
         Lane {
             id: laneItem; anchors.centerIn: parent; gap: root.islands ? root.effGap + root.islandGapPx : 0
             Repeater {
@@ -1243,6 +1320,10 @@ Scope {
     component MarqueeStrip: Item {
         id: strip
         readonly property int glyphGap: 9
+        readonly property var tn: root.tune("media", root.vertical)
+        // screen-space offset -> this (possibly rotated) strip's local axes
+        function lx(sx, sy) { return !root.vertical ? sx : cfg.position === "left" ? -sy : sy }
+        function ly(sx, sy) { return !root.vertical ? sy : cfg.position === "left" ? sx : -sx }
         // widest of both glyphs, so toggling play/pause never shifts the title
         readonly property real glyphW: Math.ceil(Math.max(gPlay.width, gPause.width))
         readonly property real titleW: Math.min(mq.textW, mq.maxW)
@@ -1255,7 +1336,8 @@ Scope {
             width: strip.glyphW; height: parent.height
             Text {
                 anchors.centerIn: parent
-                anchors.verticalCenterOffset: root.vertical ? 0 : root.iconYOffset
+                anchors.horizontalCenterOffset: strip.lx(strip.tn.iconX, strip.tn.iconY)
+                anchors.verticalCenterOffset: (root.vertical ? 0 : root.iconYOffset) + strip.ly(strip.tn.iconX, strip.tn.iconY)
                 text: mq.glyph; color: Theme.text; font.family: Theme.iconFont
                 font.pixelSize: root.sz.mq
                 renderType: root.vertical ? Text.QtRendering : Text.NativeRendering
@@ -1263,7 +1345,9 @@ Scope {
         }
         // scrolling title
         Item {
-            x: strip.glyphW + strip.glyphGap; width: strip.titleW; height: parent.height; clip: true
+            x: strip.glyphW + strip.glyphGap + strip.lx(strip.tn.textX, strip.tn.textY)
+            y: strip.ly(strip.tn.textX, strip.tn.textY)
+            width: strip.titleW; height: parent.height; clip: true
             Row {
                 x: mq.animating ? mq.x : 0; spacing: mq.gap
                 anchors.verticalCenter: parent.verticalCenter
@@ -1290,20 +1374,6 @@ Scope {
             id: cs
             readonly property real len: root.vertical ? height : width
             readonly property real thick: root.vertical ? width : height
-            readonly property real f: cfg.stripCorner === "tab"
-                ? Math.max(0, Math.min(cfg.stripFlare, thick, len / 4)) : 0
-            readonly property real r: cfg.stripCorner === "square" ? 0
-                : Math.max(0, Math.min(cfg.stripRadius, thick - f, (len - 2 * f) / 2))
-            readonly property string d: {
-                const w = cs.len, h = cs.thick, f = cs.f, r = cs.r;
-                const arc = (rad, sweep, x, y) => rad > 0
-                    ? " A " + rad + " " + rad + " 0 0 " + sweep + " " + x + " " + y
-                    : " L " + x + " " + y;
-                return "M 0 0" + arc(f, 1, f, f)
-                     + " L " + f + " " + (h - r) + arc(r, 0, f + r, h)
-                     + " L " + (w - f - r) + " " + h + arc(r, 0, w - f, h - r)
-                     + " L " + (w - f) + " " + f + arc(f, 1, w, 0);
-            }
             Item {
                 anchors.centerIn: parent
                 width: cs.len; height: cs.thick
@@ -1314,12 +1384,15 @@ Scope {
                     preferredRendererType: Shape.CurveRenderer
                     ShapePath {
                         fillColor: root.bgColor; strokeColor: "transparent"; strokeWidth: 0
-                        PathSvg { path: cs.d + " Z" }
+                        PathSvg {
+                            path: "M 0 0 L 0 " + root.bInset
+                                  + root.tabPath(0, cs.len, cs.thick, false, false) + " L " + cs.len + " 0 Z"
+                        }
                     }
                     ShapePath {
                         fillColor: "transparent"; strokeColor: root.borderColor
-                        strokeWidth: cfg.border ? 1 : 0; capStyle: ShapePath.FlatCap
-                        PathSvg { path: cs.d }
+                        strokeWidth: root.borderW; capStyle: ShapePath.FlatCap
+                        PathSvg { path: "M 0 " + root.bInset + root.tabPath(0, cs.len, cs.thick, false, false) }
                     }
                 }
             }
@@ -1534,11 +1607,14 @@ Component {
         readonly property int perRow: Math.max(1, Math.floor((root.panelThick - 6) / hit))
         readonly property int perCol: Math.max(1, Math.floor((root.panelThick - 4) / hit))
         readonly property int wsCount: Math.max(1, Hyprland.workspaces.values.length)
+        readonly property var tn: root.tune("ws", root.vertical)
         implicitWidth: root.vertical ? root.panelThick : lay.implicitWidth + 12
         implicitHeight: root.vertical ? lay.implicitHeight + 4 : root.panelThick
 
         GridLayout {
             id: lay; anchors.centerIn: parent
+            anchors.horizontalCenterOffset: wm.tn.x
+            anchors.verticalCenterOffset: wm.tn.y
             flow: root.vertical ? GridLayout.TopToBottom : GridLayout.LeftToRight
             rowSpacing: root.vertical ? 0 : 2; columnSpacing: 3
 
@@ -1552,8 +1628,8 @@ Component {
                     id: wsNum
                     readonly property var ct: root.tune("clock", root.vertical)
                     anchors.centerIn: parent
-                    anchors.horizontalCenterOffset: ct.textX
-                    anchors.verticalCenterOffset: root.vertical ? ct.textY : ct.y + ct.textY
+                    anchors.horizontalCenterOffset: ct.textX + wm.tn.textX
+                    anchors.verticalCenterOffset: (root.vertical ? ct.textY : ct.y + ct.textY) + wm.tn.textY
                     text: wm.focusedId > 0 ? wm.focusedId : ""
                     color: wmMa.containsMouse ? Theme.accent2 : Theme.text
                     font.family: Theme.fontFamily; font.bold: true
@@ -1564,6 +1640,7 @@ Component {
             Grid {
                 Layout.alignment: Qt.AlignCenter
                 flow: root.vertical ? Grid.LeftToRight : Grid.TopToBottom
+                transform: Translate { x: wm.tn.iconX; y: wm.tn.iconY }
                 rows: 2
                 columns: root.vertical
                     ? Math.max(1, Math.min(wm.perRow, Math.ceil(wm.wsCount / 2)))
@@ -1611,30 +1688,42 @@ Component {
 }
     Component {
         id: tasksC
-        Lane {
-            gap: root.taskGapPx
-            Repeater {
-                model: ToplevelManager.toplevels
-                delegate: Interactive {
-                    id: task
-                    required property var modelData
-                    Layout.alignment: Qt.AlignCenter
-                    implicitWidth: root.vertical ? root.panelThick : root.taskIconPx + 10
-                    implicitHeight: root.vertical ? root.taskIconPx + 10
-                                                  : Math.max(root.panelThick - 2, root.taskIconPx + 6)
-                    mid: "tasks"; active: modelData.activated; tip: root.appName(modelData.appId); noHints: true
-                    primaryHint: "Focus window"; tertiaryHint: "Close window"; onPrimary: modelData.activate()
-                    onTertiary: modelData.close()
-                    Image {
-                        id: appIcon; anchors.centerIn: parent; width: root.taskIconPx; height: root.taskIconPx
-                        sourceSize: Qt.size(width, height); asynchronous: true; smooth: true; visible: false
-                        source: root.iconFor(task.modelData.appId)
-                    }
-                    MultiEffect {
-                        anchors.fill: appIcon; source: appIcon; colorization: cfg.tasksColor === "accent" ? 1.0 : 0.0
-                        colorizationColor: IconTune.color("tasks", task.modelData.activated ? "taskActive" : "normal")
-                        opacity: task.modelData.activated ? 1 : 0.5
-                        scale: IconTune.resolve("tasks", root.vertical).taskScale
+        Item {
+            id: tk
+            readonly property int count: ToplevelManager.toplevels.values.length
+            implicitWidth: root.vertical ? root.panelThick : tkLane.implicitWidth
+            implicitHeight: root.vertical ? tkLane.implicitHeight
+                                          : Math.max(root.panelThick - 2, root.taskIconPx + 6)
+            Lane {
+                id: tkLane
+                anchors.centerIn: parent
+                gap: root.taskGapPx
+                Repeater {
+                    model: ToplevelManager.toplevels
+                    delegate: Interactive {
+                        id: task
+                        required property var modelData
+                        Layout.alignment: Qt.AlignCenter
+                        implicitWidth: root.vertical ? root.panelThick : root.taskIconPx + 10
+                        implicitHeight: root.vertical ? root.taskIconPx + 10
+                                                      : Math.max(root.panelThick - 2, root.taskIconPx + 6)
+                        mid: "tasks"; active: modelData.activated; tip: root.appName(modelData.appId); noHints: true
+                        readonly property var tn: root.tune("tasks", root.vertical)
+                        primaryHint: "Focus window"; tertiaryHint: "Close window"; onPrimary: modelData.activate()
+                        onTertiary: modelData.close()
+                        Image {
+                            id: appIcon; anchors.centerIn: parent; width: root.taskIconPx; height: root.taskIconPx
+                            anchors.horizontalCenterOffset: task.tn.x + task.tn.iconX
+                            anchors.verticalCenterOffset: task.tn.y + task.tn.iconY
+                            sourceSize: Qt.size(width, height); asynchronous: true; smooth: true; visible: false
+                            source: root.iconFor(task.modelData.appId)
+                        }
+                        MultiEffect {
+                            anchors.fill: appIcon; source: appIcon; colorization: cfg.tasksColor === "accent" ? 1.0 : 0.0
+                            colorizationColor: IconTune.color("tasks", task.modelData.activated ? "taskActive" : "normal")
+                            opacity: task.modelData.activated ? 1 : 0.5
+                            scale: IconTune.resolve("tasks", root.vertical).taskScale
+                        }
                     }
                 }
             }
@@ -1656,7 +1745,7 @@ Component {
         implicitHeight: flyout ? root.trayIconPx + 10
                       : root.vertical ? root.trayIconPx + 8
                                       : Math.max(root.panelThick - 4, root.trayIconPx + 4)
-        mid: "tray"; warning: attention; noTip: flyout
+        mid: "tray"; warning: attention; noHints: true
         tip: modelData.tooltipTitle !== "" ? modelData.tooltipTitle
            : modelData.title !== "" ? modelData.title : modelData.id
         primaryHint: "Activate"; secondaryHint: "Open menu"
@@ -1689,11 +1778,19 @@ Component {
             onClosed: { const h = ti.hostItem(); if (h) h.menuOpen = false; }
         }
         Image {
+            id: trayImg
             anchors.centerIn: parent
             width: root.trayIconPx; height: root.trayIconPx
             sourceSize: Qt.size(width, height)
             asynchronous: true; smooth: true; fillMode: Image.PreserveAspectFit
+            visible: false
             source: ti.modelData.icon
+        }
+        MultiEffect {
+            anchors.fill: trayImg; source: trayImg
+            colorization: cfg.tasksColor === "accent" ? 1.0 : 0.0
+            colorizationColor: IconTune.color("tasks", ti.attention ? "taskActive" : "normal")
+            opacity: ti.attention ? 1 : 0.5
         }
     }
 }
@@ -1780,6 +1877,8 @@ Component {
             MarqueeStrip {
                 id: strip
                 anchors.centerIn: parent; width: totalW; height: 18
+                anchors.horizontalCenterOffset: tn.x
+                anchors.verticalCenterOffset: tn.y
                 rotation: root.vertical ? (cfg.position === "left" ? -90 : 90) : 0
             }
         }
@@ -1872,6 +1971,7 @@ Component {
             onScrolled: delta => { const d = root.notch("night", delta); if (d !== 0) root.nightAdjust(d); }
         }
     }
+
     Variants {
         model: root.barLive
             ? (cfg.allScreens ? Quickshell.screens : Quickshell.screens.slice(0, 1))
@@ -1965,7 +2065,35 @@ Component {
                     visible: active
                     sourceComponent: root.cornerComp
                 }
-
+                readonly property var flipSpans: {
+                    root.spanTick;   // re-evaluate whenever any panel moves/resizes
+                    const flip = cfg.position === "left" || cfg.position === "bottom";
+                    const out = [];
+                    for (const p of [startPanel, midLeftPanel, clockPanel, midRightPanel, endPanel]) {
+                        if (!p.visible) continue;
+                        const a = Math.round(root.vertical ? p.y : p.x), b = Math.round(a + (root.vertical ? p.height : p.width));
+                        out.push(flip ? { a: axisLen - b, b: axisLen - a } : { a: a, b: b });
+                    }
+                    out.sort((u, v) => u.a - v.a);
+                    return out;
+                }
+                onFlipSpansChanged: root.setSpans(bar.modelData.name, flipSpans)
+                Component.onCompleted: root.setSpans(bar.modelData.name, flipSpans)
+                Item {
+                    visible: root.frameOn
+                    anchors.centerIn: parent
+                    width: frame.axisLen; height: root.panelThick
+                    rotation: cfg.position === "top" ? 0 : cfg.position === "bottom" ? 180
+                            : cfg.position === "left" ? -90 : 90
+                    Shape {
+                        anchors.fill: parent
+                        preferredRendererType: Shape.CurveRenderer
+                        ShapePath {
+                            fillColor: root.bgColor; strokeColor: "transparent"; strokeWidth: 0
+                            PathSvg { path: root.framePath(frame.flipSpans, frame.axisLen, root.panelThick, true) }
+                        }
+                    }
+                }
                 Panel {
                     id: startPanel; model: root.startList
                     x: root.vertical ? 0 : root.barInset
@@ -2009,6 +2137,90 @@ Component {
                     anchors.rightMargin: root.vertical ? 0 : root.barInset
                     anchors.bottomMargin: root.vertical ? root.barInset : 0
                     onDropped: (modId, sx, sy) => bar.dropModule(modId, sx, sy)
+                }
+            }
+        }
+    }
+    Variants {
+        model: root.barLive && root.barVisible && root.frameOn
+            ? (cfg.allScreens ? Quickshell.screens : Quickshell.screens.slice(0, 1))
+            : []
+        PanelWindow {
+            id: edge
+            required property var modelData
+            screen: modelData
+            anchors { top: true; bottom: true; left: true; right: true }
+            exclusionMode: ExclusionMode.Ignore
+            color: "transparent"
+            mask: Region {}          // empty region = clicks pass through
+            WlrLayershell.layer: WlrLayer.Overlay
+            visible: !(ToplevelManager.activeToplevel?.fullscreen ?? false)
+            Item {
+                id: holder
+                anchors.fill: parent
+                Item {
+                    id: fr
+                    anchors.centerIn: parent
+                    width: root.vertical ? holder.height : holder.width
+                    height: root.vertical ? holder.width : holder.height
+                    rotation: cfg.position === "top" ? 0 : cfg.position === "bottom" ? 180
+                            : cfg.position === "left" ? -90 : 90
+                    readonly property var mySpans: root.lastSpans
+                    readonly property string outline: root.fullPath(mySpans, fr.width, fr.height)
+                    // thin strips (screen edge to outline) in the gaps between tabs
+                    readonly property string gapPath: {
+                        const s = mySpans, k = root.bInset;
+                        let d = "";
+                        for (let i = 1; i < s.length; i++)
+                            if (s[i].a > s[i - 1].b)
+                                d += "M " + s[i - 1].b + " 0 L " + s[i].a + " 0 L " + s[i].a + " " + k
+                                   + " L " + s[i - 1].b + " " + k + " Z ";
+                        return d;
+                    }
+                    // background around the screen, only below the bar strip (the bar window draws the strip)
+                    Item {
+                        id: fillClip
+                        x: 0
+                        y: root.panelThick + root.effEdge - root.bInset
+                        width: fr.width
+                        height: fr.height - y
+                        clip: true
+                        Shape {
+                            x: 0; y: -fillClip.y
+                            width: fr.width; height: fr.height
+                            preferredRendererType: Shape.CurveRenderer
+                            ShapePath {
+                                fillColor: root.bgColor; strokeColor: "transparent"; strokeWidth: 0
+                                fillRule: ShapePath.OddEvenFill
+                                PathSvg {
+                                    path: "M 0 0 L " + fr.width + " 0 L " + fr.width + " " + fr.height
+                                          + " L 0 " + fr.height + " Z " + fr.outline
+                                }
+                            }
+                        }
+                    }
+                    Shape {
+                        anchors.fill: parent
+                        preferredRendererType: Shape.CurveRenderer
+                        ShapePath {
+                            fillColor: root.bgColor; strokeColor: "transparent"; strokeWidth: 0
+                            PathSvg { path: fr.gapPath }
+                        }
+                    }
+                    Loader {
+                        id: borderLoader
+                        anchors.fill: parent
+                        property string key: fr.outline
+                        sourceComponent: Shape {
+                            preferredRendererType: Shape.CurveRenderer
+                            ShapePath {
+                                fillColor: "transparent"; strokeColor: root.borderColor
+                                strokeWidth: root.borderW; joinStyle: ShapePath.RoundJoin
+                                PathSvg { path: fr.outline }
+                            }
+                        }
+                        onKeyChanged: { active = false; active = true; }
+                    }
                 }
             }
         }

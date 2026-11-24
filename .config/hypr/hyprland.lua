@@ -32,7 +32,7 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("awww-daemon")
     hl.exec_cmd("~/.config/hypr/scripts/wallpaper-restore.sh")
     hl.exec_cmd("~/.config/hypr/scripts/live-wallpaper-pause.sh")
-    hl.exec_cmd("sleep 1 && QSG_RENDER_LOOP=basic QS_ICON_THEME=Papirus qs")
+    hl.exec_cmd("QS_ICON_THEME=Papirus qs")
 end)
 
 ---- ENVIRONMENT VARIABLES ----
@@ -89,9 +89,6 @@ do
     end
 end
 require("rules")
-
--- HyprMod managed settings
-require("hyprland-gui")
 
 -- Let applications follow the same XDG choice as Super+B.
 hl.env("BROWSER", "python3 " .. os.getenv("HOME") .. "/.config/hypr/scripts/default-browser.py")
