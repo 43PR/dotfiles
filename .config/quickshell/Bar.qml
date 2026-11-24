@@ -27,6 +27,8 @@ Scope {
         clock24: true, clockSeconds: false, clockPadHour: true, clockAmPm: true, clockDate: true, clockDay: false, clockDot: true, clockDayOnly: false, clockCase: "normal", dateOrder: "md", weekMonday: true,
         weatherIcon: false, weatherF: false, weatherCity: "", weatherCase: "upper", weatherSymbol: false, weatherNumber: true,
         mediaMaxW: 110, mediaScroll: true,
+        stripCorner: "square", stripRadius: 12, stripFlare: 10, stripDivide: "none",
+        iconHX: 0, iconHY: 0, textHX: 0, textHY: 0, iconVX: 0, iconVY: 0, textVX: 0, textVY: 0,
         clockPrimary: "calendar", clockSecondary: "settings", clockTertiary: "barsettings",
         settingsPrimary: "settings", settingsSecondary: "barsettings", settingsTertiary: "none",
         hidden: "gputemp,settings,bright,night,wall,weather,ram",
@@ -93,6 +95,14 @@ Scope {
             property bool weatherSymbol: root.defaults.weatherSymbol
             property bool weatherNumber: root.defaults.weatherNumber
             property int mediaMaxW: root.defaults.mediaMaxW; property bool mediaScroll: root.defaults.mediaScroll
+            property string stripCorner: root.defaults.stripCorner
+            property int stripRadius: root.defaults.stripRadius
+            property int stripFlare: root.defaults.stripFlare
+            property string stripDivide: root.defaults.stripDivide
+            property real iconHX: root.defaults.iconHX; property real iconHY: root.defaults.iconHY
+            property real textHX: root.defaults.textHX; property real textHY: root.defaults.textHY
+            property real iconVX: root.defaults.iconVX; property real iconVY: root.defaults.iconVY
+            property real textVX: root.defaults.textVX; property real textVY: root.defaults.textVY
             property string hidden: root.defaults.hidden; property string startMods: root.defaults.startMods
             property string midLeftMods: root.defaults.midLeftMods
             property string centerMods: root.defaults.centerMods
@@ -166,6 +176,11 @@ Scope {
     readonly property bool vertical: cfg.position === "left" || cfg.position === "right"
     readonly property bool strip: cfg.style === "strip"; readonly property bool islands: cfg.style === "islands"
     readonly property bool joined: cfg.style === "joined" || cfg.style === "strip"
+    readonly property bool stripSplit: strip && cfg.stripDivide === "sections"
+    readonly property bool stripSections: stripSplit
+    readonly property bool shaped: strip && (cfg.stripCorner !== "square" || stripSplit)
+    readonly property int cornerPad: cfg.stripCorner === "tab"
+        ? 2 * Math.round(Math.min(cfg.stripFlare, panelThick)) : 0
     readonly property real bs: cfg.barScale
     readonly property int panelThick: Math.round((vertical ? cfg.thickness + 12 : cfg.thickness) * bs)
     readonly property int effEdge: strip ? 0 : Math.round(cfg.margin * bs)
@@ -182,6 +197,19 @@ Scope {
     readonly property color bgColor: Qt.alpha(Theme.bg, cfg.bgOpacity)
     readonly property color borderColor: Qt.alpha(Theme.accent, cfg.borderOpacity)
     function s(n) { return Math.round(n * cfg.scale * cfg.barScale); }
+    // IconTune values plus the global offsets from the Bar settings page
+    function tune(id, vert, variant) {
+        const t = IconTune.resolve(id, vert, variant);
+        const ix = vert ? cfg.iconVX : cfg.iconHX, iy = vert ? cfg.iconVY : cfg.iconHY;
+        const tx = vert ? cfg.textVX : cfg.textHX, ty = vert ? cfg.textVY : cfg.textHY;
+        // modules whose icon is drawn as text in the icon font (notif, power, wall, settings)
+        const glyphAsText = !!(defMap[id] && defMap[id].g);
+        t.iconX += ix; t.iconY += iy;
+        if (t.ringIconY !== null) t.ringIconY += iy;
+        t.textX += glyphAsText ? ix : tx;
+        t.textY += glyphAsText ? iy : ty;
+        return t;
+    }
     readonly property var sz: ({
         stat: s(12), clock: s(12), mq: s(12),
         icon: s(16), batText: s(12), power: s(16), taskIcon: s(18)
@@ -979,7 +1007,7 @@ Scope {
         property real iconX: 0; property real iconY: 0; property real textX: 0; property real textY: 0
         property real glyphXScale: 1; property int spacing: meter ? Math.round(4 * root.bs) : root.sizeIconGap
         property int padX: 0; property string variant: ""
-        readonly property var tn: IconTune.resolve(mid, root.vertical, variant)
+        readonly property var tn: root.tune(mid, root.vertical, variant)
         readonly property real iconYEff: meter && ringOn && tn.ringIconY !== null ? tn.ringIconY : tn.iconY
         readonly property real padEff: padX + tn.pad
         readonly property real basePad: root.selfPadded.indexOf(mid) >= 0 ? 0 : Math.round(8 * root.bs)
@@ -1060,7 +1088,7 @@ Scope {
         readonly property string shownLabel: useIcon ? icon : label
         readonly property string shownValue: valueText + (cfg.statsPercent ? unit : "")
         readonly property color fg: IconTune.color(mid, warning ? "warning" : "normal")
-        readonly property var tn: IconTune.resolve(mid, root.vertical)
+        readonly property var tn: root.tune(mid, root.vertical)
         readonly property int maxCross: Math.max(8, root.panelThick - (cfg.border ? 2 : 0))
         readonly property int crossPad: root.vertical ? 8 : 6
         readonly property int wantedPx: Math.max(4, Math.round(10 * cfg.statsScale * cfg.scale * cfg.barScale))
@@ -1099,20 +1127,21 @@ Scope {
                     mid: stat.mid; visible: stat.ring; Layout.alignment: Qt.AlignCenter; size: stat.ringPx
                     strokeRatio: 0.08; minStroke: 1.2; level: stat.level; glyph: stat.icon; glyphFont: stat.iconFont
                     fg: stat.fg; warning: stat.warning
-                    transform: Translate { y: stat.tn.iconY }
+                    transform: Translate { x: stat.tn.iconX; y: stat.tn.iconY }
                 }
                 Text {
                     visible: !stat.ring; Layout.alignment: Qt.AlignCenter; text: stat.shownLabel
                     color: Qt.alpha(stat.fg, 0.75); font.family: stat.useIcon ? stat.iconFont : Theme.fontFamily
                     font.pixelSize: stat.useIcon ? stat.fontPx + 2 : Math.max(4, stat.fontPx - 1)
-                    transform: Translate { y: stat.useIcon ? stat.tn.iconY : stat.tn.y + stat.tn.textY }
+                    transform: Translate { x: stat.useIcon ? stat.tn.iconX : stat.tn.textX
+                                           y: stat.useIcon ? stat.tn.iconY : stat.tn.y + stat.tn.textY }
                     renderType: Text.NativeRendering
                 }
                 Text {
                     visible: cfg.statsNumbers; Layout.alignment: Qt.AlignCenter; text: stat.shownValue; color: stat.fg
                     font.family: Theme.fontFamily; font.bold: true; font.pixelSize: stat.fontPx
                     renderType: Text.NativeRendering
-                    transform: Translate { y: stat.tn.y + stat.tn.textY }
+                    transform: Translate { x: stat.tn.textX; y: stat.tn.y + stat.tn.textY }
                 }
             }
         }
@@ -1130,17 +1159,57 @@ Scope {
         sourceComponent: root.comps[modelData] ?? root.comps.icon
         onLoaded: if (item.mid !== undefined) item.mid = modelData
     }
+    component CornerShape: Item {
+        id: cs
+        readonly property real len: root.vertical ? height : width
+        readonly property real thick: root.vertical ? width : height
+        readonly property real f: cfg.stripCorner === "tab"
+            ? Math.max(0, Math.min(cfg.stripFlare, thick, len / 4)) : 0
+        readonly property real r: cfg.stripCorner === "square" ? 0
+            : Math.max(0, Math.min(cfg.stripRadius, thick - f, (len - 2 * f) / 2))
+        readonly property string d: {
+            const w = cs.len, h = cs.thick, f = cs.f, r = cs.r;
+            const arc = (rad, sweep, x, y) => rad > 0
+                ? " A " + rad + " " + rad + " 0 0 " + sweep + " " + x + " " + y
+                : " L " + x + " " + y;
+            return "M 0 0" + arc(f, 1, f, f)
+                 + " L " + f + " " + (h - r) + arc(r, 0, f + r, h)
+                 + " L " + (w - f - r) + " " + h + arc(r, 0, w - f, h - r)
+                 + " L " + (w - f) + " " + f + arc(f, 1, w, 0);
+        }
+        Item {
+            anchors.centerIn: parent
+            width: cs.len; height: cs.thick
+            rotation: cfg.position === "top" ? 0 : cfg.position === "bottom" ? 180
+                    : cfg.position === "left" ? -90 : 90
+            Shape {
+                anchors.fill: parent
+                preferredRendererType: Shape.CurveRenderer
+                ShapePath {
+                    fillColor: root.bgColor; strokeColor: "transparent"; strokeWidth: 0
+                    PathSvg { path: cs.d + " Z" }
+                }
+                ShapePath {
+                    fillColor: "transparent"; strokeColor: root.borderColor
+                    strokeWidth: cfg.border ? 1 : 0; capStyle: ShapePath.FlatCap
+                    PathSvg { path: cs.d }
+                }
+            }
+        }
+    }
     component Panel: Rectangle {
         id: panel; property var model: []; property bool dragActive: false; readonly property Item lane: laneItem
         signal dropped(string modId, real sx, real sy)
         readonly property bool hasVisible: model.some(id => root.modVisible(id)); visible: hasVisible
         readonly property var visIds: model.filter(id => root.modVisible(id))
-        readonly property int padAlong: root.islands ? 0 : 4
+        readonly property int padAlong: root.islands ? 0
+            : 4 + (root.stripSections ? root.cornerPad : 0)
         z: dragActive ? 100 : 0
         width: root.vertical ? root.panelThick : laneItem.implicitWidth + padAlong
         height: root.vertical ? laneItem.implicitHeight + padAlong : root.panelThick
         radius: root.barRadius; color: root.joined || root.islands ? "transparent" : root.bgColor
         border.width: cfg.border && !root.joined && !root.islands ? 1 : 0; border.color: root.borderColor
+        Loader { anchors.fill: parent; active: root.stripSections; visible: active; sourceComponent: root.cornerComp }
         Lane {
             id: laneItem; anchors.centerIn: parent; gap: root.islands ? root.effGap + root.islandGapPx : 0
             Repeater {
@@ -1156,6 +1225,7 @@ Scope {
                     radius: root.barRadius; color: root.islands ? root.bgColor : "transparent"
                     border.width: root.islands && cfg.border ? 1 : 0; border.color: root.borderColor
                     onDragActiveChanged: panel.dragActive = dragActive
+ 
                     Lane {
                         id: islLane; anchors.centerIn: parent; gap: root.modPadPx
                         Repeater {
@@ -1208,6 +1278,48 @@ Scope {
                         width: index === 0 ? (mq.animating ? mq.textW : strip.titleW)
                                            : implicitWidth
                         elide: index === 0 && !mq.animating ? Text.ElideRight : Text.ElideNone
+                    }
+                }
+            }
+        }
+    }
+    readonly property Component cornerComp: cornerC
+    Component {
+        id: cornerC
+        Item {
+            id: cs
+            readonly property real len: root.vertical ? height : width
+            readonly property real thick: root.vertical ? width : height
+            readonly property real f: cfg.stripCorner === "tab"
+                ? Math.max(0, Math.min(cfg.stripFlare, thick, len / 4)) : 0
+            readonly property real r: cfg.stripCorner === "square" ? 0
+                : Math.max(0, Math.min(cfg.stripRadius, thick - f, (len - 2 * f) / 2))
+            readonly property string d: {
+                const w = cs.len, h = cs.thick, f = cs.f, r = cs.r;
+                const arc = (rad, sweep, x, y) => rad > 0
+                    ? " A " + rad + " " + rad + " 0 0 " + sweep + " " + x + " " + y
+                    : " L " + x + " " + y;
+                return "M 0 0" + arc(f, 1, f, f)
+                     + " L " + f + " " + (h - r) + arc(r, 0, f + r, h)
+                     + " L " + (w - f - r) + " " + h + arc(r, 0, w - f, h - r)
+                     + " L " + (w - f) + " " + f + arc(f, 1, w, 0);
+            }
+            Item {
+                anchors.centerIn: parent
+                width: cs.len; height: cs.thick
+                rotation: cfg.position === "top" ? 0 : cfg.position === "bottom" ? 180
+                        : cfg.position === "left" ? -90 : 90
+                Shape {
+                    anchors.fill: parent
+                    preferredRendererType: Shape.CurveRenderer
+                    ShapePath {
+                        fillColor: root.bgColor; strokeColor: "transparent"; strokeWidth: 0
+                        PathSvg { path: cs.d + " Z" }
+                    }
+                    ShapePath {
+                        fillColor: "transparent"; strokeColor: root.borderColor
+                        strokeWidth: cfg.border ? 1 : 0; capStyle: ShapePath.FlatCap
+                        PathSvg { path: cs.d }
                     }
                 }
             }
@@ -1438,9 +1550,10 @@ Component {
                 color: "transparent"; border.width: 0
                 Text {
                     id: wsNum
-                    readonly property var ct: IconTune.resolve("clock", root.vertical)
+                    readonly property var ct: root.tune("clock", root.vertical)
                     anchors.centerIn: parent
-                    anchors.verticalCenterOffset: root.vertical ? 0 : ct.y + ct.textY
+                    anchors.horizontalCenterOffset: ct.textX
+                    anchors.verticalCenterOffset: root.vertical ? ct.textY : ct.y + ct.textY
                     text: wm.focusedId > 0 ? wm.focusedId : ""
                     color: wmMa.containsMouse ? Theme.accent2 : Theme.text
                     font.family: Theme.fontFamily; font.bold: true
@@ -1842,9 +1955,17 @@ Component {
                 readonly property real midLeftC: (startEnd + centerBeg) / 2
                 readonly property real midRightC: (centerFin + endBeg) / 2
                 Rectangle {
-                    visible: root.joined; anchors.fill: parent; radius: root.barRadius; color: root.bgColor
+                    visible: root.joined && !root.shaped
+                    anchors.fill: parent; radius: root.barRadius; color: root.bgColor
                     border.width: cfg.border ? 1 : 0; border.color: root.borderColor
                 }
+                Loader {
+                    anchors.fill: parent
+                    active: root.strip && !root.stripSplit && cfg.stripCorner !== "square"
+                    visible: active
+                    sourceComponent: root.cornerComp
+                }
+
                 Panel {
                     id: startPanel; model: root.startList
                     x: root.vertical ? 0 : root.barInset

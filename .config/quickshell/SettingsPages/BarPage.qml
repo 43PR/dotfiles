@@ -29,6 +29,8 @@ Item {
         clock24: true, clockSeconds: false, clockPadHour: true, clockAmPm: true, clockDate: true, clockDay: false, clockDot: true, clockDayOnly: false, clockCase: "normal", dateOrder: "md", weekMonday: true,
         weatherIcon: false, weatherF: false, weatherCity: "", weatherCase: "upper", weatherSymbol: false, weatherNumber: true,
         mediaMaxW: 110, mediaScroll: true,
+        stripCorner: "square", stripRadius: 12, stripFlare: 10, stripDivide: "none",
+        iconHX: 0, iconHY: 0, textHX: 0, textHY: 0, iconVX: 0, iconVY: 0, textVX: 0, textVY: 0,
         clockPrimary: "calendar", clockSecondary: "settings", clockTertiary: "barsettings",
         settingsPrimary: "settings", settingsSecondary: "barsettings", settingsTertiary: "none",
         hidden: "gputemp,settings,bright,night,wall,weather,ram",
@@ -481,6 +483,24 @@ Item {
                         current: page.val("style")
                         onPicked: v => page.set("style", v)
                     }
+                    BarChoice {
+                        label: "STRIP DIVIDE"
+                        visible: page.strip
+                        options: ["none", "sections"]
+                        labels: ({ none: "ONE PIECE", sections: "SECTIONS" })
+                        maxCols: 2
+                        current: page.val("stripDivide")
+                        onPicked: v => page.set("stripDivide", v)
+                    }
+                    BarChoice {
+                        label: "STRIP CORNERS"
+                        visible: page.strip
+                        options: ["square", "round", "tab"]
+                        labels: ({ square: "SQUARE", round: "ROUNDED", tab: "TAB FLARE" })
+                        maxCols: 3
+                        current: page.val("stripCorner")
+                        onPicked: v => page.set("stripCorner", v)
+                    }
 
                     Divider {}
 
@@ -549,6 +569,20 @@ Item {
                             from: 0; to: 600; step: 1; unit: " px"
                             value: page.val("insetV")
                             onMoved: v => page.set("insetV", v)
+                        }
+                        BarSlider {
+                            label: "STRIP CORNER RADIUS"
+                            visible: page.strip && page.val("stripCorner") !== "square"
+                            from: 0; to: 40; step: 1; unit: " px"
+                            value: page.val("stripRadius")
+                            onMoved: v => page.set("stripRadius", v)
+                        }
+                        BarSlider {
+                            label: "STRIP FLARE SIZE"
+                            visible: page.strip && page.val("stripCorner") === "tab"
+                            from: 0; to: 40; step: 1; unit: " px"
+                            value: page.val("stripFlare")
+                            onMoved: v => page.set("stripFlare", v)
                         }
                         BarSlider {
                             label: "BORDER OPACITY"
@@ -1164,6 +1198,77 @@ Item {
                             options: page.settingsActions; labels: page.actionLabels
                             current: page.val("settingsTertiary")
                             onPicked: v => page.set("settingsTertiary", v)
+                        }
+                    }
+                }
+            }
+
+            // ---------------- ICON / TEXT POSITION ----------------
+            Column {
+                id: secNudge
+                width: parent.width; spacing: 6
+                topPadding: 2
+
+                SectionTitle { text: "ICON & TEXT POSITION" }
+
+                Card {
+                    Note { text: "Moves every icon / label on the bar. Added on top of the per-module values in IconTune. + is right / down." }
+
+                    GroupLabel { text: "HORIZONTAL BAR (TOP / BOTTOM)" }
+                    Cols {
+                        BarSlider {
+                            label: "ICONS X"
+                            from: -10; to: 10; step: 0.5; unit: " px"; decimals: 1
+                            value: page.val("iconHX")
+                            onMoved: v => page.set("iconHX", v)
+                        }
+                        BarSlider {
+                            label: "ICONS Y"
+                            from: -10; to: 10; step: 0.5; unit: " px"; decimals: 1
+                            value: page.val("iconHY")
+                            onMoved: v => page.set("iconHY", v)
+                        }
+                        BarSlider {
+                            label: "TEXT X"
+                            from: -10; to: 10; step: 0.5; unit: " px"; decimals: 1
+                            value: page.val("textHX")
+                            onMoved: v => page.set("textHX", v)
+                        }
+                        BarSlider {
+                            label: "TEXT Y"
+                            from: -10; to: 10; step: 0.5; unit: " px"; decimals: 1
+                            value: page.val("textHY")
+                            onMoved: v => page.set("textHY", v)
+                        }
+                    }
+
+                    Divider {}
+
+                    GroupLabel { text: "VERTICAL BAR (LEFT / RIGHT)" }
+                    Cols {
+                        BarSlider {
+                            label: "ICONS X"
+                            from: -10; to: 10; step: 0.5; unit: " px"; decimals: 1
+                            value: page.val("iconVX")
+                            onMoved: v => page.set("iconVX", v)
+                        }
+                        BarSlider {
+                            label: "ICONS Y"
+                            from: -10; to: 10; step: 0.5; unit: " px"; decimals: 1
+                            value: page.val("iconVY")
+                            onMoved: v => page.set("iconVY", v)
+                        }
+                        BarSlider {
+                            label: "TEXT X"
+                            from: -10; to: 10; step: 0.5; unit: " px"; decimals: 1
+                            value: page.val("textVX")
+                            onMoved: v => page.set("textVX", v)
+                        }
+                        BarSlider {
+                            label: "TEXT Y"
+                            from: -10; to: 10; step: 0.5; unit: " px"; decimals: 1
+                            value: page.val("textVY")
+                            onMoved: v => page.set("textVY", v)
                         }
                     }
                 }
