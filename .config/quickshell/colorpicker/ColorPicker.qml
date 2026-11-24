@@ -160,14 +160,25 @@ Scope {
         }
     }
 
-    Variants {
-        model: Quickshell.screens
-        ColorPickerOverlay {
-            required property var modelData
-            screen: modelData
-            ctl: root
+    // One overlay window per screen, but only while the picker is in use.
+    // Destroying them also frees the screenshots they decoded.
+    LazyLoader {
+        active: root.mode !== "idle"
+
+        Variants {
+            model: Quickshell.screens
+            ColorPickerOverlay {
+                required property var modelData
+                screen: modelData
+                ctl: root
+            }
         }
     }
 
-    ColorPickerEditor { ctl: root }
+    // Editor only exists while editing.
+    LazyLoader {
+        active: root.mode === "editing"
+
+        ColorPickerEditor { ctl: root }
+    }
 }

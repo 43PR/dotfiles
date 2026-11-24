@@ -226,7 +226,7 @@ if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
     kill -INT "$(cat "$PIDFILE")"
     rm -f "$PIDFILE"
 else
-    DIR="$(xdg-user-dir VIDEOS 2>/dev/null || echo "$HOME/Videos")"
+    DIR="$(xdg-user-dir VIDEOS 2>/dev/null || echo "$HOME/Videos")/Recordings"
     mkdir -p "$DIR"
     MON="$(hyprctl monitors | awk "/^Monitor/{n=\$2} /focused: yes/{print n}")"
     gpu-screen-recorder -w "${MON:-screen}" -f 60 -a default_output -o "$DIR/$(date +%Y-%m-%d_%H-%M-%S).mp4" &

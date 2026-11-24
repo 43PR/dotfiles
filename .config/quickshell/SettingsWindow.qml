@@ -36,6 +36,7 @@ Scope {
         onUnmounted: {
             root.winW = 0
             root.winH = 0
+            Qt.callLater(gc)
         }
     }
 

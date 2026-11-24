@@ -274,7 +274,7 @@ Scope {
     PopupLifecycle {
         id: life
         showing: root.wanted
-        keepAliveMs: 3600000
+        keepAliveMs: 20000
     }
     readonly property bool mounted: life.mounted
 
@@ -1544,8 +1544,8 @@ Scope {
                                 fillMode: Image.Stretch
                                 asynchronous: true
                                 cache: true
-                                mipmap: true
-                                sourceSize.width: 1920
+                                mipmap: false
+                                sourceSize.width: 1024
                             }
                         }
                         Rectangle {

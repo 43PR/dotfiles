@@ -43,9 +43,9 @@ Item {
             fillMode: Image.Stretch      // the box already has the right aspect
             asynchronous: true
             cache: true
-            mipmap: true
+            mipmap: false   // mipmaps add ~33% memory; sourceSize already decodes near display size
             // Fixed decode width so every panel shares one cached pixmap.
-            sourceSize.width: 1920
+            sourceSize.width: 1280   // raise (e.g. 1920) if the picture looks soft
         }
     }
 

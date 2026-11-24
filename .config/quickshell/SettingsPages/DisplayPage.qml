@@ -81,10 +81,9 @@ Item {
         for (let i = 0; i < names.length; i++) {
             const entry = savedState[names[i]]
             if (!entry) continue
-            if (entry.disabled === true) {
-                lines.push(monitorLua({ name: names[i] }, { disabled: true }))
-                continue
-            }
+            // Never write "disabled" to the boot file: if the other monitor is unplugged
+            // at the next boot, the only screen would stay off and leave a black screen.
+            if (entry.disabled === true) continue
             if (typeof entry.mode !== "string") continue
             lines.push(monitorLua({ name: names[i] }, {
                 mode: entry.mode,

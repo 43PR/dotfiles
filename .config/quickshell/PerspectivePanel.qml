@@ -34,7 +34,7 @@ Item {
     visible: opacity > 0.001
 
     readonly property bool needsLayer: cacheContent && visible && (
-        prewarm || hover.hovered || opacity < 0.999
+        prewarm || opacity < 0.999
         || Math.abs(rotX.angle) > 0.05 || Math.abs(rotY.angle) > 0.05
         || scaleT.xScale < 0.999)
 
