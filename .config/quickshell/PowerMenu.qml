@@ -561,6 +561,7 @@ Scope {
         boolKeys.forEach(function (k) { s[k] = root[k] })
         colorKeys.forEach(function (k) { s[k] = root[k] })
         s.settingsZoom = root.settingsZoom
+        s.collapsed = root.collapsedSections
         if (root.settingsPosSet) {
             s.settingsX = root.settingsX
             s.settingsY = root.settingsY
@@ -642,6 +643,17 @@ Scope {
         root.saveState()
     }
 
+    // ---- collapsed settings sections (saved in the state file) ----
+    // Advanced groups start folded; anything the user toggles is remembered.
+    property var collapsedSections: ({ inactive: true, active: true, hints: true })
+    function isCollapsed(k) { return collapsedSections[k] === true }
+    function toggleSection(k) {
+        var o = Object.assign({}, collapsedSections)
+        if (o[k]) delete o[k]; else o[k] = true
+        collapsedSections = o
+        zoomSaveTimer.restart()
+    }
+
     // wheel notches fire many times a second: save once it settles
     Timer {
         id: zoomSaveTimer
@@ -695,6 +707,8 @@ Scope {
                 if (typeof s.accentSource === "string"
                         && root.accentChoices.some(function (c) { return c.id === s.accentSource }))
                     root.accentSource = s.accentSource
+                if (s.collapsed && typeof s.collapsed === "object" && !Array.isArray(s.collapsed))
+                    root.collapsedSections = s.collapsed
 
                 // settings window zoom + position
                 if (typeof s.settingsZoom === "number")
@@ -1105,8 +1119,9 @@ Scope {
     // is full-screen, a blur layer rule for it should use `ignorealpha`, otherwise
     // the whole screen would be blurred.
     //
-    // Compact layout: sliders, colour pickers and toggles sit in plain `Grid`s
-    // (2 columns, 3 for the key list), so the whole page needs far less scrolling.
+    // Sections: each section has a clickable header (chevron on the right) that
+    // folds its body. Fold state is stored in root.collapsedSections. Folded
+    // bodies are invisible, so Tab skips the controls inside them.
     //
     // Keyboard: every toggle, slider, colour picker and footer button is
     // Tab-focusable (Qt's normal focus chain, in visual order). Tab / Shift+Tab or
@@ -1283,22 +1298,50 @@ Scope {
                             width: flick.width - 48 * settingsWin.u
 
                             // ---------------- GENERAL ----------------
-                            CustomizationSettings.SectionHeader { host: root; text: "General" }
+                            Item {
+                                width: contentCol.width; height: hdrGeneral.height
+                                CustomizationSettings.SectionHeader { id: hdrGeneral; host: root; text: "General" }
+                                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.toggleSection("general") }
+                                Text {
+                                    anchors.right: parent.right; anchors.rightMargin: 4 * settingsWin.u
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: "\uf077"; font.family: Theme.iconFont
+                                    font.pixelSize: root.th.textSizeBody * settingsWin.u
+                                    color: Theme.textDim
+                                    rotation: root.isCollapsed("general") ? 180 : 0
+                                    Behavior on rotation { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
+                                }
+                            }
                             Grid {
+                                visible: !root.isCollapsed("general")
                                 width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                                CustomizationSettings.SliderRow { host: root; key: "menuSize"; label: "Scale" }
+                                CustomizationSettings.SliderRow { host: root; key: "animMs"; label: "Animation" }
                                 CustomizationSettings.ToggleRow {
                                     host: root
                                     key: "showTooltips"
                                     label: "Tooltips"
                                     checked: root.showTooltips
                                 }
-                                CustomizationSettings.SliderRow { host: root; key: "menuSize"; label: "Scale" }
-                                CustomizationSettings.SliderRow { host: root; key: "animMs"; label: "Animation" }
                             }
 
                             // ---------------- LAYOUT & CONTENT ----------------
-                            CustomizationSettings.SectionHeader { host: root; text: "Layout & content" }
+                            Item {
+                                width: contentCol.width; height: hdrLayout.height
+                                CustomizationSettings.SectionHeader { id: hdrLayout; host: root; text: "Layout & content" }
+                                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.toggleSection("layout") }
+                                Text {
+                                    anchors.right: parent.right; anchors.rightMargin: 4 * settingsWin.u
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: "\uf077"; font.family: Theme.iconFont
+                                    font.pixelSize: root.th.textSizeBody * settingsWin.u
+                                    color: Theme.textDim
+                                    rotation: root.isCollapsed("layout") ? 180 : 0
+                                    Behavior on rotation { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
+                                }
+                            }
                             Grid {
+                                visible: !root.isCollapsed("layout")
                                 width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
                                 CustomizationSettings.ToggleRow { host: root; key: "horizontal"; label: "Horizontal"; checked: root.horizontal }
                                 CustomizationSettings.ToggleRow { host: root; key: "showIcons"; label: "Icons"; checked: root.showIcons }
@@ -1316,9 +1359,53 @@ Scope {
                                 CustomizationSettings.SliderRow { host: root; key: "panelPadding"; label: "Panel padding" }
                             }
 
-                            // ---------------- APPEARANCE ----------------
-                            CustomizationSettings.SectionHeader { host: root; text: "Appearance" }
+                            // ---------------- VISIBLE ACTIONS ----------------
+                            Item {
+                                width: contentCol.width; height: hdrActions.height
+                                CustomizationSettings.SectionHeader { id: hdrActions; host: root; text: "Visible actions" }
+                                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.toggleSection("actions") }
+                                Text {
+                                    anchors.right: parent.right; anchors.rightMargin: 4 * settingsWin.u
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: "\uf077"; font.family: Theme.iconFont
+                                    font.pixelSize: root.th.textSizeBody * settingsWin.u
+                                    color: Theme.textDim
+                                    rotation: root.isCollapsed("actions") ? 180 : 0
+                                    Behavior on rotation { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
+                                }
+                            }
                             Grid {
+                                visible: !root.isCollapsed("actions")
+                                width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                                Repeater {
+                                    model: root.actions
+                                    delegate: CustomizationSettings.ToggleRow {
+                                        required property var modelData
+                                        host: root
+                                        label: modelData.label + " (" + modelData.key.toUpperCase() + ")"
+                                        checked: root.hiddenNames.indexOf(modelData.name) < 0
+                                        onToggled: root.toggleAction(modelData.name)
+                                    }
+                                }
+                            }
+
+                            // ---------------- APPEARANCE ----------------
+                            Item {
+                                width: contentCol.width; height: hdrAppearance.height
+                                CustomizationSettings.SectionHeader { id: hdrAppearance; host: root; text: "Appearance" }
+                                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.toggleSection("appearance") }
+                                Text {
+                                    anchors.right: parent.right; anchors.rightMargin: 4 * settingsWin.u
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: "\uf077"; font.family: Theme.iconFont
+                                    font.pixelSize: root.th.textSizeBody * settingsWin.u
+                                    color: Theme.textDim
+                                    rotation: root.isCollapsed("appearance") ? 180 : 0
+                                    Behavior on rotation { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
+                                }
+                            }
+                            Grid {
+                                visible: !root.isCollapsed("appearance")
                                 width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
                                 CustomizationSettings.SliderRow { host: root; key: "panelRadius"; label: "Panel roundness" }
                                 CustomizationSettings.SliderRow { host: root; key: "itemRadius"; label: "Item roundness" }
@@ -1330,12 +1417,50 @@ Scope {
                                 CustomizationSettings.SliderRow { host: root; key: "dimOpacity"; label: "Screen dim" }
                             }
 
+                            // ---------------- BEHAVIOR ----------------
+                            Item {
+                                width: contentCol.width; height: hdrBehavior.height
+                                CustomizationSettings.SectionHeader { id: hdrBehavior; host: root; text: "Behavior" }
+                                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.toggleSection("behavior") }
+                                Text {
+                                    anchors.right: parent.right; anchors.rightMargin: 4 * settingsWin.u
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: "\uf077"; font.family: Theme.iconFont
+                                    font.pixelSize: root.th.textSizeBody * settingsWin.u
+                                    color: Theme.textDim
+                                    rotation: root.isCollapsed("behavior") ? 180 : 0
+                                    Behavior on rotation { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
+                                }
+                            }
+                            Grid {
+                                visible: !root.isCollapsed("behavior")
+                                width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                                CustomizationSettings.ToggleRow { host: root; key: "confirmDangerous"; label: "Confirm danger"; checked: root.confirmDangerous }
+                                CustomizationSettings.ToggleRow { host: root; key: "wrapNav"; label: "Wrap around"; checked: root.wrapNav }
+                                CustomizationSettings.ToggleRow { host: root; key: "hoverSelect"; label: "Hover selects"; checked: root.hoverSelect }
+                                CustomizationSettings.ToggleRow { host: root; key: "closeOnOutside"; label: "Click outside"; checked: root.closeOnOutside }
+                            }
+
                             // ---------------- COLORS ----------------
-                            CustomizationSettings.SectionHeader { host: root; text: "Colors" }
+                            Item {
+                                width: contentCol.width; height: hdrColors.height
+                                CustomizationSettings.SectionHeader { id: hdrColors; host: root; text: "Colors" }
+                                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.toggleSection("colors") }
+                                Text {
+                                    anchors.right: parent.right; anchors.rightMargin: 4 * settingsWin.u
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: "\uf077"; font.family: Theme.iconFont
+                                    font.pixelSize: root.th.textSizeBody * settingsWin.u
+                                    color: Theme.textDim
+                                    rotation: root.isCollapsed("colors") ? 180 : 0
+                                    Behavior on rotation { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
+                                }
+                            }
                             Item {
                                 id: acRow
+                                visible: !root.isCollapsed("colors")
                                 width: contentCol.width
-                                height: 50 * settingsWin.u
+                                height: visible ? 50 * settingsWin.u : 0
                                 activeFocusOnTab: true
 
                                 onActiveFocusChanged: if (activeFocus) root.ensureVisible(acRow, 32 * settingsWin.u)
@@ -1439,13 +1564,28 @@ Scope {
                                 }
                             }
                             Grid {
+                                visible: !root.isCollapsed("colors")
                                 width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
                                 CustomizationSettings.ToggleRow { host: root; colorKey: "panelBgColor"; label: "Panel background" }
                             }
 
-                            // ---------------- INACTIVE ITEMS ----------------
-                            CustomizationSettings.SectionHeader { host: root; text: "Inactive items" }
+                            // ---------------- INACTIVE ITEMS (folded by default) ----------------
+                            Item {
+                                width: contentCol.width; height: hdrInactive.height
+                                CustomizationSettings.SectionHeader { id: hdrInactive; host: root; text: "Inactive items" }
+                                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.toggleSection("inactive") }
+                                Text {
+                                    anchors.right: parent.right; anchors.rightMargin: 4 * settingsWin.u
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: "\uf077"; font.family: Theme.iconFont
+                                    font.pixelSize: root.th.textSizeBody * settingsWin.u
+                                    color: Theme.textDim
+                                    rotation: root.isCollapsed("inactive") ? 180 : 0
+                                    Behavior on rotation { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
+                                }
+                            }
                             Grid {
+                                visible: !root.isCollapsed("inactive")
                                 width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
                                 CustomizationSettings.ToggleRow { host: root; colorKey: "itemBgColor"; label: "Background" }
                                 CustomizationSettings.SliderRow { host: root; key: "itemOpacity"; label: "Background opacity" }
@@ -1457,9 +1597,23 @@ Scope {
                                 CustomizationSettings.SliderRow { host: root; key: "inactiveBorderOpacity"; label: "Border opacity" }
                             }
 
-                            // ---------------- ACTIVE ITEMS ----------------
-                            CustomizationSettings.SectionHeader { host: root; text: "Active items" }
+                            // ---------------- ACTIVE ITEMS (folded by default) ----------------
+                            Item {
+                                width: contentCol.width; height: hdrActive.height
+                                CustomizationSettings.SectionHeader { id: hdrActive; host: root; text: "Active items" }
+                                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.toggleSection("active") }
+                                Text {
+                                    anchors.right: parent.right; anchors.rightMargin: 4 * settingsWin.u
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: "\uf077"; font.family: Theme.iconFont
+                                    font.pixelSize: root.th.textSizeBody * settingsWin.u
+                                    color: Theme.textDim
+                                    rotation: root.isCollapsed("active") ? 180 : 0
+                                    Behavior on rotation { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
+                                }
+                            }
                             Grid {
+                                visible: !root.isCollapsed("active")
                                 width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
                                 CustomizationSettings.ToggleRow { host: root; colorKey: "itemBgActiveColor"; label: "Background" }
                                 CustomizationSettings.SliderRow { host: root; key: "hoverBoost"; label: "Background boost" }
@@ -1471,9 +1625,23 @@ Scope {
                                 CustomizationSettings.SliderRow { host: root; key: "borderOpacity"; label: "Border opacity" }
                             }
 
-                            // ---------------- KEY HINTS & CONFIRM ----------------
-                            CustomizationSettings.SectionHeader { host: root; text: "Key hints & confirm" }
+                            // ---------------- KEY HINTS & CONFIRM (folded by default) ----------------
+                            Item {
+                                width: contentCol.width; height: hdrHints.height
+                                CustomizationSettings.SectionHeader { id: hdrHints; host: root; text: "Key hints & confirm" }
+                                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.toggleSection("hints") }
+                                Text {
+                                    anchors.right: parent.right; anchors.rightMargin: 4 * settingsWin.u
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: "\uf077"; font.family: Theme.iconFont
+                                    font.pixelSize: root.th.textSizeBody * settingsWin.u
+                                    color: Theme.textDim
+                                    rotation: root.isCollapsed("hints") ? 180 : 0
+                                    Behavior on rotation { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
+                                }
+                            }
                             Grid {
+                                visible: !root.isCollapsed("hints")
                                 width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
                                 CustomizationSettings.ToggleRow { host: root; colorKey: "keyHintColor"; label: "Hint text color"; enabled: !root.horizontal && root.showKeyHints }
                                 CustomizationSettings.SliderRow { host: root; key: "keyHintOpacity"; label: "Hint text opacity"; enabled: !root.horizontal && root.showKeyHints }
@@ -1481,32 +1649,6 @@ Scope {
                                 CustomizationSettings.SliderRow { host: root; key: "keyHintBgOpacity"; label: "Hint badge opacity"; enabled: !root.horizontal && root.showKeyHints }
                                 CustomizationSettings.ToggleRow { host: root; colorKey: "pendingColor"; label: "Confirm text / icon" }
                                 CustomizationSettings.ToggleRow { host: root; colorKey: "pendingBorderColor"; label: "Confirm border" }
-                            }
-
-                            // ---------------- BEHAVIOR ----------------
-                            CustomizationSettings.SectionHeader { host: root; text: "Behavior" }
-                            Grid {
-                                width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                                CustomizationSettings.ToggleRow { host: root; key: "confirmDangerous"; label: "Confirm danger"; checked: root.confirmDangerous }
-                                CustomizationSettings.ToggleRow { host: root; key: "wrapNav"; label: "Wrap around"; checked: root.wrapNav }
-                                CustomizationSettings.ToggleRow { host: root; key: "hoverSelect"; label: "Hover selects"; checked: root.hoverSelect }
-                                CustomizationSettings.ToggleRow { host: root; key: "closeOnOutside"; label: "Click outside"; checked: root.closeOnOutside }
-                            }
-
-                            // ---------------- VISIBLE ACTIONS ----------------
-                            CustomizationSettings.SectionHeader { host: root; text: "Visible actions" }
-                            Grid {
-                                width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
-                                Repeater {
-                                    model: root.actions
-                                    delegate: CustomizationSettings.ToggleRow {
-                                        required property var modelData
-                                        host: root
-                                        label: modelData.label + " (" + modelData.key.toUpperCase() + ")"
-                                        checked: root.hiddenNames.indexOf(modelData.name) < 0
-                                        onToggled: root.toggleAction(modelData.name)
-                                    }
-                                }
                             }
                         }
                     }

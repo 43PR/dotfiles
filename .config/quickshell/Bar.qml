@@ -19,6 +19,7 @@ Scope {
         scale: 1, barScale: 0.75, bgOpacity: 0.2, border: true, borderOpacity: 0.05, radius: 15, calRadius: 15, calScale: 0.9,
         tooltips: true, tooltipHints: false, tooltipBorder: true, tipDelay: 450, tooltipScale: 0.85,
         modPad: 0, islandGap: 4, wsDot: 15, wsGap: 10, wsScroll: true, wsStyle: "minimal",
+        wsTextScale: 1, wsText: true,
         tasksScale: 0.75, tasksGap: 2, tasksColor: "accent",
         statsRing: true, statsNumbers: false, statsPercent: false, statsIcons: false, statsScale: 1, statsBorder: false, statsRadius: 24, statsGap: 0, statsWarn: 85, tempWarn: 85, batLowPct: 15,
         batNumber: false, batPercent: false, batRing: true, batLabel: false,
@@ -61,6 +62,7 @@ Scope {
             property real tooltipScale: root.defaults.tooltipScale; property int modPad: root.defaults.modPad; property int islandGap: root.defaults.islandGap
             property int wsDot: root.defaults.wsDot; property int wsGap: root.defaults.wsGap
             property bool wsScroll: root.defaults.wsScroll; property string wsStyle: root.defaults.wsStyle
+            property real wsTextScale: root.defaults.wsTextScale; property bool wsText: root.defaults.wsText
             property real tasksScale: root.defaults.tasksScale; property int tasksGap: root.defaults.tasksGap
             property string tasksColor: root.defaults.tasksColor; property bool statsRing: root.defaults.statsRing
             property bool statsNumbers: root.defaults.statsNumbers
@@ -197,9 +199,10 @@ Scope {
     property int spanTick: 0
     property var lastSpans: []
     function setSpans(name, v) {
-        const m = Object.assign({}, frameSpans); m[name] = v; frameSpans = m;
+        if (JSON.stringify(v) === JSON.stringify(lastSpans)) return;
         lastSpans = v;
     }
+    function bumpSpans() { spanTick++; }
     function arcTo(rad, sweep, x, y) {
         return rad > 0 ? " A " + rad + " " + rad + " 0 0 " + sweep + " " + x + " " + y
                        : " L " + x + " " + y;
@@ -1277,11 +1280,11 @@ Scope {
         readonly property int padAlong: root.islands ? 0
             : cfg.stripPad + (root.stripSections ? root.cornerPad : 0)
         z: dragActive ? 100 : 0
-        onXChanged: root.spanTick++
-        onYChanged: root.spanTick++
-        onWidthChanged: root.spanTick++
-        onHeightChanged: root.spanTick++
-        onVisibleChanged: root.spanTick++
+        onXChanged: Qt.callLater(root.bumpSpans)
+        onYChanged: Qt.callLater(root.bumpSpans)
+        onWidthChanged: Qt.callLater(root.bumpSpans)
+        onHeightChanged: Qt.callLater(root.bumpSpans)
+        onVisibleChanged: Qt.callLater(root.bumpSpans)
         width: root.vertical ? root.panelThick : laneItem.implicitWidth + padAlong
         height: root.vertical ? laneItem.implicitHeight + padAlong : root.panelThick
         radius: root.barRadius; color: root.joined || root.islands ? "transparent" : root.bgColor
@@ -1535,10 +1538,14 @@ Scope {
     Component {
         id: wsDotsC
         Item {
+            id: wd0
+            readonly property var tn: root.tune("ws", root.vertical)
             implicitWidth: root.vertical ? root.panelThick : wsLane.implicitWidth + 12
             implicitHeight: wsLane.implicitHeight + (root.vertical ? 12 : 0)
             Lane {
                 id: wsLane; anchors.centerIn: parent; gap: root.wsGapPx
+                anchors.horizontalCenterOffset: wd0.tn.x + wd0.tn.iconX
+                anchors.verticalCenterOffset: wd0.tn.y + wd0.tn.iconY
                 Repeater {
                     model: Hyprland.workspaces
                     delegate: Rectangle {
@@ -1558,11 +1565,13 @@ Scope {
                         Behavior on implicitHeight { NumberAnimation { duration: Theme.animMed; easing.type: Easing.OutQuad } }
                         Loader {
                             anchors.centerIn: parent
-                            active: root.wsNumbers
+                            active: cfg.wsText
                             sourceComponent: Text {
                                 text: dot.modelData.id; color: Theme.text; font.family: Theme.fontFamily
-                                font.pixelSize: Math.round(root.wsBoxPx * 0.62); font.bold: dot.modelData.focused
+                                font.pixelSize: Math.max(4, Math.round(root.wsBoxPx * 0.62 * cfg.wsTextScale)) + wd0.tn.textSize
+                                font.bold: dot.modelData.focused
                                 renderType: Text.NativeRendering
+                                transform: Translate { x: wd0.tn.textX; y: wd0.tn.textY }
                             }
                         }
                         DMouseArea {
@@ -1619,6 +1628,7 @@ Component {
             rowSpacing: root.vertical ? 0 : 2; columnSpacing: 3
 
             Rectangle {
+                visible: cfg.wsText
                 Layout.alignment: Qt.AlignCenter
                 implicitWidth: wm.circle
                 implicitHeight: root.vertical ? Math.ceil(wsNum.implicitHeight) : wm.circle
@@ -1626,14 +1636,14 @@ Component {
                 color: "transparent"; border.width: 0
                 Text {
                     id: wsNum
-                    readonly property var ct: root.tune("clock", root.vertical)
                     anchors.centerIn: parent
-                    anchors.horizontalCenterOffset: ct.textX + wm.tn.textX
-                    anchors.verticalCenterOffset: (root.vertical ? ct.textY : ct.y + ct.textY) + wm.tn.textY
+                    anchors.horizontalCenterOffset: wm.tn.textX
+                    anchors.verticalCenterOffset: wm.tn.y + wm.tn.textY
                     text: wm.focusedId > 0 ? wm.focusedId : ""
                     color: wmMa.containsMouse ? Theme.accent2 : Theme.text
                     font.family: Theme.fontFamily; font.bold: true
-                    font.pixelSize: root.sz.clock + ct.textSize
+                    // same size formula as StatBadge's `wantedPx`
+                    font.pixelSize: Math.max(4, Math.round(10 * cfg.statsScale * cfg.scale * cfg.barScale * cfg.wsTextScale)) + wm.tn.textSize
                     renderType: Text.NativeRendering
                 }
             }
@@ -2207,19 +2217,14 @@ Component {
                             PathSvg { path: fr.gapPath }
                         }
                     }
-                    Loader {
-                        id: borderLoader
+                    Shape {
                         anchors.fill: parent
-                        property string key: fr.outline
-                        sourceComponent: Shape {
-                            preferredRendererType: Shape.CurveRenderer
-                            ShapePath {
-                                fillColor: "transparent"; strokeColor: root.borderColor
-                                strokeWidth: root.borderW; joinStyle: ShapePath.RoundJoin
-                                PathSvg { path: fr.outline }
-                            }
+                        preferredRendererType: Shape.CurveRenderer
+                        ShapePath {
+                            fillColor: "transparent"; strokeColor: root.borderColor
+                            strokeWidth: root.borderW; joinStyle: ShapePath.RoundJoin
+                            PathSvg { path: fr.outline }
                         }
-                        onKeyChanged: { active = false; active = true; }
                     }
                 }
             }

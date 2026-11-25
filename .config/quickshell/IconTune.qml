@@ -72,7 +72,7 @@ Singleton {
         gpu:           { h: { iconY: 0, textY: 1 } },
         cputemp:       { h: { iconY: 0, textY: 1 } },
         gputemp:       { h: { iconY: 0, textY: 1 } },
-        ws:            { h: {}, v: { x: 1 } },
+        ws:            { h: { iconY: 0, textY: 1 }, v: { x: 0 } },
         tasks:         { h: {}, v: { x: 1 } },
         media:         { h: {}, v: { x: 1 } },
     })

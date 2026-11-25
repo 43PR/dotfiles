@@ -603,6 +603,18 @@ Scope {
 
     Timer { id: zoomSaveTimer; interval: 400; onTriggered: root.saveState() }
 
+    // ---- collapsed settings sections (saved in the state file) ----
+    // Advanced groups start folded; anything the user toggles is remembered.
+    // Not part of "Reset all".
+    property var collapsedSections: ({ opacity: true, viz: true })
+    function isCollapsed(k) { return collapsedSections[k] === true }
+    function toggleSection(k) {
+        var o = Object.assign({}, collapsedSections)
+        if (o[k]) delete o[k]; else o[k] = true
+        collapsedSections = o
+        zoomSaveTimer.restart()
+    }
+
     function setNumber(key, v) { root[key] = clamp(v, numSpec[key].min, numSpec[key].max) }
     function toggleSetting(key) { root[key] = !root[key]; saveState() }
 
@@ -616,6 +628,7 @@ Scope {
     function saveState() {
         var s = {}
         posKeys.concat(winKeys, numKeys, boolKeys).forEach(k => s[k] = root[k])
+        s.collapsed = root.collapsedSections
         stateFile.setText(JSON.stringify(s))
     }
 
@@ -636,6 +649,8 @@ Scope {
                     if (typeof s[k] === "number") root[k] = root.clamp(s[k], root.numSpec[k].min, root.numSpec[k].max)
                 })
                 root.boolKeys.forEach(k => { if (typeof s[k] === "boolean") root[k] = s[k] })
+                if (s.collapsed && typeof s.collapsed === "object" && !Array.isArray(s.collapsed))
+                    root.collapsedSections = s.collapsed
             } catch (e) {
                 console.warn("mediaosd: could not read saved state:", e)
             }
@@ -1201,6 +1216,10 @@ Scope {
     // wallpaper picker's menu, so all menus scale together. The controls come
     // from CustomizationSettings.qml.
     //
+    // Sections: each section has a clickable header (chevron on the right) that
+    // folds its body. Fold state is stored in root.collapsedSections. Folded
+    // bodies are invisible, so Tab skips the controls inside them.
+    //
     // Mouse: drag the header (or the empty part of the footer) to move the
     // window; Shift + scroll zooms it (50 - 200 %); double-click the header /
     // footer to reset position and zoom. Position and zoom are remembered.
@@ -1393,22 +1412,70 @@ Scope {
                                 id: contentCol
                                 x: 20 * settingsWin.u
                                 width: flick.width - 48 * settingsWin.u
-                                CustomizationSettings.SectionHeader { host: root; text: "Show OSDs" }
+
+                                // ---------------- SHOW OSDS ----------------
+                                Item {
+                                    width: contentCol.width; height: hdrShow.height
+                                    CustomizationSettings.SectionHeader { id: hdrShow; host: root; text: "Show OSDs" }
+                                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.toggleSection("show") }
+                                    Text {
+                                        anchors.right: parent.right; anchors.rightMargin: 4 * settingsWin.u
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: "\uf077"; font.family: Theme.iconFont
+                                        font.pixelSize: root.th.textSizeBody * settingsWin.u
+                                        color: Theme.textDim
+                                        rotation: root.isCollapsed("show") ? 180 : 0
+                                        Behavior on rotation { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
+                                    }
+                                }
                                 Grid {
+                                    visible: !root.isCollapsed("show")
                                     width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
                                     CustomizationSettings.ToggleRow { host: root; key: "volOsd"; label: "Volume" }
                                     CustomizationSettings.ToggleRow { host: root; key: "mediaOsd"; label: "Media" }
                                     CustomizationSettings.ToggleRow { host: root; key: "brightOsd"; label: "Brightness" }
                                 }
-                                CustomizationSettings.SectionHeader { host: root; text: "Global" }
+
+                                // ---------------- GLOBAL ----------------
+                                Item {
+                                    width: contentCol.width; height: hdrGlobal.height
+                                    CustomizationSettings.SectionHeader { id: hdrGlobal; host: root; text: "Global" }
+                                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.toggleSection("global") }
+                                    Text {
+                                        anchors.right: parent.right; anchors.rightMargin: 4 * settingsWin.u
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: "\uf077"; font.family: Theme.iconFont
+                                        font.pixelSize: root.th.textSizeBody * settingsWin.u
+                                        color: Theme.textDim
+                                        rotation: root.isCollapsed("global") ? 180 : 0
+                                        Behavior on rotation { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
+                                    }
+                                }
                                 Grid {
+                                    visible: !root.isCollapsed("global")
                                     width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
                                     CustomizationSettings.ToggleRow { host: root; key: "showTips"; label: "Tooltips" }
                                     CustomizationSettings.SliderRow { host: root; key: "fadeMs"; label: "Animation" }
                                 }
+
+                                // ---------------- VOLUME & BRIGHTNESS ----------------
                                 // Volume and brightness are the same kind of card, so they share these settings.
-                                CustomizationSettings.SectionHeader { host: root; text: "Volume & brightness" }
+                                Item {
+                                    width: contentCol.width; height: hdrVol.height
+                                    CustomizationSettings.SectionHeader { id: hdrVol; host: root; text: "Volume & brightness" }
+                                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.toggleSection("vol") }
+                                    Text {
+                                        anchors.right: parent.right; anchors.rightMargin: 4 * settingsWin.u
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: "\uf077"; font.family: Theme.iconFont
+                                        font.pixelSize: root.th.textSizeBody * settingsWin.u
+                                        color: Theme.textDim
+                                        rotation: root.isCollapsed("vol") ? 180 : 0
+                                        Behavior on rotation { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
+                                    }
+                                }
                                 Grid {
+                                    visible: !root.isCollapsed("vol")
                                     width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
                                     CustomizationSettings.SliderRow { host: root; key: "volScale"; label: "Scale"; enabled: root.volOsd || root.brightOsd }
                                     CustomizationSettings.SliderRow { host: root; key: "volTimeout"; label: "Hide after"; enabled: root.volOsd || root.brightOsd }
@@ -1425,16 +1492,48 @@ Scope {
                                     CustomizationSettings.ToggleRow { host: root; key: "flyoutAccent"; label: "Accent colour"; enabled: root.volOsd || root.brightOsd }
                                     CustomizationSettings.ToggleRow { host: root; key: "flyoutBorder"; label: "Border"; enabled: root.volOsd || root.brightOsd }
                                 }
-                                CustomizationSettings.SectionHeader { host: root; text: "Media" }
+
+                                // ---------------- MEDIA ----------------
+                                Item {
+                                    width: contentCol.width; height: hdrMedia.height
+                                    CustomizationSettings.SectionHeader { id: hdrMedia; host: root; text: "Media" }
+                                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.toggleSection("media") }
+                                    Text {
+                                        anchors.right: parent.right; anchors.rightMargin: 4 * settingsWin.u
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: "\uf077"; font.family: Theme.iconFont
+                                        font.pixelSize: root.th.textSizeBody * settingsWin.u
+                                        color: Theme.textDim
+                                        rotation: root.isCollapsed("media") ? 180 : 0
+                                        Behavior on rotation { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
+                                    }
+                                }
                                 Grid {
+                                    visible: !root.isCollapsed("media")
                                     width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
                                     CustomizationSettings.SliderRow { host: root; key: "mediaScale"; label: "Scale"; enabled: root.mediaOsd }
                                     CustomizationSettings.SliderRow { host: root; key: "mediaTimeout"; label: "Hide after"; enabled: root.mediaOsd }
                                     CustomizationSettings.ToggleRow { host: root; key: "musicOnly"; label: "Music only" }
                                     CustomizationSettings.ToggleRow { host: root; key: "trackChangeOsd"; label: "On track change" }
                                 }
-                                CustomizationSettings.SectionHeader { host: root; text: "Media content" }
+
+                                // ---------------- MEDIA CONTENT ----------------
+                                Item {
+                                    width: contentCol.width; height: hdrContent.height
+                                    CustomizationSettings.SectionHeader { id: hdrContent; host: root; text: "Media content" }
+                                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.toggleSection("content") }
+                                    Text {
+                                        anchors.right: parent.right; anchors.rightMargin: 4 * settingsWin.u
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: "\uf077"; font.family: Theme.iconFont
+                                        font.pixelSize: root.th.textSizeBody * settingsWin.u
+                                        color: Theme.textDim
+                                        rotation: root.isCollapsed("content") ? 180 : 0
+                                        Behavior on rotation { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
+                                    }
+                                }
                                 Grid {
+                                    visible: !root.isCollapsed("content")
                                     width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
                                     CustomizationSettings.ToggleRow { host: root; key: "showArt"; label: "Album art" }
                                     CustomizationSettings.ToggleRow { host: root; key: "showTitle"; label: "Title" }
@@ -1445,8 +1544,24 @@ Scope {
                                     CustomizationSettings.ToggleRow { host: root; key: "showVisualizer"; label: "Visualizer"; enabled: root.showBar }
                                     CustomizationSettings.SliderRow { host: root; key: "mediaTextSize"; label: "Text size"; enabled: root.showTitle || root.showArtist }
                                 }
-                                CustomizationSettings.SectionHeader { host: root; text: "Media layout" }
+
+                                // ---------------- MEDIA LAYOUT ----------------
+                                Item {
+                                    width: contentCol.width; height: hdrLayout.height
+                                    CustomizationSettings.SectionHeader { id: hdrLayout; host: root; text: "Media layout" }
+                                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.toggleSection("layout") }
+                                    Text {
+                                        anchors.right: parent.right; anchors.rightMargin: 4 * settingsWin.u
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: "\uf077"; font.family: Theme.iconFont
+                                        font.pixelSize: root.th.textSizeBody * settingsWin.u
+                                        color: Theme.textDim
+                                        rotation: root.isCollapsed("layout") ? 180 : 0
+                                        Behavior on rotation { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
+                                    }
+                                }
                                 Grid {
+                                    visible: !root.isCollapsed("layout")
                                     width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
                                     CustomizationSettings.ToggleRow { host: root; key: "portrait"; label: "Portrait" }
                                     CustomizationSettings.ToggleRow {
@@ -1461,16 +1576,72 @@ Scope {
                                     CustomizationSettings.SliderRow { host: root; key: "artSize"; label: "Art size"; enabled: root.showArt && !root.portrait }
                                     CustomizationSettings.SliderRow { host: root; key: "cardRadius"; label: "Corner radius" }
                                 }
-                                CustomizationSettings.SectionHeader { host: root; text: "Media opacity" }
+
+                                // ---------------- POSITION ----------------
+                                Item {
+                                    width: contentCol.width; height: hdrPos.height
+                                    CustomizationSettings.SectionHeader { id: hdrPos; host: root; text: "Position" }
+                                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.toggleSection("pos") }
+                                    Text {
+                                        anchors.right: parent.right; anchors.rightMargin: 4 * settingsWin.u
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: "\uf077"; font.family: Theme.iconFont
+                                        font.pixelSize: root.th.textSizeBody * settingsWin.u
+                                        color: Theme.textDim
+                                        rotation: root.isCollapsed("pos") ? 180 : 0
+                                        Behavior on rotation { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
+                                    }
+                                }
+                                Flow {
+                                    visible: !root.isCollapsed("pos")
+                                    width: parent.width
+                                    spacing: 8 * settingsWin.u
+                                    CustomizationSettings.ActionButton { host: root; label: "Reset media position"; enabled: root.mediaMoved; onClicked: root.resetPos("media") }
+                                    CustomizationSettings.ActionButton { host: root; label: "Reset volume position"; enabled: root.volMoved; onClicked: root.resetPos("vol") }
+                                    CustomizationSettings.ActionButton { host: root; label: "Reset brightness position"; enabled: root.brightMoved; onClicked: root.resetPos("bright") }
+                                }
+
+                                // ---------------- MEDIA OPACITY (folded by default) ----------------
+                                Item {
+                                    width: contentCol.width; height: hdrOpacity.height
+                                    CustomizationSettings.SectionHeader { id: hdrOpacity; host: root; text: "Media opacity" }
+                                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.toggleSection("opacity") }
+                                    Text {
+                                        anchors.right: parent.right; anchors.rightMargin: 4 * settingsWin.u
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: "\uf077"; font.family: Theme.iconFont
+                                        font.pixelSize: root.th.textSizeBody * settingsWin.u
+                                        color: Theme.textDim
+                                        rotation: root.isCollapsed("opacity") ? 180 : 0
+                                        Behavior on rotation { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
+                                    }
+                                }
                                 Grid {
+                                    visible: !root.isCollapsed("opacity")
                                     width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
                                     CustomizationSettings.SliderRow { host: root; key: "bgOpacity"; label: "Background"; enabled: root.mediaOsd }
                                     CustomizationSettings.SliderRow { host: root; key: "artOpacity"; label: "Album art"; enabled: root.showArt }
                                     CustomizationSettings.SliderRow { host: root; key: "barOpacity"; label: "Bars played"; enabled: root.showBar }
                                     CustomizationSettings.SliderRow { host: root; key: "barDimOpacity"; label: "Bars remaining"; enabled: root.showBar }
                                 }
-                                CustomizationSettings.SectionHeader { host: root; text: "Media visualizer" }
+
+                                // ---------------- MEDIA VISUALIZER (folded by default) ----------------
+                                Item {
+                                    width: contentCol.width; height: hdrViz.height
+                                    CustomizationSettings.SectionHeader { id: hdrViz; host: root; text: "Media visualizer" }
+                                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.toggleSection("viz") }
+                                    Text {
+                                        anchors.right: parent.right; anchors.rightMargin: 4 * settingsWin.u
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: "\uf077"; font.family: Theme.iconFont
+                                        font.pixelSize: root.th.textSizeBody * settingsWin.u
+                                        color: Theme.textDim
+                                        rotation: root.isCollapsed("viz") ? 180 : 0
+                                        Behavior on rotation { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
+                                    }
+                                }
                                 Grid {
+                                    visible: !root.isCollapsed("viz")
                                     width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
                                     CustomizationSettings.SliderRow { host: root; key: "barCount"; label: "Bars"; enabled: root.showBar && root.showVisualizer }
                                     CustomizationSettings.SliderRow { host: root; key: "barSpacing"; label: "Spacing"; enabled: root.showBar && root.showVisualizer }
@@ -1479,14 +1650,6 @@ Scope {
                                     CustomizationSettings.SliderRow { host: root; key: "barFps"; label: "Frame rate"; enabled: root.showBar && root.showVisualizer }
                                     CustomizationSettings.SliderRow { host: root; key: "barSensitivity"; label: "Sensitivity"; enabled: root.showBar && root.showVisualizer }
                                     CustomizationSettings.ToggleRow { host: root; key: "accentBars"; label: "Accent colour"; enabled: root.showBar }
-                                }
-                                CustomizationSettings.SectionHeader { host: root; text: "Position" }
-                                Flow {
-                                    width: parent.width
-                                    spacing: 8 * settingsWin.u
-                                    CustomizationSettings.ActionButton { host: root; label: "Reset media position"; enabled: root.mediaMoved; onClicked: root.resetPos("media") }
-                                    CustomizationSettings.ActionButton { host: root; label: "Reset volume position"; enabled: root.volMoved; onClicked: root.resetPos("vol") }
-                                    CustomizationSettings.ActionButton { host: root; label: "Reset brightness position"; enabled: root.brightMoved; onClicked: root.resetPos("bright") }
                                 }
                             }
                         }

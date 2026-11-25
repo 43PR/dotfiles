@@ -634,7 +634,32 @@ Item {
 
     Timer { id: applyTimer; interval: 250; onTriggered: page.applyLook() }
     Timer { id: saveTimer; interval: 300; onTriggered: page.persist() }
-
+    // ---- collapsed sections (remembered between sessions) ----
+    property var collapsed: ({})
+    function isCollapsed(k) { return collapsed[k] === true }
+    function toggleSection(k) {
+        const o = Object.assign({}, collapsed)
+        if (o[k]) delete o[k]; else o[k] = true
+        collapsed = o
+        uiSaveTimer.restart()
+    }
+    FileView {
+        id: uiFile
+        path: page.stateDir + "/appearance-page-ui.json"
+        blockLoading: true
+        printErrors: false
+        onLoaded: {
+            try {
+                const j = JSON.parse(uiFile.text())
+                page.collapsed = (j && typeof j === "object") ? j : ({})
+            } catch (error) {}
+        }
+    }
+    Timer {
+        id: uiSaveTimer
+        interval: 300
+        onTriggered: { try { uiFile.setText(JSON.stringify(page.collapsed)) } catch (error) {} }
+    }
     // ------------------------------------------------------------------
     // Quick jump (section chips at the top of the page)
     // ------------------------------------------------------------------
@@ -696,6 +721,7 @@ Item {
 
     component Card: Rectangle {
         id: card
+        readonly property bool isCard: true
         default property alias contentData: cardColumn.data
         width: parent.width
         height: cardColumn.implicitHeight + 20
@@ -894,23 +920,55 @@ Item {
             }
         }
     }
-
-    // Header row of a section: title on the left, optional action button on the right.
+    // Header row of a section: title and fold chevron on top row.
+    // The action button (e.g. RESET) sits right below the title and is only shown while the section is open.
     component SectionHeader: Item {
         id: sh
         property string title: ""
+        property string key: ""
         property string actionLabel: ""
+        readonly property bool folded: page.isCollapsed(key)
+        readonly property bool showAction: actionLabel !== "" && !folded
         signal action()
         width: parent.width
-        height: 22
+        height: 24 + (showAction ? 28 : 0)
+
+        function apply() {
+            for (const c of parent.children)
+                if (c !== sh && c.isCard === true) c.visible = !folded
+        }
+        onFoldedChanged: apply()
+        Component.onCompleted: apply()
 
         SectionTitle {
-            anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
+            x: 0
+            y: (24 - height) / 2
             text: sh.title
         }
+        // covers only the top row, so it never sits under the action button
+        MouseArea {
+            id: hdrMouse
+            x: 0; y: 0
+            width: parent.width; height: 24
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: page.toggleSection(sh.key)
+        }
+        Text {
+            id: chev
+            anchors.right: parent.right
+            anchors.rightMargin: 20
+            y: (24 - implicitHeight) / 2
+            text: "\uf077"
+            font.family: Theme.iconFont
+            font.pixelSize: Theme.textSizeBody
+            color: hdrMouse.containsMouse ? Theme.accent : Theme.textDim
+            rotation: sh.folded ? 180 : 0
+            Behavior on rotation { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
+        }
         SmallButton {
-            visible: sh.actionLabel !== ""
-            anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+            visible: sh.showAction
+            x: 0; y: 28
             width: 80; height: 22
             label: sh.actionLabel
             onClicked: sh.action()
@@ -966,7 +1024,7 @@ Item {
                 width: parent.width; spacing: 6
                 topPadding: 2
 
-                SectionTitle { text: "PERFORMANCE" }
+                SectionHeader { title: "PERFORMANCE"; key: "perf" }
 
                 Card {
                     Cols {
@@ -1002,7 +1060,7 @@ Item {
                 topPadding: 2
 
                 SectionHeader {
-                    title: "WINDOWS & GAPS"
+                    title: "WINDOWS & GAPS"; key: "windows"
                     actionLabel: "RESET"
                     onAction: page.resetLook()
                 }
@@ -1109,7 +1167,7 @@ Item {
                 width: parent.width; spacing: 6
                 topPadding: 2
 
-                SectionTitle { text: "ANIMATIONS & SPEED" }
+                SectionHeader { title: "ANIMATIONS & SPEED"; key: "anim" }
 
                 Card {
                     Cols {
@@ -1156,7 +1214,7 @@ Item {
                 topPadding: 2
 
                 SectionHeader {
-                    title: "HUB"
+                    title: "HUB"; key: "hub"
                     actionLabel: "RESET"
                     onAction: Theme.resetHub()
                 }
@@ -1224,10 +1282,10 @@ Item {
                 topPadding: 2
                 bottomPadding: 6
 
-                SectionTitle { text: "BACKGROUND IMAGE" }
+                SectionHeader { title: "BACKGROUND IMAGE"; key: "image" }
 
                 Note {
-                    visible: Theme.bgAlpha > 0.9
+                    visible: !page.isCollapsed("image") && Theme.bgAlpha > 0.9
                     text: "Lower BACKGROUND OPACITY in HUB to see the picture."
                 }
 
@@ -1341,10 +1399,10 @@ Item {
                 width: parent.width; spacing: 6
                 topPadding: 2
 
-                SectionTitle { text: "BLUR & SHADOWS" }
+                SectionHeader { title: "BLUR & SHADOWS"; key: "blur" }
 
                 Note {
-                    visible: page.effectsLevel === "off"
+                    visible: !page.isCollapsed("blur") && page.effectsLevel === "off"
                     text: "Blur and shadows are switched off in PERFORMANCE; these options apply once they are on."
                 }
 

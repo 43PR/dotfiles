@@ -281,7 +281,32 @@ Item {
 
     // ignore the file-change echo of our own write
     Timer { id: selfTimer; interval: 600; onTriggered: page.selfWrite = false }
-
+    // ---- collapsed sections (remembered between sessions) ----
+    property var collapsed: ({})
+    function isCollapsed(k) { return collapsed[k] === true }
+    function toggleSection(k) {
+        const o = Object.assign({}, collapsed)
+        if (o[k]) delete o[k]; else o[k] = true
+        collapsed = o
+        uiSaveTimer.restart()
+    }
+    FileView {
+        id: uiFile
+        path: page.stateDir + "/sidepanel-page-ui.json"
+        blockLoading: true
+        printErrors: false
+        onLoaded: {
+            try {
+                const j = JSON.parse(uiFile.text())
+                page.collapsed = (j && typeof j === "object") ? j : ({})
+            } catch (error) {}
+        }
+    }
+    Timer {
+        id: uiSaveTimer
+        interval: 300
+        onTriggered: { try { uiFile.setText(JSON.stringify(page.collapsed)) } catch (error) {} }
+    }
     // ------------------------------------------------------------------
     // Reusable inline components (same pattern as BarPage)
     // ------------------------------------------------------------------
@@ -320,6 +345,7 @@ Item {
 
     component Card: Rectangle {
         id: card
+        readonly property bool isCard: true
         default property alias contentData: cardColumn.data
         width: parent.width
         height: cardColumn.implicitHeight + 20
@@ -462,6 +488,45 @@ Item {
             }
         }
     }
+    // Section title with a fold chevron on the right. Folding hides the section's Card.
+    component SectionHeader: Item {
+        id: sh
+        property string title: ""
+        property string key: ""
+        readonly property bool folded: page.isCollapsed(key)
+        width: parent.width
+        height: 24
+
+        function apply() {
+            for (const c of parent.children)
+                if (c !== sh && c.isCard === true) c.visible = !folded
+        }
+        onFoldedChanged: apply()
+        Component.onCompleted: apply()
+
+        SectionTitle {
+            anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
+            text: sh.title
+        }
+        MouseArea {
+            id: hdrMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: page.toggleSection(sh.key)
+        }
+        Text {
+            anchors.right: parent.right
+            anchors.rightMargin: 30
+            anchors.verticalCenter: parent.verticalCenter
+            text: "\uf077"
+            font.family: Theme.iconFont
+            font.pixelSize: Theme.textSizeBody
+            color: hdrMouse.containsMouse ? Theme.accent : Theme.textDim
+            rotation: sh.folded ? 180 : 0
+            Behavior on rotation { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
+        }
+    }
     // UI
     Flickable {
         id: flick
@@ -519,7 +584,7 @@ Item {
                 width: parent.width; spacing: 6
                 topPadding: 2
 
-                SectionTitle { text: "APPEARANCE" }
+                SectionHeader { title: "APPEARANCE"; key: "appearance" }
 
                 Card {
                     Cols {
@@ -625,10 +690,10 @@ Item {
                 width: parent.width; spacing: 6
                 topPadding: 2
 
-                SectionTitle { text: "CALENDAR & WEATHER" }
+                SectionHeader { title: "CALENDAR & WEATHER"; key: "calendar" }
 
                 Note {
-                    visible: !page.val("showCalendar")
+                    visible: !page.isCollapsed("calendar") && !page.val("showCalendar")
                     text: "Turn on CALENDAR under Sections to use these options."
                 }
 
@@ -679,10 +744,10 @@ Item {
                 width: parent.width; spacing: 6
                 topPadding: 2
 
-                SectionTitle { text: "QUICK ACTIONS" }
+                SectionHeader { title: "QUICK ACTIONS"; key: "quick" }
 
                 Note {
-                    visible: !page.val("showQuick")
+                    visible: !page.isCollapsed("quick") && !page.val("showQuick")
                     text: "Turn on QUICK ACTIONS under Sections to use these options."
                 }
 
@@ -738,10 +803,10 @@ Item {
                 width: parent.width; spacing: 6
                 topPadding: 2
 
-                SectionTitle { text: "NOTIFICATIONS" }
+                SectionHeader { title: "NOTIFICATIONS"; key: "notifs" }
 
                 Note {
-                    visible: !page.val("showNotifs")
+                    visible: !page.isCollapsed("notifs") && !page.val("showNotifs")
                     text: "Turn on NOTIFICATIONS under Sections to use these options."
                 }
 
@@ -883,8 +948,11 @@ Item {
                 width: parent.width; spacing: 6
                 topPadding: 2
 
-                SectionTitle { text: "SECTIONS" }
-                Note { text: "Toggle visibility and reorder with the arrows (top to bottom in the panel)." }
+                SectionHeader { title: "SECTIONS"; key: "sections" }
+                Note {
+                    visible: !page.isCollapsed("sections")
+                    text: "Toggle visibility and reorder with the arrows (top to bottom in the panel)."
+                }
 
                 Card {
                     Column {

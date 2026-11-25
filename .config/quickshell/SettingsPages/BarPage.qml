@@ -21,6 +21,7 @@ Item {
         scale: 1, barScale: 0.75, bgOpacity: 0.2, border: true, borderOpacity: 0.05, radius: 15, calRadius: 15, calScale: 0.9,
         tooltips: true, tooltipHints: false, tooltipBorder: true, tipDelay: 450, tooltipScale: 0.85,
         modPad: 0, islandGap: 4, wsDot: 15, wsGap: 10, wsScroll: true, wsStyle: "minimal",
+        wsTextScale: 1, wsText: true,
         tasksScale: 0.75, tasksGap: 2, tasksColor: "accent",
         statsRing: true, statsNumbers: false, statsPercent: false, statsIcons: false, statsScale: 1, statsBorder: false, statsRadius: 24, statsGap: 0, statsWarn: 85, tempWarn: 85, batLowPct: 15,
         batNumber: false, batPercent: false, batRing: true, batLabel: false,
@@ -168,7 +169,32 @@ Item {
 
     // ignore the file-change echo of our own write
     Timer { id: selfTimer; interval: 600; onTriggered: page.selfWrite = false }
-
+    // ---- collapsed sections (remembered between sessions) ----
+    property var collapsed: ({})
+    function isCollapsed(k) { return collapsed[k] === true }
+    function toggleSection(k) {
+        const o = Object.assign({}, collapsed)
+        if (o[k]) delete o[k]; else o[k] = true
+        collapsed = o
+        uiSaveTimer.restart()
+    }
+    FileView {
+        id: uiFile
+        path: page.stateDir + "/bar-page-ui.json"
+        blockLoading: true
+        printErrors: false
+        onLoaded: {
+            try {
+                const j = JSON.parse(uiFile.text())
+                page.collapsed = (j && typeof j === "object") ? j : ({})
+            } catch (error) {}
+        }
+    }
+    Timer {
+        id: uiSaveTimer
+        interval: 300
+        onTriggered: { try { uiFile.setText(JSON.stringify(page.collapsed)) } catch (error) {} }
+    }
     // ------------------------------------------------------------------
     // Quick jump (section chips at the top of the page)
     // ------------------------------------------------------------------
@@ -210,7 +236,47 @@ Item {
         color: Theme.text
         font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeSection; font.bold: true; font.letterSpacing: 2
     }
+    // Section title + minimal chevron (no border, no background). Folds the Card(s) next to it.
+    component SectionHeader: Item {
+        id: sh
+        property string title: ""
+        property string key: ""
+        readonly property bool folded: page.isCollapsed(key)
+        width: parent.width
+        height: 24
 
+        function apply() {
+            for (const c of parent.children)
+                if (c !== sh && c.isCard === true) c.visible = !folded
+        }
+        onFoldedChanged: apply()
+        Component.onCompleted: apply()
+
+        SectionTitle {
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            text: sh.title
+        }
+        Text {
+            id: chev
+            anchors.right: parent.right
+            anchors.rightMargin: 30
+            anchors.verticalCenter: parent.verticalCenter
+            text: "\uf077"
+            font.family: Theme.iconFont
+            font.pixelSize: Theme.textSizeBody
+            color: hdrMouse.containsMouse ? Theme.accent : Theme.textDim
+            rotation: sh.folded ? 180 : 0
+            Behavior on rotation { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
+        }
+        MouseArea {
+            id: hdrMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: page.toggleSection(sh.key)
+        }
+    }
     component GroupLabel: Text {
         color: Theme.accent2
         font.family: Theme.fontFamily; font.pixelSize: Theme.textSizeGroup; font.bold: true; font.letterSpacing: 1
@@ -232,6 +298,7 @@ Item {
 
     component Card: Rectangle {
         id: card
+        readonly property bool isCard: true
         default property alias contentData: cardColumn.data
         width: parent.width
         height: cardColumn.implicitHeight + 20
@@ -309,7 +376,8 @@ Item {
         opacity: enabled ? 1.0 : 0.4
 
         SmallButton {
-            width: tg.width; height: tg.height
+            y: tg.height - 26
+            width: tg.width; height: 26
             label: (tg.checked ? "● " : "○ ") + tg.label
             current: tg.checked
             buttonEnabled: !tg.locked
@@ -468,7 +536,7 @@ Item {
                 width: parent.width; spacing: 6
                 topPadding: 2
 
-                SectionTitle { text: "LAYOUT & APPEARANCE" }
+                SectionHeader { title: "LAYOUT & APPEARANCE"; key: "bar" }
 
                 Card {
                     BarChoice {
@@ -651,7 +719,7 @@ Item {
                 width: parent.width; spacing: 6
                 topPadding: 2
 
-                SectionTitle { text: "MODULES" }
+                SectionHeader { title: "MODULES"; key: "modules" }
 
                 Card {
                     Grid {
@@ -682,7 +750,7 @@ Item {
                 width: parent.width; spacing: 6
                 topPadding: 2
 
-                SectionTitle { text: "CLOCK" }
+                SectionHeader { title: "CLOCK"; key: "clock" }
 
                 Card {
                     enabled: page.isOn("clock")
@@ -754,7 +822,7 @@ Item {
                 width: parent.width; spacing: 6
                 topPadding: 2
 
-                SectionTitle { text: "WEATHER" }
+                SectionHeader { title: "WEATHER"; key: "weather" }
 
                 Card {
                     enabled: page.isOn("weather")
@@ -805,7 +873,7 @@ Item {
                 width: parent.width; spacing: 6
                 topPadding: 2
 
-                SectionTitle { text: "WORKSPACES & OPEN APPS" }
+                SectionHeader { title: "WORKSPACES & OPEN APPS"; key: "workspaces" }
 
                 Card {
                     Column {
@@ -814,15 +882,27 @@ Item {
                         opacity: enabled ? 1.0 : 0.45
 
                         GroupLabel { text: page.isOn("ws") ? "WORKSPACES" : "WORKSPACES  (turn the module on in MODULES)" }
-                        BarChoice {
-                            label: "STYLE"
-                            options: ["dots", "numbers", "minimal"]
-                            labels: ({ dots: "DOTS", numbers: "NUMBERED", minimal: "MINIMAL" })
-                            maxCols: 3
-                            current: page.val("wsStyle")
-                            onPicked: v => page.set("wsStyle", v)
-                        }
                         Cols {
+                            verticalItemAlignment: Grid.AlignBottom
+                            CycleChoice {
+                                label: "STYLE"
+                                options: ["dots", "numbers", "minimal"]
+                                labels: ({ dots: "DOTS", numbers: "BUBBLES", minimal: "MINIMAL" })
+                                current: page.val("wsStyle")
+                                onPicked: v => page.set("wsStyle", v)
+                            }
+                            ToggleRow {
+                                label: "SHOW NUMBER"
+                                checked: page.val("wsText")
+                                onToggled: v => page.set("wsText", v)
+                            }
+                            BarSlider {
+                                label: "TEXT SCALE"
+                                enabled: page.val("wsText")
+                                from: 0.5; to: 2.0; step: 0.05; unit: "×"; decimals: 2
+                                value: page.val("wsTextScale")
+                                onMoved: v => page.set("wsTextScale", v)
+                            }
                             BarSlider {
                                 label: "DOT SIZE"
                                 from: 6; to: 30; step: 1; unit: " px"
@@ -875,7 +955,7 @@ Item {
                 width: parent.width; spacing: 6
                 topPadding: 2
 
-                SectionTitle { text: "MEDIA" }
+                SectionHeader { title: "MEDIA"; key: "media" }
 
                 Card {
                     enabled: page.isOn("media")
@@ -900,7 +980,7 @@ Item {
                 width: parent.width; spacing: 6
                 topPadding: 2
 
-                SectionTitle { text: "SYSTEM TRAY" }
+                SectionHeader { title: "SYSTEM TRAY"; key: "tray" }
 
                 Card {
                     enabled: page.isOn("tray")
@@ -920,7 +1000,7 @@ Item {
                 width: parent.width; spacing: 6
                 topPadding: 2
 
-                SectionTitle { text: "SYSTEM STATS" }
+                SectionHeader { title: "SYSTEM STATS"; key: "stats" }
 
                 Card {
                     enabled: page.statsOn
@@ -991,7 +1071,7 @@ Item {
                 width: parent.width; spacing: 6
                 topPadding: 2
 
-                SectionTitle { text: "BATTERY & VOLUME" }
+                SectionHeader { title: "BATTERY & VOLUME"; key: "battvol" }
 
                 Card {
                     Cols {
@@ -1077,7 +1157,7 @@ Item {
                 width: parent.width; spacing: 6
                 topPadding: 2
 
-                SectionTitle { text: "BRIGHTNESS & NIGHT LIGHT" }
+                SectionHeader { title: "BRIGHTNESS & NIGHT LIGHT"; key: "light" }
 
                 Card {
                     BarChoice {
@@ -1125,7 +1205,7 @@ Item {
                 width: parent.width; spacing: 6
                 topPadding: 2
 
-                SectionTitle { text: "ICON & TEXT POSITION" }
+                SectionHeader { title: "ICON & TEXT POSITION"; key: "nudge" }
 
                 Card {
                     Note { text: "Moves every icon / label on the bar. Added on top of the per-module values in IconTune. + is right / down." }
@@ -1179,7 +1259,7 @@ Item {
                 width: parent.width; spacing: 6
                 topPadding: 2
 
-                SectionTitle { text: "TOOLTIPS" }
+                SectionHeader { title: "TOOLTIPS"; key: "tooltips" }
 
                 Card {
                     Cols {
@@ -1225,7 +1305,7 @@ Item {
                 width: parent.width; spacing: 6
                 topPadding: 2
 
-                SectionTitle { text: "CLICK ACTIONS" }
+                SectionHeader { title: "CLICK ACTIONS"; key: "actions" }
 
                 Card {
                     GroupLabel { text: "CLOCK" }
