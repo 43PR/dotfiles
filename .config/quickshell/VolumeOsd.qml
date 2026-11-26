@@ -54,16 +54,19 @@ Scope {
         artOpacity:    { min: 0,   max: 100,   def: Math.max(20, Math.round((Theme.bgAlpha ?? 1) * 20) * 5), step: 5, unit: "%" },
         barOpacity:    { min: 0,   max: 100,   def: 90,   step: 5,   unit: "%" },
         barDimOpacity: { min: 0,   max: 100,   def: 30,   step: 5,   unit: "%" },
-        mediaTextSize: { min: 8,   max: 28,    def: 13,   step: 1,   unit: "px" }
+        mediaTextSize: { min: 8,   max: 28,    def: 13,   step: 1,   unit: "px" },
+        borderOpacity: { min: 0,   max: 100,   def: 12,   step: 1,   unit: "%" },
+        controlsSize:  { min: 50,  max: 200,   def: 100,  step: 5,   unit: "%" },
+        controlsOpacity: { min: 0, max: 100,   def: 100,  step: 5,   unit: "%" }
     })
     readonly property var numKeys: Object.keys(numSpec)
 
     readonly property var boolDefaults: ({
         volOsd: true, mediaOsd: true, brightOsd: true,
-        flyoutIcon: true, flyoutPercent: true, flyoutAccent: false, flyoutBorder: false,
+        flyoutIcon: true, flyoutPercent: true, flyoutBorder: false,
         showTips: true, showTitle: true, showArtist: true, showBar: true, showVisualizer: true,
         trackChangeOsd: true, showArt: true, showControls: true, musicOnly: true, artistBelow: false,
-        portrait: true, showBorder: false, accentBars: false, controlsBorder: false
+        portrait: true, showBorder: false, controlsBorder: false
     })
     readonly property var boolKeys: Object.keys(boolDefaults)
     readonly property var posKeys: ["offsetX", "offsetY", "volOffsetX", "volOffsetY", "brightOffsetX", "brightOffsetY"]
@@ -98,10 +101,9 @@ Scope {
     property int flyoutIconSize: numSpec.flyoutIconSize.def; property int flyoutTextSize: numSpec.flyoutTextSize.def
     property int flyoutTrack: numSpec.flyoutTrack.def; property int flyoutPad: numSpec.flyoutPad.def
     property bool flyoutIcon: boolDefaults.flyoutIcon; property bool flyoutPercent: boolDefaults.flyoutPercent
-    property bool flyoutAccent: boolDefaults.flyoutAccent; property bool flyoutBorder: boolDefaults.flyoutBorder
+    property bool flyoutBorder: boolDefaults.flyoutBorder
     property int artOpacity: numSpec.artOpacity.def; property int barOpacity: numSpec.barOpacity.def
     property int barDimOpacity: numSpec.barDimOpacity.def
-
     property bool volOsd: boolDefaults.volOsd; property bool mediaOsd: boolDefaults.mediaOsd
     property bool brightOsd: boolDefaults.brightOsd
     property bool showTips: boolDefaults.showTips; property bool showTitle: boolDefaults.showTitle
@@ -110,9 +112,76 @@ Scope {
     property bool showArt: boolDefaults.showArt; property bool showControls: boolDefaults.showControls
     property bool musicOnly: boolDefaults.musicOnly; property bool artistBelow: boolDefaults.artistBelow
     property bool portrait: boolDefaults.portrait; property bool showBorder: boolDefaults.showBorder
-    property bool accentBars: boolDefaults.accentBars
     property bool controlsBorder: boolDefaults.controlsBorder
     property int mediaTextSize: numSpec.mediaTextSize.def
+    property int borderOpacity: numSpec.borderOpacity.def
+    property int controlsSize: numSpec.controlsSize.def
+    property int controlsOpacity: numSpec.controlsOpacity.def
+
+    // ---- colours (same system as the power menu) -----------------------------
+    readonly property var colorChoices: [
+        { id: "text",    label: "Text" },
+        { id: "textDim", label: "Dim text" },
+        { id: "accent",  label: "Accent" },
+        { id: "accent2", label: "Accent 2" },
+        { id: "bg",      label: "Background" },
+        { id: "black",   label: "Black" },
+        { id: "white",   label: "White" }
+    ]
+    readonly property var colorDefaults: ({
+        mediaBgColor:      "bg",
+        mediaBorderColor:  "text",
+        titleColor:        "text",
+        artistColor:       "text",
+        controlsColor:     "text",
+        barColor:          "text",
+        flyoutBgColor:     "bg",
+        flyoutBorderColor: "text",
+        flyoutIconColor:   "text",
+        flyoutBarColor:    "text",
+        flyoutTextColor:   "text"
+    })
+    readonly property var colorKeys: Object.keys(colorDefaults)
+
+    property string mediaBgColor: colorDefaults.mediaBgColor
+    property string mediaBorderColor: colorDefaults.mediaBorderColor
+    property string titleColor: colorDefaults.titleColor
+    property string artistColor: colorDefaults.artistColor
+    property string controlsColor: colorDefaults.controlsColor
+    property string barColor: colorDefaults.barColor
+    property string flyoutBgColor: colorDefaults.flyoutBgColor
+    property string flyoutBorderColor: colorDefaults.flyoutBorderColor
+    property string flyoutIconColor: colorDefaults.flyoutIconColor
+    property string flyoutBarColor: colorDefaults.flyoutBarColor
+    property string flyoutTextColor: colorDefaults.flyoutTextColor
+
+    function themeColor(id) {
+        switch (id) {
+        case "text":    return Theme.text
+        case "textDim": return Theme.textDim
+        case "accent":  return Theme.accent
+        case "accent2": return Theme.accent2 !== undefined ? Theme.accent2 : Theme.accent
+        case "bg":      return Theme.bg
+        case "black":   return Qt.rgba(0, 0, 0, 1)
+        case "white":   return Qt.rgba(1, 1, 1, 1)
+        }
+        return Theme.text
+    }
+    function colorLabel(id) {
+        var c = colorChoices.find(function (x) { return x.id === id })
+        return c ? c.label : id
+    }
+    function cycleColor(key, dir) {
+        var n = colorChoices.length
+        var i = colorChoices.findIndex(function (c) { return c.id === root[key] })
+        if (i < 0) i = 0
+        root[key] = colorChoices[((i + dir) % n + n) % n].id
+        saveState()
+    }
+    // solid: backgrounds, alpha = pct (ignores the source colour's own alpha)
+    function solid(c, pct) { return Qt.rgba(c.r, c.g, c.b, Math.max(0, Math.min(1, pct / 100))) }
+    // fade: foreground, source alpha scaled by pct
+    function fade(c, pct) { return Qt.rgba(c.r, c.g, c.b, c.a * Math.max(0, Math.min(1, pct / 100))) }
 
     readonly property real scaleFactor: scaleOf(curKind)
     readonly property color cardColor: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, bgOpacity / 100)
@@ -190,6 +259,7 @@ Scope {
     readonly property bool modified: posKeys.some(k => root[k] !== 0)
         || numKeys.some(k => root[k] !== numSpec[k].def)
         || boolKeys.some(k => root[k] !== boolDefaults[k])
+        || colorKeys.some(k => root[k] !== colorDefaults[k])
     readonly property string statePath: Quickshell.env("HOME") + "/.config/quickshell/state/mediaosd-state.json"
 
     // ---- settings menu look / scale -----------------------------------------
@@ -272,6 +342,8 @@ Scope {
     property real position: 0; property real length: 0
 
     readonly property bool playing: status === "Playing"
+    // Settings preview: no real art available, so show a blank placeholder
+    readonly property bool previewArt: settingsOpen && artUrl === ""
     readonly property real progress: length > 0 ? Math.min(position / length, 1) : 0
 
     function applyPlayer(p, withTiming) {
@@ -606,7 +678,7 @@ Scope {
     // ---- collapsed settings sections (saved in the state file) ----
     // Advanced groups start folded; anything the user toggles is remembered.
     // Not part of "Reset all".
-    property var collapsedSections: ({ opacity: true, viz: true })
+    property var collapsedSections: ({ opacity: true, viz: true, colors: true })
     function isCollapsed(k) { return collapsedSections[k] === true }
     function toggleSection(k) {
         var o = Object.assign({}, collapsedSections)
@@ -622,12 +694,13 @@ Scope {
         posKeys.forEach(k => root[k] = 0)
         numKeys.forEach(k => root[k] = numSpec[k].def)
         boolKeys.forEach(k => root[k] = boolDefaults[k])
+        colorKeys.forEach(k => root[k] = colorDefaults[k])
         saveState()
     }
 
     function saveState() {
         var s = {}
-        posKeys.concat(winKeys, numKeys, boolKeys).forEach(k => s[k] = root[k])
+        posKeys.concat(winKeys, numKeys, boolKeys, colorKeys).forEach(k => s[k] = root[k])
         s.collapsed = root.collapsedSections
         stateFile.setText(JSON.stringify(s))
     }
@@ -649,6 +722,9 @@ Scope {
                     if (typeof s[k] === "number") root[k] = root.clamp(s[k], root.numSpec[k].min, root.numSpec[k].max)
                 })
                 root.boolKeys.forEach(k => { if (typeof s[k] === "boolean") root[k] = s[k] })
+                root.colorKeys.forEach(k => {
+                    if (typeof s[k] === "string" && root.colorChoices.some(c => c.id === s[k])) root[k] = s[k]
+                })
                 if (s.collapsed && typeof s.collapsed === "object" && !Array.isArray(s.collapsed))
                     root.collapsedSections = s.collapsed
             } catch (e) {
@@ -840,7 +916,7 @@ Scope {
                         visible: root.flyoutIcon
                         font.family: "Symbols Nerd Font"
                         font.pixelSize: root.flyoutIconSize
-                        color: root.flyoutAccent ? Theme.accent : Theme.text
+                        color: root.themeColor(root.flyoutIconColor)
                     }
 
                     Text {
@@ -851,7 +927,7 @@ Scope {
                         text: root.muted ? "Muted" : Math.round(root.volume * 100) + "%"
                         font.pixelSize: root.flyoutTextSize
                         font.bold: true
-                        color: Theme.text
+                        color: root.themeColor(root.flyoutTextColor)
                     }
 
                     Rectangle {
@@ -868,7 +944,7 @@ Scope {
                             width: root.muted ? 0 : parent.width * Math.min(root.volume, 1)
                             height: parent.height
                             radius: parent.radius
-                            color: root.flyoutAccent ? Theme.accent : Theme.text
+                            color: root.themeColor(root.flyoutBarColor)
                             Behavior on width { NumberAnimation { duration: 100 } }
                         }
                     }
@@ -901,7 +977,7 @@ Scope {
                         visible: root.flyoutIcon
                         font.family: "Symbols Nerd Font"
                         font.pixelSize: root.flyoutIconSize
-                        color: root.flyoutAccent ? Theme.accent : Theme.text
+                        color: root.themeColor(root.flyoutIconColor)
                     }
 
                     Text {
@@ -912,7 +988,7 @@ Scope {
                         text: root.hasBacklight ? root.brightPct + "%" : "N/A"
                         font.pixelSize: root.flyoutTextSize
                         font.bold: true
-                        color: Theme.text
+                        color: root.themeColor(root.flyoutTextColor)
                     }
 
                     Rectangle {
@@ -929,7 +1005,7 @@ Scope {
                             width: parent.width * Math.max(0, Math.min(root.brightness, 1))
                             height: parent.height
                             radius: parent.radius
-                            color: root.flyoutAccent ? Theme.accent : Theme.text
+                            color: root.themeColor(root.flyoutBarColor)
                             Behavior on width { NumberAnimation { duration: 100 } }
                         }
                     }
@@ -949,7 +1025,8 @@ Scope {
                     height: mediaCol.height + 28
                     radius: root.cardRadius
 
-                    readonly property bool artShown: root.showArt && root.artUrl !== "" && artImg.status !== Image.Error
+                    readonly property bool artShown: root.showArt
+                        && (root.previewArt || (root.artUrl !== "" && artImg.status !== Image.Error))
                     readonly property bool hasText: root.showTitle || root.showArtist
                     readonly property bool barShown: root.showBar && root.showVisualizer
                     readonly property bool lineShown: root.showBar && !root.showVisualizer
@@ -1005,6 +1082,15 @@ Scope {
                                     maskSource: artMask
                                     opacity: root.artOpacity / 100
                                 }
+
+                                // Blank stand-in while previewing in settings
+                                Rectangle {
+                                    anchors.fill: parent
+                                    visible: root.previewArt
+                                    radius: root.portrait ? 16 : 10
+                                    color: Theme.text
+                                    opacity: 0.15 * root.artOpacity / 100
+                                }
                             }
 
                             Column {
@@ -1031,7 +1117,7 @@ Scope {
                                         elide: Text.ElideRight
                                         font.pixelSize: root.mediaTextSize
                                         font.bold: true
-                                        color: Theme.text
+                                        color: root.themeColor(root.titleColor)
                                     }
                                     Text {
                                         visible: textCol.sameLine
@@ -1041,7 +1127,7 @@ Scope {
                                         horizontalAlignment: Text.AlignRight
                                         elide: Text.ElideLeft
                                         font.pixelSize: Math.max(6, root.mediaTextSize - 2)
-                                        color: Theme.text
+                                        color: root.themeColor(root.artistColor)
                                         opacity: 0.65
                                     }
                                 }
@@ -1053,7 +1139,7 @@ Scope {
                                     horizontalAlignment: root.portrait ? Text.AlignHCenter : Text.AlignLeft
                                     elide: Text.ElideRight
                                     font.pixelSize: Math.max(6, root.mediaTextSize - 2)
-                                    color: Theme.text
+                                    color: root.themeColor(root.artistColor)
                                     opacity: 0.65
                                 }
                             }
@@ -1076,7 +1162,7 @@ Scope {
                                     x: index * (visualizer.barWidth + root.barSpacing)
                                     width: visualizer.barWidth
                                     radius: Math.min(root.barRadius, width / 2)
-                                    color: root.accentBars ? Theme.accent : Theme.text
+                                    color: root.themeColor(root.barColor)
                                     opacity: (((index + 0.5) / root.barCount) <= root.progress
                                               ? root.barOpacity : root.barDimOpacity) / 100
                                     height: Math.min(visualizer.height,
@@ -1100,7 +1186,7 @@ Scope {
                                 width: parent.width
                                 height: 4
                                 radius: Math.min(root.barRadius, 2)
-                                color: root.accentBars ? Theme.accent : Theme.text
+                                color: root.themeColor(root.barColor)
                                 opacity: root.barDimOpacity / 100
                             }
                             Rectangle {
@@ -1108,37 +1194,39 @@ Scope {
                                 width: parent.width * root.progress
                                 height: 4
                                 radius: Math.min(root.barRadius, 2)
-                                color: root.accentBars ? Theme.accent : Theme.text
+                                color: root.themeColor(root.barColor)
                                 opacity: root.barOpacity / 100
                             }
                         }
 
                         Item {
+                            id: controlsRow
+                            readonly property real cs: root.controlsSize / 100
                             visible: root.showControls
                             width: parent.width
-                            height: root.controlsBorder ? 44 : 26
+                            height: (root.controlsBorder ? 44 : 26) * cs
 
                             Row {
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 anchors.verticalCenter: parent.verticalCenter
-                                anchors.verticalCenterOffset: root.controlsBorder ? 5 : 0
-                                spacing: root.controlsBorder ? 30 : 28
+                                anchors.verticalCenterOffset: (root.controlsBorder ? 5 : 0) * controlsRow.cs
+                                spacing: (root.controlsBorder ? 30 : 28) * controlsRow.cs
 
                                 GlyphButton {
                                     text: "\udb81\udcae"
-                                    font.pixelSize: 19
+                                    font.pixelSize: Math.round(19 * controlsRow.cs)
                                     onClicked: root.mediaCmd("previous")
                                     onHoveredChanged: root.hoverTip = hovered ? "Previous track" : ""
                                 }
                                 GlyphButton {
                                     text: root.playing ? "\udb80\udfe4" : "\udb81\udc0a"
-                                    font.pixelSize: 21
+                                    font.pixelSize: Math.round(21 * controlsRow.cs)
                                     onClicked: root.mediaCmd("play-pause")
                                     onHoveredChanged: root.hoverTip = hovered ? (root.playing ? "Pause" : "Play") : ""
                                 }
                                 GlyphButton {
                                     text: "\udb81\udcad"
-                                    font.pixelSize: 19
+                                    font.pixelSize: Math.round(19 * controlsRow.cs)
                                     onClicked: root.mediaCmd("next")
                                     onHoveredChanged: root.hoverTip = hovered ? "Next track" : ""
                                 }
@@ -1489,7 +1577,6 @@ Scope {
                                     CustomizationSettings.SliderRow { host: root; key: "flyoutPad"; label: "Side padding"; enabled: root.volOsd || root.brightOsd }
                                     CustomizationSettings.ToggleRow { host: root; key: "flyoutIcon"; label: "Icon"; enabled: root.volOsd || root.brightOsd }
                                     CustomizationSettings.ToggleRow { host: root; key: "flyoutPercent"; label: "Percentage"; enabled: root.volOsd || root.brightOsd }
-                                    CustomizationSettings.ToggleRow { host: root; key: "flyoutAccent"; label: "Accent colour"; enabled: root.volOsd || root.brightOsd }
                                     CustomizationSettings.ToggleRow { host: root; key: "flyoutBorder"; label: "Border"; enabled: root.volOsd || root.brightOsd }
                                 }
 
@@ -1540,6 +1627,7 @@ Scope {
                                     CustomizationSettings.ToggleRow { host: root; key: "showArtist"; label: "Artist" }
                                     CustomizationSettings.ToggleRow { host: root; key: "showControls"; label: "Controls" }
                                     CustomizationSettings.ToggleRow { host: root; key: "controlsBorder"; label: "Controls border"; enabled: root.showControls }
+                                    CustomizationSettings.SliderRow { host: root; key: "controlsSize"; label: "Controls size"; enabled: root.showControls }
                                     CustomizationSettings.ToggleRow { host: root; key: "showBar"; label: "Visualizer & bar" }
                                     CustomizationSettings.ToggleRow { host: root; key: "showVisualizer"; label: "Visualizer"; enabled: root.showBar }
                                     CustomizationSettings.SliderRow { host: root; key: "mediaTextSize"; label: "Text size"; enabled: root.showTitle || root.showArtist }
@@ -1576,31 +1664,36 @@ Scope {
                                     CustomizationSettings.SliderRow { host: root; key: "artSize"; label: "Art size"; enabled: root.showArt && !root.portrait }
                                     CustomizationSettings.SliderRow { host: root; key: "cardRadius"; label: "Corner radius" }
                                 }
-
-                                // ---------------- POSITION ----------------
+                                // ---------------- COLORS (folded by default) ----------------
                                 Item {
-                                    width: contentCol.width; height: hdrPos.height
-                                    CustomizationSettings.SectionHeader { id: hdrPos; host: root; text: "Position" }
-                                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.toggleSection("pos") }
+                                    width: contentCol.width; height: hdrColors.height
+                                    CustomizationSettings.SectionHeader { id: hdrColors; host: root; text: "Colors" }
+                                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.toggleSection("colors") }
                                     Text {
                                         anchors.right: parent.right; anchors.rightMargin: 4 * settingsWin.u
                                         anchors.verticalCenter: parent.verticalCenter
                                         text: "\uf077"; font.family: Theme.iconFont
                                         font.pixelSize: root.th.textSizeBody * settingsWin.u
                                         color: Theme.textDim
-                                        rotation: root.isCollapsed("pos") ? 180 : 0
+                                        rotation: root.isCollapsed("colors") ? 180 : 0
                                         Behavior on rotation { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
                                     }
                                 }
-                                Flow {
-                                    visible: !root.isCollapsed("pos")
-                                    width: parent.width
-                                    spacing: 8 * settingsWin.u
-                                    CustomizationSettings.ActionButton { host: root; label: "Reset media position"; enabled: root.mediaMoved; onClicked: root.resetPos("media") }
-                                    CustomizationSettings.ActionButton { host: root; label: "Reset volume position"; enabled: root.volMoved; onClicked: root.resetPos("vol") }
-                                    CustomizationSettings.ActionButton { host: root; label: "Reset brightness position"; enabled: root.brightMoved; onClicked: root.resetPos("bright") }
+                                Grid {
+                                    visible: !root.isCollapsed("colors")
+                                    width: parent.width; columns: 2; columnSpacing: 18 * settingsWin.u
+                                    CustomizationSettings.ToggleRow { host: root; colorKey: "mediaBgColor"; label: "Media background" }
+                                    CustomizationSettings.ToggleRow { host: root; colorKey: "mediaBorderColor"; label: "Media border"; enabled: root.showBorder }
+                                    CustomizationSettings.ToggleRow { host: root; colorKey: "titleColor"; label: "Title"; enabled: root.showTitle }
+                                    CustomizationSettings.ToggleRow { host: root; colorKey: "artistColor"; label: "Artist"; enabled: root.showArtist }
+                                    CustomizationSettings.ToggleRow { host: root; colorKey: "controlsColor"; label: "Controls"; enabled: root.showControls }
+                                    CustomizationSettings.ToggleRow { host: root; colorKey: "barColor"; label: "Visualizer & bar"; enabled: root.showBar }
+                                    CustomizationSettings.ToggleRow { host: root; colorKey: "flyoutBgColor"; label: "Flyout background" }
+                                    CustomizationSettings.ToggleRow { host: root; colorKey: "flyoutBorderColor"; label: "Flyout border"; enabled: root.flyoutBorder }
+                                    CustomizationSettings.ToggleRow { host: root; colorKey: "flyoutIconColor"; label: "Flyout icon"; enabled: root.flyoutIcon }
+                                    CustomizationSettings.ToggleRow { host: root; colorKey: "flyoutBarColor"; label: "Flyout bar" }
+                                    CustomizationSettings.ToggleRow { host: root; colorKey: "flyoutTextColor"; label: "Flyout text"; enabled: root.flyoutPercent }
                                 }
-
                                 // ---------------- MEDIA OPACITY (folded by default) ----------------
                                 Item {
                                     width: contentCol.width; height: hdrOpacity.height
@@ -1623,6 +1716,8 @@ Scope {
                                     CustomizationSettings.SliderRow { host: root; key: "artOpacity"; label: "Album art"; enabled: root.showArt }
                                     CustomizationSettings.SliderRow { host: root; key: "barOpacity"; label: "Bars played"; enabled: root.showBar }
                                     CustomizationSettings.SliderRow { host: root; key: "barDimOpacity"; label: "Bars remaining"; enabled: root.showBar }
+                                    CustomizationSettings.SliderRow { host: root; key: "controlsOpacity"; label: "Controls"; enabled: root.showControls }
+                                    CustomizationSettings.SliderRow { host: root; key: "borderOpacity"; label: "Borders" }
                                 }
 
                                 // ---------------- MEDIA VISUALIZER (folded by default) ----------------
@@ -1649,7 +1744,29 @@ Scope {
                                     CustomizationSettings.SliderRow { host: root; key: "barRadius"; label: "Round"; enabled: root.showBar }
                                     CustomizationSettings.SliderRow { host: root; key: "barFps"; label: "Frame rate"; enabled: root.showBar && root.showVisualizer }
                                     CustomizationSettings.SliderRow { host: root; key: "barSensitivity"; label: "Sensitivity"; enabled: root.showBar && root.showVisualizer }
-                                    CustomizationSettings.ToggleRow { host: root; key: "accentBars"; label: "Accent colour"; enabled: root.showBar }
+                                }
+                                // ---------------- POSITION ----------------
+                                Item {
+                                    width: contentCol.width; height: hdrPos.height
+                                    CustomizationSettings.SectionHeader { id: hdrPos; host: root; text: "Position" }
+                                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.toggleSection("pos") }
+                                    Text {
+                                        anchors.right: parent.right; anchors.rightMargin: 4 * settingsWin.u
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: "\uf077"; font.family: Theme.iconFont
+                                        font.pixelSize: root.th.textSizeBody * settingsWin.u
+                                        color: Theme.textDim
+                                        rotation: root.isCollapsed("pos") ? 180 : 0
+                                        Behavior on rotation { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
+                                    }
+                                }
+                                Flow {
+                                    visible: !root.isCollapsed("pos")
+                                    width: parent.width
+                                    spacing: 8 * settingsWin.u
+                                    CustomizationSettings.ActionButton { host: root; label: "Reset media position"; enabled: root.mediaMoved; onClicked: root.resetPos("media") }
+                                    CustomizationSettings.ActionButton { host: root; label: "Reset volume position"; enabled: root.volMoved; onClicked: root.resetPos("vol") }
+                                    CustomizationSettings.ActionButton { host: root; label: "Reset brightness position"; enabled: root.brightMoved; onClicked: root.resetPos("bright") }
                                 }
                             }
                         }
@@ -1758,9 +1875,11 @@ Scope {
         property bool dim: false             // OSD switched off, shown only for the settings preview
         readonly property bool hovered: cardHover.hovered
 
-        color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, (kind === "media" ? host.bgOpacity : host.flyoutBgOpacity) / 100)
+        color: host.solid(host.themeColor(kind === "media" ? host.mediaBgColor : host.flyoutBgColor),
+                          kind === "media" ? host.bgOpacity : host.flyoutBgOpacity)
         border.width: (kind === "media" ? host.showBorder : host.flyoutBorder) ? 1 : 0
-        border.color: Theme.alpha(Theme.text, 0.12)
+        border.color: host.fade(host.themeColor(kind === "media" ? host.mediaBorderColor : host.flyoutBorderColor),
+                                host.borderOpacity)
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.horizontalCenterOffset: xOffset
         anchors.top: parent.top
@@ -1821,11 +1940,11 @@ Scope {
     component GlyphButton: Text {
         id: gb
         readonly property bool hovered: gbArea.containsMouse
-        property real ringSize: 32          // same circle for every button
+        property real ringSize: 32 * root.controlsSize / 100   // same circle for every button
         signal clicked()
         font.family: "Symbols Nerd Font"
-        color: Theme.text
-        opacity: hovered ? 1 : 0.8
+        color: root.themeColor(root.controlsColor)
+        opacity: (hovered ? 1 : 0.8) * root.controlsOpacity / 100
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         // With the border on, the button is exactly the circle, so the whole circle is clickable
