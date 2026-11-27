@@ -10,10 +10,6 @@ reload = ["pkill", "-USR1", "-x", "kitty"]
 input  = "~/.config/43pr/templates/rofi-colors.rasi"
 output = "~/.config/rofi/colors.rasi"
 
-[hyprlock]
-input  = "~/.config/43pr/templates/hyprlock-colors.conf"
-output = "~/.config/hypr/hyprlock-colors.conf"
-
 [gtk3]
 input  = "~/.config/43pr/templates/gtk-colors.css"
 output = "~/.config/gtk-3.0/colors.css"

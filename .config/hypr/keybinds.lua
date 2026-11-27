@@ -145,7 +145,7 @@ bind(mainMod .. " + " .. sidepanel_key,         hl.dsp.exec_cmd("qs ipc call sid
 bind(mainMod .. " + " .. files_key,         hl.dsp.exec_cmd(fileManager))
 bind(mainMod .. " + " .. browser_key,       hl.dsp.exec_cmd("python3 " .. home .. "/.config/hypr/scripts/default-browser.py"))
 bind(mainMod .. " + " .. close_key,         hl.dsp.window.close())
-bind(mainMod .. " + " .. lock_key,          hl.dsp.exec_cmd("hyprlock"))
+bind(mainMod .. " + " .. lock_key,          hl.dsp.exec_cmd("qs ipc call lock lock"))
 bind(mainMod .. " + " .. power_key,         hl.dsp.exec_cmd("qs ipc call powermenu toggle"))
 bind(mainMod .. " + " .. settings_key,      hl.dsp.exec_cmd("qs ipc call settings toggle"))
 bind(mainMod .. " + " .. wallpapers_key,    hl.dsp.exec_cmd("qs -n -p ~/.config/quickshell/hyprquickpaper"))

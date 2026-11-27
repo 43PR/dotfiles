@@ -14,4 +14,5 @@ ShellRoot {
     Notifications {}
     ColorPicker {}
     DisplayGuard {}
+    Lock {}
 }

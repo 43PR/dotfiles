@@ -146,6 +146,7 @@ Item {
     property bool darkMode: true
     property string activeId: "default"   // last applied preset
     property string stateMode: ""         // "wallpaper" (generated colors) or "preset", from state.json
+    readonly property bool usingGenerated: page.stateMode === "wallpaper"
 
     FileView {
         id: stateView
@@ -208,8 +209,7 @@ Item {
 
     function groupOf(key) {
         if (key.indexOf("term") === 0) return "TERMINAL"
-        if (key.indexOf("lock_") === 0) return "LOCK SCREEN"
-        if (key.indexOf("gtk_") === 0) return "GTK"
+        if (key.indexOf("gtk_") === 0) return "GTK APPS"
         if (key.indexOf("qs_") === 0) return "QUICKSHELL"
         if (key === "cursor" || key === "cursor_text" || key === "url"
                 || key.indexOf("selection_") === 0) return "CURSOR / SELECTION"
@@ -220,35 +220,51 @@ Item {
         return /^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/.test(s)
     }
 
-    function parseTheme(text) {
-        colorModel.clear()
-        var sec = ""
-        var lastGrp = ""
-        var lines = text.split("\n")
-        for (var i = 0; i < lines.length; i++) {
-            var line = lines[i]
-            var sm = line.match(/^\s*\[([^\]]+)\]/)
-            if (sm) { sec = sm[1]; continue }
+// Order of the groups in the edit view. Groups not listed go at the end.
+readonly property var groupOrder: ["QUICKSHELL", "INTERFACE", "GTK APPS", "CURSOR / SELECTION", "TERMINAL"]
 
-            if (sec === "") {
-                var om = line.match(/^\s*override\s*=\s*(true|false)/)
-                if (om) page.editOverride = (om[1] === "true")
-                continue
-            }
-            if (sec !== "colors") continue
+function parseTheme(text) {
+    colorModel.clear()
+    var sec = ""
+    var buckets = {}          // group name -> [{key, value}, ...]
+    var seen = []             // groups in file order, used for unlisted ones
+    var lines = text.split("\n")
+    for (var i = 0; i < lines.length; i++) {
+        var line = lines[i]
+        var sm = line.match(/^\s*\[([^\]]+)\]/)
+        if (sm) { sec = sm[1]; continue }
 
-            var km = line.match(/^\s*([A-Za-z0-9_]+)\s*=\s*"(#[0-9a-fA-F]{6,8})"/)
-            if (km) {
-                var g = groupOf(km[1])
-                // a header entry starts each group so it can span the full width of the grid
-                if (g !== lastGrp) {
-                    colorModel.append({ key: "", value: "#000000", grp: g, hdr: true })
-                    lastGrp = g
-                }
-                colorModel.append({ key: km[1], value: km[2].toLowerCase(), grp: g, hdr: false })
-            }
+        if (sec === "") {
+            var om = line.match(/^\s*override\s*=\s*(true|false)/)
+            if (om) page.editOverride = (om[1] === "true")
+            continue
+        }
+        if (sec !== "colors") continue
+
+        var km = line.match(/^\s*([A-Za-z0-9_]+)\s*=\s*"(#[0-9a-fA-F]{6,8})"/)
+        if (km) {
+            var g = groupOf(km[1])
+            if (buckets[g] === undefined) { buckets[g] = []; seen.push(g) }
+            buckets[g].push({ key: km[1], value: km[2].toLowerCase() })
         }
     }
+
+    // listed groups first (in groupOrder), then any others in file order
+    var order = []
+    for (var a = 0; a < page.groupOrder.length; a++)
+        if (buckets[page.groupOrder[a]] !== undefined) order.push(page.groupOrder[a])
+    for (var b = 0; b < seen.length; b++)
+        if (order.indexOf(seen[b]) < 0) order.push(seen[b])
+
+    for (var c = 0; c < order.length; c++) {
+        var grp = order[c]
+        // header entry so the group label spans the full width of the grid
+        colorModel.append({ key: "", value: "#000000", grp: grp, hdr: true })
+        for (var d = 0; d < buckets[grp].length; d++)
+            colorModel.append({ key: buckets[grp][d].key, value: buckets[grp][d].value,
+                                grp: grp, hdr: false })
+    }
+}
 
     // [colors] table of a toml text -> { key: "#rrggbb", ... }
     function colorsFromText(text) {
@@ -503,12 +519,22 @@ Item {
             return
         }
         copier.newId = id
-        // args after the script: $1 = source, $2 = destination (no shell interpolation of the name)
-        copier.command = [
-            "/bin/sh", "-c",
-            "[ -f \"$1\" ] || exit 3; [ -e \"$2\" ] && exit 2; cp -- \"$1\" \"$2\"",
-            "sh", page.themePath(page.activeId), page.themePath(id)
-        ]
+        if (page.usingGenerated) {
+            // $1 = new name, $2 = destination toml, $3 = generated palette json
+            copier.command = [
+                "/bin/sh", "-c",
+                "[ -e \"$2\" ] && exit 2; [ -f \"$3\" ] || exit 3; "
+                + "python3 \"$HOME/.config/43pr/bin/theme.py\" new \"$1\" current",
+                "sh", id, page.themePath(id), page.paletteFile
+            ]
+        } else {
+            // $1 = source, $2 = destination (no shell interpolation of the name)
+            copier.command = [
+                "/bin/sh", "-c",
+                "[ -f \"$1\" ] || exit 3; [ -e \"$2\" ] && exit 2; cp -- \"$1\" \"$2\"",
+                "sh", page.themePath(page.activeId), page.themePath(id)
+            ]
+        }
         copier.running = true
     }
 
@@ -524,7 +550,9 @@ Item {
             } else if (exitCode === 2) {
                 page.createMsg = "A theme named \"" + newId + "\" already exists."
             } else if (exitCode === 3) {
-                page.createMsg = "No toml file found for \"" + page.activeId + "\" to copy."
+                page.createMsg = page.usingGenerated
+                    ? "No generated palette found at " + page.paletteFile + "."
+                    : "No toml file found for \"" + page.activeId + "\" to copy."
             } else {
                 page.createMsg = "Copy failed (exit code " + exitCode + ")."
             }
@@ -1130,7 +1158,7 @@ Item {
                     // Duplicate the active theme's toml under a new name
                     ActionButton {
                         width: topRow.cellW
-                        label: "NEW THEME"
+                        label: page.usingGenerated ? "NEW THEME FROM GENERATED" : "NEW THEME"
                         primary: page.naming
                         onClicked: page.naming ? page.closeNaming() : page.openNaming()
                     }
@@ -1143,7 +1171,8 @@ Item {
                     visible: page.naming
 
                     Text {
-                        text: "COPY OF " + page.themeLabel(page.activeId) + " AS:"
+                        text: "COPY OF " + (page.usingGenerated ? "GENERATED COLORS"
+                                                                : page.themeLabel(page.activeId)) + " AS:"
                         color: Theme.textDim
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.textSizeSmall

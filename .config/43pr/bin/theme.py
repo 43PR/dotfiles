@@ -653,8 +653,9 @@ def cmd_new(a):
         colors = json.loads(PALETTE.read_text())
     else:
         colors = preset_palette(a.source)
-    lines = [f'name = "{a.name}"', f'description = "copied from {a.source}"',
-             "override = false", "", "[colors]"]
+    src_label = "generated colors" if a.source == "current" else a.source
+    lines = [f'name = "{a.name}"', f'appearance = "{palette_appearance(colors)}"',
+             f'description = "copied from {src_label}"', "override = false", "", "[colors]"]
     lines += [f'{k} = "{v}"' for k, v in colors.items()]
     atomic_write(dst, "\n".join(lines) + "\n")
     print(f"theme: created {dst}")
