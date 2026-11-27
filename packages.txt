@@ -42,6 +42,7 @@ imagemagick
 matugen
 tesseract
 tesseract-data-eng
+tesseract-data-rus
 
 # --------------------------------------------------
 # Networking / Bluetooth
